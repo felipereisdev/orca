@@ -89,6 +89,7 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
       }),
     remove: (connectionId: string, expectedRevision: number) =>
       call<void>('database.remove', { connectionId, expectedRevision }),
+    clearHistory: (connectionId: string) => call<void>('database.clearHistory', { connectionId }),
     test: (connectionId: string, signal?: AbortSignal) =>
       call<{ serverVersion: string; readOnlyProfile: boolean }>(
         'database.testConnection',

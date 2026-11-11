@@ -9,6 +9,7 @@ import type {
 } from '../../../shared/database/database-query-contracts'
 import { sameDatabaseProject } from '../catalog/database-project-scope'
 import { DatabaseQueryAdmission, type DatabaseQueryJob } from './database-query-admission'
+import { createDatabaseQueryJob } from './database-query-job'
 import { DatabaseQueryOutput } from './database-query-output'
 import { DatabaseQueryRecords } from './database-query-records'
 import { readAuthorizedDatabaseQueryRecord, type DatabaseActor } from './database-query-actor'
@@ -23,6 +24,7 @@ export class DatabaseQueryService {
   private readonly jobs = new Map<string, DatabaseQueryJob>()
   private readonly listeners = new Set<(record: DatabaseQueryRecord) => void>()
   private readonly waiters = new Map<string, Set<() => void>>()
+  private readonly terminalSessions = new Map<string, string>()
   private disposed = false
 
   constructor(private readonly options: DatabaseQueryServiceOptions) {
@@ -62,50 +64,22 @@ export class DatabaseQueryService {
     if (this.jobs.has(queryId) || this.records.find(queryId)) {
       throw new Error('Database execution ID has already been used; start a new query explicitly')
     }
-    const record: DatabaseQueryRecord = {
-      queryId,
-      source: {
-        connectionId: connection.id,
-        connectionRevision: connection.revision,
-        alias: connection.alias,
-        engine: connection.engine,
-        environment: connection.environment,
-        executionHostId: connection.executionHostId,
-        controllerRuntimeId: this.options.controllerRuntimeId
-      },
-      project: structuredClone(actor.project),
-      sessionId: actor.sessionId,
-      sql: input.sql,
-      parameterNames: input.parameters.map((parameter) => parameter.name),
-      createdAt: Date.now(),
-      finishedAt: null,
-      status: 'queued',
-      rowCount: 0,
-      truncated: false
+    if (actor.terminalHandle && actor.sessionId) {
+      this.terminalSessions.set(actor.sessionId, actor.terminalHandle)
     }
-    const controller = new AbortController()
-    const timer = setTimeout(
-      () => controller.abort(new Error('Database query deadline exceeded')),
-      connection.limits.timeoutMs
-    )
-    timer.unref?.()
-    const job: DatabaseQueryJob = {
-      record,
-      connection,
-      controller,
-      timer,
-      settled: Promise.resolve()
-    }
+    const { job, settle } = createDatabaseQueryJob(input, actor, connection, queryId)
+    const { record, controller, timer } = job
     this.jobs.set(record.queryId, job)
     try {
       await this.records.save(record)
     } catch (error) {
       clearTimeout(timer)
       this.jobs.delete(record.queryId)
+      settle()
       throw error
     }
     const parameters = structuredClone(input.parameters)
-    job.settled = this.admission
+    void this.admission
       .run(connection.id, () => this.execute(job, parameters), controller.signal)
       .catch(async () => {
         record.status = controller.signal.aborted ? 'cancelled' : 'failed'
@@ -127,6 +101,7 @@ export class DatabaseQueryService {
         clearTimeout(timer)
         this.jobs.delete(record.queryId)
         this.publish(record)
+        settle()
       })
     this.publish(record)
     return { queryId: record.queryId, source: structuredClone(record.source) }
@@ -219,9 +194,18 @@ export class DatabaseQueryService {
   }
 
   history(actor: DatabaseActor): DatabaseQueryRecord[] {
-    return this.records
-      .history(actor.project)
-      .filter((record) => actor.owner || record.sessionId === actor.sessionId)
+    return this.records.history(actor)
+  }
+
+  async clearConnectionHistory(connectionId: string): Promise<void> {
+    const active = [...this.jobs.values()].filter(
+      (job) => job.record.source.connectionId === connectionId
+    )
+    for (const job of active) {
+      job.controller.abort(new Error('Database history cleared'))
+    }
+    await Promise.allSettled(active.map((job) => job.settled))
+    await this.records.eraseConnection(connectionId, this.options.controllerRuntimeId)
   }
 
   onChanged(listener: (record: DatabaseQueryRecord) => void): () => void {
@@ -229,7 +213,16 @@ export class DatabaseQueryService {
     return () => this.listeners.delete(listener)
   }
 
+  closeTerminal(handle: string): void {
+    for (const [sessionId, terminal] of this.terminalSessions) {
+      if (terminal === handle) {
+        this.closeSession(sessionId)
+      }
+    }
+  }
+
   closeSession(sessionId: string): void {
+    this.terminalSessions.delete(sessionId)
     for (const job of this.jobs.values()) {
       if (job.record.sessionId === sessionId) {
         job.controller.abort()
@@ -245,6 +238,7 @@ export class DatabaseQueryService {
     }
     await Promise.allSettled([...this.jobs.values()].map((job) => job.settled))
     this.records.clear()
+    this.terminalSessions.clear()
     this.listeners.clear()
   }
 
@@ -276,8 +270,13 @@ export class DatabaseQueryService {
         throw new Error('Database connection changed while queued')
       }
       phase = 'policy'
-      const { validateDatabaseReadQuery } = await import('../query-policy/database-query-policy')
-      const query = validateDatabaseReadQuery(connection.engine, record.sql)
+      const { validateDatabaseReadQueryInWorker } =
+        await import('../query-policy/database-query-policy-worker')
+      const query = await validateDatabaseReadQueryInWorker(
+        connection.engine,
+        record.sql,
+        controller.signal
+      )
       if (
         query.parameterNames.some(
           (name) => !parameters.some((parameter) => parameter.name === name)

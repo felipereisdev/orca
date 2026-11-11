@@ -1,3 +1,4 @@
+import { closeRuntimeDatabaseSession } from '../../../database/runtime-database-service-slot'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../shared/layout-owner-switch'
 import type { TerminalIdentityReadContext } from '../../../terminal/query/terminal-identity-read-context'
 import { ptyRecordForPaneKey } from '../../../terminal/query/pty-pane-record'
@@ -214,6 +215,7 @@ export abstract class OrcaRuntimeWithGetPtyRecordForPaneKey extends OrcaRuntimeW
 
   /** Settle ended chat Dispatches on tab hide; /clear successors retain their work. */
   onStructuredSessionTabHidden(sessionId: string): void {
+    closeRuntimeDatabaseSession(this, sessionId)
     try {
       const db = this.getExistingOrchestrationDb()
       for (const dispatch of db ? exitedChatDispatchesForSession(sessionId, db) : []) {

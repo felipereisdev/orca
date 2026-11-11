@@ -15,7 +15,11 @@ import {
 } from './secondary-scan-directive-pattern.mjs'
 
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/
-const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/']
+const ROOT_CODE_QUALITY_IGNORED_PREFIXES = [
+  'cloud/',
+  // Unmodified upstream grammar bases follow their pinned source, not Orca lint rewrites.
+  'src/packages/sql-read-query-parser/grammars/'
+]
 const CASTING_RULE = 'typescript/consistent-type-assertions'
 const CASTING_DISABLE_PATTERN =
   /\/[/*]\s*(?:oxlint|eslint)-disable(?:-next-line|-line)?\s[^\n]*typescript\/consistent-type-assertions/

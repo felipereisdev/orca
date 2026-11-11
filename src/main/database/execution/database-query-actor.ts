@@ -7,6 +7,7 @@ export type DatabaseActor = {
   project: DatabaseProjectKey
   sessionId: string | null
   owner: boolean
+  terminalHandle?: string
 }
 
 export function authorizeDatabaseQuery(

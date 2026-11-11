@@ -9,7 +9,10 @@ import type { DatabaseQueryRecords } from './database-query-records'
 import type { DatabaseRemoteExecution } from './database-query-executor'
 
 export type DatabaseQueryServiceOptions = {
-  store: Pick<DatabasePersistence, 'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord'>
+  store: Pick<
+    DatabasePersistence,
+    'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord' | 'removeDatabaseQueryRecords'
+  >
   catalog: Pick<DatabaseCatalog, 'resolve'>
   credentials: Pick<DatabaseCredentialStore, 'read'>
   controllerRuntimeId: string

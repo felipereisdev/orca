@@ -159,6 +159,13 @@ describe('Oracle Thin with a dedicated reader and verified TLS', () => {
         }
       ])
     ).rejects.toThrow()
+    const temporal = capture()
+    await execute(
+      'WITH dates AS (SELECT :moment AS stamp FROM dual) SELECT stamp AS value FROM dates',
+      temporal.sink,
+      [{ name: 'moment', type: 'date', value: '2024-05-06T07:08:09.123456789Z' }]
+    )
+    expect(temporal.rows).toEqual([['2024-05-06T07:08:09.123456789+00:00']])
     const large = capture()
     await execute('SELECT memo FROM approved.large_values', large.sink)
     expect(large.rows[0][0]).toBe('x'.repeat(4097))

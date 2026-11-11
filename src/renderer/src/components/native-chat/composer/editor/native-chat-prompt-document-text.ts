@@ -1,4 +1,7 @@
-import { DATABASE_REFERENCE_NODE } from '../../../../../../shared/database/database-mention-reference'
+import {
+  DATABASE_REFERENCE_NODE,
+  databaseMentionReferenceSchema
+} from '../../../../../../shared/database/database-mention-reference'
 import type { JSONContent } from '@tiptap/react'
 import type { AgentJournalSkillRef } from '../../../../../../shared/agent-session/journal/agent-session-journal-types'
 import { agentReferenceToken } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
@@ -17,8 +20,8 @@ export function promptLeafString(
   text?: string | null
 ): string {
   if (type === DATABASE_REFERENCE_NODE) {
-    const reference = attrs?.reference as { aliasAtSelection?: string } | undefined
-    return `@${reference?.aliasAtSelection ?? '?'}`
+    const reference = databaseMentionReferenceSchema.safeParse(attrs?.reference)
+    return `@${reference.success ? reference.data.aliasAtSelection : '?'}`
   }
   if (type === 'nativeChatAgentReference') {
     return agentReferenceToken({

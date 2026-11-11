@@ -17,6 +17,12 @@ const TEST_FILE_NAME = /\.(?:test|spec|e2e|bench)\.[cm]?[jt]sx?$/
 // Mirror literals must appear in runner sources; list manual rows each run so their lack of CI remains visible.
 const NON_UNIT_TEST_RUNNERS = [
   {
+    name: 'database integration',
+    include: ['tests/database/**/*.integration.test.ts'],
+    sources: ['config/vitest.database.config.ts', '.github/workflows/database-connections.yml'],
+    mirrors: ["'tests/database/**/*.integration.test.ts'", 'pnpm test:database']
+  },
+  {
     name: 'Playwright e2e',
     include: ['tests/e2e/**/*.spec.ts'],
     sources: ['tests/playwright.config.ts'],

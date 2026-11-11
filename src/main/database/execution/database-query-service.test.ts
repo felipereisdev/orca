@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DatabaseAdapter } from '../adapters/database-adapter'
 import type { DatabaseProjectKey } from '../../../shared/database/database-contracts'
 import { DatabaseCatalog } from '../catalog/database-catalog'
@@ -69,6 +69,108 @@ const fixtureAdapter: DatabaseAdapter = {
 }
 
 describe('runtime database query ownership', () => {
+  it('keeps another controller history outside the local owner project view', async () => {
+    const { service, store } = await setup(fixtureAdapter)
+    const handle = await service.start(
+      { connection: 'hmg', project, sql: 'SELECT 1', parameters: [] },
+      actor
+    )
+    await service.wait(handle.queryId, actor, new AbortController().signal)
+    const record = store.getDatabaseQueryHistory()[0]
+    await store.saveDatabaseQueryRecord({
+      ...record,
+      queryId: '33333333-3333-4333-8333-333333333333',
+      sql: 'SELECT foreign_private_data',
+      source: { ...record.source, controllerRuntimeId: 'controller-b' }
+    })
+    expect(service.history({ ...actor, owner: true }).map((entry) => entry.sql)).toEqual([
+      'SELECT 1'
+    ])
+  })
+  it('clears a connection history and cached rows after stopping its active query', async () => {
+    let started!: () => void
+    const executing = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const { service, store } = await setup({
+      ...fixtureAdapter,
+      execute: async (config, credentials, query, parameters, sink, signal) => {
+        if (query.sql !== 'SELECT 2') {
+          await fixtureAdapter.execute(config, credentials, query, parameters, sink, signal)
+          return
+        }
+        started()
+        await new Promise<void>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('Stopped')), { once: true })
+        )
+      }
+    })
+    const first = await service.start(
+      { connection: 'hmg', project, sql: 'SELECT 1', parameters: [] },
+      actor
+    )
+    await service.wait(first.queryId, actor, new AbortController().signal)
+    const other = await service.start(
+      { connection: 'prod', project, sql: 'SELECT 1', parameters: [] },
+      actor
+    )
+    await service.wait(other.queryId, actor, new AbortController().signal)
+    const record = store.getDatabaseQueryHistory().find((entry) => entry.source.alias === 'hmg')!
+    await store.saveDatabaseQueryRecord({
+      ...record,
+      queryId: '33333333-3333-4333-8333-333333333333',
+      source: { ...record.source, controllerRuntimeId: 'controller-b' }
+    })
+    await service.start({ connection: 'hmg', project, sql: 'SELECT 2', parameters: [] }, actor)
+    await executing
+    await service.clearConnectionHistory('11111111-1111-4111-8111-111111111111')
+    expect(
+      store
+        .getDatabaseQueryHistory()
+        .map((entry) => `${entry.source.controllerRuntimeId}:${entry.source.alias}`)
+        .sort()
+    ).toEqual(['controller-a:prod', 'controller-b:hmg'])
+    expect(() => service.result(first.queryId, actor)).toThrow()
+  })
+  it('does not restore cleared SQL when clearing races with initial durable admission', async () => {
+    const { service, store } = await setup(fixtureAdapter)
+    const starting = service.start(
+      { connection: 'hmg', project, sql: 'SELECT private_literal', parameters: [] },
+      actor
+    )
+    const clearing = service.clearConnectionHistory('11111111-1111-4111-8111-111111111111')
+    const handle = await starting
+    await clearing
+    expect(store.getDatabaseQueryHistory()).toEqual([])
+    expect(() => service.result(handle.queryId, actor)).toThrow()
+  })
+  it('expires SQL history and result metadata after seven days without a new query', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1800000000000)
+    try {
+      const { service } = await setup(fixtureAdapter)
+      const handle = await service.start(
+        { connection: 'hmg', project, sql: 'SELECT 1', parameters: [] },
+        actor
+      )
+      await service.wait(handle.queryId, actor, new AbortController().signal)
+      clock.mockReturnValue(1800691200000)
+      expect(service.history({ ...actor, owner: true })).toEqual([])
+      expect(() => service.result(handle.queryId, actor)).toThrow()
+    } finally {
+      clock.mockRestore()
+    }
+  })
+  it('expires cached rows when their terminal session closes', async () => {
+    const { service } = await setup(fixtureAdapter)
+    const terminalActor = { ...actor, terminalHandle: 'terminal#17' }
+    const handle = await service.start(
+      { connection: 'hmg', project, sql: 'SELECT 1', parameters: [] },
+      terminalActor
+    )
+    await service.wait(handle.queryId, terminalActor, new AbortController().signal)
+    service.closeTerminal('terminal#17')
+    expect(service.result(handle.queryId, terminalActor).status).toBe('expired')
+  })
   it('keeps an accepted query available when an activity observer disconnects', async () => {
     const { service } = await setup(fixtureAdapter)
     service.onChanged(() => {

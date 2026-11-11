@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateDatabaseReadQuery } from './database-query-policy'
+import { validateDatabaseReadQueryInWorker as validateDatabaseReadQuery } from './database-query-policy-worker'
 
 describe('database read-query admission', () => {
   it.each([
@@ -11,8 +11,8 @@ describe('database read-query admission', () => {
     ['sql-server', 'SELECT id FROM dbo.encomendas WHERE id = @id'],
     ['oracle', 'SELECT id FROM encomendas FETCH FIRST 10 ROWS ONLY'],
     ['oracle', 'SELECT id FROM encomendas WHERE id = :id']
-  ] as const)('admits a supported %s read: %s', (engine, sql) => {
-    expect(validateDatabaseReadQuery(engine, sql).sql).toBe(sql)
+  ] as const)('admits a supported %s read: %s', async (engine, sql) => {
+    expect((await validateDatabaseReadQuery(engine, sql)).sql).toBe(sql)
   })
 
   it.each([
@@ -40,11 +40,30 @@ describe('database read-query admission', () => {
     ['oracle', 'BEGIN mutate_data(); END;'],
     ['oracle', 'SELECT 1 FROM dual; DELETE FROM encomendas'],
     ['oracle', "SELECT 'unterminated FROM dual"]
-  ] as const)('refuses a %s query with unsafe or unsupported behavior: %s', (engine, sql) => {
-    expect(() => validateDatabaseReadQuery(engine, sql)).toThrow()
+  ] as const)('refuses a %s query with unsafe or unsupported behavior: %s', async (engine, sql) => {
+    await expect(validateDatabaseReadQuery(engine, sql)).rejects.toThrow()
   })
 
-  it('rejects oversized SQL before attempting dialect parsing', () => {
-    expect(() => validateDatabaseReadQuery('postgres', `SELECT ${' '.repeat(65_536)}`)).toThrow()
+  it('cancels a waiting validation without waiting for an unrelated query to finish', async () => {
+    const outcome: string[] = []
+    const first = validateDatabaseReadQuery('postgres', 'SELECT 1').then(() => {
+      outcome.push('first completed')
+    })
+    const controller = new AbortController()
+    const second = validateDatabaseReadQuery(
+      'oracle',
+      'SELECT 1 FROM dual',
+      controller.signal
+    ).catch(() => {
+      outcome.push('second cancelled')
+    })
+    controller.abort()
+    await Promise.all([first, second])
+    expect(outcome).toEqual(['second cancelled', 'first completed'])
+  })
+  it('rejects oversized SQL before attempting dialect parsing', async () => {
+    await expect(
+      validateDatabaseReadQuery('postgres', `SELECT ${' '.repeat(65_536)}`)
+    ).rejects.toThrow()
   })
 })

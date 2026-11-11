@@ -65,8 +65,8 @@ export class DatabaseExecutionBindings {
   }
 
   async remove(principalId: string, credentialRef: string): Promise<void> {
-    this.read(principalId, credentialRef)
-    await this.store.removeDatabaseExecutionBinding(principalId, credentialRef)
+    const binding = this.read(principalId, credentialRef)
+    await this.store.removeDatabaseExecutionBinding(binding)
     await this.credentials.remove(credentialRef)
   }
 }

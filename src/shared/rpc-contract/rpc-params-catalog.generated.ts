@@ -1047,6 +1047,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'database.cancelBindingQuery': DatabaseBindingQuery,
   'database.cancelQuery': DatabaseQueryId,
   'database.catalog': null,
+  'database.clearHistory': DatabaseConfigurationId,
   'database.configuration': DatabaseConfigurationId,
   'database.describe': DatabaseDescribe,
   'database.describeBinding': DatabaseBindingDescribe,

@@ -21,7 +21,7 @@ export function createOracleAdapter(): DatabaseAdapter {
           throw new Error('Oracle query dialect mismatch')
         }
         await assertOraclePrivilegeProfile(connection)
-        await executeOracleResult(connection, query.statementSql, parameters, sink, activeSignal)
+        await executeOracleResult(connection, query, parameters, sink, activeSignal)
       }),
     dispose: sessions.dispose
   }

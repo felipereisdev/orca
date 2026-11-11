@@ -1,6 +1,8 @@
 import oracledb from 'oracledb'
+import type { ValidatedDatabaseReadQuery } from '../query-policy/database-query-policy'
 import type { DatabaseParameter } from '../../../shared/database/database-query-contracts'
 import type { DatabaseResultSink } from './database-adapter'
+import { prepareOracleResultProjection } from './oracle-result-projection'
 import { prepareOracleParameters } from './oracle-parameters'
 function isOracleLob(value: unknown): value is oracledb.Lob {
   return (
@@ -14,20 +16,14 @@ function isOracleLob(value: unknown): value is oracledb.Lob {
 }
 export async function executeOracleResult(
   connection: oracledb.Connection,
-  statement: string,
+  query: ValidatedDatabaseReadQuery,
   parameters: DatabaseParameter[],
   sink: DatabaseResultSink,
   signal: AbortSignal
 ) {
   signal.throwIfAborted()
-  const prepared = await prepareOracleParameters(statement, parameters)
-  const stringTypes = new Set<oracledb.DbType>([
-    oracledb.DB_TYPE_NUMBER,
-    oracledb.DB_TYPE_DATE,
-    oracledb.DB_TYPE_TIMESTAMP,
-    oracledb.DB_TYPE_TIMESTAMP_TZ,
-    oracledb.DB_TYPE_TIMESTAMP_LTZ
-  ])
+  const prepared = await prepareOracleParameters(query, parameters)
+  const stringTypes = new Set<oracledb.DbType>([oracledb.DB_TYPE_NUMBER])
   const nativeTypes = new Set<oracledb.DbType>([
     oracledb.DB_TYPE_VARCHAR,
     oracledb.DB_TYPE_NVARCHAR,
@@ -39,7 +35,9 @@ export async function executeOracleResult(
     oracledb.DB_TYPE_BLOB,
     oracledb.DB_TYPE_BOOLEAN
   ])
-  const result = await connection.execute<unknown[]>(prepared.statement, prepared.binds, {
+  const projection = await prepareOracleResultProjection(connection, prepared)
+  signal.throwIfAborted()
+  const result = await connection.execute<unknown[]>(projection.statement, prepared.binds, {
     resultSet: true,
     outFormat: oracledb.OUT_FORMAT_ARRAY,
     prefetchRows: 0,
@@ -65,10 +63,11 @@ export async function executeOracleResult(
       throw new Error('Oracle result columns exceed the supported limit')
     }
     sink.columns(
-      fields.map((field, index) => ({
-        id: String(index),
-        name: field.dbColumnName ?? field.name,
-        databaseType: field.dbTypeName ?? field.dbType?.name ?? 'unknown'
+      projection.columns.map((column, index) => ({
+        ...column,
+        databaseType: projection.temporalColumns.has(index)
+          ? column.databaseType
+          : (fields[index]?.dbTypeName ?? column.databaseType)
       }))
     )
     while (!sink.stopped) {

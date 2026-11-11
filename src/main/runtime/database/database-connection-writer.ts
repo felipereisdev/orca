@@ -87,7 +87,7 @@ export class DatabaseConnectionWriter {
     return this.catalog.getConfiguration(saved.id)
   }
 
-  async remove(id: string, revision: number) {
+  async remove(id: string, revision: number, afterRemoval?: () => Promise<void>) {
     const previous = this.persistence
       .getDatabaseCatalog()
       .connections.find((item) => item.id === id)
@@ -96,11 +96,15 @@ export class DatabaseConnectionWriter {
     }
     const route = await this.router.routeHost(id, previous.executionHostId)
     await this.catalog.remove(id, revision)
-    await (route.environmentId
-      ? this.router.call(route, 'database.removeBinding', {
-          credentialRef: previous.credentialRef,
-          controllerRuntimeId: this.runtime.getRuntimeId()
-        })
-      : this.credentials.remove(previous.credentialRef))
+    try {
+      await afterRemoval?.()
+    } finally {
+      await (route.environmentId
+        ? this.router.call(route, 'database.removeBinding', {
+            credentialRef: previous.credentialRef,
+            controllerRuntimeId: this.runtime.getRuntimeId()
+          })
+        : this.credentials.remove(previous.credentialRef))
+    }
   }
 }

@@ -5,12 +5,21 @@ import { parseDatabaseCatalog } from '../../database/catalog/database-catalog-va
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { PrimaryStateWriteOperations } from './primary-state-writes'
 
+function retainedHistory(records: DatabaseQueryRecord[]): DatabaseQueryRecord[] {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60_000
+  return records.filter((record) => record.createdAt >= cutoff)
+}
+
 type DatabasePersistenceRuntime = Pick<StoreRuntimeState, 'state' | 'dirtyProfileStateDomains'>
 type CatalogChange<T> = { state: DatabaseCatalogState; value: T }
 const context = Symbol('DatabasePersistence')
 
 export class DatabasePersistence {
-  readonly [context]: { runtime: DatabasePersistenceRuntime; writes: PrimaryStateWriteOperations }
+  readonly [context]: {
+    runtime: DatabasePersistenceRuntime
+    writes: PrimaryStateWriteOperations
+    pruning?: Promise<void>
+  }
 
   constructor(runtime: DatabasePersistenceRuntime, writes: PrimaryStateWriteOperations) {
     this[context] = { runtime, writes }
@@ -49,13 +58,16 @@ export class DatabasePersistence {
     }
   }
 
-  async removeDatabaseExecutionBinding(principalId: string, credentialRef: string): Promise<void> {
+  async removeDatabaseExecutionBinding(binding: DatabaseExecutionBinding): Promise<void> {
     const { runtime, writes } = this[context]
     await writes.runDurableMutation(() => {
       const previous = runtime.state.databaseExecutionBindings
       runtime.state.databaseExecutionBindings = (previous ?? []).filter(
         (item) =>
-          item.principalId !== principalId || item.connection.credentialRef !== credentialRef
+          item.principalId !== binding.principalId ||
+          item.controllerRuntimeId !== binding.controllerRuntimeId ||
+          item.connection.credentialRef !== binding.connection.credentialRef ||
+          item.connection.executionHostId !== binding.connection.executionHostId
       )
       runtime.dirtyProfileStateDomains?.add('databaseExecutionBindings')
       return {
@@ -69,19 +81,51 @@ export class DatabasePersistence {
   }
 
   getDatabaseQueryHistory(): DatabaseQueryRecord[] {
-    return structuredClone(this[context].runtime.state.databaseQueryHistory ?? [])
+    const state = this[context]
+    const all = state.runtime.state.databaseQueryHistory ?? []
+    const visible = retainedHistory(all)
+    if (visible.length !== all.length && !state.pruning) {
+      state.pruning = this.removeDatabaseQueryRecords([])
+        .catch(() => {})
+        .finally(() => {
+          state.pruning = undefined
+        })
+    }
+    return structuredClone(visible)
+  }
+
+  async removeDatabaseQueryRecords(records: readonly DatabaseQueryRecord[]): Promise<void> {
+    const removed = new Map(records.map((record) => [record.queryId, record]))
+    const { runtime, writes } = this[context]
+    await writes.runDurableMutation(() => {
+      const previous = runtime.state.databaseQueryHistory
+      runtime.state.databaseQueryHistory = retainedHistory(previous ?? []).filter(
+        (record) =>
+          !(
+            removed.get(record.queryId)?.source.controllerRuntimeId ===
+              record.source.controllerRuntimeId &&
+            removed.get(record.queryId)?.project.executionHostId === record.project.executionHostId
+          )
+      )
+      runtime.dirtyProfileStateDomains?.add('databaseQueryHistory')
+      return {
+        value: undefined,
+        persist: true,
+        rollback: () => {
+          runtime.state.databaseQueryHistory = previous
+        }
+      }
+    })
   }
 
   saveDatabaseQueryRecord(record: DatabaseQueryRecord): Promise<void> {
     const { runtime, writes } = this[context]
     return writes.runDurableMutation(() => {
       const previous = runtime.state.databaseQueryHistory
-      const entries = [
+      const entries = retainedHistory([
         record,
         ...(previous ?? []).filter((item) => item.queryId !== record.queryId)
-      ]
-        .filter((item) => item.createdAt >= Date.now() - 7 * 24 * 60 * 60_000)
-        .sort((a, b) => b.createdAt - a.createdAt)
+      ]).sort((a, b) => b.createdAt - a.createdAt)
       const counts = new Map<string, number>()
       const next: DatabaseQueryRecord[] = []
       let bytes = 0

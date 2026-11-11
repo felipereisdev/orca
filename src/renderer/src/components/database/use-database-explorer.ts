@@ -38,6 +38,9 @@ export function useDatabaseExplorer(
   const scope = useMemo(() => ({ worktree: worktreeId }), [worktreeId])
   const connection = connections.find((entry) => entry.id === state.connection.connectionId)
   const current = useRef(0)
+  const invalidateSchema = useCallback(() => {
+    current.current++
+  }, [])
   const verify = useCallback(async () => {
     if ((await client.status()).runtimeId !== state.connection.controllerRuntimeId) {
       throw new Error(
@@ -73,38 +76,40 @@ export function useDatabaseExplorer(
       setSchema(null)
       setSchemaError(null)
       setTable(selected ?? null)
-      try {
-        await verify()
-        const value = await client.describe(
-          scope,
-          state.connection.connectionId,
-          selected?.schema ?? schemaName,
-          selected?.name
-        )
-        if (current.current === version) {
-          setSchema(value)
-          const selectedConnection = connections.find(
-            (entry) => entry.id === state.connection.connectionId
+      await verify()
+        .then(async () => {
+          const value = await client.describe(
+            scope,
+            state.connection.connectionId,
+            selected?.schema ?? schemaName,
+            selected?.name
           )
-          if (selectedConnection) {
-            setSchemaSource({
-              connectionId: selectedConnection.id,
-              alias: selectedConnection.alias,
-              environment: selectedConnection.environment,
-              executionHostId: selectedConnection.executionHostId,
-              capturedAt: new Date().toISOString()
-            })
+          if (current.current === version) {
+            setSchema(value)
+            const selectedConnection = connections.find(
+              (entry) => entry.id === state.connection.connectionId
+            )
+            if (selectedConnection) {
+              setSchemaSource({
+                connectionId: selectedConnection.id,
+                alias: selectedConnection.alias,
+                environment: selectedConnection.environment,
+                executionHostId: selectedConnection.executionHostId,
+                capturedAt: new Date().toISOString()
+              })
+            }
           }
-        }
-      } catch (error) {
-        if (current.current === version) {
-          setSchemaError(error instanceof Error ? error.message : String(error))
-        }
-      } finally {
-        if (current.current === version) {
-          setSchemaLoading(false)
-        }
-      }
+        })
+        .catch((error: unknown) => {
+          if (current.current === version) {
+            setSchemaError(error instanceof Error ? error.message : String(error))
+          }
+        })
+        .finally(() => {
+          if (current.current === version) {
+            setSchemaLoading(false)
+          }
+        })
     },
     [client, scope, state.connection.connectionId, verify, connections]
   )
@@ -115,12 +120,8 @@ export function useDatabaseExplorer(
     if (connection) {
       void describe()
     }
-    return () => {
-      // Invalidate the generation, not a DOM reference, on connection change.
-      // oxlint-disable-next-line react-hooks/exhaustive-deps
-      current.current++
-    }
-  }, [connection, describe])
+    return invalidateSchema
+  }, [connection, describe, invalidateSchema])
   useEffect(() => {
     if (requestedQuery) {
       void controller.openQuery(requestedQuery, async (id) => {
@@ -138,29 +139,36 @@ export function useDatabaseExplorer(
     submitting.current = true
     setStarting(true)
     controller.error(null)
-    try {
-      await verify()
-      const parameters = DatabaseParameters.parse(JSON.parse(state.parameters))
-      const handle = await client.start(scope, state.connection.connectionId, state.sql, parameters)
-      setRunningId(handle.queryId)
-      await controller.openQuery(
-        handle.queryId,
-        async (id) => {
-          let value = await client.wait(scope, id)
-          while (value.status === 'queued' || value.status === 'running') {
-            value = await client.wait(scope, id)
-          }
-          return value
-        },
-        false
+    await verify()
+      .then(async () => {
+        const parameters = DatabaseParameters.parse(JSON.parse(state.parameters))
+        const handle = await client.start(
+          scope,
+          state.connection.connectionId,
+          state.sql,
+          parameters
+        )
+        setRunningId(handle.queryId)
+        await controller.openQuery(
+          handle.queryId,
+          async (id) => {
+            let value = await client.wait(scope, id)
+            while (value.status === 'queued' || value.status === 'running') {
+              value = await client.wait(scope, id)
+            }
+            return value
+          },
+          false
+        )
+      })
+      .catch((error: unknown) =>
+        controller.error(error instanceof Error ? error.message : String(error))
       )
-    } catch (error) {
-      controller.error(error instanceof Error ? error.message : String(error))
-    } finally {
-      submitting.current = false
-      setStarting(false)
-      setRunningId(null)
-    }
+      .finally(() => {
+        submitting.current = false
+        setStarting(false)
+        setRunningId(null)
+      })
   }
   return {
     state,

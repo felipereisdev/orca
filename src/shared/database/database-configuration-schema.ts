@@ -52,7 +52,17 @@ export const databaseConnectionSchema = z.object({
       .regex(/^[^\0\r\n;()\\/]+$/),
     tls: z.object({
       enabled: z.literal(true),
-      caCertificate: z.string().max(65_536).optional(),
+      caCertificate: z
+        .string()
+        .max(65_536)
+        .refine(
+          (value) =>
+            /^(?:-----BEGIN CERTIFICATE-----\s+[A-Za-z0-9+/=\s]+-----END CERTIFICATE-----\s*)+$/.test(
+              value.trim()
+            ),
+          'Provide public PEM certificates only'
+        )
+        .optional(),
       serverName: z.string().min(1).max(253).optional()
     })
   }),

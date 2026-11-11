@@ -28,9 +28,17 @@ export function PickerListbox({
 }): React.JSX.Element {
   const marker = useRef<HTMLSpanElement>(null)
   const listbox = useRef<HTMLDivElement>(null)
+  const [menuLayer, setMenuLayer] = useState(false)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
     setContainer(marker.current?.closest<HTMLElement>('.native-chat-appearance') ?? document.body)
+    setMenuLayer(
+      Boolean(
+        marker.current?.closest(
+          '[data-slot="popover-content"], [data-slot="dropdown-menu-sub-content"]'
+        )
+      )
+    )
   }, [])
   useLayoutEffect(() => {
     const anchor = marker.current?.parentElement
@@ -70,7 +78,7 @@ export function PickerListbox({
             role="listbox"
             data-focus-behavior="composer-suggestions"
             // Inside the launch setup (a popover or the new-tab menu's submenu), take the menu layer those overlays use.
-            className={`scrollbar-sleek fixed left-0 top-0 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-floating ${marker.current?.closest('[data-slot="popover-content"], [data-slot="dropdown-menu-sub-content"]') ? 'z-[70]' : 'z-50'}`}
+            className={`scrollbar-sleek fixed left-0 top-0 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-floating ${menuLayer ? 'z-[70]' : 'z-50'}`}
           >
             {children}
           </div>,

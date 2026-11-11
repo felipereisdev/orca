@@ -37,6 +37,7 @@ async function call<T>(method: string, params: unknown): Promise<T> {
   if (!response.ok) {
     throw new Error(`${response.error.code}: ${response.error.message}`)
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture caller chooses the expected result from the real authenticated dispatcher.
   return response.result as T
 }
 
@@ -193,6 +194,15 @@ describe('database controller and authenticated execution runtime', () => {
       }
     )
     expect(refused.ok).toBe(false)
+    if (!result.record.sessionId) {
+      throw new Error('Expected a session-scoped query')
+    }
+    controller.onStructuredSessionTabHidden(result.record.sessionId)
+    const afterClose = await call<DatabaseQuerySnapshot | { status: 'expired' }>(
+      'database.queryResult',
+      { project: projectId, queryId: handle.queryId }
+    )
+    expect(afterClose.status).toBe('expired')
   })
 
   it('does not publish a remote catalog entry when secure storage on that executor is unavailable', async () => {

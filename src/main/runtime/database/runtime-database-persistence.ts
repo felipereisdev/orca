@@ -12,6 +12,7 @@ type DatabaseStore = Pick<
   | 'setDatabaseCredential'
   | 'getDatabaseQueryHistory'
   | 'saveDatabaseQueryRecord'
+  | 'removeDatabaseQueryRecords'
 >
 
 export function requireDatabasePersistence(store: RuntimeStore): DatabaseStore {
@@ -24,6 +25,7 @@ export function requireDatabasePersistence(store: RuntimeStore): DatabaseStore {
     !store.getDatabaseCredential ||
     !store.setDatabaseCredential ||
     !store.getDatabaseQueryHistory ||
+    !store.removeDatabaseQueryRecords ||
     !store.saveDatabaseQueryRecord
   ) {
     throw new Error('database_capability_missing')
@@ -37,6 +39,7 @@ export function requireDatabasePersistence(store: RuntimeStore): DatabaseStore {
     getDatabaseCredential: store.getDatabaseCredential.bind(store),
     setDatabaseCredential: store.setDatabaseCredential.bind(store),
     getDatabaseQueryHistory: store.getDatabaseQueryHistory.bind(store),
+    removeDatabaseQueryRecords: store.removeDatabaseQueryRecords.bind(store),
     saveDatabaseQueryRecord: store.saveDatabaseQueryRecord.bind(store)
   }
 }

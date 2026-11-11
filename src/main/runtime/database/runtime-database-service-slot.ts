@@ -1,8 +1,9 @@
 import type { OrcaRuntimeService } from '../orca-runtime'
+import type { OrcaRuntimeWithRuntimeId } from '../construction/runtime-identity-state'
 import type { RuntimeDatabaseCommands } from './runtime-database-commands'
 
-const controllers = new WeakMap<OrcaRuntimeService, Promise<RuntimeDatabaseCommands>>()
-const closed = new WeakSet<OrcaRuntimeService>()
+const controllers = new WeakMap<OrcaRuntimeWithRuntimeId, Promise<RuntimeDatabaseCommands>>()
+const closed = new WeakSet<OrcaRuntimeWithRuntimeId>()
 
 export function runtimeDatabaseCommands(
   runtime: OrcaRuntimeService
@@ -26,4 +27,28 @@ export function runtimeDatabaseCommands(
 export async function disposeRuntimeDatabase(runtime: OrcaRuntimeService): Promise<void> {
   closed.add(runtime)
   await (await controllers.get(runtime))?.dispose()
+}
+
+export function closeRuntimeDatabaseSession(
+  runtime: OrcaRuntimeWithRuntimeId,
+  sessionId: string
+): void {
+  void controllers.get(runtime)?.then(
+    (commands) => commands.queries.closeSession(sessionId),
+    () => {}
+  )
+}
+
+export function closeRuntimeDatabaseTerminals(
+  runtime: OrcaRuntimeWithRuntimeId,
+  handles: readonly string[]
+): void {
+  void controllers.get(runtime)?.then(
+    (commands) => {
+      for (const handle of handles) {
+        commands.queries.closeTerminal(handle)
+      }
+    },
+    () => {}
+  )
 }

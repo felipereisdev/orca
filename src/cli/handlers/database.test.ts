@@ -46,7 +46,7 @@ beforeEach(() => {
 function stdin(text: string) {
   const input = new PassThrough()
   input.end(text)
-  // The CLI consumes only the readable stream interface.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: CLI input consumes only the readable stream API.
   vi.spyOn(process, 'stdin', 'get').mockReturnValue(input as unknown as typeof process.stdin)
 }
 

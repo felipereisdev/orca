@@ -1,6 +1,10 @@
 import oracledb from 'oracledb'
+import type { ValidatedDatabaseReadQuery } from '../query-policy/database-query-policy'
 import type { DatabaseParameter } from '../../../shared/database/database-query-contracts'
-export async function prepareOracleParameters(statement: string, parameters: DatabaseParameter[]) {
+export async function prepareOracleParameters(
+  query: ValidatedDatabaseReadQuery,
+  parameters: DatabaseParameter[]
+) {
   const binds: oracledb.BindParameters = {}
   const replacements = new Map<string, string>()
   for (const parameter of parameters) {
@@ -28,7 +32,17 @@ export async function prepareOracleParameters(statement: string, parameters: Dat
       expression = `TO_NUMBER(:${name})`
     }
     if (parameter.type === 'date') {
-      expression = `TO_TIMESTAMP_TZ(:${name}, 'YYYY-MM-DD"T"HH24:MI:SS.FFTZH:TZM')`
+      if (value !== null) {
+        const parts =
+          /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(
+            String(value)
+          )
+        if (!parts) {
+          throw new Error('Oracle dates require an ISO timestamp with an offset')
+        }
+        binding.val = `${parts[1]}.${(parts[2] ?? '').padEnd(9, '0')}${parts[3] === 'Z' ? '+00:00' : parts[3]}`
+      }
+      expression = `TO_TIMESTAMP_TZ(:${name}, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')`
     }
     if (parameter.type === 'binary') {
       binding = {
@@ -43,17 +57,20 @@ export async function prepareOracleParameters(statement: string, parameters: Dat
     binds[name] = binding
     replacements.set(name, expression)
   }
-  const { parseSql } = await import('@orca/sql-read-query-parser')
-  const tokens = parseSql('oracle', statement).tokens
+  const tokens = query.statementTokens
+  const text = tokens
+    .filter((token, index) => token.text !== ';' || index !== tokens.length - 1)
+    .map((token) =>
+      token.parameterName !== undefined
+        ? (replacements.get(token.parameterName.toUpperCase()) ?? token.text)
+        : token.text
+    )
   return {
     binds,
-    statement: tokens
-      .filter((token, index) => token.text !== ';' || index !== tokens.length - 1)
-      .map((token) =>
-        token.kind === 'BINDVAR'
-          ? (replacements.get(token.text.slice(1).toUpperCase()) ?? token.text)
-          : token.text
-      )
-      .join(' ')
+    statement: text.join(' '),
+    withPrefix: query.oracleWithTokenCount
+      ? text.slice(1, query.oracleWithTokenCount).join(' ')
+      : '',
+    body: text.slice(query.oracleWithTokenCount).join(' ')
   }
 }

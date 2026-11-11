@@ -131,8 +131,12 @@ export class RuntimeDatabaseCommands {
     return this.writer.save(input, credentials, expectedRevision)
   }
 
+  async clearHistory(id: string): Promise<void> {
+    this.catalog.getConfiguration(id)
+    await this.queries.clearConnectionHistory(id)
+  }
   remove(id: string, revision: number) {
-    return this.writer.remove(id, revision)
+    return this.writer.remove(id, revision, () => this.queries.clearConnectionHistory(id))
   }
 
   async test(id: string, signal: AbortSignal) {

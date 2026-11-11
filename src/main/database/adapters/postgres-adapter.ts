@@ -44,8 +44,8 @@ export function createPostgresAdapter(): DatabaseAdapter {
     preflight: (config, credentials, signal) =>
       session(config, credentials, signal, assertPostgresPrivilegeProfile),
     describe: (config, credentials, request, signal) =>
-      session(config, credentials, signal, async (client) => {
-        await assertPostgresPrivilegeProfile(client)
+      session(config, credentials, signal, async (client, activeSignal) => {
+        await assertPostgresPrivilegeProfile(client, activeSignal)
         return describePostgres(client, request)
       }),
     execute: (config, credentials, query, parameters, sink, signal) =>
@@ -53,7 +53,7 @@ export function createPostgresAdapter(): DatabaseAdapter {
         if (query.engine !== 'postgres') {
           throw new Error('PostgreSQL query dialect mismatch')
         }
-        await assertPostgresPrivilegeProfile(client)
+        await assertPostgresPrivilegeProfile(client, activeSignal)
         const values = bindPostgresParameters(parameters)
         const prepared = await preparePostgresResultQuery(client, query.statementSql, values)
         sink.columns(prepared.columns)

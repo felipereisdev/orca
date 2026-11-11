@@ -182,6 +182,13 @@ export const DATABASE_METHODS = [
       (await runtimeDatabaseCommands(runtime)).remove(params.connectionId, params.expectedRevision)
   }),
   defineMethod({
+    name: 'database.clearHistory',
+    permission: 'accounts-admin',
+    params: DatabaseConfigurationId,
+    handler: async (params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).clearHistory(params.connectionId)
+  }),
+  defineMethod({
     name: 'database.testConnection',
     permission: 'accounts-admin',
     params: DatabaseConfigurationId,

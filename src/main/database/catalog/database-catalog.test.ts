@@ -44,6 +44,23 @@ function openCatalog() {
 }
 
 describe('global database connection catalog', () => {
+  it('refuses a private key in the public certificate field before catalog persistence', async () => {
+    const { catalog, store } = openCatalog()
+    await expect(
+      catalog.save({
+        ...input,
+        endpoint: {
+          ...input.endpoint,
+          tls: {
+            enabled: true,
+            caCertificate:
+              '-----BEGIN PRIVATE KEY-----\nZGlzcG9zYWJsZQ==\n-----END PRIVATE KEY-----'
+          }
+        }
+      })
+    ).rejects.toThrow()
+    expect(store.getDatabaseCatalog().connections).toEqual([])
+  })
   it('persists a connection shared by a repository and a folder without publishing credentials', async () => {
     const { store, catalog, dataFile } = openCatalog()
     await catalog.save(input)

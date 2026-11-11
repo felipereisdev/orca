@@ -107,11 +107,11 @@ export function useNativeChatStructuredComposerSend({
           ).context
         }
       } catch (error) {
+        databaseResolution.current = false
         structuredTransport.onError(error instanceof Error ? error.message : String(error))
         return false
-      } finally {
-        databaseResolution.current = false
       }
+      databaseResolution.current = false
       const pickedModeSkill = promptHasInteractionModeSkill(agent, text, submitted.document)
       const hostCommand =
         !pickedModeSkill &&

@@ -133,7 +133,11 @@ describe('PostgreSQL read-only adapter with verified TLS', () => {
     try {
       const result = capture()
       await execute('SELECT memo FROM approved.invoices WHERE id = 2;', result.sink)
-      expect(Buffer.byteLength(result.rows[0][0] as string)).toBeLessThanOrEqual(16388)
+      const value = result.rows[0][0]
+      if (typeof value !== 'string') {
+        throw new Error('Expected bounded text')
+      }
+      expect(Buffer.byteLength(value)).toBeLessThanOrEqual(16388)
     } finally {
       await fixture.admin.query("UPDATE approved.invoices SET memo = '' WHERE id = 2")
     }

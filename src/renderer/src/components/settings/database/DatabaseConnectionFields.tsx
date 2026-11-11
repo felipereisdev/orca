@@ -12,15 +12,14 @@ import { SettingsSubsectionHeader } from '../form-controls/SettingsFormControls'
 import { useTranslate } from '@/i18n/use-translate'
 import type { DatabaseConnectionDraftController } from './use-database-connection-draft'
 import { databaseEngineNames } from './database-connection-draft'
-import type { DatabaseEngine } from '../../../../../shared/database/database-contracts'
+import { databaseConnectionSchema } from '../../../../../shared/database/database-configuration-schema'
 
 export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDraftController }) {
   const t = useTranslate()
   const { draft, update } = form
-  const engines = Object.entries(databaseEngineNames).filter(
-    ([engine]) =>
-      engine === draft.engine || form.capabilities?.engines.includes(engine as DatabaseEngine)
-  )
+  const engines = databaseConnectionSchema.shape.engine.options
+    .filter((engine) => engine === draft.engine || form.capabilities?.engines.includes(engine))
+    .map((engine) => ({ id: engine, label: databaseEngineNames[engine] }))
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -55,7 +54,7 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           <Select
             value={draft.engine}
             onValueChange={(value) => {
-              const engine = engines.find(([id]) => id === value)?.[0] as DatabaseEngine | undefined
+              const engine = engines.find(({ id }) => id === value)?.id
               if (engine) {
                 update('engine', engine)
                 if (!form.original) {
@@ -71,12 +70,8 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {engines.map(([id, label]) => (
-                <SelectItem
-                  key={id}
-                  value={id}
-                  disabled={!form.capabilities?.engines.includes(id as DatabaseEngine)}
-                >
+              {engines.map(({ id, label }) => (
+                <SelectItem key={id} value={id} disabled={!form.capabilities?.engines.includes(id)}>
                   {label}
                 </SelectItem>
               ))}

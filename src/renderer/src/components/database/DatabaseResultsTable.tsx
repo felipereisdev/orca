@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { useTranslate } from '@/i18n/use-translate'
+import { useTranslate, useIntlLocale } from '@/i18n/use-translate'
 import type { DatabaseExplorerResult, DatabaseCellSelection } from './database-explorer-state'
 import type { DatabaseCell } from '../../../../shared/database/database-query-contracts'
 export const databaseCellText = (cell: DatabaseCell) =>
@@ -18,6 +18,7 @@ export function DatabaseResultsTable({
   onQuery: (button: HTMLButtonElement) => void
 }) {
   const t = useTranslate()
+  const intlLocale = useIntlLocale()
   if (!result) {
     return (
       <p className="p-4 text-xs text-muted-foreground">
@@ -33,7 +34,7 @@ export function DatabaseResultsTable({
         <span>{source.environment}</span>
         <span className="text-muted-foreground">{source.executionHostId}</span>
         <time className="text-muted-foreground">
-          {new Date(result.record.createdAt).toLocaleString()}
+          {new Date(result.record.createdAt).toLocaleString(intlLocale)}
         </time>
         <span className="text-muted-foreground">{result.status}</span>
         <Button size="xs" variant="ghost" onClick={(event) => onQuery(event.currentTarget)}>

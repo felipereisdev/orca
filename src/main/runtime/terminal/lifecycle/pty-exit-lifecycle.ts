@@ -1,3 +1,4 @@
+import { closeRuntimeDatabaseTerminals } from '../../database/runtime-database-service-slot'
 import { OrcaRuntimeWithOnClientDisconnected } from '../layout/terminal-client-disconnect'
 import type { PtyIncarnationId } from '../../../../shared/terminal/pty/lifecycle/pty-incarnation'
 
@@ -14,7 +15,7 @@ import { advertisedUrlWatcher } from '../../../ports/advertised-url-watcher'
 
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 import { exitedSplitPaneFacts } from './exited-split-pane-rule'
-import { closedPaneOfExitedPty, type ClosedPaneOfExit } from './closed-pane-of-exited-pty'
+import { closedPaneOfExitedPty } from './closed-pane-of-exited-pty'
 import type { RuntimePtyWorktreeRecord } from '../records/runtime-terminal-state-records'
 
 export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDisconnected {
@@ -39,22 +40,6 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
 
   /** Its process ended on its own: no close, kill, sleep or restart, nor a lost host or replayed exit. */
   protected notePtyEndedOnItsOwn(_pty: RuntimePtyWorktreeRecord): void {}
-
-  /** The pane main's close already dropped, from its closed-pane record; null while main holds it. */
-  private closedPaneOfExit(
-    pty: RuntimePtyWorktreeRecord | undefined,
-    exitIncarnationId: PtyIncarnationId | undefined
-  ): ClosedPaneOfExit | null {
-    if (!ORCA_LAYOUT_OWNER_IS_MAIN || !pty || this.paneOfPty(pty).paneKey) {
-      return null
-    }
-    return closedPaneOfExitedPty(
-      this.store,
-      this.tryGetWorkspaceSessionHostIdForWorktree(pty.worktreeId),
-      pty,
-      exitIncarnationId ?? pty.incarnationId
-    )
-  }
 
   onPtyExit(
     ptyId: string,
@@ -98,7 +83,15 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
     // Why: collect before retirePtyAgentLaunchAuthority, which deletes the restored-authority
     // receipt a receipt-only pane's key comes from.
     const exitPaneKeys = this.collectAgentStatusPaneKeysForPty(ptyId)
-    const closedPane = this.closedPaneOfExit(pty, exitIncarnationId)
+    const closedPane =
+      ORCA_LAYOUT_OWNER_IS_MAIN && pty && !this.paneOfPty(pty).paneKey
+        ? closedPaneOfExitedPty(
+            this.store,
+            this.tryGetWorkspaceSessionHostIdForWorktree(pty.worktreeId),
+            pty,
+            exitIncarnationId ?? pty.incarnationId
+          )
+        : null
     if (closedPane) {
       exitPaneKeys.add(closedPane.paneKey)
     }
@@ -123,6 +116,7 @@ export abstract class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDi
         priorExit.incarnationId === (pty?.incarnationId ?? undefined)
       )
     if (processDeathCertified) {
+      closeRuntimeDatabaseTerminals(this, this.getExistingTerminalHandlesForPtyId(ptyId))
       // An unverifiable exit keeps the facet tracked until a certified exit or prune.
       this.clearLiveProgramStatusFacet(ptyId)
     }

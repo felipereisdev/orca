@@ -141,8 +141,11 @@ describe('SQL Server with a dedicated reader and verified TLS', () => {
   it('bounds multi-megabyte values before the driver hands them to the result sink', async () => {
     const result = capture()
     await execute('SELECT memo FROM approved.large_values', result.sink)
-    expect(typeof result.rows[0][0]).toBe('string')
-    expect(Buffer.byteLength(result.rows[0][0] as string)).toBeLessThanOrEqual(8194)
+    const value = result.rows[0][0]
+    if (typeof value !== 'string') {
+      throw new Error('Expected bounded text')
+    }
+    expect(Buffer.byteLength(value)).toBeLessThanOrEqual(8194)
   })
   it('confirms cancellation at the server and disposes active sessions', async () => {
     const release = await fixture.lock()

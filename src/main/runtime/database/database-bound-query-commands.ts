@@ -18,7 +18,10 @@ type QueryScope = z.infer<typeof DatabaseBindingQuery>
 type BoundQueryPorts = {
   bindings: DatabaseExecutionBindings
   credentials: DatabaseCredentialStore
-  store: Pick<DatabasePersistence, 'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord'>
+  store: Pick<
+    DatabasePersistence,
+    'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord' | 'removeDatabaseQueryRecords'
+  >
   adapter(engine: DatabaseEngine): DatabaseAdapter | undefined
   admission: DatabaseQueryAdmission
   records: DatabaseQueryRecords

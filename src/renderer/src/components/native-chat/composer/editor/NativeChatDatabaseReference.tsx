@@ -1,9 +1,14 @@
-import type { Editor } from '@tiptap/react'
 import { closeHistory } from '@tiptap/pm/history'
 import { promptTextPosition } from './native-chat-prompt-document'
 import type { DatabaseMentionReference } from '../../../../../../shared/database/database-mention-reference'
 import { Database } from 'lucide-react'
-import { NodeViewWrapper, ReactNodeViewRenderer, Node, type NodeViewProps } from '@tiptap/react'
+import {
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  Node,
+  type NodeViewProps,
+  type Editor
+} from '@tiptap/react'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   DATABASE_REFERENCE_NODE,

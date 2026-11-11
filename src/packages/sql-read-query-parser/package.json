@@ -12,6 +12,16 @@
       "orca-source": "./src/parse-sql.ts",
       "types": "./dist/parse-sql.d.ts",
       "default": "./dist/parse-sql.js"
+    },
+    "./read-query": {
+      "orca-source": "./src/database-query-policy.ts",
+      "types": "./dist/database-query-policy.d.ts",
+      "default": "./dist/database-query-policy.js"
+    },
+    "./worker-path": {
+      "orca-source": "./src/database-query-policy-worker-path.ts",
+      "types": "./dist/database-query-policy-worker-path.d.ts",
+      "default": "./dist/database-query-policy-worker-path.js"
     }
   },
   "scripts": {

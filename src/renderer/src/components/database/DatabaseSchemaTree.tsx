@@ -70,8 +70,8 @@ export function DatabaseSchemaTree({
           <Button variant="outline" size="sm" onClick={onPreview}>
             {t('database.explorer.preview', 'Preview rows')}
           </Button>
-          {value?.columns.map((column, index) => (
-            <div key={index} className="flex items-start gap-2">
+          {value?.columns.map((column) => (
+            <div key={column.name} className="flex items-start gap-2">
               {column.primaryKey && (
                 <KeyRound className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
               )}

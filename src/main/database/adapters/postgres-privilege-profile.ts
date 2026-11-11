@@ -42,7 +42,8 @@ FROM pg_catalog.pg_roles r WHERE r.rolname = current_user
 `
 
 export async function assertPostgresPrivilegeProfile(
-  client: Client
+  client: Client,
+  signal: AbortSignal = AbortSignal.timeout(5000)
 ): Promise<DatabasePreflightResult> {
   const result = await client.query<{ version: string; safe: boolean }>(profileSql)
   if (result.rows[0]?.safe !== true) {
@@ -71,10 +72,11 @@ export async function assertPostgresPrivilegeProfile(
     throw new Error('PostgreSQL view profile exceeds its inspection limit')
   }
   const validate = views.rows.length
-    ? (await import('../query-policy/database-query-policy')).validateDatabaseReadQuery
+    ? (await import('../query-policy/database-query-policy-worker'))
+        .validateDatabaseReadQueryInWorker
     : undefined
   for (const view of views.rows) {
-    validate?.('postgres', view.definition)
+    await validate?.('postgres', view.definition, signal)
   }
   return { serverVersion: result.rows[0].version, readOnlyProfile: true }
 }

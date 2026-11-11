@@ -113,67 +113,63 @@ export function useDatabaseConnectionDraft(
   }
   async function save(): Promise<DatabaseConnectionConfiguration | undefined> {
     setError(null)
-    setSaving(true)
     setInvalidFields(new Set())
-    try {
-      if (
-        !capabilities?.engines.includes(draft.engine) ||
-        !capabilities.protectedCredentialStorage
-      ) {
-        throw new Error(
-          t(
-            'database.form.hostUnavailable',
-            'The execution host or protected credential storage is unavailable'
+    if (!capabilities?.engines.includes(draft.engine) || !capabilities.protectedCredentialStorage) {
+      setError(
+        t(
+          'database.form.hostUnavailable',
+          'The execution host or protected credential storage is unavailable'
+        )
+      )
+      return undefined
+    }
+    const changingCredentials = Boolean(draft.username || draft.password || !original)
+    if (changingCredentials && (!draft.username || !draft.password)) {
+      setInvalidFields(
+        new Set(
+          ['username', 'password'].filter((field) =>
+            field === 'username' ? !draft.username : !draft.password
           )
         )
-      }
-      let credentials: DatabaseCredentials | undefined
-      if (draft.username || draft.password || !original) {
-        if (!draft.username || !draft.password) {
+      )
+      setError(t('database.form.credentialsRequired', 'Enter both a username and password'))
+      return undefined
+    }
+    const credentials: DatabaseCredentials | undefined = changingCredentials
+      ? { username: draft.username, password: draft.password }
+      : undefined
+    setSaving(true)
+    return Promise.resolve()
+      .then(() =>
+        client.save(databaseConnectionInput(draft, original), credentials, original?.revision)
+      )
+      .then((saved) => {
+        setOriginal(saved)
+        setDraft(databaseConnectionDraft(saved))
+        setInitial(databaseConnectionDraft(saved))
+        return saved
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof ZodError) {
           setInvalidFields(
             new Set(
-              ['username', 'password'].filter((field) =>
-                field === 'username' ? !draft.username : !draft.password
+              reason.issues.map((issue) =>
+                String(issue.path[0] === 'projects' ? 'projects' : issue.path.at(-1))
               )
             )
           )
-          throw new Error(
-            t('database.form.credentialsRequired', 'Enter both a username and password')
-          )
-        }
-        credentials = { username: draft.username, password: draft.password }
-      }
-      const saved = await client.save(
-        databaseConnectionInput(draft, original),
-        credentials,
-        original?.revision
-      )
-      setOriginal(saved)
-      setDraft(databaseConnectionDraft(saved))
-      setInitial(databaseConnectionDraft(saved))
-      return saved
-    } catch (reason) {
-      if (reason instanceof ZodError) {
-        setInvalidFields(
-          new Set(
-            reason.issues.map((issue) =>
-              String(issue.path[0] === 'projects' ? 'projects' : issue.path.at(-1))
+          setError(
+            t(
+              'database.form.invalidDetails',
+              'Review the highlighted connection details before saving'
             )
           )
-        )
-        setError(
-          t(
-            'database.form.invalidDetails',
-            'Review the highlighted connection details before saving'
-          )
-        )
-      } else {
-        setError(reason instanceof Error ? reason.message : String(reason))
-      }
-      return undefined
-    } finally {
-      setSaving(false)
-    }
+        } else {
+          setError(reason instanceof Error ? reason.message : String(reason))
+        }
+        return undefined
+      })
+      .finally(() => setSaving(false))
   }
   async function testSaved() {
     if (!original || dirty) {
@@ -182,13 +178,13 @@ export function useDatabaseConnectionDraft(
     setTesting(true)
     setError(null)
     setTest(null)
-    try {
-      setTest(await client.test(original.id))
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setTesting(false)
-    }
+    await client
+      .test(original.id)
+      .then(setTest)
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : String(reason))
+      )
+      .finally(() => setTesting(false))
   }
   return {
     draft,

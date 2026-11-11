@@ -26,6 +26,7 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
   const [options, setOptions] = useState<DatabaseSettingsOptions | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [engine, setEngine] = useState('all')
   const [edit, setEdit] = useState<string | null | undefined>()
@@ -33,15 +34,13 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
   const reload = useCallback(async () => {
     setLoading(true)
     setError(null)
-    try {
-      const [catalog, choices] = await Promise.all([client.catalog(), client.settingsOptions()])
-      setConnections(catalog)
-      setOptions(choices)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setLoading(false)
-    }
+    await Promise.all([client.catalog(), client.settingsOptions()])
+      .then(([catalog, choices]) => {
+        setConnections(catalog)
+        setOptions(choices)
+      })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+      .finally(() => setLoading(false))
   }, [client])
   useEffect(() => {
     void reload()
@@ -74,6 +73,36 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
           error: reason instanceof Error ? reason.message : String(reason)
         }
       }))
+    }
+  }
+  async function clearHistory(connection: DatabaseConnectionSummary) {
+    if (
+      !(await confirm({
+        title: t('database.history.clearTitle', 'Clear query history for @{{alias}}?', {
+          alias: connection.alias
+        }),
+        description: t(
+          'database.history.clearHelp',
+          'Deletes stored SQL and cached results, and cancels running queries. Open panels and agent conversations retain data already displayed.'
+        ),
+        confirmLabel: t('database.history.clear', 'Clear query history'),
+        confirmVariant: 'destructive',
+        surface: 'security'
+      }))
+    ) {
+      return
+    }
+    setError(null)
+    setNotice(null)
+    try {
+      await client.clearHistory(connection.id)
+      setNotice(
+        t('database.history.cleared', 'Query history cleared for @{{alias}}', {
+          alias: connection.alias
+        })
+      )
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
     }
   }
   async function remove(connection: DatabaseConnectionSummary) {
@@ -147,6 +176,11 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
           {loading || error ? '—' : visible.length}
         </span>
       </div>
+      {notice && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {notice}
+        </p>
+      )}
       {error ? (
         <div role="alert" className="space-y-2 text-sm text-destructive">
           <p>{error}</p>
@@ -168,6 +202,7 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
           tests={tests}
           onEdit={setEdit}
           onTest={(connection) => void test(connection)}
+          onClearHistory={(connection) => void clearHistory(connection)}
           onRemove={(connection) => void remove(connection)}
         />
       ) : (

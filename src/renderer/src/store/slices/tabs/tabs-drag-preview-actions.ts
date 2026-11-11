@@ -63,23 +63,12 @@ function previewActiveSurfacePatch(
       activeTabTypeByWorktree: nextActiveTabTypeByWorktree('browser')
     }
   }
-  if (unifiedTab.contentType === 'database') {
-    return {
-      activeTabType: 'database',
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('database')
-    }
-  }
-  if (unifiedTab.contentType === 'simulator') {
-    if (
-      state.activeTabType === 'simulator' &&
-      state.activeTabTypeByWorktree[worktreeId] === 'simulator'
-    ) {
+  if (unifiedTab.contentType === 'simulator' || unifiedTab.contentType === 'database') {
+    const tabType = unifiedTab.contentType
+    if (state.activeTabType === tabType && state.activeTabTypeByWorktree[worktreeId] === tabType) {
       return {}
     }
-    return {
-      activeTabType: 'simulator',
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
-    }
+    return { activeTabType: tabType, activeTabTypeByWorktree: nextActiveTabTypeByWorktree(tabType) }
   }
   if (
     state.activeTabType === 'editor' &&

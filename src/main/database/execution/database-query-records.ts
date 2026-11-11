@@ -1,9 +1,9 @@
-import type { DatabaseProjectKey } from '../../../shared/database/database-contracts'
 import type {
   DatabaseQueryRecord,
   DatabaseQuerySnapshot
 } from '../../../shared/database/database-query-contracts'
 import type { DatabasePersistence } from '../../persistence/loading-store/database-persistence'
+import type { DatabaseActor } from './database-query-actor'
 import { sameDatabaseProject } from '../catalog/database-project-scope'
 
 type CompletedResult = Extract<DatabaseQuerySnapshot, { status: 'completed' }>
@@ -18,7 +18,7 @@ export class DatabaseQueryRecords {
   constructor(
     private readonly persistence: Pick<
       DatabasePersistence,
-      'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord'
+      'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord' | 'removeDatabaseQueryRecords'
     >
   ) {}
 
@@ -26,14 +26,33 @@ export class DatabaseQueryRecords {
     return this.persistence.saveDatabaseQueryRecord(structuredClone(record))
   }
 
-  history(project: DatabaseProjectKey): DatabaseQueryRecord[] {
+  history(actor: DatabaseActor): DatabaseQueryRecord[] {
     return this.persistence
       .getDatabaseQueryHistory()
-      .filter((record) => sameDatabaseProject(record.project, project))
+      .filter(
+        (record) =>
+          sameDatabaseProject(record.project, actor.project) &&
+          record.source.controllerRuntimeId === actor.controllerRuntimeId &&
+          (actor.owner || record.sessionId === actor.sessionId)
+      )
   }
 
   find(queryId: string): DatabaseQueryRecord | undefined {
     return this.persistence.getDatabaseQueryHistory().find((record) => record.queryId === queryId)
+  }
+
+  async eraseConnection(connectionId: string, controllerRuntimeId: string): Promise<void> {
+    const matches = (record: DatabaseQueryRecord) =>
+      record.source.connectionId === connectionId &&
+      record.source.controllerRuntimeId === controllerRuntimeId
+    const records = this.persistence.getDatabaseQueryHistory().filter(matches)
+
+    await this.persistence.removeDatabaseQueryRecords(records)
+    for (const [id, entry] of this.results) {
+      if (matches(entry.result.record)) {
+        this.remove(id)
+      }
+    }
   }
 
   cache(result: CompletedResult): void {

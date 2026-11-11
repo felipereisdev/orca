@@ -11,6 +11,7 @@ export type RuntimeStore = {
   getDatabaseCredential?: Store['getDatabaseCredential']
   setDatabaseCredential?: Store['setDatabaseCredential']
   getDatabaseQueryHistory?: Store['getDatabaseQueryHistory']
+  removeDatabaseQueryRecords?: Store['removeDatabaseQueryRecords']
   saveDatabaseQueryRecord?: Store['saveDatabaseQueryRecord']
   getRepos: Store['getRepos']
   getSshTargets?: Store['getSshTargets']

@@ -95,3 +95,34 @@ export const hostUnavailable = defineFixture({
     button?.click()
   }
 })
+
+export const actions = defineFixture({
+  width: 784,
+  render: () => <Preview />,
+  interact: (frame) => {
+    const button = frame.querySelector<HTMLButtonElement>(
+      'button[aria-label="Actions for @faturacao-hmg"]'
+    )
+    button?.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })
+    )
+  }
+})
+
+export const clearHistory = defineFixture({
+  width: 784,
+  render: () => <Preview />,
+  interact: async (frame) => {
+    const button = frame.querySelector<HTMLButtonElement>(
+      'button[aria-label="Actions for @faturacao-hmg"]'
+    )
+    button?.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })
+    )
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const action = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+      item.textContent?.includes('Clear query history')
+    )
+    action?.click()
+  }
+})

@@ -8,7 +8,12 @@ export const databaseMentionReferenceSchema = databaseExplorerReferenceSchema.ex
 })
 export type DatabaseMentionReference = z.infer<typeof databaseMentionReferenceSchema>
 export const DATABASE_REFERENCE_NODE = 'nativeChatDatabaseReference'
-type PromptNode = { type?: string; attrs?: Record<string, unknown>; content?: PromptNode[] }
+type PromptNode = {
+  type?: string
+  text?: string
+  attrs?: Record<string, unknown>
+  content?: PromptNode[]
+}
 export function databaseMentionsInPrompt(
   document: PromptNode | undefined
 ): DatabaseMentionReference[] {
@@ -43,10 +48,10 @@ export function databaseMentionsInPrompt(
   }
   return references
 }
-export function seedDatabaseMentionReferences<T extends PromptNode>(
-  document: T,
+export function seedDatabaseMentionReferences(
+  document: PromptNode,
   references: readonly DatabaseMentionReference[]
-): T {
+): PromptNode {
   const occurrences = new Map<string, number>()
   const visit = (node: PromptNode & { text?: string }): PromptNode & { text?: string } => {
     if (!node.content) {
@@ -83,7 +88,7 @@ export function seedDatabaseMentionReferences<T extends PromptNode>(
       })
     }
   }
-  return visit(document) as T
+  return visit(document)
 }
 export async function resolveDatabaseMentions(
   references: readonly DatabaseMentionReference[],

@@ -1,4 +1,4 @@
-import type { SqlSyntax, SqlSyntaxNode, SqlSyntaxToken } from '@orca/sql-read-query-parser'
+import type { SqlSyntax, SqlSyntaxNode, SqlSyntaxToken } from './parse-sql'
 
 export class DatabaseQuerySyntax {
   readonly rules: SqlSyntaxNode[] = []

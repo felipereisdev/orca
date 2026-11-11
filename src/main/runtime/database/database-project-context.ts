@@ -108,6 +108,9 @@ export async function databaseActor(
         ? session.address
         : session.sessionId
       : rpcCallerOperationKey(context.caller),
-    owner: context.caller.kind !== 'paired-device' && !session
+    owner: context.caller.kind !== 'paired-device' && !session,
+    ...(session && session.kind !== 'peer' && session.terminalHandle
+      ? { terminalHandle: session.terminalHandle }
+      : {})
   }
 }

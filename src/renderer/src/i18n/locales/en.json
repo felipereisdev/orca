@@ -24926,6 +24926,12 @@
     },
     "queryCard": {
       "open": "Open query"
+    },
+    "history": {
+      "clear": "Clear query history",
+      "clearTitle": "Clear query history for @{{alias}}?",
+      "clearHelp": "Deletes stored SQL and cached results, and cancels running queries. Open panels and agent conversations retain data already displayed.",
+      "cleared": "Query history cleared for @{{alias}}"
     }
   }
 }

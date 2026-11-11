@@ -28,13 +28,15 @@ export function DatabaseConnectionRows({
   tests,
   onEdit,
   onTest,
-  onRemove
+  onRemove,
+  onClearHistory
 }: {
   connections: DatabaseConnectionSummary[]
   options: DatabaseSettingsOptions | null
   tests: Record<string, DatabaseConnectionTestState>
   onEdit(id: string): void
   onTest(connection: DatabaseConnectionSummary): void
+  onClearHistory(connection: DatabaseConnectionSummary): void
   onRemove(connection: DatabaseConnectionSummary): void
 }) {
   const t = useTranslate()
@@ -110,6 +112,10 @@ export function DatabaseConnectionRows({
                     <DropdownMenuItem disabled={test?.pending} onSelect={() => onTest(connection)}>
                       <Plug className="size-4" />
                       {t('database.catalog.test', 'Test connection')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onClearHistory(connection)}>
+                      <Trash2 className="size-4" />
+                      {t('database.history.clear', 'Clear query history')}
                     </DropdownMenuItem>
                     <DropdownMenuItem variant="destructive" onSelect={() => onRemove(connection)}>
                       <Trash2 className="size-4" />
