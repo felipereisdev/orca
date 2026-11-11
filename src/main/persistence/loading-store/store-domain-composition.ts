@@ -18,6 +18,7 @@ import { CrossStoreLineagePersistence } from './cross-store-lineage-persistence'
 import { FolderParentLineagePersistence } from './folder-parent-lineage-persistence'
 import { ProjectCollectionOperations } from './project-collection-operations'
 import { AutomationPersistence } from './automation-persistence'
+import { DatabasePersistence } from './database-persistence'
 import { MobileTabSelectionPersistence } from './mobile-tab-selection-persistence'
 import { RemoteLayoutSnapshotPersistence } from '../../remote-layout-snapshot/remote-layout-snapshot-persistence'
 import { HostRepoCatalogSnapshotPersistence } from '../../host-repo-catalog-snapshot/host-repo-catalog-snapshot-persistence'
@@ -32,6 +33,7 @@ import { OrcadCatalogImportPersistence } from '../migrating-orcad-catalog/orcad-
 import { OrcadMigrationBlobInstallPersistence } from '../migrating-orcad-catalog/orcad-migration-blob-install-persistence'
 
 export type StoreDomainOperations = WriteSchedulingOperations &
+  DatabasePersistence &
   PrimaryStateWriteOperations &
   ProjectCollectionOperations &
   RepoLifecycleOperations &
@@ -74,6 +76,7 @@ export type StoreDomains = {
   folderParentLineage: FolderParentLineagePersistence
   projects: ProjectCollectionOperations
   automations: AutomationPersistence
+  databases: DatabasePersistence
   mobileTabSelections: MobileTabSelectionPersistence
   remoteLayoutSnapshots: RemoteLayoutSnapshotPersistence
   hostRepoCatalogSnapshots: HostRepoCatalogSnapshotPersistence
@@ -89,6 +92,7 @@ export type StoreDomains = {
 }
 
 export const STORE_DOMAIN_OPERATION_CLASSES = [
+  DatabasePersistence,
   WriteSchedulingOperations,
   PrimaryStateWriteOperations,
   ProjectCollectionOperations,
@@ -177,6 +181,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     folderParentLineage: new FolderParentLineagePersistence(runtime, scheduling),
     projects,
     automations,
+    databases: new DatabasePersistence(runtime, writes),
     mobileTabSelections,
     remoteLayoutSnapshots,
     hostRepoCatalogSnapshots: new HostRepoCatalogSnapshotPersistence(runtime, scheduling),

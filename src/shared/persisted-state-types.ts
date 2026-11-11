@@ -6,6 +6,7 @@ import type {
   SshTarget
 } from './ssh-types'
 import type { Automation } from './automations/automation-definition'
+import type { DatabaseCatalogState } from './database/database-contracts'
 import type { AutomationRun } from './automations/history/automation-run'
 import type { MigrationUnsupportedPtyEntry } from './agent-status/contracts/agent-status-ipc-payload'
 import type { FeatureInteractionTelemetryBucketState } from './feature-interactions'
@@ -117,6 +118,9 @@ export type PersistedState = {
   legacyPaneKeyAliasEntries: LegacyPaneKeyAliasEntry[]
   automations: Automation[]
   automationRuns: AutomationRun[]
+  databaseCatalog?: DatabaseCatalogState
+  /** Host-local ciphertext only; never send through settings or agent APIs. */
+  databaseCredentials?: Record<string, string>
   /** Catalogs an orcad imported, so a retried commit returns the same receipt. */
   orcadMigrationImportReceipts?: OrcadMigrationImportReceipt[]
   /** Commits whose full receipt aged out of the list above; still answered as committed. */

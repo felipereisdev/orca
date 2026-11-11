@@ -52,6 +52,8 @@ export const WSL_DRIVE_UNC_STATE_DISPOSITIONS = {
   automations: 'rewrite',
   // Run history stays as it ran, beside its automation.
   automationRuns: 'keep',
+  databaseCatalog: 'keep',
+  databaseCredentials: 'keep',
   orcadMigrationImportReceipts: 'keep',
   orcadMigrationEvictedReceipts: 'keep',
   orcadMigrationStagedCatalogs: 'keep',

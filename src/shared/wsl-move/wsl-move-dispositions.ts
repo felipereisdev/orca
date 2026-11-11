@@ -99,6 +99,14 @@ export const PERSISTED_STATE_DISPOSITIONS = {
   automationRuns: moveDisposition(19, {
     note: "An in-flight run in scope blocks the move. The desktop's history stays as written, beside its automation."
   }),
+  databaseCatalog: notApplicableDisposition(
+    62,
+    'Controller-global catalog; execution hosts stay explicit.'
+  ),
+  databaseCredentials: notApplicableDisposition(
+    62,
+    'Credentials stay sealed on their enrolled execution host.'
+  ),
   orcadMigrationImportReceipts: notApplicableDisposition(67, 'Mover-owned.'),
   orcadMigrationEvictedReceipts: notApplicableDisposition(67, 'Mover-owned.'),
   orcadMigrationStagedCatalogs: notApplicableDisposition(68, 'Mover-owned.'),
