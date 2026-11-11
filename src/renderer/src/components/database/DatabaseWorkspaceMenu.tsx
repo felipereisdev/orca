@@ -55,7 +55,7 @@ export function DatabaseWorkspaceMenu({
   }, [open, client, worktreeId])
   return (
     <DropdownMenuSub open={open} onOpenChange={setOpen}>
-      <DropdownMenuSubTrigger disabled={!client} variant="launch-row">
+      <DropdownMenuSubTrigger disabled={!client} variant="create-row">
         <Database className="size-4 text-muted-foreground" />
         {t('database.workspace.open', 'Database connections')}
       </DropdownMenuSubTrigger>
