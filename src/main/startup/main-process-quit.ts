@@ -1,4 +1,5 @@
 import { killWslChannelsInCloseGrace } from '../wsl/execution/wsl-command-channel'
+import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-commands'
 import { markHostShuttingDown } from './quit/host-shutdown-state'
 import { app, type Event } from 'electron'
 import { closeAllWatchers } from '../ipc/filesystem/watchers/filesystem-watcher-shutdown'
@@ -245,6 +246,9 @@ function installWillQuitHandler(): void {
     disposeDesktopBrowserBridge()
     const browserClientHostShutdown = shutdownPairedRuntimeBrowserClientHosts()
     const skillUploadShutdown = state.runtime?.disposeSkillUploadSessions() ?? Promise.resolve()
+    const databaseShutdown = state.runtime
+      ? disposeRuntimeDatabase(state.runtime)
+      : Promise.resolve()
     // Capture ownership before awaits let other teardown paths clear runtime state.
     const ownedPid = process.pid
     const ownedRuntimeId = state.runtime?.getRuntimeId()
@@ -279,6 +283,7 @@ function installWillQuitHandler(): void {
       { name: 'ssh', promise: sshShutdown },
       { name: 'plugin-hosts', promise: pluginHostShutdown },
       { name: 'skill-uploads', promise: skillUploadShutdown },
+      { name: 'database', promise: databaseShutdown },
       { name: 'grok-hooks', promise: grokHookCleanup },
       { name: 'ref-maintenance', promise: refMaintenanceShutdown },
       { name: 'codex-backfill-recovery', promise: codexBackfillRecoveryShutdown },

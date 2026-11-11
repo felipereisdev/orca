@@ -592,6 +592,18 @@ const ORCA_CLI_MARKDOWN = [
   "| Creating, loading, installing, updating, approving, or publishing an Orca plugin, or adding a plugin catalog    | `references/plugins.md`          |",
   "| Mobile emulator taps, gestures, typing, buttons, camera, or permissions                                         | invoke the `orca-emulator` skill |",
   "",
+  "## Read-only databases",
+  "",
+  "Use the installed Orca command resolved at the start of this guide. Database environments are configured in Orca settings and associated with projects. Credentials stay on the configured execution host; never request passwords, build connection URLs or run vendor CLIs to bypass this service.",
+  "",
+  "List environments for the current workspace with `ORCA db list --json`. An explicit `--project <id>` supports folder projects outside Git; `--worktree <selector>` selects another registered workspace. Remote commands require an explicit project or workspace and never infer a remote path from local cwd.",
+  "",
+  "An `@faturacao-hmg` mention names that exact alias. Use `ORCA db describe --connection faturacao-hmg --json` to inspect the accessible schema, then `ORCA db query --connection faturacao-hmg --sql-file <path|-> --json` for one supported read query. PostgreSQL parameters use numeric names such as `[{\"name\":\"1\",\"type\":\"integer\",\"value\":\"9007199254740993\"}]` in `--parameters-file <path|->`; SQL and parameter files cannot both consume stdin. Supported types are string, integer, decimal, boolean, date and binary; exact numbers use strings and binary values use base64.",
+  "",
+  "Always pass `--connection` explicitly. If the user has not identified the environment, list the associated environments and ask which one to consult. Never infer production versus homologation from recent activity, another tab or a previous query. A conversation can consult several environments, each with its own explicit selector.",
+  "",
+  "A query starts once and waits for its own execution ID. Preserve the returned query ID and source (alias, engine, environment, host and revision) when discussing results. Use `ORCA db cancel <query-id>` to cancel and `ORCA db history --json` for retained metadata. A disconnect, failure or expired result requires an explicit rerun decision; never replay automatically. Results are bounded and may contain truncated previews; do not claim that a limited result represents every row.",
+  "",
 ].join('\n')
 
 // oxfmt-ignore

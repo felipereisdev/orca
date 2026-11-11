@@ -17,6 +17,8 @@ import {
 } from './orchestration-session-caller-test-fixture'
 import './orchestration-session-caller'
 import '../orchestration/addressing/orchestration-party'
+import { RpcDispatcher } from './dispatcher'
+import { DATABASE_METHODS } from './methods/database/database'
 
 const hostRef = vi.hoisted((): { current: unknown } => ({ current: null }))
 vi.mock('../../native-chat/agent-session-wire/host/structured-agent-session-registry', () => ({
@@ -33,6 +35,20 @@ describe('orchestration session callers at the dispatch entry', () => {
   afterEach(() => {
     h.close()
     vi.restoreAllMocks()
+  })
+
+  it('refuses an unknown agent session before database project access', async () => {
+    const response = await new RpcDispatcher({
+      runtime: h.runtime,
+      methods: DATABASE_METHODS
+    }).dispatch({
+      id: 'database-caller',
+      authToken: 'test',
+      method: 'database.list',
+      params: { project: 'private-project' },
+      orchestrationCompatibilityEvidence: { agentSessionId: '33333333-3333-4333-8333-333333333333' }
+    })
+    expect(response).toMatchObject({ ok: false, error: { code: 'session_caller_unknown' } })
   })
 
   describe('a declared caller must name the session', () => {

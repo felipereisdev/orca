@@ -3,6 +3,12 @@ import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { VoiceSettings } from '../../../shared/speech-types'
 
 export type RuntimeStore = {
+  getDatabaseCatalog?: Store['getDatabaseCatalog']
+  mutateDatabaseCatalog?: Store['mutateDatabaseCatalog']
+  getDatabaseCredential?: Store['getDatabaseCredential']
+  setDatabaseCredential?: Store['setDatabaseCredential']
+  getDatabaseQueryHistory?: Store['getDatabaseQueryHistory']
+  saveDatabaseQueryRecord?: Store['saveDatabaseQueryRecord']
   getRepos: Store['getRepos']
   getSshTargets?: Store['getSshTargets']
   getRepo: Store['getRepo']

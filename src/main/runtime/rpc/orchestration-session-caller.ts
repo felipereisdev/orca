@@ -58,7 +58,7 @@ export function needsOrchestrationCallerResolution(
   request: RpcRequest,
   callerField: OrchestrationCallerField | undefined
 ): boolean {
-  if (!request.method.startsWith('orchestration.')) {
+  if (!request.method.startsWith('orchestration.') && !request.method.startsWith('database.')) {
     return false
   }
   return (

@@ -4,6 +4,16 @@ import { OrchestrationRequestEvidence } from './orchestration-compatibility-enve
 const CHAT = { ORCA_AGENT_SESSION_ID: '11111111-1111-4111-8111-111111111111' }
 
 describe('caller evidence on requests to another server', () => {
+  it('binds local database execution to the injected chat session', () => {
+    const evidence = new OrchestrationRequestEvidence(CHAT)
+    expect(
+      evidence.envelopeFor('database.startQuery', {
+        remote: false,
+        mutation: false,
+        requestId: undefined
+      }).orchestrationCompatibilityEvidence
+    ).toEqual({ agentSessionId: '11111111-1111-4111-8111-111111111111' })
+  })
   it('sends a chat read there like a shell, with no session id', () => {
     const evidence = new OrchestrationRequestEvidence(CHAT)
     expect(

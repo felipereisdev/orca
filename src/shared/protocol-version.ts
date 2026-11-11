@@ -2,6 +2,7 @@ import {
   PROJECT_GROUP_UPDATE_MANY_RUNTIME_CAPABILITY,
   PROJECT_ROOT_ORDER_RUNTIME_CAPABILITY
 } from './project-group-order-capability'
+import { DATABASE_RUNTIME_CAPABILITIES } from './database/database-runtime-capabilities'
 import { EMULATOR_RUNTIME_CAPABILITIES } from './emulator-runtime-capabilities'
 import { ACCOUNT_RUNTIME_CAPABILITIES } from './account-runtime-capabilities'
 import * as agentLaunchCapabilities from './agent-launch/contracts/agent-launch-runtime-capability'
@@ -90,6 +91,7 @@ export const SAVED_RESUME_ORIGIN_RUNTIME_CAPABILITY =
 // Individual protocol exports must not retain the unused host capability aggregate.
 export const RUNTIME_CAPABILITIES = /* @__PURE__ */ (() =>
   [
+    ...DATABASE_RUNTIME_CAPABILITIES,
     ...EMULATOR_RUNTIME_CAPABILITIES,
     SAVED_RESUME_ORIGIN_RUNTIME_CAPABILITY,
     ...HOST_RUNTIME_CAPABILITIES,

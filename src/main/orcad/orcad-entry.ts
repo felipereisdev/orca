@@ -1,5 +1,6 @@
 // Compose the Node-host runtime; paired desktop pages work even without a local browser engine.
 import process from 'node:process'
+import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-commands'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { resolveUserDataPath } from './orcad-app-paths'
 import { prepareOrcadCliLauncher } from './orcad-cli-launcher'
@@ -286,6 +287,7 @@ async function startOrcadRuntime(
 
   // Run after RPC stops; later dismissal records save synchronously until exit.
   registerCleanup(() => runtime.closeNotificationDismissals())
+  registerCleanup(() => disposeRuntimeDatabase(runtime))
   // Stop recovery retries before final profile flush.
   registerCleanup(() => runtime.stopLegacyWorkerTerminalRecovery())
 

@@ -205,6 +205,15 @@ import {
   ConnectorWatch
 } from './connector-params'
 import {
+  DatabaseConfigurationId,
+  DatabaseDescribe,
+  DatabaseQueryId,
+  DatabaseRemove,
+  DatabaseSave,
+  DatabaseScope,
+  DatabaseStartQuery
+} from './database-params'
+import {
   AttachParams as AttachParamsOfEmulatorParams,
   AxParams,
   ButtonParams,
@@ -1027,6 +1036,18 @@ export const RPC_PARAMS_BY_METHOD = {
   'connector.send': ConnectorSend,
   'connector.start': ConnectorStart,
   'connector.watch': ConnectorWatch,
+  'database.cancelQuery': DatabaseQueryId,
+  'database.catalog': null,
+  'database.configuration': DatabaseConfigurationId,
+  'database.describe': DatabaseDescribe,
+  'database.list': DatabaseScope,
+  'database.queryHistory': DatabaseScope,
+  'database.queryResult': DatabaseQueryId,
+  'database.remove': DatabaseRemove,
+  'database.save': DatabaseSave,
+  'database.startQuery': DatabaseStartQuery,
+  'database.testConnection': DatabaseConfigurationId,
+  'database.waitQuery': DatabaseQueryId,
   'desktopBrowserBridge.attach': DesktopBrowserBridgeAttachParams,
   'desktopBrowserBridge.result': DesktopBrowserBridgeResultParams,
   'diagnostics.memory': null,

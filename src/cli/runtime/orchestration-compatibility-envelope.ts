@@ -51,6 +51,9 @@ export class OrchestrationRequestEvidence {
     method: string,
     request: { remote: boolean; mutation: boolean; requestId: string | undefined }
   ): RuntimeOrchestrationEnvelope {
+    if (method.startsWith('database.') && !request.remote) {
+      return { orchestrationCompatibilityEvidence: this.agentLaunchCaller }
+    }
     if (method.startsWith('orchestration.')) {
       const base = request.remote && !request.mutation ? this.remoteRead : this.orchestration
       return {

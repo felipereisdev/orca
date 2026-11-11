@@ -21,7 +21,7 @@ import { authorizeDatabaseQuery, type DatabaseActor } from './database-query-act
 export type { DatabaseActor } from './database-query-actor'
 
 type DatabaseQueryServiceOptions = {
-  store: DatabasePersistence
+  store: Pick<DatabasePersistence, 'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord'>
   catalog: DatabaseCatalog
   credentials: Pick<DatabaseCredentialStore, 'read'>
   controllerRuntimeId: string
