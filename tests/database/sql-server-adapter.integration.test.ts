@@ -1,3 +1,8 @@
+import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
+import { RpcDispatcher } from '../../src/main/runtime/rpc/dispatcher'
+import { DATABASE_METHODS } from '../../src/main/runtime/rpc/methods/database/database'
+import { disposeRuntimeDatabase } from '../../src/main/runtime/database/runtime-database-service-slot'
+import { createDatabaseTestProfile } from '../../src/main/database/catalog/testing/database-profile-fixture'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createSqlServerAdapter } from '../../src/main/database/adapters/sql-server-adapter'
 import type {
@@ -68,6 +73,70 @@ describe('SQL Server with a dedicated reader and verified TLS', () => {
       nullable: false,
       primaryKey: true
     })
+  })
+  it('reports distinct safe TLS, authentication and reader-profile failures through the runtime', async () => {
+    const profile = createDatabaseTestProfile()
+    const runtime = new OrcaRuntimeService(profile.store)
+    const dispatcher = new RpcDispatcher({ runtime, methods: DATABASE_METHODS })
+    try {
+      for (const scenario of [
+        {
+          alias: 'bad-tls',
+          endpoint: { ...fixture.configuration.endpoint, tls: { enabled: true as const } },
+          credentials: fixture.credentials,
+          code: 'database_tls_verification_failed'
+        },
+        {
+          alias: 'bad-login',
+          endpoint: fixture.configuration.endpoint,
+          credentials: {
+            username: fixture.credentials.username,
+            password: 'incorrect-disposable-password'
+          },
+          code: 'database_authentication_failed'
+        },
+        {
+          alias: 'unsafe-reader',
+          endpoint: fixture.configuration.endpoint,
+          credentials: fixture.adminCredentials,
+          code: 'database_read_only_profile_refused'
+        }
+      ]) {
+        const saved = await dispatcher.dispatch({
+          id: scenario.alias,
+          authToken: 'fixture',
+          method: 'database.save',
+          params: {
+            configuration: {
+              ...fixture.configuration,
+              id: undefined,
+              alias: scenario.alias,
+              endpoint: scenario.endpoint
+            },
+            credentials: scenario.credentials
+          }
+        })
+        if (
+          !saved.ok ||
+          !saved.result ||
+          typeof saved.result !== 'object' ||
+          !('id' in saved.result)
+        ) {
+          throw new Error('Expected saved connection')
+        }
+        const result = await dispatcher.dispatch({
+          id: `${scenario.alias}-test`,
+          authToken: 'fixture',
+          method: 'database.testConnection',
+          params: { connectionId: saved.result.id }
+        })
+        expect(result).toMatchObject({ ok: false, error: { code: scenario.code } })
+        expect(JSON.stringify(result)).not.toContain(scenario.credentials.password)
+      }
+    } finally {
+      await disposeRuntimeDatabase(runtime)
+      await profile.close()
+    }
   })
   it('refuses mutations, unsafe paths, administrators, writable grants and unverified certificates', async () => {
     for (const sql of [

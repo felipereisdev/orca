@@ -1,10 +1,12 @@
+import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import type { DatabasePreflightResult } from './database-adapter'
 import type { SqlServerSession } from './sql-server-session'
 
 export async function assertSqlServerPrivilegeProfile(
   session: SqlServerSession
 ): Promise<DatabasePreflightResult> {
-  const result = await session.query<{ version: string; safe: boolean }>(`
+  const result = await session
+    .query<{ version: string; safe: boolean }>(`
 SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion')) AS version, CONVERT(bit, CASE WHEN
   DB_ID() > 4 AND USER_NAME() <> 'dbo'
   AND NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE type = 'R' AND name <> 'public' AND IS_SRVROLEMEMBER(name) = 1)
@@ -20,8 +22,11 @@ SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion')) AS version, CONV
     OR EXISTS (SELECT 1 FROM sys.security_predicates p WHERE p.target_object_id = o.object_id)
     OR EXISTS (SELECT 1 FROM sys.external_tables e WHERE e.object_id = o.object_id)))
   THEN 1 ELSE 0 END) AS safe`)
+    .catch(() => {
+      throw new DatabaseOperationError('database_read_only_verification_failed')
+    })
   if (result.recordset[0]?.safe !== true) {
-    throw new Error('SQL Server account is outside the supported read-only privilege profile')
+    throw new DatabaseOperationError('database_read_only_profile_refused')
   }
   return { serverVersion: result.recordset[0].version, readOnlyProfile: true }
 }

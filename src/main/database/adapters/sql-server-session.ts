@@ -1,3 +1,4 @@
+import { sqlServerConnectionError } from './sql-server-connection-error'
 import sql from 'mssql'
 import type {
   DatabaseConnection,
@@ -73,7 +74,9 @@ export async function withSqlServerSession<T>(
   }
 
   try {
-    await pool.connect()
+    await pool.connect().catch((error: unknown) => {
+      throw sqlServerConnectionError(error)
+    })
     signal.throwIfAborted()
     await transaction.begin(sql.ISOLATION_LEVEL.READ_COMMITTED)
     begun = true

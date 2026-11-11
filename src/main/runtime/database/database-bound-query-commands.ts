@@ -1,3 +1,4 @@
+import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import type { z } from 'zod'
 import type {
   DatabaseBindingQuery,
@@ -122,7 +123,10 @@ export class DatabaseBoundQueryCommands {
     }
     try {
       return await adapter.preflight(connection, await this.ports.credentials.read(ref), signal)
-    } catch {
+    } catch (error) {
+      if (error instanceof DatabaseOperationError) {
+        throw error
+      }
       throw new Error('Database read-only verification failed')
     }
   }
@@ -149,7 +153,10 @@ export class DatabaseBoundQueryCommands {
         },
         signal
       )
-    } catch {
+    } catch (error) {
+      if (error instanceof DatabaseOperationError) {
+        throw error
+      }
       throw new Error('Database schema could not be inspected')
     }
   }

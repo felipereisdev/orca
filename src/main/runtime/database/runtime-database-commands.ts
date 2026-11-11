@@ -1,3 +1,4 @@
+import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import { getSecretStore } from '../../../shared/secret-store'
 import { z } from 'zod'
 import { databaseSettingsOptions } from './database-settings-options'
@@ -168,7 +169,10 @@ export class RuntimeDatabaseCommands {
         await this.credentials.read(connection.credentialRef),
         signal
       )
-    } catch {
+    } catch (error) {
+      if (error instanceof DatabaseOperationError) {
+        throw error
+      }
       throw new Error('Database connection or read-only privilege verification failed')
     }
   }
@@ -194,7 +198,10 @@ export class RuntimeDatabaseCommands {
         request,
         signal
       )
-    } catch {
+    } catch (error) {
+      if (error instanceof DatabaseOperationError) {
+        throw error
+      }
       throw new Error('Database schema could not be inspected')
     }
   }
