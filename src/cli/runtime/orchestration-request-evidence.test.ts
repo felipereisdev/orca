@@ -36,3 +36,31 @@ describe('caller evidence on requests to another server', () => {
     ).toEqual({ agentSessionId: '11111111-1111-4111-8111-111111111111' })
   })
 })
+
+it('retains terminal attestation for local database calls and strips it on another runtime', () => {
+  const evidence = new OrchestrationRequestEvidence({
+    ORCA_TERMINAL_HANDLE: 'term_a',
+    ORCA_PANE_KEY: 'tab_a:leaf_a',
+    ORCA_AGENT_LAUNCH_TOKEN: 'launch-a'
+  })
+  expect(
+    evidence.envelopeFor('database.startQuery', {
+      remote: false,
+      mutation: false,
+      requestId: undefined
+    })
+  ).toEqual({
+    orchestrationCompatibilityEvidence: {
+      terminalHandle: 'term_a',
+      paneKey: 'tab_a:leaf_a',
+      launchToken: 'launch-a'
+    }
+  })
+  expect(
+    evidence.envelopeFor('database.startQuery', {
+      remote: true,
+      mutation: false,
+      requestId: undefined
+    })
+  ).toEqual({})
+})

@@ -46,6 +46,16 @@ describe('database result transport', () => {
     ).toThrow()
   })
 
+  it('previews only the authorized SQL Server columns', () => {
+    expect(
+      buildDatabaseTablePreview(
+        'sql-server',
+        { schema: 'approved', name: 'invoices', kind: 'table' },
+        100,
+        ['id', 'odd]name']
+      )
+    ).toBe('SELECT TOP (100) [id], [odd]]name] FROM [approved].[invoices]')
+  })
   it.each([
     ['postgres', 'SELECT * FROM "public"."odd""name" LIMIT 100'],
     ['sql-server', 'SELECT TOP (100) * FROM [public].[odd"name]'],

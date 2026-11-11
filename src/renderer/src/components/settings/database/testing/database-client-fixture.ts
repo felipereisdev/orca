@@ -59,6 +59,7 @@ export function createDatabaseClientFixture() {
   }
   const client: DatabaseRuntimeClient = {
     ...createDatabaseRuntimeClient({ kind: 'local' }),
+    controllerIdentity: async () => 'fixture-controller',
     settingsOptions: async () => options,
     hostCapabilities: async (): Promise<DatabaseHostCapabilities> => ({
       engines: ['postgres', 'sql-server', 'oracle'],

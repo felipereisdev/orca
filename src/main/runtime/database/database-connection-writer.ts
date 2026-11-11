@@ -18,7 +18,8 @@ export class DatabaseConnectionWriter {
     private readonly persistence: ReturnType<typeof requireDatabasePersistence>,
     private readonly catalog: DatabaseCatalog,
     private readonly credentials: DatabaseCredentialStore,
-    private readonly router: DatabaseExecutionRouter
+    private readonly router: DatabaseExecutionRouter,
+    private readonly controllerRuntimeId: string
   ) {}
 
   async save(
@@ -53,7 +54,7 @@ export class DatabaseConnectionWriter {
         await this.router.call(route, 'database.enrollBinding', {
           configuration,
           credentials,
-          controllerRuntimeId: this.runtime.getRuntimeId(),
+          controllerRuntimeId: this.controllerRuntimeId,
           previousCredentialRef: previous?.credentialRef
         })
       )
@@ -69,7 +70,7 @@ export class DatabaseConnectionWriter {
       route.environmentId
         ? this.router.call(route, 'database.removeBinding', {
             credentialRef: ref,
-            controllerRuntimeId: this.runtime.getRuntimeId()
+            controllerRuntimeId: this.controllerRuntimeId
           })
         : this.credentials.remove(ref)
     let saved
@@ -102,7 +103,7 @@ export class DatabaseConnectionWriter {
       await (route.environmentId
         ? this.router.call(route, 'database.removeBinding', {
             credentialRef: previous.credentialRef,
-            controllerRuntimeId: this.runtime.getRuntimeId()
+            controllerRuntimeId: this.controllerRuntimeId
           })
         : this.credentials.remove(previous.credentialRef))
     }

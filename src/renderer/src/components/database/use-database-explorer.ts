@@ -42,7 +42,7 @@ export function useDatabaseExplorer(
     current.current++
   }, [])
   const verify = useCallback(async () => {
-    if ((await client.status()).runtimeId !== state.connection.controllerRuntimeId) {
+    if ((await client.controllerIdentity()) !== state.connection.controllerRuntimeId) {
       throw new Error(
         t(
           'database.explorer.controllerChanged',
@@ -194,12 +194,13 @@ export function useDatabaseExplorer(
       }
     },
     preview: () => {
-      if (connection && table) {
+      if (connection && table && schema && !schemaLoading && !schemaError) {
         controller.edit(
           buildDatabaseTablePreview(
             connection.engine,
             table,
-            Math.min(100, connection.limits.maxRows)
+            Math.min(100, connection.limits.maxRows),
+            schema.columns.map((column) => column.name)
           )
         )
       }

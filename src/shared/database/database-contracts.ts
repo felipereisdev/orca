@@ -64,6 +64,7 @@ export type DatabaseConnectionInput = Omit<
 }
 
 export type DatabaseCatalogState = {
+  controllerId?: string
   version: 1
   connections: DatabaseConnection[]
   retiredAliases: string[]

@@ -24,6 +24,7 @@ export function DatabaseExplorerPane({
   client,
   controller,
   worktreeId,
+  entityId,
   requestedQuery = null,
   requestedVersion = 0,
   requestedSessionId
@@ -31,6 +32,7 @@ export function DatabaseExplorerPane({
   client: DatabaseRuntimeClient
   controller: DatabaseExplorerState
   worktreeId: string
+  entityId: string
   requestedQuery?: string | null
   requestedVersion?: number
   requestedSessionId?: string
@@ -151,10 +153,10 @@ export function DatabaseExplorerPane({
               }
             >
               <MonacoEditor
-                fileId={`database:${worktreeId}`}
+                fileId={`database:${worktreeId}:${entityId}`}
                 filePath="query.sql"
                 relativePath="query.sql"
-                viewStateKey={`database:${worktreeId}:${view.state.connection.connectionId}`}
+                viewStateKey={`database:${worktreeId}:${entityId}`}
                 content={view.state.sql}
                 language="sql"
                 onContentChange={controller.edit}
@@ -167,14 +169,14 @@ export function DatabaseExplorerPane({
               {t('database.explorer.parameters', 'Bound parameters')}
             </summary>
             <div className="space-y-2 py-2">
-              <Label htmlFor={`database-params-${worktreeId}`}>
+              <Label htmlFor={`database-params-${worktreeId}-${entityId}`}>
                 {t(
                   'database.explorer.parameterHelp',
                   'JSON array with name, type and value. Keep integer and decimal values as strings.'
                 )}
               </Label>
               <Textarea
-                id={`database-params-${worktreeId}`}
+                id={`database-params-${worktreeId}-${entityId}`}
                 variant="code"
                 value={view.state.parameters}
                 onChange={(event) => controller.parameters(event.target.value)}

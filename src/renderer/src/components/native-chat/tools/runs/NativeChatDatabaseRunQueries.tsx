@@ -37,7 +37,7 @@ export function NativeChatDatabaseRunQueries({ blocks }: { blocks: readonly Nati
     }
     let current = true
     void Promise.all([
-      client.status(),
+      client.controllerIdentity(),
       Promise.allSettled(
         ids
           .split(',')
@@ -46,11 +46,11 @@ export function NativeChatDatabaseRunQueries({ blocks }: { blocks: readonly Nati
           )
       )
     ])
-      .then(([status, records]) => {
+      .then(([controllerRuntimeId, records]) => {
         if (current) {
           setState({
             identity,
-            controllerRuntimeId: status.runtimeId,
+            controllerRuntimeId,
             results: records.flatMap((record, index) =>
               record.status === 'fulfilled' &&
               record.value.queryId === ids.split(',')[index] &&

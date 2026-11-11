@@ -92,6 +92,7 @@ function Preview({ expired = false }: { expired?: boolean }) {
   return (
     <div className="h-[720px]">
       <DatabaseExplorerPane
+        entityId="fixture-explorer"
         client={client}
         controller={controller}
         worktreeId="billing::/work/billing"

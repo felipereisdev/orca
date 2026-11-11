@@ -44,6 +44,7 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
       - run: pnpm build:packages
       - run: node config/scripts/database/verify-database-runtime.mjs
+      - run: pnpm test config/scripts/orcad-distribution/server-bundle/orcad-database-runtime.test.mjs --maxWorkers=2
 
   adapters:
     name: Database integration (${{ matrix.engine }})

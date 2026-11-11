@@ -31,11 +31,11 @@ export function DatabaseWorkspaceMenu({ worktreeId }: { worktreeId: string }) {
     let active = true
     setError(null)
     setControllerRuntimeId(undefined)
-    void Promise.all([client.list({ worktree: worktreeId }), client.status()])
-      .then(([entries, status]) => {
+    void Promise.all([client.list({ worktree: worktreeId }), client.controllerIdentity()])
+      .then(([entries, identity]) => {
         if (active) {
           setEntries(entries)
-          setControllerRuntimeId(status.runtimeId)
+          setControllerRuntimeId(identity)
         }
       })
       .catch((reason) => {

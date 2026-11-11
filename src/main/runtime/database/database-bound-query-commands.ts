@@ -30,11 +30,15 @@ export class DatabaseBoundQueryCommands {
   private readonly services = new Map<string, DatabaseQueryService>()
   constructor(private readonly ports: BoundQueryPorts) {}
 
-  private connection(principalId: string, ref: string) {
-    return this.ports.bindings.read(principalId, ref).connection
+  private connection(principalId: string, ref: string, controllerRuntimeId: string) {
+    const binding = this.ports.bindings.read(principalId, ref)
+    if (binding.controllerRuntimeId !== controllerRuntimeId) {
+      throw new Error('Database execution binding belongs to another controller')
+    }
+    return binding.connection
   }
   private actor(principalId: string, input: QueryScope) {
-    const connection = this.connection(principalId, input.credentialRef)
+    const connection = this.connection(principalId, input.credentialRef, input.controllerRuntimeId)
     if (!connection.projects.some((project) => sameDatabaseProject(project, input.project))) {
       throw new Error('Database execution binding is outside the requested project')
     }
@@ -49,14 +53,22 @@ export class DatabaseBoundQueryCommands {
     const key = JSON.stringify([principalId, input.controllerRuntimeId, input.credentialRef])
     let service = this.services.get(key)
     if (!service) {
-      const connection = this.connection(principalId, input.credentialRef)
+      const connection = this.connection(
+        principalId,
+        input.credentialRef,
+        input.controllerRuntimeId
+      )
       service = new DatabaseQueryService({
         ...this.ports,
         controllerRuntimeId: input.controllerRuntimeId,
         executionHostId: connection.executionHostId,
         catalog: {
           resolve: (selector, project) => {
-            const current = this.connection(principalId, input.credentialRef)
+            const current = this.connection(
+              principalId,
+              input.credentialRef,
+              input.controllerRuntimeId
+            )
             if (
               selector !== current.id ||
               !current.projects.some((item) => sameDatabaseProject(item, project))
@@ -73,7 +85,7 @@ export class DatabaseBoundQueryCommands {
   }
   start(principalId: string, input: z.infer<typeof DatabaseBindingStart>) {
     const actor = this.actor(principalId, input)
-    const connection = this.connection(principalId, input.credentialRef)
+    const connection = this.connection(principalId, input.credentialRef, input.controllerRuntimeId)
     return this.service(principalId, input).start(
       {
         connection: connection.id,
@@ -102,8 +114,8 @@ export class DatabaseBoundQueryCommands {
     const actor = this.actor(principalId, input)
     return this.service(principalId, input).cancel(input.queryId, actor)
   }
-  async test(principalId: string, ref: string, signal: AbortSignal) {
-    const connection = this.connection(principalId, ref)
+  async test(principalId: string, ref: string, controllerRuntimeId: string, signal: AbortSignal) {
+    const connection = this.connection(principalId, ref, controllerRuntimeId)
     const adapter = this.ports.adapter(connection.engine)
     if (!adapter) {
       throw new Error('database_capability_missing')
@@ -119,7 +131,7 @@ export class DatabaseBoundQueryCommands {
     input: z.infer<typeof DatabaseBindingDescribe>,
     signal: AbortSignal
   ) {
-    const connection = this.connection(principalId, input.credentialRef)
+    const connection = this.connection(principalId, input.credentialRef, input.controllerRuntimeId)
     if (!connection.projects.some((project) => sameDatabaseProject(project, input.project))) {
       throw new Error('Database schema binding is outside the requested project')
     }

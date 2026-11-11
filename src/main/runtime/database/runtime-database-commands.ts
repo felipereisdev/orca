@@ -40,13 +40,16 @@ export class RuntimeDatabaseCommands {
     ['oracle', createOracleAdapter()]
   ])
 
-  constructor(private readonly runtime: DatabaseRuntimeHost) {
+  constructor(
+    private readonly runtime: DatabaseRuntimeHost,
+    readonly controllerRuntimeId: string
+  ) {
     const store = requireDatabasePersistence(runtime.requireStore())
     this.persistence = store
     this.catalog = new DatabaseCatalog(store)
     this.credentials = new DatabaseCredentialStore(store)
     this.router = new DatabaseExecutionRouter({
-      controllerRuntimeId: runtime.getRuntimeId(),
+      controllerRuntimeId: this.controllerRuntimeId,
       connection: (id, project) => this.catalog.resolve(id, project),
       resolveServer: (selector) => {
         if (!runtime.resolveOrchestrationWorkerServer) {
@@ -73,7 +76,8 @@ export class RuntimeDatabaseCommands {
       store,
       this.catalog,
       this.credentials,
-      this.router
+      this.router,
+      this.controllerRuntimeId
     )
     this.bindings = new DatabaseExecutionBindings(store, this.credentials)
     const admission = new DatabaseQueryAdmission()
@@ -93,7 +97,7 @@ export class RuntimeDatabaseCommands {
       store,
       catalog: this.catalog,
       credentials: this.credentials,
-      controllerRuntimeId: runtime.getRuntimeId(),
+      controllerRuntimeId: this.controllerRuntimeId,
       executionHostId: 'local',
       adapter: (engine) => this.adapters.get(engine)
     })
@@ -102,6 +106,7 @@ export class RuntimeDatabaseCommands {
   executionCapabilities() {
     const keyring = getSecretStore()
     return {
+      controllerRuntimeId: this.controllerRuntimeId,
       engines: [...this.adapters.keys()],
       protectedCredentialStorage:
         keyring.isEncryptionAvailable() && keyring.describeProtectionGap() === null
@@ -150,7 +155,7 @@ export class RuntimeDatabaseCommands {
       const route = await this.router.routeHost(connection.id, connection.executionHostId)
       return this.router.call(route, 'database.testBinding', {
         credentialRef: connection.credentialRef,
-        controllerRuntimeId: this.runtime.getRuntimeId()
+        controllerRuntimeId: this.controllerRuntimeId
       })
     }
     const adapter = this.adapters.get(connection.engine)
@@ -175,7 +180,7 @@ export class RuntimeDatabaseCommands {
       return this.router.call(route, 'database.describeBinding', {
         ...request,
         credentialRef: connection.credentialRef,
-        controllerRuntimeId: this.runtime.getRuntimeId()
+        controllerRuntimeId: this.controllerRuntimeId
       })
     }
     const adapter = this.adapters.get(connection.engine)

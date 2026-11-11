@@ -25,6 +25,7 @@ let dispatcher: RpcDispatcher
 let executorDispatcher: RpcDispatcher
 let configuration: DatabaseConnectionConfiguration
 let projectId: string
+let controllerIdentity: string
 const network = new AbortController()
 
 async function call<T>(method: string, params: unknown): Promise<T> {
@@ -41,14 +42,8 @@ async function call<T>(method: string, params: unknown): Promise<T> {
   return response.result as T
 }
 
-beforeAll(async () => {
-  installFakeAppEnvironment()
-  fixture = await createPostgresFixture()
-  controllerProfile = createDatabaseTestProfile()
-  executorProfile = createDatabaseTestProfile()
-  executor = new OrcaRuntimeService(executorProfile.store)
-  executorDispatcher = new RpcDispatcher({ runtime: executor, methods: DATABASE_BINDING_METHODS })
-  controller = new OrcaRuntimeService(controllerProfile.store, undefined, {
+function createController() {
+  return new OrcaRuntimeService(controllerProfile.store, undefined, {
     orchestrationEnvironmentTransport: {
       resolve: (selector) => {
         if (selector !== 'remote-a') {
@@ -105,7 +100,20 @@ beforeAll(async () => {
       }
     }
   })
+}
+
+beforeAll(async () => {
+  installFakeAppEnvironment()
+  fixture = await createPostgresFixture()
+  controllerProfile = createDatabaseTestProfile()
+  executorProfile = createDatabaseTestProfile()
+  executor = new OrcaRuntimeService(executorProfile.store)
+  executorDispatcher = new RpcDispatcher({ runtime: executor, methods: DATABASE_BINDING_METHODS })
+  controller = createController()
   dispatcher = new RpcDispatcher({ runtime: controller, methods: DATABASE_METHODS })
+  controllerIdentity = (
+    await call<{ controllerRuntimeId: string }>('database.executionCapabilities', undefined)
+  ).controllerRuntimeId
   const group = controllerProfile.store.createProjectGroup({
     name: 'Folder outside Git',
     createdFrom: 'manual'
@@ -165,7 +173,7 @@ describe('database controller and authenticated execution runtime', () => {
         queryId: handle.queryId,
         source: {
           connectionId: configuration.id,
-          controllerRuntimeId: controller.getRuntimeId(),
+          controllerRuntimeId: controllerIdentity,
           executionHostId: 'runtime:remote-a',
           alias: 'same-hmg'
         }
@@ -179,7 +187,7 @@ describe('database controller and authenticated execution runtime', () => {
         method: 'database.waitBindingQuery',
         params: {
           credentialRef: binding.connection.credentialRef,
-          controllerRuntimeId: controller.getRuntimeId(),
+          controllerRuntimeId: controllerIdentity,
           queryId: handle.queryId,
           project: binding.connection.projects[0],
           sessionId: 'trusted-local:runtime'
@@ -203,6 +211,86 @@ describe('database controller and authenticated execution runtime', () => {
       { project: projectId, queryId: handle.queryId }
     )
     expect(afterClose.status).toBe('expired')
+  })
+
+  it('refuses a foreign controller on every enrolled execution route', async () => {
+    const handle = await call<DatabaseQueryHandle>('database.startQuery', {
+      project: projectId,
+      connection: 'same-hmg',
+      sql: 'SELECT id FROM approved.blocked',
+      parameters: []
+    })
+    const result = await call<DatabaseQuerySnapshot>('database.waitQuery', {
+      project: projectId,
+      queryId: handle.queryId
+    })
+    const binding = executorProfile.store.getDatabaseExecutionBindings()[0]
+    const input = {
+      credentialRef: binding.connection.credentialRef,
+      controllerRuntimeId: 'foreign-controller',
+      project: binding.connection.projects[0],
+      sessionId: result.record.sessionId,
+      queryId: handle.queryId
+    }
+    const outcomes: boolean[] = []
+    for (const [method, params] of [
+      [
+        'database.testBinding',
+        { credentialRef: input.credentialRef, controllerRuntimeId: input.controllerRuntimeId }
+      ],
+      ['database.describeBinding', { ...input, queryId: undefined, sessionId: undefined }],
+      [
+        'database.startBindingQuery',
+        {
+          ...input,
+          queryId: '44444444-4444-4444-8444-444444444444',
+          sql: 'SELECT id FROM approved.blocked',
+          parameters: []
+        }
+      ],
+      ['database.waitBindingQuery', input],
+      ['database.cancelBindingQuery', input]
+    ] as const) {
+      const response = await executorDispatcher.dispatch(
+        { id: randomUUID(), authToken: 'fixture', method, params },
+        {
+          caller: { kind: 'paired-device', deviceId: 'controller-device' },
+          pairedDeviceId: 'controller-device',
+          authenticatedCallerFingerprint: 'controller-principal',
+          callerScope: { kind: 'runtime-paired', grants: [] },
+          clientKind: 'runtime'
+        }
+      )
+      outcomes.push(response.ok)
+    }
+    expect(outcomes).toEqual([false, false, false, false, false])
+  })
+  it('keeps remote bindings and recorded history after the controlling process restarts', async () => {
+    await disposeRuntimeDatabase(controller)
+    controller = createController()
+    dispatcher = new RpcDispatcher({ runtime: controller, methods: DATABASE_METHODS })
+    expect(
+      (await call<{ controllerRuntimeId: string }>('database.executionCapabilities', undefined))
+        .controllerRuntimeId
+    ).toBe(controllerIdentity)
+    expect(
+      (
+        await call<DatabaseQuerySnapshot['record'][]>('database.queryHistory', {
+          project: projectId
+        })
+      ).map((record) => record.source.controllerRuntimeId)
+    ).toContain(controllerIdentity)
+    const handle = await call<DatabaseQueryHandle>('database.startQuery', {
+      project: projectId,
+      connection: 'same-hmg',
+      sql: 'SELECT id FROM approved.blocked',
+      parameters: []
+    })
+    expect(
+      await call('database.waitQuery', { project: projectId, queryId: handle.queryId })
+    ).toMatchObject({ status: 'completed', rows: [['7']] })
+    await call('database.clearHistory', { connectionId: configuration.id })
+    expect(await call('database.queryHistory', { project: projectId })).toEqual([])
   })
 
   it('does not publish a remote catalog entry when secure storage on that executor is unavailable', async () => {

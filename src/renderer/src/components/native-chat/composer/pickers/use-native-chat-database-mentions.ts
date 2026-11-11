@@ -35,8 +35,8 @@ export function useNativeChatDatabaseMentions(
     }
     let current = true
     setState({ worktreeId, entries: [], loading: true })
-    void Promise.all([client.list({ worktree: worktreeId }), client.status()])
-      .then(([connections, status]) => {
+    void Promise.all([client.list({ worktree: worktreeId }), client.controllerIdentity()])
+      .then(([connections, identity]) => {
         if (current) {
           setState({
             worktreeId,
@@ -44,7 +44,7 @@ export function useNativeChatDatabaseMentions(
               reference: {
                 kind: 'database',
                 connectionId: connection.id,
-                controllerRuntimeId: status.runtimeId,
+                controllerRuntimeId: identity,
                 aliasAtSelection: connection.alias
               },
               engine: connection.engine,

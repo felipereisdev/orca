@@ -86,6 +86,9 @@ describe('runtime database query ownership', () => {
     expect(service.history({ ...actor, owner: true }).map((entry) => entry.sql)).toEqual([
       'SELECT 1'
     ])
+    expect(() =>
+      service.result('33333333-3333-4333-8333-333333333333', { ...actor, owner: true })
+    ).toThrow('unavailable')
   })
   it('clears a connection history and cached rows after stopping its active query', async () => {
     let started!: () => void

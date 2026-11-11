@@ -13,14 +13,17 @@ afterEach(async () => {
 it('keeps published replacement credentials usable when obsolete-secret cleanup fails', async () => {
   const profile = createDatabaseTestProfile()
   profiles.push(profile)
-  const controller = new RuntimeDatabaseCommands({
-    requireStore: () => profile.store,
-    getRuntimeId: () => 'runtime-a',
-    listRepos: () => [],
-    showManagedWorktree: async () => {
-      throw new Error('No workspace selected')
-    }
-  })
+  const controller = new RuntimeDatabaseCommands(
+    {
+      requireStore: () => profile.store,
+      getRuntimeId: () => 'runtime-a',
+      listRepos: () => [],
+      showManagedWorktree: async () => {
+        throw new Error('No workspace selected')
+      }
+    },
+    '11111111-1111-4111-8111-111111111111'
+  )
   controllers.push(controller)
   const input = {
     alias: 'hmg',

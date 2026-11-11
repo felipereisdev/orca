@@ -1,3 +1,4 @@
+import { databaseControllerIdentity } from '../../database/catalog/database-controller-identity'
 import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
 import { DatabaseCatalog } from '../../database/catalog/database-catalog'
 import { requireDatabasePersistence } from './runtime-database-persistence'
@@ -18,8 +19,10 @@ export async function resolveRuntimeDatabaseMentions(
   const project = await resolveDatabaseProject(runtime, scope)
   const catalog = new DatabaseCatalog(requireDatabasePersistence(runtime.requireStore()))
   const available = catalog.list(project)
-  return resolveDatabaseMentions(references, runtime.getRuntimeId(), (id) =>
-    available.find((connection) => connection.id === id)
+  return resolveDatabaseMentions(
+    references,
+    await databaseControllerIdentity(requireDatabasePersistence(runtime.requireStore())),
+    (id) => available.find((connection) => connection.id === id)
   )
 }
 

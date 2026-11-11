@@ -126,6 +126,23 @@ describe('PostgreSQL read-only adapter with verified TLS', () => {
     }
   })
 
+  it('refuses forbidden functions in views exposed only through a column grant', async () => {
+    await fixture.admin.query(
+      `CREATE VIEW approved.column_lock WITH (security_invoker=true) AS SELECT pg_catalog.pg_try_advisory_lock(42424242) AS acquired`
+    )
+    await fixture.admin.query('GRANT SELECT(acquired) ON approved.column_lock TO orca_reader')
+    try {
+      await expect(
+        adapter.preflight(fixture.configuration, fixture.credentials, AbortSignal.timeout(5000))
+      ).rejects.toThrow()
+      await expect(
+        execute('SELECT acquired FROM approved.column_lock', capture().sink)
+      ).rejects.toThrow()
+    } finally {
+      await fixture.admin.query('DROP VIEW approved.column_lock')
+    }
+  })
+
   it('bounds large cell values before the driver delivers them to the result sink', async () => {
     await fixture.admin.query(
       "UPDATE approved.invoices SET memo = repeat('x', 2000000) WHERE id = 2"

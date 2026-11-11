@@ -15,7 +15,7 @@ SELECT CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion')) AS version, CONV
   AND (SELECT COUNT(*) FROM sys.objects WHERE is_ms_shipped = 0) <= 10000
   AND NOT EXISTS (SELECT 1 FROM sys.schemas s CROSS APPLY sys.fn_my_permissions(QUOTENAME(s.name),'SCHEMA') p WHERE p.permission_name NOT IN ('SELECT','VIEW DEFINITION') AND s.name NOT IN ('sys','INFORMATION_SCHEMA'))
   AND NOT EXISTS (SELECT 1 FROM sys.objects o CROSS APPLY sys.fn_my_permissions(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+'.'+QUOTENAME(o.name),'OBJECT') p WHERE o.is_ms_shipped = 0 AND p.permission_name NOT IN ('SELECT','VIEW DEFINITION'))
-  AND NOT EXISTS (SELECT 1 FROM sys.objects o WHERE o.is_ms_shipped = 0 AND o.parent_object_id = 0 AND HAS_PERMS_BY_NAME(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+'.'+QUOTENAME(o.name),'OBJECT','SELECT') = 1 AND (
+  AND NOT EXISTS (SELECT 1 FROM sys.objects o WHERE o.is_ms_shipped = 0 AND o.parent_object_id = 0 AND (HAS_PERMS_BY_NAME(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+'.'+QUOTENAME(o.name),'OBJECT','SELECT') = 1 OR EXISTS (SELECT 1 FROM sys.columns visible WHERE visible.object_id = o.object_id AND HAS_PERMS_BY_NAME(QUOTENAME(OBJECT_SCHEMA_NAME(o.object_id))+'.'+QUOTENAME(o.name),'OBJECT','SELECT',visible.name,'COLUMN') = 1)) AND (
     o.type <> 'U' OR EXISTS (SELECT 1 FROM sys.columns c WHERE c.object_id = o.object_id AND (c.is_computed = 1 OR c.user_type_id <> c.system_type_id))
     OR EXISTS (SELECT 1 FROM sys.security_predicates p WHERE p.target_object_id = o.object_id)
     OR EXISTS (SELECT 1 FROM sys.external_tables e WHERE e.object_id = o.object_id)))

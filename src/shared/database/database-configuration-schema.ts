@@ -69,6 +69,7 @@ export const databaseConnectionSchema = z.object({
   limits: databaseLimitsSchema
 })
 const state = z.object({
+  controllerId: z.uuid().optional(),
   version: z.literal(1),
   connections: z.array(databaseConnectionSchema).max(1000),
   retiredAliases: z.array(z.string()).max(10_000)

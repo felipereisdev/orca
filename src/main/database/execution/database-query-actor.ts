@@ -17,6 +17,7 @@ export function authorizeDatabaseQuery(
 ): void {
   if (
     actor.controllerRuntimeId !== controllerRuntimeId ||
+    record.source.controllerRuntimeId !== controllerRuntimeId ||
     !sameDatabaseProject(record.project, actor.project) ||
     (!actor.owner && record.sessionId !== actor.sessionId)
   ) {

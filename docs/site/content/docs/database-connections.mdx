@@ -11,7 +11,7 @@ Credentials are sealed on the selected execution host. Settings can return endpo
 
 In native chat, type `@` and select a connection under **Databases**. File mentions remain a separate category, even when the filename matches the alias. Selected mentions retain the connection ID and controller identity through sending and resuming. Renamed, removed or unavailable references require a new selection; they cannot silently target another connection.
 
-For example: “`@conexal1-hmg` inspect the last failed invoices.” The agent uses the project-scoped Orca database service and an explicit connection on each query. Raw terminals accept aliases as ordinary text; agents can use the [database CLI commands](/docs/cli/reference#read-only-database-environments). There is no implicit global active environment.
+For example: “`@conexal1-hmg` inspect the last failed invoices.” The agent uses the project-scoped Orca database service and an explicit connection on each query. Raw terminals accept aliases as ordinary text; agents can use the [database CLI commands](/docs/cli/reference#read-only-database-environments). There is no implicit global active environment. Orca-launched terminal agents retain their attested terminal ownership; their running queries are cancelled and cached rows expire when that terminal ends. An external shell without an Orca terminal/session identity uses the explicit owner CLI scope.
 
 Open the project's database explorer to browse visible schemas/tables/keys, generate a bounded table preview, or submit one SQL query with typed parameters. SQL Server and Oracle use stricter ordinary-table profiles than PostgreSQL; unsupported objects are refused. Query results retain their captured environment and host even after the editor connection changes.
 
@@ -34,6 +34,8 @@ Paired runtime execution hosts use the existing authenticated environment transp
 Node and Electron-as-Node imports were exercised on macOS; Node driver imports were exercised on Linux ARM64. Windows import/worker qualification is configured in CI and remains required. Full packaged-client and hidden Electron UI evidence is separate from these checks. Component fixtures cover the approved settings, explorer, mentions and cards; they do not establish mobile/desktop end-to-end delivery.
 
 ## Limits, cancellation and history
+
+Controller identity is stored with the profile, so history, mentions and restored explorers survive an application restart. Transport calls still use the current process identity and pairing revision to refuse stale hosts.
 
 Each query has an overall deadline of at most 30 seconds, at most 1,000 returned rows and 5 MiB of serialized output. Connections can lower these limits. Large cells become explicit previews, and exact numbers remain strings. Results preserve duplicate column names by separate positions. Oracle treats empty strings as NULL. Supported exact numeric inputs must fit the selected engine's precision.
 

@@ -57,6 +57,7 @@ export const DATABASE_BINDING_METHODS = [
       (await runtimeDatabaseCommands(context.runtime)).boundQueries.test(
         principal(context),
         params.credentialRef,
+        params.controllerRuntimeId,
         signal(context)
       )
   }),

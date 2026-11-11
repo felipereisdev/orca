@@ -28,11 +28,16 @@ const PACKAGED_RUNTIME_PACKAGE_ROOTS = [
   '@anthropic-ai/claude-agent-sdk',
   '@linear/sdk',
   '@orca/process-host',
+  '@orca/sql-read-query-parser',
   '@parcel/watcher',
   'electron-updater',
   'i18next',
   'jsonc-parser',
   'node-pty',
+  'pg',
+  'pg-cursor',
+  'mssql',
+  'oracledb',
   'posthog-node',
   'proper-lockfile',
   'qrcode',
@@ -222,7 +227,9 @@ function collectPackagedRuntimePackages(electronPlatformName = process.platform)
 function createPackagedRuntimeNodeModuleResources(electronPlatformName = process.platform) {
   return collectPackagedRuntimePackages(electronPlatformName).map(([packageName, packageDir]) => {
     const filter = [
-      ...(packageName === '@orca/process-host' ? ['package.json', 'dist/**/*'] : []),
+      ...(['@orca/process-host', '@orca/sql-read-query-parser'].includes(packageName)
+        ? ['package.json', 'dist/**/*']
+        : []),
       // Why: another worktree can rename these away mid-copy, failing the walk with ENOENT.
       ...(NATIVE_BUILD_PACKAGES[packageName] ? TRANSIENT_NATIVE_BUILD_ENTRY_FILTER : []),
       ...runtimePackageExcludeFilter(packageName, electronPlatformName)

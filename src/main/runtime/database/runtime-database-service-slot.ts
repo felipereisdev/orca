@@ -1,3 +1,5 @@
+import { databaseControllerIdentity } from '../../database/catalog/database-controller-identity'
+import { requireDatabasePersistence } from './runtime-database-persistence'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { OrcaRuntimeWithRuntimeId } from '../construction/runtime-identity-state'
 import type { RuntimeDatabaseCommands } from './runtime-database-commands'
@@ -14,7 +16,11 @@ export function runtimeDatabaseCommands(
   let commands = controllers.get(runtime)
   if (!commands) {
     commands = import('./runtime-database-commands').then(
-      ({ RuntimeDatabaseCommands }) => new RuntimeDatabaseCommands(runtime)
+      async ({ RuntimeDatabaseCommands }) =>
+        new RuntimeDatabaseCommands(
+          runtime,
+          await databaseControllerIdentity(requireDatabasePersistence(runtime.requireStore()))
+        )
     )
     controllers.set(runtime, commands)
     void commands.catch(() => {

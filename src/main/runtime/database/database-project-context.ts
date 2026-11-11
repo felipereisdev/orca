@@ -1,3 +1,6 @@
+import { databaseTerminalCaller } from './database-terminal-caller'
+import { databaseControllerIdentity } from '../../database/catalog/database-controller-identity'
+import { requireDatabasePersistence } from './runtime-database-persistence'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { DatabaseProjectKey } from '../../../shared/database/database-contracts'
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
@@ -92,23 +95,29 @@ export async function databaseActor(
   }
   const project = await resolveDatabaseProject(context.runtime, scope)
   const session = context.orchestrationCaller
-  if (session && session.kind !== 'peer') {
+  const terminal = databaseTerminalCaller(context)
+  const workspaceId =
+    session && session.kind !== 'peer' ? session.workspaceId : terminal?.workspaceId
+  if (workspaceId) {
     const bound = await resolveDatabaseProject(context.runtime, {
-      worktree: `id:${session.workspaceId}`
+      worktree: `id:${workspaceId}`
     })
     if (!sameDatabaseProject(project, bound)) {
       throw new Error('Database project is outside the caller session')
     }
   }
   return {
-    controllerRuntimeId: context.runtime.getRuntimeId(),
+    controllerRuntimeId: await databaseControllerIdentity(
+      requireDatabasePersistence(context.runtime.requireStore())
+    ),
     project,
     sessionId: session
       ? session.kind === 'peer'
         ? session.address
         : session.sessionId
-      : rpcCallerOperationKey(context.caller),
-    owner: context.caller.kind !== 'paired-device' && !session,
+      : (terminal?.sessionId ?? rpcCallerOperationKey(context.caller)),
+    owner: context.caller.kind !== 'paired-device' && !session && !terminal,
+    ...(terminal ? { terminalHandle: terminal.terminalHandle } : {}),
     ...(session && session.kind !== 'peer' && session.terminalHandle
       ? { terminalHandle: session.terminalHandle }
       : {})

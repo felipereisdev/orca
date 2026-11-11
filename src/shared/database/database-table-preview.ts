@@ -16,14 +16,20 @@ export function quoteDatabaseIdentifier(engine: DatabaseEngine, parts: readonly 
 export function buildDatabaseTablePreview(
   engine: DatabaseEngine,
   table: DatabaseTable,
-  limit: number
+  limit: number,
+  columns?: readonly string[]
 ): string {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
     throw new Error('Database preview limit is invalid')
   }
   const name = quoteDatabaseIdentifier(engine, [table.schema, table.name])
   if (engine === 'sql-server') {
-    return `SELECT TOP (${limit}) * FROM ${name}`
+    if (columns && !columns.length) {
+      throw new Error('No authorized columns are available')
+    }
+    const selection =
+      columns?.map((column) => quoteDatabaseIdentifier(engine, [column])).join(', ') ?? '*'
+    return `SELECT TOP (${limit}) ${selection} FROM ${name}`
   }
   if (engine === 'oracle') {
     return `SELECT * FROM ${name} FETCH FIRST ${limit} ROWS ONLY`

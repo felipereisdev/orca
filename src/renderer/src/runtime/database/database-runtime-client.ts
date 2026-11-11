@@ -71,6 +71,10 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
   return {
     target,
     status,
+    controllerIdentity: () =>
+      call<{ controllerRuntimeId: string }>('database.executionCapabilities').then(
+        (value) => value.controllerRuntimeId
+      ),
     settingsOptions: () => call<DatabaseSettingsOptions>('database.settingsOptions'),
     hostCapabilities: (executionHostId: ExecutionHostId) =>
       call<DatabaseHostCapabilities>('database.hostCapabilities', { executionHostId }),

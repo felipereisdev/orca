@@ -54,7 +54,7 @@ export async function assertPostgresPrivilegeProfile(
       SELECT pg_catalog.pg_get_viewdef(c.oid, true) AS definition
       FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
       WHERE c.relkind = 'v' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-        AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
+        AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT')
     ) SELECT count(*)::integer AS total, max(octet_length(definition)) AS largest,
       sum(octet_length(definition))::integer AS bytes FROM views
   `)
@@ -66,7 +66,7 @@ export async function assertPostgresPrivilegeProfile(
     SELECT pg_catalog.pg_get_viewdef(c.oid, true) AS definition
     FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind = 'v' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND pg_catalog.has_table_privilege(c.oid, 'SELECT') LIMIT 1001
+      AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT') LIMIT 1001
   `)
   if (views.rows.length > 1000) {
     throw new Error('PostgreSQL view profile exceeds its inspection limit')

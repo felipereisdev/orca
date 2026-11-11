@@ -39,6 +39,7 @@ export default function WorkspaceDatabaseExplorer({
   return (
     <DatabaseExplorerPane
       key={entityId}
+      entityId={entityId}
       client={client}
       controller={controller}
       worktreeId={worktreeId}

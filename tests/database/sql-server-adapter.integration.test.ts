@@ -125,6 +125,73 @@ describe('SQL Server with a dedicated reader and verified TLS', () => {
       await fixture.admin('ALTER TABLE approved.invoices DROP COLUMN calculated')
     }
   })
+  it('refuses computed sources exposed only through a column grant', async () => {
+    await fixture.admin('REVOKE SELECT ON SCHEMA::approved FROM orca_reader')
+    await fixture.admin('CREATE FUNCTION approved.hidden() RETURNS int AS BEGIN RETURN 42 END')
+    await fixture.admin(
+      'CREATE TABLE approved.computed_only (base int, derived AS approved.hidden()); INSERT INTO approved.computed_only(base) VALUES (1); GRANT SELECT (derived) ON OBJECT::approved.computed_only TO orca_reader'
+    )
+    try {
+      await expect(
+        adapter.preflight(fixture.configuration, fixture.credentials, AbortSignal.timeout(10000))
+      ).rejects.toThrow()
+      await expect(
+        execute('SELECT derived FROM approved.computed_only', capture().sink)
+      ).rejects.toThrow()
+    } finally {
+      await fixture.admin(
+        'DROP TABLE approved.computed_only; DROP FUNCTION approved.hidden; GRANT SELECT ON SCHEMA::approved TO orca_reader'
+      )
+    }
+  })
+  it('browses table and column grants without exposing unauthorized columns', async () => {
+    await fixture.admin(
+      'REVOKE SELECT ON SCHEMA::approved FROM orca_reader; GRANT SELECT ON OBJECT::approved.invoices TO orca_reader'
+    )
+    const request = {
+      connection: 'fixture-hmg',
+      project: { kind: 'folder' as const, projectId: 'fixture', executionHostId: 'local' as const },
+      schema: 'approved',
+      table: 'invoices'
+    }
+    try {
+      expect(
+        (
+          await adapter.preflight(
+            fixture.configuration,
+            fixture.credentials,
+            AbortSignal.timeout(10000)
+          )
+        ).readOnlyProfile
+      ).toBe(true)
+      const tableGrant = await adapter.describe(
+        fixture.configuration,
+        fixture.credentials,
+        request,
+        AbortSignal.timeout(10000)
+      )
+      expect(tableGrant.schemas).toEqual(['approved'])
+      expect(tableGrant.tables).toEqual([{ schema: 'approved', name: 'invoices', kind: 'table' }])
+      await fixture.admin(
+        'REVOKE SELECT ON OBJECT::approved.invoices FROM orca_reader; GRANT SELECT (id) ON OBJECT::approved.invoices TO orca_reader'
+      )
+      const columnGrant = await adapter.describe(
+        fixture.configuration,
+        fixture.credentials,
+        request,
+        AbortSignal.timeout(10000)
+      )
+      expect(columnGrant.schemas).toEqual(['approved'])
+      expect(columnGrant.tables).toEqual([{ schema: 'approved', name: 'invoices', kind: 'table' }])
+      expect(columnGrant.columns).toEqual([
+        { name: 'id', databaseType: 'bigint', nullable: false, primaryKey: true }
+      ])
+    } finally {
+      await fixture.admin(
+        'REVOKE SELECT (id) ON OBJECT::approved.invoices FROM orca_reader; REVOKE SELECT ON OBJECT::approved.invoices FROM orca_reader; GRANT SELECT ON SCHEMA::approved TO orca_reader'
+      )
+    }
+  })
   it('binds integer and decimal strings without rounding them before SQL Server', async () => {
     const result = capture()
     await execute(

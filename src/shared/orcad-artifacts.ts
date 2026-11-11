@@ -99,6 +99,18 @@ export const ORCAD_EMOJI_SHORTCODE_DATASET =
 // linear-sdk.ts loads it through createRequire, which the server bundle cannot follow.
 export const ORCAD_LINEAR_SDK_ENTRY = 'node_modules/@linear/sdk/index.js'
 
+export const ORCAD_DATABASE_PARSER_ARTIFACTS = [
+  'package.json',
+  'dist/parse-sql.js',
+  'dist/database-query-syntax.js',
+  'dist/postgres-query-policy.js',
+  'dist/sql-server-query-policy.js',
+  'dist/oracle-query-policy.js',
+  'dist/database-query-policy.js',
+  'dist/database-query-policy-worker-entry.js',
+  'dist/database-query-policy-worker-path.js'
+].map((filename) => `node_modules/@orca/sql-read-query-parser/${filename}`)
+
 export const ORCAD_VERSION = '0.1.0'
 export const ORCAD_LAUNCHER_FILENAME = 'orcad.js'
 export const ORCAD_SERVER_ENTRY_FILENAME = 'orcad-server.js'
@@ -263,6 +275,7 @@ export const ORCAD_ARTIFACTS: readonly OrcadArtifact[] = [
   { filename: ORCAD_PARCEL_WATCHER_NATIVE },
   { filename: ORCAD_EMOJI_SHORTCODE_DATASET },
   { filename: ORCAD_LINEAR_SDK_ENTRY },
+  ...ORCAD_DATABASE_PARSER_ARTIFACTS.map((filename) => ({ filename })),
   ...ORCAD_NODE_PTY_JS_ARTIFACTS.map((filename) => ({ filename })),
   ...ORCAD_RIPGREP_LICENSE_ARTIFACTS.map((filename) => ({ filename })),
   ...ORCAD_NATIVE_CHAT_VISUALS_ARTIFACTS.map((filename) => ({ filename })),
