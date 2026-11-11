@@ -11,6 +11,7 @@ export type ValidatedDatabaseReadQuery = {
   readonly [validated]: true
   readonly engine: DatabaseEngine
   readonly sql: string
+  readonly statementSql: string
   readonly parameterNames: readonly string[]
 }
 
@@ -40,6 +41,13 @@ export function validateDatabaseReadQuery(
     [validated]: true,
     engine,
     sql,
+    statementSql:
+      engine === 'postgres'
+        ? query.syntax.tokens
+            .slice(0, query.syntax.tokens.at(-1)?.text === ';' ? -1 : undefined)
+            .map((token) => token.text)
+            .join(' ')
+        : sql,
     parameterNames: Object.freeze([...new Set(parameterNames)])
   })
 }

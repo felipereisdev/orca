@@ -1,6 +1,6 @@
 // Compose the Node-host runtime; paired desktop pages work even without a local browser engine.
 import process from 'node:process'
-import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-commands'
+import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-service-slot'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { resolveUserDataPath } from './orcad-app-paths'
 import { prepareOrcadCliLauncher } from './orcad-cli-launcher'

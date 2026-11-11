@@ -1,3 +1,4 @@
+import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import { BranchSwitchLandedWithWarningError } from '../../git/branch-switch'
 import { mapBrowserError } from './browser-error-response'
 import { ZodError } from 'zod'
@@ -32,6 +33,9 @@ export function mapDispatcherError(
     return errorResponse(request.id, meta, 'runtime_error', error.message, {
       outcome: 'landed-with-warning'
     })
+  }
+  if (error instanceof DatabaseOperationError) {
+    return errorResponse(request.id, meta, error.code, error.message)
   }
   if (error instanceof ZodError) {
     return invalidArgumentResponse(request, meta, formatZodError(error))

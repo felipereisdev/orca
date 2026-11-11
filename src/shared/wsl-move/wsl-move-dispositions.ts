@@ -99,6 +99,10 @@ export const PERSISTED_STATE_DISPOSITIONS = {
   automationRuns: moveDisposition(19, {
     note: "An in-flight run in scope blocks the move. The desktop's history stays as written, beside its automation."
   }),
+  databaseExecutionBindings: notApplicableDisposition(
+    62,
+    'Execution-host binding receipts stay with their sealed credentials.'
+  ),
   databaseCatalog: notApplicableDisposition(
     62,
     'Controller-global catalog; execution hosts stay explicit.'

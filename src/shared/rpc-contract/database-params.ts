@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import {
   databaseConnectionInputSchema,
-  databaseConnectionId
+  databaseConnectionId,
+  databaseCredentialRef,
+  databaseConnectionSchema,
+  databaseProjectSchema
 } from '../database/database-configuration-schema'
 
 export const DatabaseParameters = z
@@ -82,4 +85,29 @@ export const DatabaseSave = z.object({
 export const DatabaseConfigurationId = z.object({ connectionId: databaseConnectionId })
 export const DatabaseRemove = DatabaseConfigurationId.extend({
   expectedRevision: z.number().int().positive()
+})
+
+export const DatabaseBindingRef = z.object({
+  credentialRef: databaseCredentialRef,
+  controllerRuntimeId: z.string().min(1).max(1024)
+})
+export const DatabaseBindingEnroll = z.object({
+  controllerRuntimeId: z.string().min(1).max(1024),
+  configuration: databaseConnectionSchema,
+  credentials: DatabaseSave.shape.credentials,
+  previousCredentialRef: databaseCredentialRef.optional()
+})
+export const DatabaseBindingDescribe = DatabaseBindingRef.extend({
+  project: databaseProjectSchema,
+  schema: z.string().max(256).optional(),
+  table: z.string().max(256).optional()
+})
+export const DatabaseBindingQuery = DatabaseBindingRef.extend({
+  project: databaseProjectSchema,
+  sessionId: z.string().min(1).max(1024),
+  queryId: z.string().uuid()
+})
+export const DatabaseBindingStart = DatabaseBindingQuery.extend({
+  sql: z.string().min(1).max(65536),
+  parameters: DatabaseParameters
 })

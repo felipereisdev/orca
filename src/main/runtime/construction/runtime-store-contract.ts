@@ -3,6 +3,9 @@ import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { VoiceSettings } from '../../../shared/speech-types'
 
 export type RuntimeStore = {
+  getDatabaseExecutionBindings?: Store['getDatabaseExecutionBindings']
+  addDatabaseExecutionBinding?: Store['addDatabaseExecutionBinding']
+  removeDatabaseExecutionBinding?: Store['removeDatabaseExecutionBinding']
   getDatabaseCatalog?: Store['getDatabaseCatalog']
   mutateDatabaseCatalog?: Store['mutateDatabaseCatalog']
   getDatabaseCredential?: Store['getDatabaseCredential']

@@ -15,6 +15,18 @@ function encodeCell(column: DatabaseColumn, value: unknown, maxTextBytes: number
   if (value === null || typeof value === 'boolean') {
     return value
   }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    value.kind === 'preview' &&
+    'text' in value &&
+    typeof value.text === 'string' &&
+    'truncated' in value &&
+    value.truncated === true
+  ) {
+    return { kind: 'preview', text: clampUtf8TextPrefix(value.text, maxTextBytes), truncated: true }
+  }
   if (value instanceof Uint8Array) {
     const length = Math.min(value.byteLength, Math.floor(maxTextBytes / 4) * 3)
     const text = Buffer.from(value.buffer, value.byteOffset, length).toString('base64')

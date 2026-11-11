@@ -8,7 +8,7 @@ import {
   DatabaseConfigurationId,
   DatabaseRemove
 } from '../../../../../shared/rpc-contract/database-params'
-import { runtimeDatabaseCommands } from '../../../database/runtime-database-commands'
+import { runtimeDatabaseCommands } from '../../../database/runtime-database-service-slot'
 import { databaseActor } from '../../../database/database-project-context'
 
 function signal(context: RpcContext): AbortSignal {
@@ -22,7 +22,7 @@ export const DATABASE_METHODS = [
     params: DatabaseScope,
     handler: async (params, context) => {
       const actor = await databaseActor(context, params)
-      return runtimeDatabaseCommands(context.runtime).catalog.list(actor.project)
+      return (await runtimeDatabaseCommands(context.runtime)).catalog.list(actor.project)
     }
   }),
   defineMethod({
@@ -31,7 +31,7 @@ export const DATABASE_METHODS = [
     params: DatabaseDescribe,
     handler: async (params, context) => {
       const actor = await databaseActor(context, params)
-      return runtimeDatabaseCommands(context.runtime).describe(
+      return (await runtimeDatabaseCommands(context.runtime)).describe(
         { ...params, project: actor.project },
         signal(context)
       )
@@ -43,7 +43,7 @@ export const DATABASE_METHODS = [
     params: DatabaseStartQuery,
     handler: async (params, context) => {
       const actor = await databaseActor(context, params)
-      return runtimeDatabaseCommands(context.runtime).queries.start(
+      return (await runtimeDatabaseCommands(context.runtime)).queries.start(
         { ...params, project: actor.project },
         actor
       )
@@ -55,7 +55,7 @@ export const DATABASE_METHODS = [
     params: DatabaseQueryId,
     handler: async (params, context) => {
       const actor = await databaseActor(context, params)
-      const queries = runtimeDatabaseCommands(context.runtime).queries
+      const queries = (await runtimeDatabaseCommands(context.runtime)).queries
       const deadline = AbortSignal.timeout(25_000)
       try {
         return await queries.wait(
@@ -76,7 +76,7 @@ export const DATABASE_METHODS = [
     permission: 'workspace',
     params: DatabaseQueryId,
     handler: async (params, context) =>
-      runtimeDatabaseCommands(context.runtime).queries.cancel(
+      (await runtimeDatabaseCommands(context.runtime)).queries.cancel(
         params.queryId,
         await databaseActor(context, params)
       )
@@ -86,7 +86,7 @@ export const DATABASE_METHODS = [
     permission: 'workspace',
     params: DatabaseQueryId,
     handler: async (params, context) =>
-      runtimeDatabaseCommands(context.runtime).queries.result(
+      (await runtimeDatabaseCommands(context.runtime)).queries.result(
         params.queryId,
         await databaseActor(context, params)
       )
@@ -96,27 +96,29 @@ export const DATABASE_METHODS = [
     permission: 'workspace',
     params: DatabaseScope,
     handler: async (params, context) =>
-      runtimeDatabaseCommands(context.runtime).queries.history(await databaseActor(context, params))
+      (await runtimeDatabaseCommands(context.runtime)).queries.history(
+        await databaseActor(context, params)
+      )
   }),
   defineMethod({
     name: 'database.catalog',
     permission: 'settings-write',
     params: null,
-    handler: (_params, { runtime }) => runtimeDatabaseCommands(runtime).catalog.list()
+    handler: async (_params, { runtime }) => (await runtimeDatabaseCommands(runtime)).catalog.list()
   }),
   defineMethod({
     name: 'database.configuration',
     permission: 'settings-write',
     params: DatabaseConfigurationId,
-    handler: (params, { runtime }) =>
-      runtimeDatabaseCommands(runtime).catalog.getConfiguration(params.connectionId)
+    handler: async (params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).catalog.getConfiguration(params.connectionId)
   }),
   defineMethod({
     name: 'database.save',
     permission: 'accounts-admin',
     params: DatabaseSave,
-    handler: (params, { runtime }) =>
-      runtimeDatabaseCommands(runtime).save(
+    handler: async (params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).save(
         params.configuration,
         params.credentials,
         params.expectedRevision
@@ -126,14 +128,14 @@ export const DATABASE_METHODS = [
     name: 'database.remove',
     permission: 'accounts-admin',
     params: DatabaseRemove,
-    handler: (params, { runtime }) =>
-      runtimeDatabaseCommands(runtime).remove(params.connectionId, params.expectedRevision)
+    handler: async (params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).remove(params.connectionId, params.expectedRevision)
   }),
   defineMethod({
     name: 'database.testConnection',
     permission: 'accounts-admin',
     params: DatabaseConfigurationId,
-    handler: (params, context) =>
-      runtimeDatabaseCommands(context.runtime).test(params.connectionId, signal(context))
+    handler: async (params, context) =>
+      (await runtimeDatabaseCommands(context.runtime)).test(params.connectionId, signal(context))
   })
 ]

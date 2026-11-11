@@ -78,7 +78,7 @@ export function createPostgresAdapter(): DatabaseAdapter {
         }
         await assertPostgresPrivilegeProfile(client)
         const values = bindPostgresParameters(parameters)
-        const prepared = await preparePostgresResultQuery(client, query.sql, values)
+        const prepared = await preparePostgresResultQuery(client, query.statementSql, values)
         sink.columns(prepared.columns)
         const cursor = client.query(
           new Cursor(prepared.sql, values, {

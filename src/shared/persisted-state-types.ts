@@ -1,3 +1,4 @@
+import type { DatabaseExecutionBinding } from './database/database-execution-binding'
 import type { ExecutionHostId } from './execution-host'
 import type {
   RemovedSshTargetTombstone,
@@ -119,6 +120,7 @@ export type PersistedState = {
   legacyPaneKeyAliasEntries: LegacyPaneKeyAliasEntry[]
   automations: Automation[]
   automationRuns: AutomationRun[]
+  databaseExecutionBindings?: DatabaseExecutionBinding[]
   databaseCatalog?: DatabaseCatalogState
   /** Host-local ciphertext only; never send through settings or agent APIs. */
   databaseCredentials?: Record<string, string>

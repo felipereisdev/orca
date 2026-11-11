@@ -16,6 +16,7 @@ export type OrchestrationWorkerServer = {
 
 /** Callers that already proved the contract, or that pin the pairing generation they resolved against. */
 export type OrchestrationEnvironmentCallOptions = {
+  expectedRuntimeId?: string
   prepareRequest?: RuntimeRequestPreparation
   contractVerified?: boolean
   expectedEnvironmentPairingRevision?: number

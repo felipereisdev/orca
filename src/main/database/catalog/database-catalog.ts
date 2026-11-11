@@ -72,19 +72,7 @@ export class DatabaseCatalog {
       ) {
         throw new Error('Database connection alias is already in use or retired')
       }
-      const connection = parseDatabaseConnection({
-        ...input,
-        id,
-        alias,
-        revision: (previous?.revision ?? 0) + 1,
-        limits: {
-          timeoutMs: 30_000,
-          maxRows: 1000,
-          maxOutputBytes: 5 * 1024 * 1024,
-          ...previous?.limits,
-          ...input.limits
-        }
-      })
+      const connection = prepareDatabaseConnection({ ...input, id }, previous)
       if (previous && previous.executionHostId !== connection.executionHostId) {
         throw new Error('Create a connection with credentials enrolled on the new execution host')
       }
@@ -107,4 +95,28 @@ export class DatabaseCatalog {
       return { state, value: undefined }
     })
   }
+}
+
+export function prepareDatabaseConnection(
+  input: DatabaseCatalogSaveInput,
+  previous?: DatabaseConnection
+): DatabaseConnection {
+  const id = databaseConnectionId.parse(input.id ?? input.credentialRef.split(':')[0])
+  const alias = input.alias.trim().toLowerCase()
+  if (databaseConnectionId.safeParse(alias).success) {
+    throw new Error('Database aliases cannot be connection IDs')
+  }
+  return parseDatabaseConnection({
+    ...input,
+    id,
+    alias,
+    revision: (previous?.revision ?? 0) + 1,
+    limits: {
+      timeoutMs: 30000,
+      maxRows: 1000,
+      maxOutputBytes: 5 * 1024 * 1024,
+      ...previous?.limits,
+      ...input.limits
+    }
+  })
 }

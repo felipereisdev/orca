@@ -3,6 +3,15 @@ import { encodeDatabaseRow } from './database-result-encoding'
 import { buildDatabaseTablePreview } from '../adapters/database-adapter'
 
 describe('database result transport', () => {
+  it('preserves an already truncated remote cell as a typed preview', () => {
+    expect(
+      encodeDatabaseRow(
+        [{ id: '0', name: 'memo', databaseType: 'text' }],
+        [{ kind: 'preview', text: 'partial memo', truncated: true }],
+        4096
+      ).row
+    ).toEqual([{ kind: 'preview', text: 'partial memo', truncated: true }])
+  })
   it('preserves exact numbers, duplicate columns, nulls and empty text', () => {
     const result = encodeDatabaseRow(
       [

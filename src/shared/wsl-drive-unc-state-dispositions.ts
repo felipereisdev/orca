@@ -53,6 +53,7 @@ export const WSL_DRIVE_UNC_STATE_DISPOSITIONS = {
   // Run history stays as it ran, beside its automation.
   automationRuns: 'keep',
   databaseCatalog: 'keep',
+  databaseExecutionBindings: 'keep',
   databaseCredentials: 'keep',
   databaseQueryHistory: 'keep',
   orcadMigrationImportReceipts: 'keep',

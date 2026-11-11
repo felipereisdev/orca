@@ -20,6 +20,7 @@ export type DatabasePreflightResult = {
 export type DatabaseResultSink = {
   columns(columns: DatabaseColumn[]): void
   row(values: readonly unknown[]): boolean
+  markTruncated(): void
   readonly remainingBytes: number
   readonly stopped: boolean
 }

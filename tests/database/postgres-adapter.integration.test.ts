@@ -22,6 +22,7 @@ function capture(limit = 1000) {
   const rows: unknown[][] = []
   const names: string[] = []
   const sink: DatabaseResultSink = {
+    markTruncated: () => {},
     columns: (columns) => {
       names.push(...columns.map((column) => column.name))
     },

@@ -66,6 +66,7 @@ export class StateSerializationSecretHandlingOperations {
           break
         case 'automations':
         case 'automationRuns':
+        case 'databaseExecutionBindings':
         case 'databaseCatalog':
         case 'databaseCredentials':
         case 'databaseQueryHistory':

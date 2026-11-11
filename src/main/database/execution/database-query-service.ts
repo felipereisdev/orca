@@ -1,5 +1,5 @@
+import { databaseQueryFailure } from './database-query-failure'
 import { randomUUID } from 'node:crypto'
-import type { DatabaseEngine } from '../../../shared/database/database-contracts'
 import type {
   DatabaseQueryHandle,
   DatabaseQueryInput,
@@ -7,30 +7,18 @@ import type {
   DatabaseQuerySnapshot,
   ExpiredDatabaseResult
 } from '../../../shared/database/database-query-contracts'
-import type { ExecutionHostId } from '../../../shared/execution-host'
-import type { DatabasePersistence } from '../../persistence/loading-store/database-persistence'
-import type { DatabaseAdapter } from '../adapters/database-adapter'
-import type { DatabaseCatalog } from '../catalog/database-catalog'
-import type { DatabaseCredentialStore } from '../credentials/database-credential-store'
 import { sameDatabaseProject } from '../catalog/database-project-scope'
-import { validateDatabaseReadQuery } from '../query-policy/database-query-policy'
 import { DatabaseQueryAdmission, type DatabaseQueryJob } from './database-query-admission'
 import { DatabaseQueryOutput } from './database-query-output'
 import { DatabaseQueryRecords } from './database-query-records'
 import { authorizeDatabaseQuery, type DatabaseActor } from './database-query-actor'
+import { executeDatabaseQueryOnHost } from './database-query-executor'
 export type { DatabaseActor } from './database-query-actor'
 
-type DatabaseQueryServiceOptions = {
-  store: Pick<DatabasePersistence, 'getDatabaseQueryHistory' | 'saveDatabaseQueryRecord'>
-  catalog: DatabaseCatalog
-  credentials: Pick<DatabaseCredentialStore, 'read'>
-  controllerRuntimeId: string
-  executionHostId: ExecutionHostId
-  adapter(engine: DatabaseEngine): DatabaseAdapter | undefined
-}
+import type { DatabaseQueryServiceOptions } from './database-query-service-options'
 
 export class DatabaseQueryService {
-  private readonly admission = new DatabaseQueryAdmission()
+  private readonly admission: DatabaseQueryAdmission
   private readonly records: DatabaseQueryRecords
   private readonly jobs = new Map<string, DatabaseQueryJob>()
   private readonly listeners = new Set<(record: DatabaseQueryRecord) => void>()
@@ -38,10 +26,15 @@ export class DatabaseQueryService {
   private disposed = false
 
   constructor(private readonly options: DatabaseQueryServiceOptions) {
-    this.records = new DatabaseQueryRecords(options.store)
+    this.records = options.records ?? new DatabaseQueryRecords(options.store)
+    this.admission = options.admission ?? new DatabaseQueryAdmission()
   }
 
-  async start(input: DatabaseQueryInput, actor: DatabaseActor): Promise<DatabaseQueryHandle> {
+  async start(
+    input: DatabaseQueryInput,
+    actor: DatabaseActor,
+    queryId: string = randomUUID()
+  ): Promise<DatabaseQueryHandle> {
     if (
       this.disposed ||
       actor.controllerRuntimeId !== this.options.controllerRuntimeId ||
@@ -53,15 +46,24 @@ export class DatabaseQueryService {
       throw new Error('Database query input is invalid')
     }
     const captured = this.options.catalog.resolve(input.connection, actor.project)
-    if (captured.executionHostId !== this.options.executionHostId) {
+    if (
+      captured.executionHostId !== this.options.executionHostId &&
+      !this.options.remoteExecution
+    ) {
       throw new Error('Database connection requires its configured execution host')
     }
-    if (!this.options.adapter(captured.engine)) {
+    if (
+      captured.executionHostId === this.options.executionHostId &&
+      !this.options.adapter(captured.engine)
+    ) {
       throw new Error('Database engine is unavailable on this execution host')
     }
     const connection = structuredClone(captured)
+    if (this.jobs.has(queryId) || this.records.find(queryId)) {
+      throw new Error('Database execution ID has already been used; start a new query explicitly')
+    }
     const record: DatabaseQueryRecord = {
-      queryId: randomUUID(),
+      queryId,
       source: {
         connectionId: connection.id,
         connectionRevision: connection.revision,
@@ -271,6 +273,7 @@ export class DatabaseQueryService {
         throw new Error('Database connection changed while queued')
       }
       phase = 'policy'
+      const { validateDatabaseReadQuery } = await import('../query-policy/database-query-policy')
       const query = validateDatabaseReadQuery(connection.engine, record.sql)
       if (
         query.parameterNames.some(
@@ -279,34 +282,28 @@ export class DatabaseQueryService {
       ) {
         throw new Error('Database query parameters are missing')
       }
-      phase = 'credentials'
-      const credentials = await this.options.credentials.read(connection.credentialRef)
-      const adapter = this.options.adapter(connection.engine)
-      if (!adapter) {
-        throw new Error('Database adapter is unavailable')
-      }
-      phase = 'preflight'
-      const profile = await adapter.preflight(connection, credentials, controller.signal)
-      if (!profile.readOnlyProfile) {
-        throw new Error('Database principal does not meet the read-only profile')
-      }
       controller.signal.throwIfAborted()
       record.status = 'running'
       this.publish(record)
       phase = 'execution'
       const output = new DatabaseQueryOutput(record, connection.limits)
-      await adapter.execute(connection, credentials, query, parameters, output, controller.signal)
+      await executeDatabaseQueryOnHost(
+        this.options,
+        record,
+        connection,
+        query,
+        parameters,
+        output,
+        controller.signal
+      )
       controller.signal.throwIfAborted()
       record.status = 'completed'
       record.finishedAt = Date.now()
       this.records.cache(output.finish())
-    } catch {
+    } catch (error) {
       record.status = controller.signal.aborted ? 'cancelled' : 'failed'
       record.finishedAt = Date.now()
-      record.error = {
-        code: `database_${phase}_failed`,
-        message: `Database query could not complete its ${phase} step`
-      }
+      record.error = databaseQueryFailure(error, phase)
     }
     await this.records.save(record)
   }

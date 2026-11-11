@@ -40,6 +40,10 @@ export class DatabaseQueryOutput implements DatabaseResultSink {
     return this.halted
   }
 
+  markTruncated(): void {
+    this.truncated = true
+  }
+
   columns(columns: DatabaseColumn[]): void {
     if (
       !columns.length ||

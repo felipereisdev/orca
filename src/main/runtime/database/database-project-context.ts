@@ -1,17 +1,21 @@
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { DatabaseProjectKey } from '../../../shared/database/database-contracts'
-import { getRepoExecutionHostId } from '../../../shared/execution-host'
+import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { RpcContext } from '../rpc/core'
 import { rpcCallerOperationKey } from '../rpc/rpc-caller-identity'
 import type { DatabaseActor } from '../../database/execution/database-query-actor'
 import { sameDatabaseProject } from '../../database/catalog/database-project-scope'
 
-export type DatabaseScope = { project?: string; worktree?: string }
-export type DatabaseRuntimeHost = Pick<
-  OrcaRuntimeService,
-  'requireStore' | 'getRuntimeId' | 'listRepos' | 'showManagedWorktree'
->
+export type DatabaseScope = {
+  project?: string
+  worktree?: string
+  executionHostId?: ExecutionHostId
+}
+export type DatabaseRuntimeHost = Partial<
+  Pick<OrcaRuntimeService, 'resolveOrchestrationWorkerServer' | 'callOrchestrationWorkerServer'>
+> &
+  Pick<OrcaRuntimeService, 'requireStore' | 'getRuntimeId' | 'listRepos' | 'showManagedWorktree'>
 
 export async function resolveDatabaseProject(
   runtime: DatabaseRuntimeHost,

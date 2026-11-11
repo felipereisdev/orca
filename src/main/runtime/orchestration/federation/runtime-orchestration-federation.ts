@@ -104,7 +104,7 @@ export class RuntimeOrchestrationFederation {
     const response =
       isOrchestrationMutation(method, params) && !internal?.contractVerified
         ? await this.sendOnContractVerifiedRuntime(transport, selector, send, timeoutMs, internal)
-        : await send()
+        : await send(internal?.expectedRuntimeId)
     if (response.ok === false) {
       throw new OrchestrationError(response.error.code, response.error.message, response.error.data)
     }

@@ -1,5 +1,5 @@
 import { killWslChannelsInCloseGrace } from '../wsl/execution/wsl-command-channel'
-import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-commands'
+import { disposeRuntimeDatabase } from '../runtime/database/runtime-database-service-slot'
 import { markHostShuttingDown } from './quit/host-shutdown-state'
 import { app, type Event } from 'electron'
 import { closeAllWatchers } from '../ipc/filesystem/watchers/filesystem-watcher-shutdown'

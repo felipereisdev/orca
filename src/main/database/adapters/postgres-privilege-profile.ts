@@ -1,5 +1,4 @@
 import type { Client } from 'pg'
-import { validateDatabaseReadQuery } from '../query-policy/database-query-policy'
 import type { DatabasePreflightResult } from './database-adapter'
 
 const profileSql = `
@@ -71,8 +70,11 @@ export async function assertPostgresPrivilegeProfile(
   if (views.rows.length > 1000) {
     throw new Error('PostgreSQL view profile exceeds its inspection limit')
   }
+  const validate = views.rows.length
+    ? (await import('../query-policy/database-query-policy')).validateDatabaseReadQuery
+    : undefined
   for (const view of views.rows) {
-    validateDatabaseReadQuery('postgres', view.definition)
+    validate?.('postgres', view.definition)
   }
   return { serverVersion: result.rows[0].version, readOnlyProfile: true }
 }

@@ -1,4 +1,3 @@
-import { parseSql } from '@orca/sql-read-query-parser'
 import type { Client } from 'pg'
 import type { DatabaseColumn } from '../../../shared/database/database-query-contracts'
 
@@ -10,11 +9,7 @@ export async function preparePostgresResultQuery(
   sql: string
   columns: DatabaseColumn[]
 }> {
-  const tokens = parseSql('postgres', sql).tokens
-  if (tokens.at(-1)?.text === ';') {
-    tokens.pop()
-  }
-  const statement = tokens.map((token) => token.text).join(' ')
+  const statement = sql
   const description = await client.query({
     text: `SELECT * FROM (${statement}) AS _orca_description LIMIT 0`,
     values,

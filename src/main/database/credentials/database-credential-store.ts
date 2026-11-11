@@ -1,3 +1,4 @@
+import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { getSecretStore } from '../../../shared/secret-store'
@@ -26,7 +27,7 @@ export class DatabaseCredentialStore {
     const value = credential.parse(credentials)
     const keyring = getSecretStore()
     if (!keyring.isEncryptionAvailable() || keyring.describeProtectionGap() !== null) {
-      throw new Error('Secure credential storage is unavailable on this execution host')
+      throw new DatabaseOperationError('database_credential_storage_unavailable')
     }
     const encrypted = this.secrets.encrypt(`databaseCredential:${ref}`, JSON.stringify(value))
     if (encrypted.degraded || !encrypted.blob) {
