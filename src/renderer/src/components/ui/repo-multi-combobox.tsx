@@ -16,20 +16,23 @@ import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 
-type RepoMultiComboboxProps = {
-  repos: readonly Repo[]
+type RepoOption = Pick<Repo, 'id' | 'displayName' | 'path' | 'badgeColor'>
+type RepoMultiComboboxProps<T extends RepoOption> = {
+  repos: readonly T[]
   /** Keep at least one repo selected by disabling its last checkbox. */
   selected: ReadonlySet<string>
   /** Emit a full selection, never null; the caller persists sticky-all as null. */
   onChange: (next: ReadonlySet<string>) => void
   /** Signal explicit All selection so persistence includes future repos rather than freezing this snapshot. */
   onSelectAll: () => void
-  getRepoHostLabel?: (repo: Repo) => string | null | undefined
+  getRepoHostLabel?: (repo: T) => string | null | undefined
   triggerClassName?: string
+  allowEmpty?: boolean
+  ariaLabel?: string
 }
 
 function renderTriggerLabel(
-  repos: readonly Repo[],
+  repos: readonly RepoOption[],
   selected: ReadonlySet<string>,
   t: Translate = translate
 ): React.JSX.Element {
@@ -40,7 +43,14 @@ function renderTriggerLabel(
       </span>
     )
   }
-  if (selected.size === repos.length) {
+  if (selected.size === 0) {
+    return (
+      <span className="text-muted-foreground">
+        {t('database.projects.choose', 'Choose projects')}
+      </span>
+    )
+  }
+  if (repos.every((repo) => selected.has(repo.id))) {
     return (
       <span className="inline-flex min-w-0 items-center gap-1.5">
         {t('auto.components.ui.repo.multi.combobox.bfd8ce21c6', 'All projects')}
@@ -64,26 +74,28 @@ function renderTriggerLabel(
   )
 }
 
-export function getRepoMultiComboboxDetail(repo: Repo, hostLabel?: string | null): string {
+export function getRepoMultiComboboxDetail(repo: RepoOption, hostLabel?: string | null): string {
   const trimmedHostLabel = hostLabel?.trim()
   return trimmedHostLabel ? `${trimmedHostLabel} · ${repo.path}` : repo.path
 }
 
-export default function RepoMultiCombobox({
+export default function RepoMultiCombobox<T extends RepoOption>({
   repos,
   selected,
   onChange,
   onSelectAll,
   getRepoHostLabel,
-  triggerClassName
-}: RepoMultiComboboxProps): React.JSX.Element {
+  triggerClassName,
+  allowEmpty = false,
+  ariaLabel
+}: RepoMultiComboboxProps<T>): React.JSX.Element {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [commandValue, setCommandValue] = useState('')
 
   const filteredRepos = useMemo(() => searchRepos(repos, query), [repos, query])
-  const allSelected = selected.size === repos.length && repos.length > 0
+  const allSelected = repos.length > 0 && repos.every((repo) => selected.has(repo.id))
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen)
@@ -97,7 +109,7 @@ export default function RepoMultiCombobox({
       const next = new Set(selected)
       if (next.has(repoId)) {
         // Fetch effects require a nonempty selection; block the click rather than enter a no-op state.
-        if (next.size <= 1) {
+        if (!allowEmpty && next.size <= 1) {
           return
         }
         next.delete(repoId)
@@ -106,10 +118,14 @@ export default function RepoMultiCombobox({
       }
       onChange(next)
     },
-    [onChange, selected]
+    [onChange, selected, allowEmpty]
   )
 
   const handleSelectAll = useCallback(() => {
+    if (allSelected && allowEmpty) {
+      onChange(new Set())
+      return
+    }
     if (allSelected) {
       // Toggle All to the first eligible repo when already selected; never emit an empty set.
       const first = repos[0]
@@ -120,7 +136,7 @@ export default function RepoMultiCombobox({
       return
     }
     onSelectAll()
-  }, [allSelected, onChange, onSelectAll, repos])
+  }, [allSelected, onChange, onSelectAll, repos, allowEmpty])
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -129,6 +145,7 @@ export default function RepoMultiCombobox({
           type="button"
           variant="outline"
           role="combobox"
+          aria-label={ariaLabel}
           aria-expanded={open}
           className={cn('h-8 w-full justify-between px-3 text-xs font-normal', triggerClassName)}
         >
@@ -182,7 +199,7 @@ export default function RepoMultiCombobox({
             </CommandEmpty>
             {filteredRepos.map((repo) => {
               const isSelected = selected.has(repo.id)
-              const isLastSelected = isSelected && selected.size <= 1
+              const isLastSelected = !allowEmpty && isSelected && selected.size <= 1
               const detail = getRepoMultiComboboxDetail(repo, getRepoHostLabel?.(repo))
               return (
                 <CommandItem
@@ -206,7 +223,7 @@ export default function RepoMultiCombobox({
                         className="max-w-full"
                       />
                     </span>
-                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{detail}</p>
+                    <p className="mt-0.5 truncate text-3xs text-muted-foreground">{detail}</p>
                   </div>
                 </CommandItem>
               )

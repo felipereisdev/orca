@@ -5,8 +5,9 @@ import { isClipboardTextByteLengthOverLimit } from '../../../shared/clipboard-te
 const PATH_SCORE_OFFSET = 1000
 export const REPO_SEARCH_QUERY_MAX_BYTES = 2 * 1024
 
-type RepoMatch = {
-  repo: Repo
+type SearchableRepo = Pick<Repo, 'displayName' | 'path'>
+type RepoMatch<T extends SearchableRepo> = {
+  repo: T
   score: number
   index: number
 }
@@ -18,7 +19,7 @@ export function isRepoSearchQueryTooLarge(
   return isClipboardTextByteLengthOverLimit(query, maxBytes)
 }
 
-function matchScore(repo: Repo, query: string): number | null {
+function matchScore(repo: SearchableRepo, query: string): number | null {
   const displayNameIndex = repo.displayName.toLowerCase().indexOf(query)
   if (displayNameIndex !== -1) {
     return displayNameIndex
@@ -33,7 +34,10 @@ function matchScore(repo: Repo, query: string): number | null {
   return null
 }
 
-export function searchRepos(repos: readonly Repo[], rawQuery: string): readonly Repo[] {
+export function searchRepos<T extends SearchableRepo>(
+  repos: readonly T[],
+  rawQuery: string
+): readonly T[] {
   if (isRepoSearchQueryTooLarge(rawQuery)) {
     return []
   }
@@ -43,7 +47,7 @@ export function searchRepos(repos: readonly Repo[], rawQuery: string): readonly 
     return repos
   }
 
-  const matches: RepoMatch[] = []
+  const matches: RepoMatch<T>[] = []
   for (const [index, repo] of repos.entries()) {
     const score = matchScore(repo, query)
     if (score !== null) {

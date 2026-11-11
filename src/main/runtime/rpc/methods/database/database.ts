@@ -1,5 +1,6 @@
 import { defineMethod, type RpcContext } from '../../core'
 import {
+  DatabaseExecutionHost,
   DatabaseScope,
   DatabaseDescribe,
   DatabaseStartQuery,
@@ -16,6 +17,27 @@ function signal(context: RpcContext): AbortSignal {
 }
 
 export const DATABASE_METHODS = [
+  defineMethod({
+    name: 'database.settingsOptions',
+    permission: 'settings-write',
+    params: null,
+    handler: async (_params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).settingsOptions()
+  }),
+  defineMethod({
+    name: 'database.executionCapabilities',
+    permission: 'workspace',
+    params: null,
+    handler: async (_params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).executionCapabilities()
+  }),
+  defineMethod({
+    name: 'database.hostCapabilities',
+    permission: 'settings-write',
+    params: DatabaseExecutionHost,
+    handler: async (params, { runtime }) =>
+      (await runtimeDatabaseCommands(runtime)).hostCapabilities(params.executionHostId)
+  }),
   defineMethod({
     name: 'database.list',
     permission: 'workspace',

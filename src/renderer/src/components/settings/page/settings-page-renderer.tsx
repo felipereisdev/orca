@@ -11,6 +11,7 @@ import type { Translate } from '@/i18n/use-translate'
 import type { SettingsInteractionController } from './use-settings-interaction-controller'
 import type { SettingsRenderContext } from './settings-render-context'
 import {
+  renderDatabaseSettingsSection,
   renderAccountsSettingsSection,
   renderAgentsSettingsSection,
   renderDesktopCapabilitySettingsSections,
@@ -166,6 +167,7 @@ export function renderSettingsPage(
                   >
                     {renderAgentsSettingsSection(context, t)}
                     {renderAccountsSettingsSection(context, t)}
+                    {renderDatabaseSettingsSection(context, t)}
                     {renderOrchestrationSettingsSection(context, t)}
                     {renderLinearSettingsSection(context, t)}
                     {renderDesktopCapabilitySettingsSections(context, t)}

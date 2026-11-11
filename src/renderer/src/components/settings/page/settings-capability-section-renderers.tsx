@@ -1,3 +1,4 @@
+import { DatabaseSettingsContent } from '../database/DatabaseSettingsContent'
 import { AccountsPane } from '../accounts/AccountsPane'
 import { getProviderAccountsOwnerKey } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
 import { AgentsPane } from '../agents/AgentsPane'
@@ -188,4 +189,32 @@ export function renderDesktopCapabilitySettingsSections(
       </SettingsSection>
     </>
   ) : null
+}
+
+export function renderDatabaseSettingsSection(
+  context: SettingsRenderContext,
+  t: Translate = translate
+): React.JSX.Element {
+  const { model, navigation, view } = context
+  return (
+    <SettingsSection
+      id="database"
+      grouped
+      hideHeader
+      title={t('database.settings.title', 'Database connections')}
+      description={t(
+        'database.settings.description',
+        'Register read-only environments and associate them with projects'
+      )}
+      searchEntries={navigation.getSectionSearchEntries('database')}
+    >
+      {view.isSectionMounted('database') ? (
+        model.settingsHostScope.available ? (
+          <DatabaseSettingsContent target={model.settingsHostScope.target} />
+        ) : (
+          <SettingsHostScopeUnavailableNotice />
+        )
+      ) : null}
+    </SettingsSection>
+  )
 }

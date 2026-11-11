@@ -24796,5 +24796,94 @@
       "dismiss": "Dismiss",
       "cancelDownload": "Cancel download"
     }
+  },
+  "database": {
+    "form": {
+      "name": "Name",
+      "alias": "Mention alias",
+      "engine": "Database type",
+      "environment": "Environment",
+      "endpoint": "Connection",
+      "server": "Server",
+      "port": "Port",
+      "service": "Service name",
+      "database": "Database",
+      "credentials": "Credentials",
+      "keepCredentials": "Leave both fields blank to keep the stored credentials",
+      "readAccount": "Use a dedicated read-only account",
+      "username": "Username",
+      "password": "Password",
+      "tls": "TLS certificate settings",
+      "tlsHelp": "TLS and certificate verification are always enabled",
+      "tlsName": "Certificate server name (optional)",
+      "ca": "CA certificate in PEM format (optional)",
+      "executionHost": "Execute on",
+      "hostLocked": "Create a new connection to move credentials to another host",
+      "projects": "Associated projects",
+      "projectHelp": "The same connection can be used by several projects, including folder workspaces",
+      "checkingHost": "Checking execution host…",
+      "storageUnavailable": "Protected credential storage is unavailable on this host",
+      "discardTitle": "Discard connection changes?",
+      "discardHelp": "The unsaved changes and entered credentials will be discarded",
+      "discard": "Discard",
+      "edit": "Edit connection",
+      "add": "New connection",
+      "description": "Register an environment once and associate it with projects",
+      "verified": "Connection and read-only account profile verified",
+      "notVerified": "The account does not match the read-only profile",
+      "saveBeforeTest": "Save changes before testing the connection",
+      "testSaved": "Test saved connection",
+      "save": "Save connection",
+      "hostUnavailable": "The execution host or protected credential storage is unavailable",
+      "credentialsRequired": "Enter both a username and password",
+      "invalidDetails": "Review the highlighted connection details before saving",
+      "aliasPlaceholder": "faturacao-hmg",
+      "environmentPlaceholder": "HMG"
+    },
+    "catalog": {
+      "connection": "Connection",
+      "projects": "Projects",
+      "unassociated": "No projects",
+      "actions": "Actions for @{{alias}}",
+      "moreActions": "Connection actions",
+      "test": "Test connection",
+      "checking": "Checking connection and read-only profile…",
+      "verified": "Read-only profile verified",
+      "profileFailed": "The account does not match the read-only profile",
+      "search": "Search connections",
+      "searchPlaceholder": "Search name, alias or environment…",
+      "allTypes": "All types",
+      "loading": "Loading connections…",
+      "noMatches": "No connections match this search",
+      "empty": "Add your first database environment",
+      "clearSearch": "Clear search",
+      "readOnlyHelp": "Queries use the selected environment and are restricted to read-only access. Credentials stay on the execution host."
+    },
+    "edit": "Edit",
+    "remove": {
+      "title": "Remove database connection?",
+      "help": "This removes @{{alias}} and its project associations. The alias cannot be reused.",
+      "action": "Remove"
+    },
+    "retry": "Retry",
+    "loading": "Loading connection…",
+    "cancel": "Cancel",
+    "settings": {
+      "title": "Database connections",
+      "description": "Register read-only environments and associate them with projects"
+    },
+    "add": "New connection",
+    "projects": {
+      "choose": "Choose projects"
+    },
+    "search": {
+      "database": "database",
+      "postgres": "postgres",
+      "sqlServer": "sql server",
+      "oracle": "oracle",
+      "connections": "connections",
+      "readOnly": "read-only",
+      "environment": "environment"
+    }
   }
 }

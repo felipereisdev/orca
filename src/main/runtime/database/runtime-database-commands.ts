@@ -1,3 +1,7 @@
+import { getSecretStore } from '../../../shared/secret-store'
+import { z } from 'zod'
+import { databaseSettingsOptions } from './database-settings-options'
+import type { ExecutionHostId } from '../../../shared/execution-host'
 import { DatabaseQueryAdmission } from '../../database/execution/database-query-admission'
 import { DatabaseQueryRecords } from '../../database/execution/database-query-records'
 import { DatabaseExecutionRouter } from '../../database/routing/database-execution-route'
@@ -89,6 +93,30 @@ export class RuntimeDatabaseCommands {
       executionHostId: 'local',
       adapter: (engine) => this.adapters.get(engine)
     })
+  }
+
+  executionCapabilities() {
+    const keyring = getSecretStore()
+    return {
+      engines: [...this.adapters.keys()],
+      protectedCredentialStorage:
+        keyring.isEncryptionAvailable() && keyring.describeProtectionGap() === null
+    }
+  }
+  settingsOptions() {
+    return databaseSettingsOptions(this.runtime, this.executionCapabilities())
+  }
+  async hostCapabilities(executionHostId: ExecutionHostId) {
+    if (executionHostId === 'local') {
+      return this.executionCapabilities()
+    }
+    const route = await this.router.routeHost('capability-probe', executionHostId)
+    return z
+      .object({
+        engines: z.array(z.enum(['postgres', 'sql-server', 'oracle'])).max(3),
+        protectedCredentialStorage: z.boolean()
+      })
+      .parse(await this.router.call(route, 'database.executionCapabilities', undefined))
   }
 
   save(

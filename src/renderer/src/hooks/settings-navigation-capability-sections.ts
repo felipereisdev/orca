@@ -1,3 +1,4 @@
+import { getDatabaseConnectionsSearchEntries } from '@/components/settings/database/database-connections-search'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { getAccountsPaneSearchEntries } from '@/components/settings/accounts/accounts-search'
 import { getAgentsPaneSearchEntries } from '@/components/settings/agents/agents-search'
@@ -14,6 +15,7 @@ import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import type { SettingsNavSection } from '@/components/settings/navigation/settings-navigation-types'
 import {
+  Database,
   Blocks,
   Bot,
   CircleUserRound,
@@ -60,6 +62,17 @@ export function buildCapabilitySettingsSections(
       searchEntries: getAccountsPaneSearchEntries(),
       group: 'capabilities',
       badge: t('auto.hooks.useSettingsNavigationMetadata.7c79d3b7bf', 'Optional')
+    },
+    {
+      id: 'database',
+      title: t('database.settings.title', 'Database connections'),
+      description: t(
+        'database.settings.description',
+        'Register read-only environments and associate them with projects'
+      ),
+      icon: Database,
+      searchEntries: getDatabaseConnectionsSearchEntries(),
+      group: 'capabilities'
     },
     {
       id: 'orchestration',

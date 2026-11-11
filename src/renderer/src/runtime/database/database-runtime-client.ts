@@ -1,3 +1,8 @@
+import type {
+  DatabaseSettingsOptions,
+  DatabaseHostCapabilities
+} from '../../../../shared/database/database-settings-options'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { z } from 'zod'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { RuntimeStatus } from '../../../../shared/runtime-session-contracts'
@@ -59,6 +64,9 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
   return {
     target,
     status,
+    settingsOptions: () => call<DatabaseSettingsOptions>('database.settingsOptions'),
+    hostCapabilities: (executionHostId: ExecutionHostId) =>
+      call<DatabaseHostCapabilities>('database.hostCapabilities', { executionHostId }),
     catalog: () => call<DatabaseConnectionSummary[]>('database.catalog'),
     configuration: (connectionId: string) =>
       call<DatabaseConnectionConfiguration>('database.configuration', { connectionId }),

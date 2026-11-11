@@ -111,3 +111,7 @@ export const DatabaseBindingStart = DatabaseBindingQuery.extend({
   sql: z.string().min(1).max(65536),
   parameters: DatabaseParameters
 })
+
+export const DatabaseExecutionHost = z.object({
+  executionHostId: databaseProjectSchema.shape.executionHostId
+})
