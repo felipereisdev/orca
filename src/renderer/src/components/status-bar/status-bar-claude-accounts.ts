@@ -72,7 +72,7 @@ function getClaudeStatusAccountsForTarget(
 export function buildClaudeStatusSwitchGroups(
   state: ClaudeRateLimitAccountsState,
   currentTarget: CodexStatusRuntimeTarget,
-  options: StatusSwitchGroupOptions = {}
+  options: StatusSwitchGroupOptions & { systemDefault?: 'always' | 'fallback' } = {}
 ): ClaudeStatusSwitchGroup[] {
   const groups: ClaudeStatusSwitchGroup[] = []
   const normalizedCurrentTarget = normalizeClaudeStatusRuntimeTarget(state, currentTarget)
@@ -84,15 +84,22 @@ export function buildClaudeStatusSwitchGroups(
       label: getCodexStatusRuntimeLabel(target, options.hostLabel),
       runtimeTarget: target,
       targets: [
-        {
-          id: null,
-          label: translate('auto.components.status.bar.StatusBar.c676918adc', 'System default'),
-          active: activeId === null,
-          runtimeTarget: target
-        },
+        ...(options.systemDefault !== 'fallback' || accountsForTarget.length === 0
+          ? [
+              {
+                id: null,
+                label: translate(
+                  'auto.components.status.bar.StatusBar.c676918adc',
+                  'System default'
+                ),
+                active: activeId === null,
+                runtimeTarget: target
+              }
+            ]
+          : []),
         ...accountsForTarget.map((account) => ({
           id: account.id,
-          label: account.email,
+          label: account.label || account.email,
           active: account.id === activeId,
           runtimeTarget: target,
           ...(account.needsSignIn
@@ -164,20 +171,22 @@ function getClaudeStatusAccountsFromSettings(
   const hostRows = new Map(runtimeState.accounts.map((account) => [account.id, account]))
   return {
     accounts: settings.claudeManagedAccounts
-      .map(
-        (account): ClaudeStatusAccount =>
-          hostRows.get(account.id) ?? {
-            id: account.id,
-            email: account.email,
-            managedAuthRuntime: account.managedAuthRuntime ?? 'host',
-            wslDistro: account.wslDistro ?? null,
-            authMethod: account.authMethod ?? 'unknown',
-            organizationUuid: account.organizationUuid ?? null,
-            organizationName: account.organizationName ?? null,
-            createdAt: account.createdAt,
-            updatedAt: account.updatedAt,
-            lastAuthenticatedAt: account.lastAuthenticatedAt
-          }
+      .map((account): ClaudeStatusAccount =>
+        hostRows.has(account.id)
+          ? { ...hostRows.get(account.id)!, label: account.label }
+          : {
+              id: account.id,
+              label: account.label,
+              email: account.email,
+              managedAuthRuntime: account.managedAuthRuntime ?? 'host',
+              wslDistro: account.wslDistro ?? null,
+              authMethod: account.authMethod ?? 'unknown',
+              organizationUuid: account.organizationUuid ?? null,
+              organizationName: account.organizationName ?? null,
+              createdAt: account.createdAt,
+              updatedAt: account.updatedAt,
+              lastAuthenticatedAt: account.lastAuthenticatedAt
+            }
       )
       .sort((a, b) => b.updatedAt - a.updatedAt),
     activeAccountId:

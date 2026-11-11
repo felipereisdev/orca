@@ -244,6 +244,20 @@ export function resolveOwnerUsageRateLimits(
   }
   return {
     ...base,
+    inactiveClaudeAccounts: base.inactiveClaudeAccounts.map((account) => ({
+      ...account,
+      isFetching: false,
+      rateLimits: stamp('claude')
+    })),
+    inactiveCodexAccounts: base.inactiveCodexAccounts.map((account) => ({
+      ...account,
+      isFetching: false,
+      rateLimits: stamp('codex')
+    })),
+    antigravityAccounts: base.antigravityAccounts.map((account) => ({
+      ...account,
+      rateLimits: stamp('antigravity')
+    })),
     ...mapProviders((key) => {
       const provider = base[key]
       // Preserve absent slots, but end loading for real fetching slots when contact is lost.

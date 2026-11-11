@@ -30,6 +30,7 @@ export function ProviderDetailsMenu({
   trigger,
   accountLabel,
   panelFooter,
+  panelContent,
   variant = 'default'
 }: {
   provider: ProviderRateLimits | null
@@ -46,6 +47,7 @@ export function ProviderDetailsMenu({
   trigger?: React.ReactElement
   accountLabel?: string
   panelFooter?: React.ReactNode
+  panelContent?: React.ReactNode
   variant?: 'default' | 'account'
 }): React.JSX.Element {
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
@@ -65,7 +67,9 @@ export function ProviderDetailsMenu({
   const panelBody = (
     <>
       {topContent}
-      {provider ? (
+      {panelContent !== undefined ? (
+        <div className="p-2">{panelContent}</div>
+      ) : provider ? (
         <div className="p-2">
           {variant === 'account' ? (
             <ProviderIdentityCard
@@ -82,7 +86,9 @@ export function ProviderDetailsMenu({
       {children ? (
         <>
           {/* Why: the account card is already bordered, so a rule under it is redundant. */}
-          {variant === 'account' && provider ? null : <DropdownMenuSeparator />}
+          {variant === 'account' && (provider || panelContent !== undefined) ? null : (
+            <DropdownMenuSeparator />
+          )}
           {children}
         </>
       ) : null}

@@ -13,6 +13,10 @@ import {
 import { toast } from 'sonner'
 import { getClaudeAccountErrorDescription } from '../../lib/provider-accounts/provider-account-action-errors'
 import { useTranslate } from '@/i18n/use-translate'
+import { normalizeUsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { ClaudeAccountUsagePanel } from './ClaudeAccountUsagePanel'
+import { ClaudeAccountSwitchRows } from './ClaudeAccountSwitchRows'
 import {
   getWindowsTerminalCapabilityOwnerKey,
   useWindowsTerminalCapabilities
@@ -34,17 +38,10 @@ import {
 } from './status-bar-claude-accounts'
 import { handleRunningClaudeSessionsAfterSwitch } from '@/lib/provider-accounts/claude-account-switch-sessions'
 import { AccountRuntimeToggle } from './StatusBarAccountControls'
-import {
-  InlineUsageBars,
-  InlineUsageSignInAction,
-  InlineUsageSkeleton
-} from './InlineProviderUsage'
-import { AccountSwitchSection, AccountSwitchSignedOutHeading } from './AccountSwitchList'
-import { AccountSwitchRowItem } from './AccountSwitchRowItem'
+import { AccountSwitchSection } from './AccountSwitchList'
 import { ProviderDetailsMenu } from './ProviderDetailsMenu'
 import { signInToClaudeAccount } from '@/lib/provider-accounts/claude-account-sign-in'
 
-// Retain account switch/reset drill-in even though the footer now opens UsageRosterPanel.
 export function ClaudeSwitcherForOwner({
   claude,
   compact,
@@ -52,11 +49,15 @@ export function ClaudeSwitcherForOwner({
   asSubmenu = false,
   triggerContent,
   chatAction,
+  usageState,
+  usageAccounts,
   owner
 }: ClaudeSwitcherMenuProps & { owner: AccountOwner }): React.JSX.Element | null {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [isSwitching, setIsSwitching] = useState(false)
+  const [viewRuntime, setViewRuntime] = useState<string | null>(null)
+  const display = normalizeUsagePercentageDisplay(useAppStore((s) => s.usagePercentageDisplay))
   const [signingInId, setSigningInId] = useState<string | null>(null)
   const signingInRef = useRef(false)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
@@ -71,12 +72,13 @@ export function ClaudeSwitcherForOwner({
   const hasActiveRuntimeEnvironment = activeRuntimeEnvironmentId !== null
   const {
     inactiveClaudeAccounts,
-    claudeTarget,
+    claudeTarget: storedClaudeTarget,
     settings,
     ownHostName,
     accountSettings,
     claudeAccountSyncKey
   } = useClaudeSwitcherState(chatAction, activeRuntimeEnvironmentId)
+  const claudeTarget = usageState?.claudeTarget ?? storedClaudeTarget
   const providerAccountHostLabel = hasActiveRuntimeEnvironment
     ? (ownHostName ?? t('auto.components.status.bar.StatusBar.remoteServerLabel', 'Remote server'))
     : undefined
@@ -92,13 +94,13 @@ export function ClaudeSwitcherForOwner({
       runtimeTarget,
       claudeAccountSyncKey,
       emptyClaudeAccountsState(),
-      !!chatAction
+      !!chatAction,
+      !hasActiveRuntimeEnvironment || !!chatAction
     )
-  const accountState = resolveClaudeStatusAccountState(
-    accountSettings,
-    accounts,
-    activeRuntimeEnvironmentId
-  )
+  const accountState =
+    hasActiveRuntimeEnvironment && !chatAction
+      ? (usageAccounts ?? emptyClaudeAccountsState())
+      : resolveClaudeStatusAccountState(accountSettings, accounts, activeRuntimeEnvironmentId)
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean): void => {
@@ -109,12 +111,13 @@ export function ClaudeSwitcherForOwner({
       if (!hasActiveRuntimeEnvironment) {
         void fetchInactiveClaudeAccountUsage()
       }
-      // Why reload: the login each account folder holds changes without a settings change.
-      void loadAccounts().catch((error) => {
-        console.error('Failed to load Claude accounts for status bar:', error)
-      })
+      if (!hasActiveRuntimeEnvironment || chatAction) {
+        void loadAccounts().catch((error) => {
+          console.error('Failed to load Claude accounts for status bar:', error)
+        })
+      }
     },
-    [fetchInactiveClaudeAccountUsage, hasActiveRuntimeEnvironment, loadAccounts]
+    [fetchInactiveClaudeAccountUsage, hasActiveRuntimeEnvironment, loadAccounts, chatAction]
   )
 
   const handleSelectAccount = async (
@@ -191,6 +194,10 @@ export function ClaudeSwitcherForOwner({
   }
 
   const handleSelectRuntime = async (group: ClaudeStatusSwitchGroup): Promise<void> => {
+    if (hasActiveRuntimeEnvironment) {
+      setViewRuntime(group.key)
+      return
+    }
     const currentKey = getCodexStatusRuntimeKey(
       normalizeClaudeStatusRuntimeTarget(accountState, toCodexStatusRuntimeTarget(claudeTarget))
     )
@@ -219,12 +226,14 @@ export function ClaudeSwitcherForOwner({
       includeFallbackWsl:
         wslHostDistro !== null ||
         (!hasActiveRuntimeEnvironment && shouldIncludeSettingsWslRuntime(settings)),
-      hostLabel: providerAccountHostLabel
+      hostLabel: providerAccountHostLabel,
+      systemDefault: chatAction ? 'always' : 'fallback'
     }
   )
   const selectedGroup = chatAction
     ? switchGroups.find((group) => group.runtimeTarget.runtime === 'host')
-    : (switchGroups.find((group) => group.key === selectedRuntimeKey) ?? switchGroups[0])
+    : (switchGroups.find((group) => group.key === (viewRuntime ?? selectedRuntimeKey)) ??
+      switchGroups[0])
 
   const accountControl = providerChatAccountControl(
     'claude',
@@ -237,54 +246,16 @@ export function ClaudeSwitcherForOwner({
     return runtimeTarget.kind === 'local' ? accountControl.button : null
   }
 
-  const rows = (selectedGroup?.targets ?? []).map((target) => ({
-    target,
-    inactiveUsage: target.id ? inactiveClaudeAccounts.find((a) => a.accountId === target.id) : null,
-    // Why local only: the hidden sign-in runs on this device, not a remote server.
-    signInId: target.needsSignIn && !hasActiveRuntimeEnvironment ? target.id : null
-  }))
-  const signedOutRows = rows.filter((row) => row.signInId)
-  const renderRow = ({
-    target,
-    inactiveUsage,
-    signInId
-  }: (typeof rows)[number]): React.JSX.Element => (
-    <AccountSwitchRowItem
-      label={target.label}
-      detail={target.hint}
-      active={target.active}
-      key={`${selectedGroup?.key}:${target.id ?? 'system'}`}
-      disabled={
-        isSwitching ||
-        signingInId !== null ||
-        (signInId === null && (target.active || target.disabled))
-      }
-      onSelect={(event) => {
-        event.preventDefault()
-        if (signInId) {
-          void handleSignIn(signInId)
-        } else if (!target.active) {
-          void handleSelectAccount(target.id, target.runtimeTarget)
-        }
-      }}
-      action={
-        signInId ? (
-          <InlineUsageSignInAction
-            accountLabel={target.label}
-            isSigningIn={signingInId === signInId}
-            disabled={isSwitching || signingInId !== null}
-            onSignIn={() => void handleSignIn(signInId)}
-          />
-        ) : undefined
-      }
-    >
-      {signInId ? null : inactiveUsage?.isFetching && !inactiveUsage.rateLimits ? (
-        <InlineUsageSkeleton />
-      ) : inactiveUsage?.rateLimits ? (
-        <InlineUsageBars limits={inactiveUsage.rateLimits} isFetching={inactiveUsage.isFetching} />
-      ) : null}
-    </AccountSwitchRowItem>
-  )
+  const openAccountSettings = () => {
+    openSettingsTarget({
+      pane: 'accounts',
+      repoId: null,
+      sectionId: 'accounts-claude',
+      hostScope: runtimeTarget,
+      ...(chatAction ? { intent: 'native-accounts' as const } : {})
+    })
+    openSettingsPage()
+  }
 
   return (
     <ProviderDetailsMenu
@@ -299,6 +270,28 @@ export function ClaudeSwitcherForOwner({
         'Open Claude details and account switcher'
       )}
       variant="account"
+      panelContent={
+        chatAction ? undefined : (
+          <ClaudeAccountUsagePanel
+            key={selectedGroup?.key}
+            group={selectedGroup}
+            accounts={accountState.accounts}
+            loaded={
+              hasActiveRuntimeEnvironment
+                ? usageAccounts != null
+                : accountsLoaded || accountState.accounts.length > 0
+            }
+            activeUsage={selectedGroup?.key === selectedRuntimeKey ? claude : null}
+            previews={
+              usageState?.inactiveClaudeAccounts ??
+              (hasActiveRuntimeEnvironment ? [] : inactiveClaudeAccounts)
+            }
+            display={display}
+            signingInId={signingInId}
+            onSignIn={hasActiveRuntimeEnvironment ? undefined : (id) => void handleSignIn(id)}
+          />
+        )
+      }
       accountLabel={
         !hasActiveRuntimeEnvironment
           ? (selectedGroup?.targets.find((target) => target.active)?.label ??
@@ -318,28 +311,31 @@ export function ClaudeSwitcherForOwner({
       open={open}
       onOpenChange={handleOpenChange}
     >
-      <AccountSwitchSection
-        heading={t('auto.components.status.bar.StatusBar.d450654fa2', 'Claude Account')}
-        targets={selectedGroup?.targets ?? []}
-        panelShowsActiveAccount={!hasActiveRuntimeEnvironment}
-        onOpenSettings={() => {
-          openSettingsTarget({
-            pane: 'accounts',
-            repoId: null,
-            sectionId: 'accounts-claude',
-            ...(chatAction ? { hostScope: chatAction.target, intent: 'native-accounts' } : {})
-          })
-          openSettingsPage()
-        }}
-      >
-        {rows.filter((row) => !row.signInId).map(renderRow)}
-        {signedOutRows.length > 0 ? (
-          <>
-            <AccountSwitchSignedOutHeading />
-            {signedOutRows.map(renderRow)}
-          </>
-        ) : null}
-      </AccountSwitchSection>
+      {chatAction ? (
+        <AccountSwitchSection
+          heading={t('auto.components.status.bar.StatusBar.d450654fa2', 'Claude Account')}
+          targets={selectedGroup?.targets ?? []}
+          panelShowsActiveAccount={!hasActiveRuntimeEnvironment}
+          onOpenSettings={openAccountSettings}
+        >
+          <ClaudeAccountSwitchRows
+            group={selectedGroup}
+            previews={inactiveClaudeAccounts}
+            isSwitching={isSwitching}
+            signingInId={signingInId}
+            canSignIn={!hasActiveRuntimeEnvironment}
+            onSignIn={(id) => void handleSignIn(id)}
+            onSelect={(id, target) => void handleSelectAccount(id, target)}
+          />
+        </AccountSwitchSection>
+      ) : (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={openAccountSettings}>
+            {t('auto.components.status.bar.StatusBar.75ded02687', 'Manage Accounts…')}
+          </DropdownMenuItem>
+        </>
+      )}
     </ProviderDetailsMenu>
   )
 }

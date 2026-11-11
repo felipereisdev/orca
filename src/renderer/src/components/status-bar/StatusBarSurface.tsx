@@ -78,6 +78,8 @@ export function StatusBarSurface({
     canSignInFromUsageRow,
     collapseUsage,
     collapsedUsageProviders,
+    claudeUsageState,
+    claudeUsageAccounts,
     compact,
     floatingTerminalActionLabel,
     floatingTerminalShortcut,
@@ -229,6 +231,8 @@ export function StatusBarSurface({
                         return (
                           <ClaudeSwitcherMenu
                             claude={p}
+                            usageState={claudeUsageState}
+                            usageAccounts={claudeUsageAccounts}
                             compact={compact}
                             iconOnly={false}
                             asSubmenu

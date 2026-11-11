@@ -139,7 +139,6 @@
 1 src/renderer/src/components/skills/SkillsPage.tsx
 1 src/renderer/src/components/skills/setup/linear-agent-skill-install-cta.tsx
 1 src/renderer/src/components/source-control/BaseRefPicker.tsx
-1 src/renderer/src/components/status-bar/ClaudeSwitcherMenu.tsx
 1 src/renderer/src/components/status-bar/CodexSwitcherMenu.tsx
 1 src/renderer/src/components/status-bar/SshStatusSegment.tsx
 1 src/renderer/src/components/status-bar/StatusBarSurface.tsx

@@ -23,7 +23,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const floatingTerminalShortcut = useShortcutLabel('floatingTerminal.toggle')
   const localRateLimits = useAppStore((s) => s.rateLimits)
   // Why: with a remote account owner the agents run there, so its usage is the one to show.
-  const { rateLimits, remoteOwner, refreshRemote } = useOwnerUsageRateLimits(localRateLimits)
+  const { rateLimits, claudeAccounts, remoteOwner, refreshRemote } =
+    useOwnerUsageRateLimits(localRateLimits)
   const remoteOwned = remoteOwner !== null
   const settings = useAppStore((s) => s.settings)
   const refreshRateLimits = useAppStore((s) => s.refreshRateLimits)
@@ -277,6 +278,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   }
 
   return {
+    claudeUsageState: rateLimits,
+    claudeUsageAccounts: claudeAccounts,
     antigravityAccounts: rateLimits.antigravityAccounts,
     anyFetching,
     anyVisible,

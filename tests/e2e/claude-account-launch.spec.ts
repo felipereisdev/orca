@@ -111,6 +111,82 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
   await page.screenshot({ path: testInfo.outputPath('accounts-menu.png') })
   await page.keyboard.press('Escape')
 
+  await page.evaluate(async () => {
+    const store = window.__store!
+    await store.getState().updateSettings({
+      activeRuntimeEnvironmentId: 'disconnected-default-host',
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: {} }
+    })
+    const limits = (usedPercent: number) => ({
+      provider: 'claude' as const,
+      session: null,
+      weekly: { usedPercent, windowMinutes: 10_080, resetsAt: null, resetDescription: null },
+      status: 'ok' as const,
+      updatedAt: Date.now(),
+      error: null
+    })
+    store.setState({
+      statusBarVisible: true,
+      statusBarItems: ['claude'],
+      detectedAgentIds: null,
+      usagePercentageDisplay: 'used',
+      fetchInactiveClaudeAccountUsage: async () => {},
+      rateLimits: {
+        ...store.getState().rateLimits,
+        claude: limits(91),
+        inactiveClaudeAccounts: [
+          {
+            accountId: 'personal',
+            rateLimits: limits(18),
+            updatedAt: Date.now(),
+            isFetching: false
+          },
+          { accountId: 'work', rateLimits: limits(3), updatedAt: Date.now(), isFetching: false }
+        ]
+      }
+    })
+  })
+  await page.getByRole('button', { name: 'Usage', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^Claude/ }).press('ArrowRight')
+  const usageAccount = page.getByRole('combobox', { name: 'Claude Account', exact: true })
+  await expect(usageAccount).toHaveText('Pessoal')
+  await expect(page.getByText('18% used', { exact: true })).toBeVisible()
+  await usageAccount.click()
+  await expect(page.getByRole('option', { name: 'System default', exact: true })).not.toBeAttached()
+  await page.getByRole('option', { name: 'Empresa', exact: true }).click()
+  await expect(usageAccount).toHaveText('Empresa')
+  await expect(page.getByText('3% used', { exact: true })).toBeVisible()
+  await usageAccount.press('ArrowDown')
+  await expect(page.getByRole('option', { name: 'Empresa', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('option', { name: 'Empresa', exact: true })).not.toBeAttached()
+  await expect(usageAccount).toBeFocused()
+  await expect(usageAccount).toBeVisible()
+  expect(
+    await page.evaluate(async () => (await window.api.claudeAccounts.list()).activeAccountId)
+  ).toBeNull()
+  await page.screenshot({ path: testInfo.outputPath('account-usage-selector.png') })
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await page.evaluate(async () => {
+    await window.__store!.getState().updateSettings({ claudeManagedAccounts: [] })
+  })
+  await page.getByRole('button', { name: 'Usage', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^Claude/ }).press('ArrowRight')
+  await expect(usageAccount).toHaveText('System default')
+  await expect(page.getByText('91% used', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await page.evaluate(async (accounts) => {
+    await window.__store!.getState().updateSettings({
+      claudeManagedAccounts: accounts,
+      activeRuntimeEnvironmentId: null,
+      activeClaudeManagedAccountId: 'personal',
+      activeClaudeManagedAccountIdsByRuntime: { host: 'personal', wsl: {} }
+    })
+  }, accounts)
+
   for (const [label, draft] of [
     ['Pessoal', 'private draft'],
     ['Empresa', 'company draft']
