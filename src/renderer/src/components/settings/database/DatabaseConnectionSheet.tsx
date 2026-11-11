@@ -108,21 +108,23 @@ export function DatabaseConnectionSheet({
               ) : null}
               {form.test ? (
                 <div role="status" className="mt-4 flex items-start gap-2 text-sm">
-                  {form.test.readOnlyProfile ? (
+                  {form.original?.accessMode === 'read-write' || form.test.readOnlyProfile ? (
                     <ShieldCheck className="mt-0.5 size-4 shrink-0" />
                   ) : (
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                   )}
                   <p>
-                    {form.test.readOnlyProfile
-                      ? t(
-                          'database.form.verified',
-                          'Connection and read-only account profile verified'
-                        )
-                      : t(
-                          'database.form.notVerified',
-                          'The account does not match the read-only profile'
-                        )}
+                    {form.original?.accessMode === 'read-write'
+                      ? t('database.form.writeConnected', 'Connected · Read and write')
+                      : form.test.readOnlyProfile
+                        ? t(
+                            'database.form.verified',
+                            'Connection and read-only account profile verified'
+                          )
+                        : t(
+                            'database.form.notVerified',
+                            'The account does not match the read-only profile'
+                          )}
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {form.test.serverVersion}
                     </span>

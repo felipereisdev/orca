@@ -57,12 +57,13 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
         [connection.id]: {
           revision: connection.revision,
           ...result,
-          error: result.readOnlyProfile
-            ? undefined
-            : t(
-                'database.catalog.profileFailed',
-                'The account does not match the read-only profile'
-              )
+          error:
+            connection.accessMode === 'read-write' || result.readOnlyProfile
+              ? undefined
+              : t(
+                  'database.catalog.profileFailed',
+                  'The account does not match the read-only profile'
+                )
         }
       }))
     } catch (reason) {
@@ -139,7 +140,7 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
           <p className="text-settings-detail text-muted-foreground">
             {t(
               'database.settings.description',
-              'Register read-only environments and associate them with projects'
+              'Register database environments and associate them with projects'
             )}
           </p>
         </div>
@@ -234,7 +235,7 @@ export function DatabaseConnectionsPane({ client }: { client: DatabaseRuntimeCli
         <LockKeyhole className="size-4 shrink-0" />
         {t(
           'database.catalog.readOnlyHelp',
-          'Queries use the selected environment and are restricted to read-only access. Credentials stay on the execution host.'
+          'Queries use the selected environment and its configured access mode. Credentials stay on the execution host.'
         )}
       </p>
       {edit !== undefined && options ? (

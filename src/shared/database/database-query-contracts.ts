@@ -1,4 +1,9 @@
-import type { DatabaseEngine, DatabaseProjectKey, DatabaseQueryLimits } from './database-contracts'
+import type {
+  DatabaseAccessMode,
+  DatabaseEngine,
+  DatabaseProjectKey,
+  DatabaseQueryLimits
+} from './database-contracts'
 import type { ExecutionHostId } from '../execution-host'
 
 export type DatabaseParameter = {
@@ -23,6 +28,7 @@ export type DatabaseQueryInput = {
 }
 
 export type DatabaseQuerySource = {
+  accessMode?: DatabaseAccessMode
   connectionId: string
   connectionRevision: number
   alias: string
@@ -40,6 +46,7 @@ export type DatabaseQueryHandle = {
 export type DatabaseQueryStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 export type DatabaseQueryRecord = DatabaseQueryHandle & {
+  affectedRows?: number
   project: DatabaseProjectKey
   sessionId: string | null
   sql: string

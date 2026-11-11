@@ -204,7 +204,7 @@ export function renderDatabaseSettingsSection(
       title={t('database.settings.title', 'Database connections')}
       description={t(
         'database.settings.description',
-        'Register read-only environments and associate them with projects'
+        'Register database environments and associate them with projects'
       )}
       searchEntries={navigation.getSectionSearchEntries('database')}
     >

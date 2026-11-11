@@ -54,7 +54,12 @@ export function DatabaseConnectionRows({
       {connections.map((connection) => {
         const test =
           tests[connection.id]?.revision === connection.revision ? tests[connection.id] : undefined
-        const verified = test?.readOnlyProfile === true && !test.error && !test.pending
+        const verified =
+          (connection.accessMode === 'read-write'
+            ? test?.serverVersion !== undefined
+            : test?.readOnlyProfile === true) &&
+          !test?.error &&
+          !test?.pending
         return (
           <div key={connection.id} className="py-4">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 @2xl:grid-cols-[minmax(0,1.5fr)_0.9fr_1fr_minmax(0,1fr)_auto]">
@@ -65,7 +70,10 @@ export function DatabaseConnectionRows({
                     @{connection.alias}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {databaseEngineNames[connection.engine]}
+                    {databaseEngineNames[connection.engine]} ·{' '}
+                    {connection.accessMode === 'read-write'
+                      ? t('database.access.readWrite', 'Read and write')
+                      : t('database.access.readOnly', 'Read only')}
                   </span>
                 </div>
               </div>
@@ -136,9 +144,11 @@ export function DatabaseConnectionRows({
                   <ShieldCheck className="size-3.5" />
                 )}
                 {test?.pending
-                  ? t('database.catalog.checking', 'Checking connection and read-only profile…')
-                  : t('database.catalog.verified', 'Read-only profile verified')}
-                {verified && test.serverVersion ? ` · ${test.serverVersion}` : ''}
+                  ? t('database.catalog.checking', 'Checking connection…')
+                  : connection.accessMode === 'read-write'
+                    ? t('database.catalog.connected', 'Connected · Read and write')
+                    : t('database.catalog.verified', 'Read-only profile verified')}
+                {verified && test?.serverVersion ? ` · ${test.serverVersion}` : ''}
               </div>
             ) : null}
             {test?.error ? (

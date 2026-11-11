@@ -4,6 +4,14 @@ The adapter uses `oracledb` 26.0.0 in Thin mode with password authentication, an
 
 Provide a public PEM CA certificate when the execution host's trust store does not trust the issuer. Orca carries a pinned driver patch allowing a CA-only PEM without a client private key; chain validation and server identity matching remain enabled. Mutual TLS wallets/client keys are outside the initial enrollment flow. The optional TLS server-name field means the full certificate subject DN for Oracle (for example `CN=db.example.com,O=Example`), as required by the driver; leave it blank to verify the actual hostname against CN/SAN. Do not disable identity checks to work around a failure.
 
+## Access mode
+
+Connections default to **Read only**, including previously saved connections. The restrictions below describe that mode. Select **Read and write** to permit native SQL, including INSERT/UPDATE/DELETE, CREATE/ALTER/DROP and routines, according to the saved account's actual permissions. This option does not grant database privileges. Testing a write-mode connection verifies connectivity, not permission to perform every command.
+
+Write mode uses native commit semantics. Completed statements or DDL may remain committed after a subsequent error, cancellation, timeout or lost connection. Orca never automatically retries an operation. Each operation uses a fresh session; transactions cannot span separate requests. PostgreSQL and SQL Server accept native batches; Oracle accepts one SQL statement (without a terminal semicolon) or a PL/SQL block. Client directives such as `GO`, `\\g` and SQL*Plus commands are not SQL driver statements.
+
+The result contains a bounded preview of the first result set and `record.affectedRows` when reported by the driver. Additional result sets are omitted and mark the preview truncated. Preview limits do not cancel a running write. Values the driver cannot represent losslessly are marked unavailable; cast those columns to text in SQL. A remote execution host must advertise `database.writeV1` before a write-mode connection can be saved or executed there.
+
 ## Provisioning
 
 Use a dedicated reader user that owns no objects, has no enabled roles and has only the `CREATE SESSION` system privilege. Grant `SELECT` or `READ` on individually approved ordinary tables. Password provisioning belongs to the administrator's secret-management process.

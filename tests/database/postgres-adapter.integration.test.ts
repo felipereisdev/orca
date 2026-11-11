@@ -1,3 +1,4 @@
+import { exerciseDatabaseWriteMode } from './exercise-database-write-mode'
 import { captureDatabaseResult as capture } from './capture-database-result'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresAdapter } from '../../src/main/database/adapters/postgres-adapter'
@@ -31,6 +32,16 @@ async function execute(sql: string, sink: DatabaseResultSink, signal = AbortSign
 }
 
 describe('PostgreSQL read-only adapter with verified TLS', () => {
+  it('executes full SQL only with the persisted write mode and database privileges', async () => {
+    await exerciseDatabaseWriteMode(
+      adapter,
+      fixture.configuration,
+      { username: 'postgres', password: 'disposable-admin-password' },
+      fixture.credentials,
+      '$1',
+      'DO $$ BEGIN PERFORM 1; END $$'
+    )
+  })
   it('preserves exact seeded numbers, duplicate columns and nulls with bounded cursor reads', async () => {
     expect(
       (

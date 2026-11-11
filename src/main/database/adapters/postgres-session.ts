@@ -19,10 +19,10 @@ function clientConfig(config: DatabaseConnection, credentials: DatabaseCredentia
       ca: config.endpoint.tls.caCertificate,
       servername: config.endpoint.tls.serverName
     },
-    application_name: 'orca-read-only',
+    application_name: config.accessMode === 'read-write' ? 'orca-read-write' : 'orca-read-only',
     connectionTimeoutMillis: Math.min(config.limits.timeoutMs, 5000),
-    query_timeout: config.limits.timeoutMs,
-    options: `-c search_path=pg_catalog -c default_transaction_read_only=on -c statement_timeout=${config.limits.timeoutMs} -c lock_timeout=${config.limits.timeoutMs} -c idle_in_transaction_session_timeout=${config.limits.timeoutMs}`
+    query_timeout: config.accessMode === 'read-write' ? 0 : config.limits.timeoutMs,
+    options: `-c search_path=pg_catalog -c default_transaction_read_only=${config.accessMode === 'read-write' ? 'off' : 'on'} -c statement_timeout=${config.limits.timeoutMs} -c lock_timeout=${config.limits.timeoutMs} -c idle_in_transaction_session_timeout=${config.limits.timeoutMs}`
   }
 }
 
@@ -65,10 +65,14 @@ export async function withPostgresSession<T>(
     signal.throwIfAborted()
     pid = (await client.query<{ pid: number }>('SELECT pg_catalog.pg_backend_pid() AS pid')).rows[0]
       .pid
-    await client.query('BEGIN READ ONLY')
+    if (config.accessMode !== 'read-write') {
+      await client.query('BEGIN READ ONLY')
+    }
     const value = await operation(client, signal)
     signal.throwIfAborted()
-    await client.query('ROLLBACK')
+    if (config.accessMode !== 'read-write') {
+      await client.query('ROLLBACK')
+    }
     return value
   } finally {
     signal.removeEventListener('abort', abort)

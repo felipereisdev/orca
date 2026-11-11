@@ -30,7 +30,7 @@ export async function withOracleSession<T>(
     stmtCacheSize: 0
   })
   connection.callTimeout = config.limits.timeoutMs
-  connection.module = 'orca-read-only'
+  connection.module = config.accessMode === 'read-write' ? 'orca-read-write' : 'orca-read-only'
   let cancellation: Promise<void> | undefined
   const abort = () => {
     cancellation ??= connection.break().catch(() => {})
@@ -41,7 +41,9 @@ export async function withOracleSession<T>(
     await connection.execute(
       `ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,' NLS_DATE_FORMAT='YYYY-MM-DD"T"HH24:MI:SS' NLS_TIMESTAMP_FORMAT='YYYY-MM-DD"T"HH24:MI:SS.FF9' NLS_TIMESTAMP_TZ_FORMAT='YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'`
     )
-    await connection.execute('SET TRANSACTION READ ONLY')
+    if (config.accessMode !== 'read-write') {
+      await connection.execute('SET TRANSACTION READ ONLY')
+    }
     const value = await operation(connection, signal)
     signal.throwIfAborted()
     return value

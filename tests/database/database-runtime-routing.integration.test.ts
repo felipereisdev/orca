@@ -27,6 +27,7 @@ let configuration: DatabaseConnectionConfiguration
 let projectId: string
 let controllerIdentity: string
 const network = new AbortController()
+let supportsWrites = false
 
 async function call<T>(method: string, params: unknown): Promise<T> {
   const response = await dispatcher.dispatch({
@@ -79,7 +80,11 @@ function createController() {
             _meta: { runtimeId: executor.getRuntimeId() },
             result: {
               runtimeId: executor.getRuntimeId(),
-              capabilities: ['database.catalogV1', 'database.executionV1']
+              capabilities: [
+                'database.catalogV1',
+                'database.executionV1',
+                ...(supportsWrites ? ['database.writeV1'] : [])
+              ]
             }
           }
         }
@@ -150,6 +155,61 @@ afterAll(async () => {
 })
 
 describe('database controller and authenticated execution runtime', () => {
+  it('requires remote write support and preserves mode, empty results and affected rows across the authenticated binding', async () => {
+    const input = {
+      ...fixture.configuration,
+      id: undefined,
+      alias: 'remote-writes',
+      accessMode: 'read-write',
+      executionHostId: 'runtime:remote-a',
+      projects: [{ kind: 'folder', projectId, executionHostId: 'local' }]
+    }
+    const credentials = { username: 'postgres', password: 'disposable-admin-password' }
+    await expect(call('database.save', { configuration: input, credentials })).rejects.toThrow(
+      'database_capability_missing'
+    )
+    supportsWrites = true
+    try {
+      const saved = await call<DatabaseConnectionConfiguration>('database.save', {
+        configuration: input,
+        credentials
+      })
+      expect(saved.accessMode).toBe('read-write')
+      const run = async (sql: string) => {
+        const handle = await call<DatabaseQueryHandle>('database.startQuery', {
+          project: projectId,
+          connection: saved.id,
+          sql,
+          parameters: []
+        })
+        return call<DatabaseQuerySnapshot>('database.waitQuery', {
+          project: projectId,
+          queryId: handle.queryId
+        })
+      }
+      expect(await run('CREATE TABLE approved.orca_remote_write_test (id integer)')).toMatchObject({
+        status: 'completed',
+        columns: [],
+        rows: []
+      })
+      expect(await run('INSERT INTO approved.orca_remote_write_test VALUES (19)')).toMatchObject({
+        status: 'completed',
+        record: {
+          affectedRows: 1,
+          source: { accessMode: 'read-write', executionHostId: 'runtime:remote-a' }
+        }
+      })
+      expect(
+        (await fixture.admin.query('SELECT id FROM approved.orca_remote_write_test')).rows
+      ).toEqual([{ id: 19 }])
+      expect(await run('DROP TABLE approved.orca_remote_write_test')).toMatchObject({
+        status: 'completed'
+      })
+      await call('database.remove', { connectionId: saved.id, expectedRevision: saved.revision })
+    } finally {
+      supportsWrites = false
+    }
+  })
   it('keeps credentials only on the executor and returns the pinned remote result to the controller', async () => {
     const binding = executorProfile.store.getDatabaseExecutionBindings()[0]
     expect(executorProfile.store.getDatabaseCatalog().connections).toEqual([])

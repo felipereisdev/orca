@@ -15,6 +15,7 @@ export function createDatabaseQueryJob(
   const record: DatabaseQueryRecord = {
     queryId,
     source: {
+      ...(connection.accessMode ? { accessMode: connection.accessMode } : {}),
       connectionId: connection.id,
       connectionRevision: connection.revision,
       alias: connection.alias,

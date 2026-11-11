@@ -1,6 +1,7 @@
 import type { ExecutionHostId } from '../execution-host'
 
 export type DatabaseEngine = 'postgres' | 'sql-server' | 'oracle'
+export type DatabaseAccessMode = 'read-only' | 'read-write'
 
 export type DatabaseProjectKey = {
   kind: 'repository' | 'folder'
@@ -38,6 +39,7 @@ export type DatabaseCredentials = {
 }
 
 export type DatabaseConnectionSummary = {
+  accessMode?: DatabaseAccessMode
   id: string
   revision: number
   alias: string

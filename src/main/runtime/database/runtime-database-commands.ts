@@ -153,7 +153,11 @@ export class RuntimeDatabaseCommands {
       throw new Error('database_host_unavailable')
     }
     if (connection.executionHostId !== 'local') {
-      const route = await this.router.routeHost(connection.id, connection.executionHostId)
+      const route = await this.router.routeHost(
+        connection.id,
+        connection.executionHostId,
+        connection.accessMode
+      )
       return this.router.call(route, 'database.testBinding', {
         credentialRef: connection.credentialRef,
         controllerRuntimeId: this.controllerRuntimeId
@@ -173,14 +177,22 @@ export class RuntimeDatabaseCommands {
       if (error instanceof DatabaseOperationError) {
         throw error
       }
-      throw new Error('Database connection or read-only privilege verification failed')
+      throw new Error(
+        connection.accessMode === 'read-write'
+          ? 'Database connection verification failed'
+          : 'Database connection or read-only privilege verification failed'
+      )
     }
   }
 
   async describe(request: DatabaseSchemaRequest, signal: AbortSignal) {
     const connection = this.catalog.resolve(request.connection, request.project)
     if (connection.executionHostId !== 'local') {
-      const route = await this.router.routeHost(connection.id, connection.executionHostId)
+      const route = await this.router.routeHost(
+        connection.id,
+        connection.executionHostId,
+        connection.accessMode
+      )
       return this.router.call(route, 'database.describeBinding', {
         ...request,
         credentialRef: connection.credentialRef,

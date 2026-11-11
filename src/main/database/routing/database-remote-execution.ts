@@ -4,7 +4,7 @@ import type {
   DatabaseParameter
 } from '../../../shared/database/database-query-contracts'
 import { databaseQueryResultSchema } from '../../../shared/database/database-query-result-schema'
-import type { ValidatedDatabaseReadQuery } from '../query-policy/database-query-policy'
+import type { DatabaseExecutableQuery } from '../query-policy/database-query-policy'
 import type { DatabaseResultSink } from '../adapters/database-adapter'
 import type { DatabaseExecutionRouter } from './database-execution-route'
 
@@ -12,7 +12,7 @@ export async function executeRemoteDatabaseQuery(
   router: DatabaseExecutionRouter,
   record: DatabaseQueryRecord,
   connection: DatabaseConnection,
-  query: ValidatedDatabaseReadQuery,
+  query: DatabaseExecutableQuery,
   parameters: DatabaseParameter[],
   output: DatabaseResultSink,
   signal: AbortSignal
@@ -72,6 +72,9 @@ export async function executeRemoteDatabaseQuery(
         result.rows.some((row) => row.length !== result.columns.length)
       ) {
         throw new Error('Remote database result shape is invalid')
+      }
+      if (result.record.affectedRows !== undefined) {
+        output.affectedRows?.(result.record.affectedRows)
       }
       output.columns(result.columns)
       for (const row of result.rows) {

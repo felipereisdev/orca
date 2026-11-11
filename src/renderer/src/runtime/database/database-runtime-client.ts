@@ -49,7 +49,7 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
             value.capabilities?.includes(capability)
           )
         ) {
-          throw new Error('This Orca runtime does not support read-only database connections')
+          throw new Error('This Orca runtime does not support database connections')
         }
         return value
       })

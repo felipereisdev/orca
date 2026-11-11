@@ -9,7 +9,7 @@ import type {
 } from '../../../shared/database/database-query-contracts'
 import type { DatabaseAdapter, DatabaseResultSink } from '../adapters/database-adapter'
 import type { DatabaseCredentialStore } from '../credentials/database-credential-store'
-import type { ValidatedDatabaseReadQuery } from '../query-policy/database-query-policy'
+import type { DatabaseExecutableQuery } from '../query-policy/database-query-policy'
 
 export type DatabaseLocalExecution = {
   credentials: Pick<DatabaseCredentialStore, 'read'>
@@ -18,7 +18,7 @@ export type DatabaseLocalExecution = {
 export type DatabaseRemoteExecution = (
   record: DatabaseQueryRecord,
   connection: DatabaseConnection,
-  query: ValidatedDatabaseReadQuery,
+  query: DatabaseExecutableQuery,
   parameters: DatabaseParameter[],
   output: DatabaseResultSink,
   signal: AbortSignal
@@ -26,7 +26,7 @@ export type DatabaseRemoteExecution = (
 export async function executeLocalDatabaseQuery(
   options: DatabaseLocalExecution,
   connection: DatabaseConnection,
-  query: ValidatedDatabaseReadQuery,
+  query: DatabaseExecutableQuery,
   parameters: DatabaseParameter[],
   output: DatabaseResultSink,
   signal: AbortSignal
@@ -37,7 +37,15 @@ export async function executeLocalDatabaseQuery(
     throw new Error('Database adapter is unavailable')
   }
   const profile = await adapter.preflight(connection, credentials, signal)
-  if (!profile.readOnlyProfile) {
+  if (connection.accessMode === 'read-write') {
+    if (!adapter.executeStatement) {
+      throw new Error('Database write execution is unavailable')
+    }
+    signal.throwIfAborted()
+    await adapter.executeStatement(connection, credentials, query.sql, parameters, output, signal)
+    return
+  }
+  if (!profile.readOnlyProfile || !('statementSql' in query)) {
     throw new Error('Database principal does not meet the read-only profile')
   }
   signal.throwIfAborted()
@@ -51,7 +59,7 @@ export function executeDatabaseQueryOnHost(
   },
   record: DatabaseQueryRecord,
   connection: DatabaseConnection,
-  query: ValidatedDatabaseReadQuery,
+  query: DatabaseExecutableQuery,
   parameters: DatabaseParameter[],
   output: DatabaseResultSink,
   signal: AbortSignal

@@ -27,6 +27,31 @@ class RejectSqlSyntaxErrors extends BaseErrorListener {
   }
 }
 
+export function tokenizeOracleStatement(sql: string): {
+  oracleWithTokenCount: number
+  statementTokens: { text: string; parameterName?: string }[]
+} {
+  if (!sql.trim() || Buffer.byteLength(sql, 'utf8') > 65_536) {
+    throw new Error('SQL must contain a statement of at most 64 KiB')
+  }
+  const { lexer, stream } = createDialect('oracle', sql)
+  lexer.removeErrorListeners()
+  lexer.addErrorListener(new RejectSqlSyntaxErrors())
+  stream.fill()
+  return {
+    oracleWithTokenCount: 0,
+    statementTokens: stream
+      .getTokens()
+      .filter((token) => token.channel === Token.DEFAULT_CHANNEL && token.type !== Token.EOF)
+      .map((token) => ({
+        text: token.text ?? '',
+        ...(lexer.vocabulary.getSymbolicName(token.type) === 'BINDVAR'
+          ? { parameterName: token.text?.slice(1) }
+          : {})
+      }))
+  }
+}
+
 export function parseSql(engine: SqlEngine, sql: string): SqlSyntax {
   if (!sql.trim() || Buffer.byteLength(sql, 'utf8') > 65_536) {
     throw new Error('SQL must contain a query of at most 64 KiB')

@@ -4,7 +4,7 @@ import type { DatabaseParameter } from '../../../shared/database/database-query-
 import type { DatabaseResultSink } from './database-adapter'
 import { prepareOracleResultProjection } from './oracle-result-projection'
 import { prepareOracleParameters } from './oracle-parameters'
-function isOracleLob(value: unknown): value is oracledb.Lob {
+export function isOracleLob(value: unknown): value is oracledb.Lob {
   return (
     typeof value === 'object' &&
     value !== null &&

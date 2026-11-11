@@ -111,6 +111,8 @@ export function DatabaseResultsTable({
           </div>
           <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
             {t('database.explorer.rowCount', '{{count}} rows', { count: result.rowCount })}
+            {result.record.affectedRows !== undefined &&
+              ` · ${t('database.explorer.affectedRows', '{{count}} rows affected', { count: result.record.affectedRows })}`}
             {result.truncated &&
               ` · ${t('database.explorer.truncated', 'Truncated by query limits')}`}
           </p>

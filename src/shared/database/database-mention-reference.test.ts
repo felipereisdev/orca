@@ -75,6 +75,7 @@ it('keeps a file and database with the same alias distinct across serialization 
       controllerRuntimeId: 'controller',
       alias: 'faturacao-hmg',
       connectionRevision: 4,
+      accessMode: 'read-only',
       engine: 'postgres',
       environment: 'HMG',
       executionHostId: 'local'

@@ -16,6 +16,7 @@ export type DatabasePreflightResult = {
 }
 
 export type DatabaseResultSink = {
+  affectedRows?(count: number): void
   columns(columns: DatabaseColumn[]): void
   row(values: readonly unknown[]): boolean
   markTruncated(): void
@@ -24,6 +25,14 @@ export type DatabaseResultSink = {
 }
 
 export type DatabaseAdapter = {
+  executeStatement?(
+    config: DatabaseConnection,
+    credentials: DatabaseCredentials,
+    sql: string,
+    parameters: DatabaseParameter[],
+    sink: DatabaseResultSink,
+    signal: AbortSignal
+  ): Promise<void>
   preflight(
     config: DatabaseConnection,
     credentials: DatabaseCredentials,

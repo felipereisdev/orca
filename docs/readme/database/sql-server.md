@@ -2,6 +2,14 @@
 
 The adapter uses the portable `mssql`/Tedious driver, verified TLS, an explicit TCP port and database, and a fresh private session for every operation. It has been exercised with SQL Server 2022 CU18 (16.0.4185.3). SQL authentication is supported; integrated Windows authentication is outside this initial profile. Certificate verification is enabled by default. For a local development server with a self-signed certificate, the explicit **Trust server certificate** checkbox sets `trustServerCertificate: true` while keeping encryption enabled. This skips certificate identity verification only for that saved connection. For verified connections, supply the issuing PEM CA and certificate server name.
 
+## Access mode
+
+Connections default to **Read only**, including previously saved connections. The restrictions below describe that mode. Select **Read and write** to permit native SQL, including INSERT/UPDATE/DELETE, CREATE/ALTER/DROP and routines, according to the saved account's actual permissions. This option does not grant database privileges. Testing a write-mode connection verifies connectivity, not permission to perform every command.
+
+Write mode uses native commit semantics. Completed statements or DDL may remain committed after a subsequent error, cancellation, timeout or lost connection. Orca never automatically retries an operation. Each operation uses a fresh session; transactions cannot span separate requests. PostgreSQL and SQL Server accept native batches; Oracle accepts one SQL statement (without a terminal semicolon) or a PL/SQL block. Client directives such as `GO`, `\\g` and SQL*Plus commands are not SQL driver statements.
+
+The result contains a bounded preview of the first result set and `record.affectedRows` when reported by the driver. Additional result sets are omitted and mark the preview truncated. Preview limits do not cancel a running write. Values the driver cannot represent losslessly are marked unavailable; cast those columns to text in SQL. A remote execution host must advertise `database.writeV1` before a write-mode connection can be saved or executed there.
+
 ## Provisioning
 
 Create a dedicated login and database user through the administrator's secret-management process. In the application database, grant only `CONNECT`, `VIEW DEFINITION`, and `SELECT` on approved schemas or ordinary tables. The login must not own objects or belong to server roles other than `public`; database roles other than `public` and `db_datareader` are refused. Prefer explicit schema/table grants to the database-wide reader role. Effective server, database, schema, object and column permissions are checked again before each operation; any write, execute, impersonation or administration permission makes the connection unavailable. Do not provision this user in system databases.

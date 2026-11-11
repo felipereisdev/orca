@@ -1,4 +1,5 @@
 import { parseSql } from './parse-sql'
+export { tokenizeOracleStatement } from './parse-sql'
 import type { SqlEngine as DatabaseEngine } from './parse-sql'
 import { DatabaseQuerySyntax } from './database-query-syntax'
 import { validatePostgresReadQuery } from './postgres-query-policy'

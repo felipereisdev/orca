@@ -47,7 +47,7 @@ export class DatabaseConnectionWriter {
       { ...input, id, credentialRef: `${id}:${randomUUID()}` },
       previous
     )
-    const route = await this.router.routeHost(id, input.executionHostId)
+    const route = await this.router.routeHost(id, input.executionHostId, input.accessMode)
     let staged: string | undefined
     if (route.environmentId) {
       const receipt = z.object({ credentialRef: databaseCredentialRef }).parse(

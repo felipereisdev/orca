@@ -10,7 +10,7 @@ export const getDatabaseConnectionsSearchEntries = createLocalizedCatalog(() => 
     title: translate('database.settings.title', 'Database connections'),
     description: translate(
       'database.settings.description',
-      'Register read-only environments and associate them with projects'
+      'Register database environments and associate them with projects'
     ),
     keywords: [
       ...translateSearchKeyword('database.search.database', 'database'),

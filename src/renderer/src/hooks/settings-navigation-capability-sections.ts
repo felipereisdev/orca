@@ -68,7 +68,7 @@ export function buildCapabilitySettingsSections(
       title: t('database.settings.title', 'Database connections'),
       description: t(
         'database.settings.description',
-        'Register read-only environments and associate them with projects'
+        'Register database environments and associate them with projects'
       ),
       icon: Database,
       searchEntries: getDatabaseConnectionsSearchEntries(),

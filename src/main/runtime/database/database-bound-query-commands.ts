@@ -127,7 +127,11 @@ export class DatabaseBoundQueryCommands {
       if (error instanceof DatabaseOperationError) {
         throw error
       }
-      throw new Error('Database read-only verification failed')
+      throw new Error(
+        connection.accessMode === 'read-write'
+          ? 'Database connection verification failed'
+          : 'Database read-only verification failed'
+      )
     }
   }
   async describe(

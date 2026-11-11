@@ -1,3 +1,4 @@
+import { exerciseDatabaseWriteMode } from './exercise-database-write-mode'
 import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
 import { RpcDispatcher } from '../../src/main/runtime/rpc/dispatcher'
 import { DATABASE_METHODS } from '../../src/main/runtime/rpc/methods/database/database'
@@ -39,6 +40,16 @@ async function execute(
   )
 }
 describe('SQL Server with a dedicated reader and verified TLS', () => {
+  it('executes full SQL only with the persisted write mode and database privileges', async () => {
+    await exerciseDatabaseWriteMode(
+      adapter,
+      fixture.configuration,
+      fixture.adminCredentials,
+      fixture.credentials,
+      '@label',
+      "EXEC sys.sp_executesql N'SELECT ''routine'' AS routine_value'"
+    )
+  })
   it('preserves exact numbers, duplicate names and nulls and describes primary keys', async () => {
     expect(
       (

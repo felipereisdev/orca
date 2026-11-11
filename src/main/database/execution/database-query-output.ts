@@ -44,9 +44,16 @@ export class DatabaseQueryOutput implements DatabaseResultSink {
     this.truncated = true
   }
 
+  affectedRows(count: number): void {
+    const total = (this.record.affectedRows ?? 0) + count
+    if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(total)) {
+      throw new Error('Database affected row count exceeds the supported limit')
+    }
+    this.record.affectedRows = total
+  }
+
   columns(columns: DatabaseColumn[]): void {
     if (
-      !columns.length ||
       columns.length > 256 ||
       columns.some((column) => column.name.length > 256 || column.databaseType.length > 128)
     ) {

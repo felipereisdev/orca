@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { databaseProjectSchema, databaseLimitsSchema } from './database-configuration-schema'
 
 const source = z.object({
+  accessMode: z.enum(['read-only', 'read-write']).optional(),
   connectionId: z.string().uuid(),
   connectionRevision: z.number().int().positive(),
   alias: z.string().max(96),
@@ -11,6 +12,7 @@ const source = z.object({
   controllerRuntimeId: z.string().min(1).max(1024)
 })
 export const databaseQueryRecordSchema = z.object({
+  affectedRows: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   queryId: z.string().uuid(),
   source,
   project: databaseProjectSchema,

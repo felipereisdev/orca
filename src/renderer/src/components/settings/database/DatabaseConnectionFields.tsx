@@ -1,4 +1,5 @@
 import { DatabaseCertificateTrust } from './DatabaseCertificateTrust'
+import { DatabaseAccessMode } from './DatabaseAccessMode'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -174,7 +175,12 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
                   'database.form.keepCredentials',
                   'Leave both fields blank to keep the stored credentials'
                 )
-              : t('database.form.readAccount', 'Use a dedicated read-only account')
+              : draft.accessMode === 'read-write'
+                ? t(
+                    'database.form.writeAccount',
+                    'Use an account with the permissions this connection needs'
+                  )
+                : t('database.form.readAccount', 'Use a dedicated read-only account')
           }
         />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -205,6 +211,7 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           </div>
         </div>
       </div>
+      <DatabaseAccessMode form={form} />
       {draft.engine === 'sql-server' ? (
         <DatabaseCertificateTrust
           checked={draft.trustServerCertificate}

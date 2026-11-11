@@ -44,7 +44,12 @@ export class DatabaseQueryService {
     ) {
       throw new Error('Database query is unavailable in this runtime context')
     }
-    if (!input.connection || input.sql.length > 65_536 || input.parameters.length > 256) {
+    if (
+      !input.connection ||
+      !input.sql.trim() ||
+      Buffer.byteLength(input.sql) > 65_536 ||
+      input.parameters.length > 256
+    ) {
       throw new Error('Database query input is invalid')
     }
     const captured = this.options.catalog.resolve(input.connection, actor.project)
@@ -270,20 +275,14 @@ export class DatabaseQueryService {
         throw new Error('Database connection changed while queued')
       }
       phase = 'policy'
-      const { validateDatabaseReadQueryInWorker } =
-        await import('../query-policy/database-query-policy-worker')
-      const query = await validateDatabaseReadQueryInWorker(
-        connection.engine,
+      const { validateDatabaseQueryForConnection } =
+        await import('../query-policy/database-query-policy')
+      const query = await validateDatabaseQueryForConnection(
+        connection,
         record.sql,
+        parameters,
         controller.signal
       )
-      if (
-        query.parameterNames.some(
-          (name) => !parameters.some((parameter) => parameter.name === name)
-        )
-      ) {
-        throw new Error('Database query parameters are missing')
-      }
       controller.signal.throwIfAborted()
       record.status = 'running'
       this.publish(record)
@@ -306,6 +305,10 @@ export class DatabaseQueryService {
       record.status = controller.signal.aborted ? 'cancelled' : 'failed'
       record.finishedAt = Date.now()
       record.error = databaseQueryFailure(error, phase)
+      if (connection.accessMode === 'read-write' && phase === 'execution') {
+        record.error.message +=
+          ' Changes may already have committed. Check the database before retrying.'
+      }
     }
     await this.records.save(record)
   }

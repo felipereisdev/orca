@@ -73,3 +73,27 @@ it('keeps certificate verification by default and persists an explicit SQL Serve
     )
   ).toBe('true')
 })
+
+it('persists full SQL access and restores read-only access when selected again', async () => {
+  const { client, options, state } = createDatabaseClientFixture()
+  render(
+    <ConfirmationDialogProvider>
+      <DatabaseConnectionSheet
+        client={client}
+        connectionId={state.configuration.id}
+        options={options}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />
+    </ConfirmationDialogProvider>
+  )
+  const mode = await screen.findByRole('combobox', { name: 'Access mode' })
+  fireEvent.click(mode)
+  fireEvent.click(await screen.findByRole('option', { name: 'Read and write' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+  await waitFor(() => expect(state.configuration).toMatchObject({ accessMode: 'read-write' }))
+  fireEvent.click(screen.getByRole('combobox', { name: 'Access mode' }))
+  fireEvent.click(await screen.findByRole('option', { name: 'Read only' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+  await waitFor(() => expect(state.configuration).toMatchObject({ accessMode: 'read-only' }))
+})

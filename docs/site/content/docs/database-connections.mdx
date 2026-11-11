@@ -48,3 +48,9 @@ Local history stores executed SQL and metadata, including parameter names, but e
 Use **Settings → Database connections → connection actions → Clear query history** to delete that controller's stored SQL and runtime result cache for the connection across projects. Running queries for it are cancelled before deletion finishes. Removing the connection also clears its history. Open panels, remote execution-host history and agent conversations retain data already supplied under their own retention; clearing controller history does not erase external transcripts.
 
 Unsent SQL and parameter drafts stay in window memory. Layout restores the connection reference, without saving result rows or parameter values; unsent drafts are lost on restart. Keep SQL in a file when it needs durable storage.
+
+## Read and write access
+
+Each connection has an **Access mode** setting. **Read only** is the default for new and existing connections. Choose **Read and write** to allow the agent to execute data changes, structure changes and routines using the account's existing database permissions. The mode is visible in the connection list, explorer and agent context.
+
+Writes follow the database's native commit behavior. An error, timeout or cancellation does not guarantee rollback; check the database before retrying. Orca does not retry queries automatically. Result previews remain bounded, and affected-row counts are included when available. Use separate requests for Oracle SQL statements or one PL/SQL block; SQL client commands such as GO are not supported. Remote hosts need write-mode support before enabling it.

@@ -29,6 +29,7 @@ export const databaseLimitsSchema = z.object({
     .max(5 * 1024 * 1024)
 })
 export const databaseConnectionSchema = z.object({
+  accessMode: z.enum(['read-only', 'read-write']).default('read-only'),
   id: databaseConnectionId,
   revision: z.number().int().positive(),
   alias: z.string().regex(/^[a-z][a-z0-9-]{0,95}$/),

@@ -45,6 +45,12 @@ export function prepareSqlServerParameters(parameters: DatabaseParameter[]) {
     definitions: parameters
       .map((parameter, index) => `@${parameter.name} ${types[index]}`)
       .join(', '),
+    namedDeclarations: parameters
+      .map(
+        (parameter, index) =>
+          `DECLARE @${parameter.name} ${types[index]} = CONVERT(${types[index]}, @orca_v${index});`
+      )
+      .join('\n'),
     declarations: parameters
       .map(
         (_parameter, index) =>

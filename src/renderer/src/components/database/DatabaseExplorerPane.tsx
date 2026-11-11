@@ -92,7 +92,9 @@ export function DatabaseExplorerPane({
         </Select>
         <span className="text-xs text-muted-foreground">{view.connection?.executionHostId}</span>
         <span className="text-xs text-muted-foreground">
-          {t('database.explorer.readOnly', 'Read only')}
+          {view.connection?.accessMode === 'read-write'
+            ? t('database.access.readWrite', 'Read and write')
+            : t('database.explorer.readOnly', 'Read only')}
         </span>
       </header>
       {view.catalogError && (

@@ -63,12 +63,13 @@ export class DatabaseExecutionRouter {
     ) {
       throw new Error('Database connection is outside its registered project')
     }
-    return this.routeHost(connection.id, connection.executionHostId)
+    return this.routeHost(connection.id, connection.executionHostId, connection.accessMode)
   }
 
   async routeHost(
     connectionId: string,
-    executionHostId: ExecutionHostId
+    executionHostId: ExecutionHostId,
+    accessMode?: 'read-only' | 'read-write'
   ): Promise<DatabaseExecutionRoute> {
     const base = {
       controllerRuntimeId: this.ports.controllerRuntimeId,
@@ -92,7 +93,10 @@ export class DatabaseExecutionRouter {
         { expectedEnvironmentPairingRevision: server.pairingRevision }
       )
       const status = statusSchema.parse(raw)
-      if (!status.capabilities?.includes('database.executionV1')) {
+      if (
+        !status.capabilities?.includes('database.executionV1') ||
+        (accessMode === 'read-write' && !status.capabilities.includes('database.writeV1'))
+      ) {
         throw new DatabaseOperationError('database_capability_missing')
       }
       return {

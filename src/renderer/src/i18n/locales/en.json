@@ -24838,7 +24838,12 @@
       "save": "Save connection",
       "hostUnavailable": "The execution host or protected credential storage is unavailable",
       "credentialsRequired": "Enter both a username and password",
-      "invalidDetails": "Review the highlighted connection details before saving"
+      "invalidDetails": "Review the highlighted connection details before saving",
+      "accessMode": "Access mode",
+      "writeHelp": "Agents can modify data and structure, run routines, and execute any SQL allowed by this account. Changes may be committed immediately.",
+      "readHelp": "Only supported read-only queries and a verified read-only account are allowed.",
+      "writeConnected": "Connected · Read and write",
+      "writeAccount": "Use an account with the permissions this connection needs"
     },
     "catalog": {
       "connection": "Connection",
@@ -24847,7 +24852,7 @@
       "actions": "Actions for @{{alias}}",
       "moreActions": "Connection actions",
       "test": "Test connection",
-      "checking": "Checking connection and read-only profile…",
+      "checking": "Checking connection…",
       "verified": "Read-only profile verified",
       "profileFailed": "The account does not match the read-only profile",
       "search": "Search connections",
@@ -24857,7 +24862,8 @@
       "noMatches": "No connections match this search",
       "empty": "Add your first database environment",
       "clearSearch": "Clear search",
-      "readOnlyHelp": "Queries use the selected environment and are restricted to read-only access. Credentials stay on the execution host."
+      "readOnlyHelp": "Queries use the selected environment and its configured access mode. Credentials stay on the execution host.",
+      "connected": "Connected · Read and write"
     },
     "edit": "Edit",
     "remove": {
@@ -24870,7 +24876,7 @@
     "cancel": "Cancel",
     "settings": {
       "title": "Database connections",
-      "description": "Register read-only environments and associate them with projects"
+      "description": "Register database environments and associate them with projects"
     },
     "add": "New connection",
     "projects": {
@@ -24910,7 +24916,8 @@
       "addSchema": "Add schema to chat",
       "schemaTruncated": "Schema listing truncated",
       "ownerUnavailable": "The workspace host is unavailable",
-      "controllerChanged": "The database controller has changed. Select the connection again from this project."
+      "controllerChanged": "The database controller has changed. Select the connection again from this project.",
+      "affectedRows": "{{count}} rows affected"
     },
     "workspace": {
       "open": "Database connections",
@@ -24932,6 +24939,10 @@
       "clearTitle": "Clear query history for @{{alias}}?",
       "clearHelp": "Deletes stored SQL and cached results, and cancels running queries. Open panels and agent conversations retain data already displayed.",
       "cleared": "Query history cleared for @{{alias}}"
+    },
+    "access": {
+      "readOnly": "Read only",
+      "readWrite": "Read and write"
     }
   }
 }

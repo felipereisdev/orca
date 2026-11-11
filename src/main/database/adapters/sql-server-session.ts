@@ -35,8 +35,8 @@ export async function withSqlServerSession<T>(
       trustServerCertificate: config.endpoint.tls.trustServerCertificate === true,
       serverName: config.endpoint.tls.serverName,
       cryptoCredentialsDetails: { ca: config.endpoint.tls.caCertificate },
-      appName: 'orca-read-only',
-      readOnlyIntent: true,
+      appName: config.accessMode === 'read-write' ? 'orca-read-write' : 'orca-read-only',
+      readOnlyIntent: config.accessMode !== 'read-write',
       cancelTimeout: 1000
     }
   })
@@ -78,15 +78,17 @@ export async function withSqlServerSession<T>(
       throw sqlServerConnectionError(error)
     })
     signal.throwIfAborted()
-    await transaction.begin(sql.ISOLATION_LEVEL.READ_COMMITTED)
-    begun = true
+    if (config.accessMode !== 'read-write') {
+      await transaction.begin(sql.ISOLATION_LEVEL.READ_COMMITTED)
+      begun = true
+    }
     const session: SqlServerSession = {
-      request: () => new sql.Request(transaction),
+      request: () => (begun ? new sql.Request(transaction) : new sql.Request(pool)),
       run: async (request, statement) => {
         await execute(request, statement)
       },
       query: async <Row>(statement: string, bind?: (request: sql.Request) => void) => {
-        const request = new sql.Request(transaction)
+        const request = begun ? new sql.Request(transaction) : new sql.Request(pool)
         bind?.(request)
         const result = await execute<Row>(request, statement)
         if (!result) {
@@ -96,7 +98,7 @@ export async function withSqlServerSession<T>(
       }
     }
     await session.query(
-      `SET NOCOUNT ON; SET XACT_ABORT ON; SET DEADLOCK_PRIORITY LOW; SET LOCK_TIMEOUT ${config.limits.timeoutMs}`
+      `SET NOCOUNT ${config.accessMode === 'read-write' ? 'OFF' : 'ON'}; SET XACT_ABORT ON; SET TEXTSIZE 8194; SET DEADLOCK_PRIORITY LOW; SET LOCK_TIMEOUT ${config.limits.timeoutMs}`
     )
     const value = await operation(session, signal)
     signal.throwIfAborted()

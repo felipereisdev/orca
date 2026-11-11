@@ -3,7 +3,7 @@ import { GLOBAL_FLAGS, type CommandSpec } from '../args'
 export const DATABASE_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['db', 'list'],
-    summary: 'List read-only database environments associated with a project',
+    summary: 'List database environments associated with a project',
     usage: 'orca db list [--project <id>|--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'project', 'worktree']
   },
@@ -16,7 +16,7 @@ export const DATABASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['db', 'query'],
-    summary: 'Run one read query against an explicitly selected environment',
+    summary: 'Execute SQL using the access mode of an explicitly selected environment',
     usage:
       'orca db query --connection <alias|id> --sql-file <path|-> [--parameters-file <path|->] [--project <id>|--worktree <selector>] [--json]',
     allowedFlags: [

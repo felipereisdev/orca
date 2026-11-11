@@ -14,7 +14,7 @@ const messages = {
 
   database_host_unavailable: 'The configured database execution host is unavailable',
   database_capability_missing:
-    'This execution host does not support read-only database connections',
+    'This execution host does not support the configured database access mode',
   database_credential_storage_unavailable:
     'Protected credential storage is unavailable on the database execution host',
   database_binding_forbidden:

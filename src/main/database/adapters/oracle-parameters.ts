@@ -2,8 +2,9 @@ import oracledb from 'oracledb'
 import type { ValidatedDatabaseReadQuery } from '../query-policy/database-query-policy'
 import type { DatabaseParameter } from '../../../shared/database/database-query-contracts'
 export async function prepareOracleParameters(
-  query: ValidatedDatabaseReadQuery,
-  parameters: DatabaseParameter[]
+  query: Pick<ValidatedDatabaseReadQuery, 'statementTokens' | 'oracleWithTokenCount'>,
+  parameters: DatabaseParameter[],
+  keepTerminator = false
 ) {
   const binds: oracledb.BindParameters = {}
   const replacements = new Map<string, string>()
@@ -59,7 +60,7 @@ export async function prepareOracleParameters(
   }
   const tokens = query.statementTokens
   const text = tokens
-    .filter((token, index) => token.text !== ';' || index !== tokens.length - 1)
+    .filter((token, index) => keepTerminator || token.text !== ';' || index !== tokens.length - 1)
     .map((token) =>
       token.parameterName !== undefined
         ? (replacements.get(token.parameterName.toUpperCase()) ?? token.text)

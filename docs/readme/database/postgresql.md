@@ -2,6 +2,14 @@
 
 The adapter is validated against PostgreSQL 16 with verified TLS and password authentication. A connection uses a dedicated login, explicit database/host/port and optional PEM CA certificate/server name. Certificate verification is always enabled. Queries must qualify application tables with their schema; the session search path contains only `pg_catalog`.
 
+## Access mode
+
+Connections default to **Read only**, including previously saved connections. The restrictions below describe that mode. Select **Read and write** to permit native SQL, including INSERT/UPDATE/DELETE, CREATE/ALTER/DROP and routines, according to the saved account's actual permissions. This option does not grant database privileges. Testing a write-mode connection verifies connectivity, not permission to perform every command.
+
+Write mode uses native commit semantics. Completed statements or DDL may remain committed after a subsequent error, cancellation, timeout or lost connection. Orca never automatically retries an operation. Each operation uses a fresh session; transactions cannot span separate requests. PostgreSQL and SQL Server accept native batches; Oracle accepts one SQL statement (without a terminal semicolon) or a PL/SQL block. Client directives such as `GO`, `\\g` and SQL*Plus commands are not SQL driver statements.
+
+The result contains a bounded preview of the first result set and `record.affectedRows` when reported by the driver. Additional result sets are omitted and mark the preview truncated. Preview limits do not cancel a running write. Values the driver cannot represent losslessly are marked unavailable; cast those columns to text in SQL. A remote execution host must advertise `database.writeV1` before a write-mode connection can be saved or executed there.
+
 ## Supported privilege profile
 
 The login must have no superuser, database/role creation, replication or RLS-bypass attributes, no role memberships, no database CREATE/TEMP privileges, no schema CREATE privileges, and no ownership or write grants on application objects. Grant only USAGE on approved schemas and SELECT on approved tables/columns. Accessible columns must use built-in scalar types; custom/domain/array types, RLS, foreign tables and materialized views are refused. Views must use PostgreSQL 15+ `security_invoker=true`; every accessible view definition must also pass the supported read-query parser. Functions outside `pg_catalog` and `information_schema` must not be executable by this login, including rights inherited from PUBLIC.

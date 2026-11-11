@@ -7,6 +7,7 @@ import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { databaseConnectionInputSchema } from '../../../../../shared/database/database-configuration-schema'
 
 export type DatabaseConnectionDraft = {
+  accessMode: 'read-only' | 'read-write'
   alias: string
   displayName: string
   engine: DatabaseEngine
@@ -26,6 +27,7 @@ export function databaseConnectionDraft(
   connection?: DatabaseConnectionConfiguration
 ): DatabaseConnectionDraft {
   return {
+    accessMode: connection?.accessMode ?? 'read-only',
     alias: connection?.alias ?? '',
     displayName: connection?.displayName ?? '',
     engine: connection?.engine ?? 'postgres',
@@ -47,6 +49,7 @@ export function databaseConnectionInput(
   original?: DatabaseConnectionConfiguration
 ) {
   return databaseConnectionInputSchema.parse({
+    accessMode: draft.accessMode,
     id: original?.id,
     alias: draft.alias,
     displayName: draft.displayName,

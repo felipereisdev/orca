@@ -1,3 +1,4 @@
+import { exerciseDatabaseWriteMode } from './exercise-database-write-mode'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createOracleAdapter } from '../../src/main/database/adapters/oracle-adapter'
 import { validateDatabaseReadQuery } from '../../src/main/database/query-policy/database-query-policy'
@@ -34,6 +35,16 @@ async function execute(
   )
 }
 describe('Oracle Thin with a dedicated reader and verified TLS', () => {
+  it('executes full SQL only with the persisted write mode and database privileges', async () => {
+    await exerciseDatabaseWriteMode(
+      adapter,
+      fixture.configuration,
+      fixture.adminCredentials,
+      fixture.credentials,
+      ':label',
+      "DECLARE c SYS_REFCURSOR; BEGIN OPEN c FOR SELECT 'routine' AS value FROM dual; DBMS_SQL.RETURN_RESULT(c); END;"
+    )
+  })
   it('preserves NUMBER text, ordered duplicate columns, nulls and primary key metadata', async () => {
     expect(
       (
