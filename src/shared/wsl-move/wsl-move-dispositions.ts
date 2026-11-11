@@ -108,6 +108,7 @@ export const PERSISTED_STATE_DISPOSITIONS = {
     'Credentials stay sealed on their enrolled execution host.'
   ),
   orcadMigrationImportReceipts: notApplicableDisposition(67, 'Mover-owned.'),
+  databaseQueryHistory: notApplicableDisposition(62, 'Controller-owned execution history.'),
   orcadMigrationEvictedReceipts: notApplicableDisposition(67, 'Mover-owned.'),
   orcadMigrationStagedCatalogs: notApplicableDisposition(68, 'Mover-owned.'),
   onboarding: notApplicableDisposition(62),

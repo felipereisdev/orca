@@ -1,4 +1,5 @@
 import type { DatabaseCatalogState } from '../../../shared/database/database-contracts'
+import type { DatabaseQueryRecord } from '../../../shared/database/database-query-contracts'
 import { parseDatabaseCatalog } from '../../database/catalog/database-catalog-validation'
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { PrimaryStateWriteOperations } from './primary-state-writes'
@@ -16,6 +17,47 @@ export class DatabasePersistence {
 
   getDatabaseCatalog(): DatabaseCatalogState {
     return parseDatabaseCatalog(this[context].runtime.state.databaseCatalog)
+  }
+
+  getDatabaseQueryHistory(): DatabaseQueryRecord[] {
+    return structuredClone(this[context].runtime.state.databaseQueryHistory ?? [])
+  }
+
+  saveDatabaseQueryRecord(record: DatabaseQueryRecord): Promise<void> {
+    const { runtime, writes } = this[context]
+    return writes.runDurableMutation(() => {
+      const previous = runtime.state.databaseQueryHistory
+      const entries = [
+        record,
+        ...(previous ?? []).filter((item) => item.queryId !== record.queryId)
+      ]
+        .filter((item) => item.createdAt >= Date.now() - 7 * 24 * 60 * 60_000)
+        .sort((a, b) => b.createdAt - a.createdAt)
+      const counts = new Map<string, number>()
+      const next: DatabaseQueryRecord[] = []
+      let bytes = 0
+      for (const entry of entries) {
+        const count = counts.get(entry.source.connectionId) ?? 0
+        if (count >= 100 || next.length >= 1000) {
+          continue
+        }
+        const size = Buffer.byteLength(JSON.stringify(entry))
+        if (bytes + size > 16 * 1024 * 1024) {
+          continue
+        }
+        bytes += size
+        counts.set(entry.source.connectionId, count + 1)
+        next.push(entry)
+      }
+      runtime.state.databaseQueryHistory = next
+      runtime.dirtyProfileStateDomains?.add('databaseQueryHistory')
+      return {
+        value: undefined,
+        rollback: () => {
+          runtime.state.databaseQueryHistory = previous
+        }
+      }
+    })
   }
 
   async mutateDatabaseCatalog<T>(

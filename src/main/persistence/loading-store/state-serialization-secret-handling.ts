@@ -68,6 +68,7 @@ export class StateSerializationSecretHandlingOperations {
         case 'automationRuns':
         case 'databaseCatalog':
         case 'databaseCredentials':
+        case 'databaseQueryHistory':
           stateToSave[domain] = this.runtime.state[domain]
           break
         case 'featureInteractionTelemetryBuckets':

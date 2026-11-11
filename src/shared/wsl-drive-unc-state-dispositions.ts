@@ -54,6 +54,7 @@ export const WSL_DRIVE_UNC_STATE_DISPOSITIONS = {
   automationRuns: 'keep',
   databaseCatalog: 'keep',
   databaseCredentials: 'keep',
+  databaseQueryHistory: 'keep',
   orcadMigrationImportReceipts: 'keep',
   orcadMigrationEvictedReceipts: 'keep',
   orcadMigrationStagedCatalogs: 'keep',
