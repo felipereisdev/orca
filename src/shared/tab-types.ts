@@ -25,6 +25,7 @@ export type TabContentType =
   | 'agent-session'
   | 'browser'
   | 'simulator'
+  | 'database'
 
 export type WorkspaceVisibleTabType =
   | 'terminal'
@@ -32,6 +33,7 @@ export type WorkspaceVisibleTabType =
   | 'agent-session'
   | 'browser'
   | 'simulator'
+  | 'database'
 export type CtrlTabOrderMode = 'mru' | 'sequential'
 
 // Many content kinds collapse to editor; resolve a concrete tab and project forward instead of trying to invert equality.
@@ -40,7 +42,8 @@ export function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleT
     contentType === 'agent-session' ||
     contentType === 'browser' ||
     contentType === 'terminal' ||
-    contentType === 'simulator'
+    contentType === 'simulator' ||
+    contentType === 'database'
   ) {
     return contentType
   }

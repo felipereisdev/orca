@@ -1,3 +1,4 @@
+import type { WindowContentTabOpenCommand } from './workspace-layout-window-content-open-command'
 // Pure commands change layout only; runtime owns catalog/path/host-support/liveness refusals requiring external facts.
 
 import type { LayoutClientVisibility } from './workspace-layout-client-visibility'
@@ -134,7 +135,10 @@ export type LayoutCommand =
       tabId?: string
       /** Main-only opens may derive file ID; wire commands must still provide it. */
       fileId?: string
-      contentType: Exclude<TabContentType, 'terminal' | 'browser' | 'agent-session' | 'simulator'>
+      contentType: Exclude<
+        TabContentType,
+        'terminal' | 'browser' | 'agent-session' | 'simulator' | 'database'
+      >
       /** Present for edit-mode files, which are restored after restart. */
       file?: LayoutEditorFile
       /** What the tab shows beyond its file; not saved. */
@@ -150,18 +154,7 @@ export type LayoutCommand =
       split?: NewGroupSplit
     })
   | (On & { type: 'promotePreviewTab'; tabId: string })
-  | (On & {
-      type: 'openSimulatorTab'
-      /** The window's id for the tab it drew; also the tab's entity. */
-      tabId: string
-      groupId?: string
-      /** Placement in the group: after this tab, else at this index, else at its end. */
-      afterTabId?: string
-      index?: number
-      /** When the window drew the tab, so a later save of it matches main's copy. */
-      createdAt?: number
-      split?: NewGroupSplit
-    })
+  | (On & WindowContentTabOpenCommand)
   | (On & {
       type: 'moveTabToWorkspace'
       /** The workspace that owns the tabs' file, as the window resolved it; same partition. */

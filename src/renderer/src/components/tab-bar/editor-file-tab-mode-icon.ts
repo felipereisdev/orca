@@ -1,5 +1,6 @@
 import {
   Eye,
+  Database,
   GitCompareArrows,
   GitGraph,
   ListChecks,
@@ -23,7 +24,9 @@ export function getEditorFileTabModeIcon(
           ? GitCompareArrows
           : file.mode === 'markdown-preview'
             ? Eye
-            : file.language === 'simulator'
-              ? Smartphone
-              : null
+            : file.language === 'database'
+              ? Database
+              : file.language === 'simulator'
+                ? Smartphone
+                : null
 }

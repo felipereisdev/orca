@@ -149,6 +149,10 @@ export function activateWorkspaceTabPaletteResult(
     return { status: 'activated' }
   }
 
+  if (result.contentType === 'database') {
+    state.setActiveTabType('database', result.worktreeId)
+    return { status: 'activated' }
+  }
   state.setActiveFile(result.entityId)
   // setActiveFile may pick an editor tab for the same entity instead of this diff.
   state.activateTab(result.tabId, { worktreeId: result.worktreeId })

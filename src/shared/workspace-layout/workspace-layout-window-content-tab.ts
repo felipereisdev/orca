@@ -1,19 +1,33 @@
-// Main records window-owned emulator tabs under the window’s IDs; the emulator itself remains in the window.
+import { databaseExplorerEntitySchema } from '../database/database-explorer-reference'
 
 import { applied, refuse, type Applied } from './workspace-layout-command-steps'
 import type { CommandOf, LayoutContext } from './workspace-layout-command-types'
 import { drawnTabOpen, withSendersGroup } from './workspace-layout-content-commands'
-import type { WorkspaceLayoutModel } from './workspace-layout-model'
+import type { LayoutContentTab, WorkspaceLayoutModel } from './workspace-layout-model'
 import { placeContentTab } from './workspace-layout-tab-commands'
 
-export function openSimulatorTab(
+export function openWindowContentTab(
   model: WorkspaceLayoutModel,
-  command: CommandOf<'openSimulatorTab'>,
+  command: CommandOf<'openSimulatorTab'> | CommandOf<'openDatabaseTab'>,
   context: LayoutContext
 ): Applied {
+  if (
+    command.type === 'openDatabaseTab' &&
+    !databaseExplorerEntitySchema.safeParse(command.entityId).success
+  ) {
+    return refuse('invalid_params')
+  }
+  const kind = command.type === 'openDatabaseTab' ? 'database' : 'simulator'
+  const entityId = command.type === 'openDatabaseTab' ? command.entityId : command.tabId
   const key = command.workspace
   // Only a layout-owner window sends this command, so a taken id is always refused.
-  const drawn = drawnTabOpen(model, key, command.tabId, (tab) => tab.kind === 'simulator', true)
+  const drawn = drawnTabOpen(
+    model,
+    key,
+    command.tabId,
+    (tab) => tab.kind === kind && tab.entityId === entityId,
+    true
+  )
   if (drawn) {
     return drawn
   }
@@ -25,10 +39,10 @@ export function openSimulatorTab(
   ) {
     return refuse('group_not_found')
   }
-  const tab = {
+  const tab: LayoutContentTab = {
     id: command.tabId,
-    entityId: command.tabId,
-    kind: 'simulator' as const,
+    entityId,
+    kind,
     createdAt: command.createdAt ?? context.now(),
     customTitle: null,
     color: null

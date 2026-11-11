@@ -196,6 +196,7 @@ type NewGroupOpen = CommandOf<
   | 'openEditorTab'
   | 'openBrowserTab'
   | 'openAgentSessionTab'
+  | 'openDatabaseTab'
   | 'openSimulatorTab'
 >
 

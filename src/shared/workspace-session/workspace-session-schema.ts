@@ -1,3 +1,4 @@
+import { databaseExplorerEntitySchema } from '../database/database-explorer-reference'
 // Validate persisted sessions at read boundaries so malformed legacy data never reaches React. Ignore unknown fields, validate fields we read, and salvage independent entries via zod-salvage; only non-session payloads reset to defaults.
 import { z } from 'zod'
 import {
@@ -74,43 +75,48 @@ const executionHostIdSchema = z.custom<ExecutionHostId>(
   (value) => typeof value === 'string' && Boolean(parseExecutionHostId(value))
 )
 
-const tabSchema = z.object({
-  id: z.string(),
-  entityId: z.string(),
-  groupId: z.string(),
-  worktreeId: z.string(),
-  executionHostId: executionHostIdSchema.optional(),
-  contentType: tabContentTypeSchema,
-  // Accept registered agent slugs across mixed versions; invalid slugs become absent rather than rejecting the session.
-  agentSessionAgent: z
-    .string()
-    .refine((value) => isStructuredAgentId(value))
-    .optional()
-    .catch(undefined),
-  label: z.string(),
-  generatedLabel: z.string().nullable().optional(),
-  aiVaultTitle: z
-    .object({
-      agent: z.enum(['claude', 'codex']),
-      sessionId: z.string(),
-      title: z.string(),
-      kind: z.enum(['named', 'fallback']).optional().catch(undefined)
-    })
-    .nullable()
-    .optional()
-    .catch(undefined),
-  quickCommandLabel: z.string().nullable().optional(),
-  customLabel: z.string().nullable(),
-  color: z.string().nullable(),
-  sortOrder: z.number(),
-  createdAt: z.number(),
-  // Why: corrupt optional recency must not discard the whole persisted tab.
-  lastFocusedAt: z.number().finite().nonnegative().optional().catch(undefined),
-  isPreview: z.boolean().optional(),
-  isPinned: z.boolean().optional(),
-  // Preserve chat mode on restore; unknown future values degrade to terminal and missing legacy values remain absent.
-  viewMode: z.enum(['terminal', 'chat']).catch('terminal').optional()
-})
+const tabSchema = z
+  .object({
+    id: z.string(),
+    entityId: z.string(),
+    groupId: z.string(),
+    worktreeId: z.string(),
+    executionHostId: executionHostIdSchema.optional(),
+    contentType: tabContentTypeSchema,
+    // Accept registered agent slugs across mixed versions; invalid slugs become absent rather than rejecting the session.
+    agentSessionAgent: z
+      .string()
+      .refine((value) => isStructuredAgentId(value))
+      .optional()
+      .catch(undefined),
+    label: z.string(),
+    generatedLabel: z.string().nullable().optional(),
+    aiVaultTitle: z
+      .object({
+        agent: z.enum(['claude', 'codex']),
+        sessionId: z.string(),
+        title: z.string(),
+        kind: z.enum(['named', 'fallback']).optional().catch(undefined)
+      })
+      .nullable()
+      .optional()
+      .catch(undefined),
+    quickCommandLabel: z.string().nullable().optional(),
+    customLabel: z.string().nullable(),
+    color: z.string().nullable(),
+    sortOrder: z.number(),
+    createdAt: z.number(),
+    // Why: corrupt optional recency must not discard the whole persisted tab.
+    lastFocusedAt: z.number().finite().nonnegative().optional().catch(undefined),
+    isPreview: z.boolean().optional(),
+    isPinned: z.boolean().optional(),
+    // Preserve chat mode on restore; unknown future values degrade to terminal and missing legacy values remain absent.
+    viewMode: z.enum(['terminal', 'chat']).catch('terminal').optional()
+  })
+  .refine(
+    (tab) =>
+      tab.contentType !== 'database' || databaseExplorerEntitySchema.safeParse(tab.entityId).success
+  )
 
 const tabGroupSchema = z.object({
   id: z.string(),

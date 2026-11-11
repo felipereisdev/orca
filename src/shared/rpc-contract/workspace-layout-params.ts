@@ -1,3 +1,4 @@
+import { databaseExplorerEntitySchema } from '../database/database-explorer-reference'
 import { z } from 'zod'
 import { isTerminalLeafId } from '../workspace-layout/stable-pane-id'
 import { SleepCommand, StartPaneCommand, WakeCommand } from './workspace-layout-sleep-wake-params'
@@ -242,6 +243,17 @@ const OpenSimulatorTabCommand = z.object({
   split: NewGroupSplit
 })
 
+const OpenDatabaseTabCommand = z.object({
+  type: z.literal('openDatabaseTab'),
+  ...OnTab,
+  entityId: databaseExplorerEntitySchema,
+  groupId: z.string().min(1).optional(),
+  afterTabId: z.string().min(1).optional(),
+  index: z.number().int().nonnegative().optional(),
+  createdAt: z.number().int().nonnegative().optional(),
+  split: NewGroupSplit
+})
+
 /** Move restored editor tabs to the window-resolved owning workspace, preserving proposed IDs (F42). */
 const MoveTabToWorkspaceCommand = z.object({
   type: z.literal('moveTabToWorkspace'),
@@ -313,6 +325,7 @@ export const LayoutApplyParams = z.object({
     OpenAgentSessionTabCommand,
     PromotePreviewTabCommand,
     OpenSimulatorTabCommand,
+    OpenDatabaseTabCommand,
     MoveTabToWorkspaceCommand,
     RenameEditorFilesCommand,
     SleepCommand,

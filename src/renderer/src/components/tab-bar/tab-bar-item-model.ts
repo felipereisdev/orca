@@ -17,42 +17,8 @@ import { resolveTabIndicatorEdges } from '../tab-group/tab-insertion'
 import type { HoveredTabInsertion } from '../tab-group/useTabDragSplit'
 import type { Translate } from '@/i18n/use-translate'
 
-export type TabBarItem =
-  | {
-      type: 'terminal'
-      id: string
-      unifiedTabId: string
-      isPinned: boolean
-      data: TerminalTab & { unifiedTabId?: string }
-    }
-  | {
-      type: 'editor'
-      id: string
-      unifiedTabId: string
-      isPinned: boolean
-      data: OpenFile & { tabId?: string }
-    }
-  | {
-      type: 'browser'
-      id: string
-      unifiedTabId: string
-      isPinned: boolean
-      data: BrowserWorkspace & { tabId?: string }
-    }
-  | {
-      type: 'simulator'
-      id: string
-      unifiedTabId: string
-      isPinned: boolean
-      data: Tab
-    }
-  | {
-      type: 'agent-session'
-      id: string
-      unifiedTabId: string
-      isPinned: boolean
-      data: Tab & { contentType: 'agent-session' }
-    }
+import type { TabBarItem } from './tab-bar-item-types'
+export type { TabBarItem } from './tab-bar-item-types'
 
 /** The terminal tab as the strip shows it: its title resolved against the generated-titles setting. */
 export function resolveTerminalItemTab(
@@ -209,9 +175,9 @@ export function buildOrderedTabItems({
       continue
     }
     const simulatorTab = unifiedTabByVisibleId.get(id)
-    if (simulatorTab?.contentType === 'simulator') {
+    if (simulatorTab?.contentType === 'simulator' || simulatorTab?.contentType === 'database') {
       items.push({
-        type: 'simulator',
+        type: simulatorTab.contentType,
         id,
         unifiedTabId: simulatorTab.id,
         isPinned: simulatorTab.isPinned === true,
@@ -266,6 +232,9 @@ export function findActiveVisibleTabId(
     }
     if (item.type === 'browser') {
       return active.activeTabType === 'browser' && item.id === active.activeBrowserTabId
+    }
+    if (item.type === 'database') {
+      return active.activeTabType === 'database' && item.id === active.activeFileId
     }
     if (item.type === 'simulator') {
       return active.activeTabType === 'simulator' && item.id === active.activeSimulatorTabId

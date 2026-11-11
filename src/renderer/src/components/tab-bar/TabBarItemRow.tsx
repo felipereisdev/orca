@@ -171,15 +171,16 @@ function TabBarItemRow({
     onClose: () => actions.closeFile(item.id),
     onCloseAll: actions.closeAllFiles
   }
-  if (item.type === 'simulator') {
-    const simulatorLabel = formatSimulatorTabLabel(item.data.label, t)
+  if (item.type === 'simulator' || item.type === 'database') {
+    const simulatorLabel =
+      item.type === 'database' ? item.data.label : formatSimulatorTabLabel(item.data.label, t)
     const simulatorFile: OpenFile & { tabId: string } = {
       id: item.id,
       tabId: item.id,
       filePath: simulatorLabel,
       relativePath: simulatorLabel,
       worktreeId,
-      language: 'simulator',
+      language: item.type,
       isPreview: false,
       isDirty: false,
       mode: 'edit'

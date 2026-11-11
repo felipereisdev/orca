@@ -28,6 +28,7 @@ import { EditorRevealFlash } from './EditorRevealFlash'
 import { SplitPaneLanding } from './SplitPaneLanding'
 import { isSplitLandingGroup } from '@/store/slices/tabs/split-landing-groups'
 
+const WorkspaceDatabaseExplorer = lazy(() => import('../database/WorkspaceDatabaseExplorer'))
 const EditorPanel = lazy(() => import('../editor/EditorPanel'))
 const EMPTY_GROUPS: readonly TabGroup[] = []
 const EMPTY_CLIENT_HOSTED_ROWS: readonly ClientHostedBrowserRow[] = []
@@ -194,12 +195,14 @@ export default function TabGroupPanel({
       groupActiveTabId={activeTab?.id ?? null}
       agentSessionTabs={agentSessionItems}
       activeFileId={
-        activeTab?.contentType === 'terminal' ||
-        activeTab?.contentType === 'agent-session' ||
-        activeTab?.contentType === 'browser' ||
-        activeTab?.contentType === 'simulator'
-          ? null
-          : activeTab?.id
+        activeTab?.contentType === 'database'
+          ? activeTab.id
+          : activeTab?.contentType === 'terminal' ||
+              activeTab?.contentType === 'agent-session' ||
+              activeTab?.contentType === 'browser' ||
+              activeTab?.contentType === 'simulator'
+            ? null
+            : activeTab?.id
       }
       activeBrowserTabId={activeTab?.contentType === 'browser' ? activeTab.entityId : null}
       activeSimulatorTabId={activeTab?.contentType === 'simulator' ? activeTab.id : null}
@@ -210,9 +213,11 @@ export default function TabGroupPanel({
             ? 'agent-session'
             : activeTab?.contentType === 'browser'
               ? 'browser'
-              : activeTab?.contentType === 'simulator'
-                ? 'simulator'
-                : 'editor'
+              : activeTab?.contentType === 'database'
+                ? 'database'
+                : activeTab?.contentType === 'simulator'
+                  ? 'simulator'
+                  : 'editor'
       }
       onActivateFile={commands.activateEditor}
       onCloseFile={commands.closeItem}
@@ -361,7 +366,8 @@ export default function TabGroupPanel({
           activeTab.contentType !== 'terminal' &&
           activeTab.contentType !== 'agent-session' &&
           activeTab.contentType !== 'browser' &&
-          activeTab.contentType !== 'simulator' && (
+          activeTab.contentType !== 'simulator' &&
+          activeTab.contentType !== 'database' && (
             // Why: a capture-phase owner, so Monaco never sees the drop and the file opens as a tab here.
             <div ref={attachEditorFileDropOwner} className="absolute inset-0 flex min-h-0 min-w-0">
               {/* Why: split groups render editor content in a plain relative pane body, not the legacy Terminal.tsx flex column. */}
@@ -383,6 +389,14 @@ export default function TabGroupPanel({
               <EditorRevealFlash viewStateId={activeTab.id} />
             </div>
           )}
+
+        {activeTab?.contentType === 'database' && (
+          <div className="absolute inset-0">
+            <Suspense fallback={null}>
+              <WorkspaceDatabaseExplorer worktreeId={worktreeId} entityId={activeTab.entityId} />
+            </Suspense>
+          </div>
+        )}
 
         {showsSplitLanding ? (
           <SplitPaneLanding

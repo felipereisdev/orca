@@ -24884,6 +24884,38 @@
       "connections": "connections",
       "readOnly": "read-only",
       "environment": "environment"
+    },
+    "explorer": {
+      "toggleSchema": "Toggle schema browser",
+      "connection": "Query connection",
+      "readOnly": "Read only",
+      "sql": "SQL query",
+      "cancel": "Cancel query",
+      "run": "Run query",
+      "editorLoading": "Loading SQL editor…",
+      "parameters": "Bound parameters",
+      "parameterHelp": "JSON array with name, type and value. Keep integer and decimal values as strings.",
+      "loadingResults": "Loading query results…",
+      "noResults": "Run a query to see results",
+      "addQuery": "Add query to chat",
+      "addSelected": "Add selected data to chat",
+      "expired": "These cached results have expired. Run the query explicitly to retrieve fresh data.",
+      "rowCount": "{{count}} rows",
+      "truncated": "Truncated by query limits",
+      "running": "Query in progress…",
+      "schema": "Schema",
+      "schemaLoading": "Loading schema…",
+      "preview": "Preview rows",
+      "nullable": "nullable",
+      "addSchema": "Add schema to chat",
+      "schemaTruncated": "Schema listing truncated",
+      "ownerUnavailable": "The workspace host is unavailable",
+      "controllerChanged": "The database controller has changed. Select the connection again from this project."
+    },
+    "workspace": {
+      "open": "Database connections",
+      "loading": "Loading connections…",
+      "empty": "No connections associated with this project"
     }
   }
 }

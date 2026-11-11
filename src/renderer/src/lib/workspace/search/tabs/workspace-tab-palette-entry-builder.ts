@@ -209,8 +209,11 @@ export function buildSearchableWorkspaceTabEntries({
         })
         continue
       }
-      if (tab.contentType === 'agent-session') {
-        const title = projectedStructuredChatTabName(tab, chatNames)
+      if (tab.contentType === 'agent-session' || tab.contentType === 'database') {
+        const title =
+          tab.contentType === 'database'
+            ? (tab.customLabel ?? tab.label)
+            : projectedStructuredChatTabName(tab, chatNames)
         seenTabIdentities.add(tabIdentity)
         entries.push({
           ...baseEntry,
@@ -218,7 +221,7 @@ export function buildSearchableWorkspaceTabEntries({
           secondaryText: '',
           titleSearchText: title,
           secondarySearchTexts: [],
-          typeSearchAliases: ['chat'],
+          typeSearchAliases: [tab.contentType === 'database' ? 'database' : 'chat'],
           document: buildPaletteTabDocument({
             id: tab.id,
             title,
@@ -226,7 +229,7 @@ export function buildSearchableWorkspaceTabEntries({
             worktreeName,
             branch,
             repoName,
-            typeAliases: ['chat']
+            typeAliases: [tab.contentType === 'database' ? 'database' : 'chat']
           }),
           agentMetadata: [],
           // Why: a chat records its provider, as the tab strip's icon does.

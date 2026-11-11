@@ -142,6 +142,16 @@ export type WindowLayoutCommand =
       split?: NewGroupSplit
     }
   | {
+      type: 'openDatabaseTab'
+      entityId: string
+      tabId: string
+      groupId?: string
+      afterTabId?: string
+      index?: number
+      createdAt?: number
+      split?: NewGroupSplit
+    }
+  | {
       type: 'moveTabToWorkspace'
       toWorkspace: string
       tabs: { tabId: string; newTabId: string; newEntityId: string; view?: LayoutEditorView }[]
@@ -201,6 +211,7 @@ function drawnTabHolds(worktreeId: string, command: WindowLayoutCommand): DrawnT
     case 'replaceBrowserPage':
     case 'setBrowserTabProfile':
     case 'openAgentSessionTab':
+    case 'openDatabaseTab':
     case 'openSimulatorTab':
     case 'openEditorTab':
     case 'promotePreviewTab':

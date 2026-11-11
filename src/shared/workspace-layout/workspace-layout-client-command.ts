@@ -117,6 +117,7 @@ export function clientLayoutCommand(
   switch (command.type) {
     case 'createTerminalTab':
     case 'openEditorTab':
+    case 'openDatabaseTab':
     case 'openSimulatorTab':
     case 'openBrowserTab':
     case 'openAgentSessionTab':

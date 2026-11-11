@@ -14,7 +14,7 @@ const record = z.object({
   queryId: z.string().uuid(),
   source,
   project: databaseProjectSchema,
-  sessionId: z.string().max(2048),
+  sessionId: z.string().max(2048).nullable(),
   sql: z.string().max(65536),
   parameterNames: z.array(z.string().max(256)).max(256),
   createdAt: z.number(),
