@@ -465,3 +465,17 @@ orca agent hooks off --json
 - Read terminal state before sending input unless the next input is obvious.
 - Use worktree comments for progress checkpoints. See [Worktree checkpoints](/docs/cli/worktree-checkpoints).
 - Use [Orchestration](/docs/cli/orchestration) for tracked multi-agent dispatches instead of ad hoc terminal prompts.
+
+## Read-only database environments
+
+Configure connections under Settings → Database connections and associate them with repository or folder projects. Every query requires an exact alias or stable connection ID. See [Database connections](/docs/database-connections) for engine provisioning, limits and retention.
+
+```bash
+orca db list --worktree active --json
+orca db describe --connection conexal1-hmg --schema approved --worktree active --json
+orca db query --connection conexal1-hmg --sql-file query.sql --parameters-file parameters.json --worktree active --json
+orca db history --worktree active --json
+orca db cancel <query-id> --worktree active --json
+```
+
+Use `--project <id>` for a registered folder/project outside the current Git directory. SQL and parameter files can use `-` for stdin, but cannot both consume stdin. No credential or connection-URL flags are accepted. Exact numeric parameter values are strings; binary values use base64. Preserve the returned query ID and source when referring to results. A failed connection or expired result never triggers an automatic replay.

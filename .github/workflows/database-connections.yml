@@ -1,0 +1,77 @@
+name: Database connections
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/main/database/**'
+      - 'src/main/runtime/database/**'
+      - 'src/main/runtime/rpc/methods/database/**'
+      - 'src/shared/database/**'
+      - 'src/packages/sql-read-query-parser/**'
+      - 'tests/database/**'
+      - 'config/vitest.database.config.ts'
+      - 'config/scripts/database/**'
+      - 'config/patches/oracledb*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/database-connections.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: databases-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clients:
+    name: Database runtime (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      ORCA_BACKGROUND_LAUNCH: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-node-dependencies
+      - run: pnpm build:packages
+      - run: node config/scripts/database/verify-database-runtime.mjs
+
+  adapters:
+    name: Database integration (${{ matrix.engine }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: postgres
+            tests: tests/database/postgres-adapter.integration.test.ts tests/database/database-runtime-routing.integration.test.ts
+          - engine: sql-server
+            tests: tests/database/sql-server-adapter.integration.test.ts
+          - engine: oracle
+            tests: tests/database/oracle-adapter.integration.test.ts
+    timeout-minutes: 20
+    env:
+      ORCA_BACKGROUND_LAUNCH: '1'
+      VITE_CONFIG_NATIVE_IGNORE_WARNING: 'true'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+      - name: Verify required fixture services
+        run: |
+          docker info
+          openssl version
+      - name: Exercise disposable servers with verified TLS
+        run: pnpm test:database ${{ matrix.tests }}

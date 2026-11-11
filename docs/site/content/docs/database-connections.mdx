@@ -1,0 +1,48 @@
+---
+title: Read-only database connections
+description: Register database environments, consult them from agents and inspect bounded results.
+---
+
+Register environments once in **Settings → Database connections**. Give each connection a unique alias such as `conexal1-hmg`, choose its database engine and execution host, and associate it with the projects that may use it. One connection can serve several repository or folder projects. Production and homologation use the same read restrictions; the selected environment remains visible during queries.
+
+Credentials are sealed on the selected execution host. Settings can return endpoint configuration, but never saved passwords. Enrollment requires the host's protected secret store; Orca does not fall back to plaintext. Changing execution hosts requires a new connection. Use the saved connection's **Test connection** action to check its actual TLS connection and reader profile.
+
+## Consult an environment
+
+In native chat, type `@` and select a connection under **Databases**. File mentions remain a separate category, even when the filename matches the alias. Selected mentions retain the connection ID and controller identity through sending and resuming. Renamed, removed or unavailable references require a new selection; they cannot silently target another connection.
+
+For example: “`@conexal1-hmg` inspect the last failed invoices.” The agent uses the project-scoped Orca database service and an explicit connection on each query. Raw terminals accept aliases as ordinary text; agents can use the [database CLI commands](/docs/cli/reference#read-only-database-environments). There is no implicit global active environment.
+
+Open the project's database explorer to browse visible schemas/tables/keys, generate a bounded table preview, or submit one SQL query with typed parameters. SQL Server and Oracle use stricter ordinary-table profiles than PostgreSQL; unsupported objects are refused. Query results retain their captured environment and host even after the editor connection changes.
+
+An agent query card opens its own query ID. Opening a result never reruns SQL. Use the explorer's explicit execute action to run again. Selected cells, a query or a schema fragment can be sent to an existing conversation with source, capture time and truncation metadata. Database content is untrusted data, including text that resembles instructions.
+
+## Supported configurations
+
+| Engine     | Observed server evidence                       | Authentication and connection                                                      | Initial restrictions                                                                                                                                                                          |
+| ---------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL | PostgreSQL 16, disposable real server          | Password, explicit database/TCP, verified TLS                                      | Built-in scalar tables and inspected PostgreSQL 15+ security-invoker views; no privileged roles, custom types/routines, RLS, foreign/materialized tables                                      |
+| SQL Server | 2022 CU18, 16.0.4185.3, disposable real server | SQL password authentication, explicit database/TCP, verified TLS, portable Tedious | Ordinary tables; no views, synonyms, computed columns, RLS, external/CLR types or writable principals. Legacy datetime/money/float/sql_variant results are refused                            |
+| Oracle     | Free 23.26.3.0.0, disposable real server       | Thin driver, password, service name, verified TCPS                                 | Ordinary tables; no owned objects, enabled roles, application views/synonyms, virtual columns, RLS or custom types/routines. No Thick fallback, SID/TNS discovery or client wallet enrollment |
+
+Detailed administrator provisioning profiles: [PostgreSQL](https://github.com/stablyai/orca/blob/main/docs/readme/database/postgresql.md), [SQL Server](https://github.com/stablyai/orca/blob/main/docs/readme/database/sql-server.md), [Oracle](https://github.com/stablyai/orca/blob/main/docs/readme/database/oracle.md). The application never changes grants itself. A `SELECT` prefix or read-only application intent is insufficient: parsed SQL, least-privilege accounts and engine controls all participate.
+
+CA input accepts public PEM certificates only. For PostgreSQL and SQL Server the optional TLS name is the expected DNS name. For Oracle it is the full certificate subject DN; leave it blank for hostname verification. Certificate verification is always enabled. Unsupported syntax is refused, including scripts, writes, locking escapes, sequence advancement, cross-database links and arbitrary routine calls.
+
+Paired runtime execution hosts use the existing authenticated environment transport and capability checks. Credentials stay on that executor, and requests pin its runtime/pairing identity. Raw legacy SSH relays and older hosts without database capability are refused. Live remote service evidence uses PostgreSQL across two runtime instances at the authenticated RPC boundary; a real SSH/socket deployment has not been exercised by that fixture. SQL Server and Oracle share this routing contract and have direct real-server adapter evidence.
+
+Node and Electron-as-Node imports were exercised on macOS; Node driver imports were exercised on Linux ARM64. Windows import/worker qualification is configured in CI and remains required. Full packaged-client and hidden Electron UI evidence is separate from these checks. Component fixtures cover the approved settings, explorer, mentions and cards; they do not establish mobile/desktop end-to-end delivery.
+
+## Limits, cancellation and history
+
+Each query has an overall deadline of at most 30 seconds, at most 1,000 returned rows and 5 MiB of serialized output. Connections can lower these limits. Large cells become explicit previews, and exact numbers remain strings. Results preserve duplicate column names by separate positions. Oracle treats empty strings as NULL. Supported exact numeric inputs must fit the selected engine's precision.
+
+At most two queries run per connection and ten per execution host, with a pending queue of twenty. Cancel and deadline actions stop driver/server work and discard the private session. A disconnect or uncertain outcome does not cause a retry. A queued query whose connection revision or association changed is refused before execution.
+
+Results are cached in runtime memory for up to 15 minutes or until the initiating session closes, under a 25 MiB budget. Older cached results can expire sooner. Opening an expired result shows metadata and requires an explicit rerun. Open result panels can retain data already displayed.
+
+Local history stores executed SQL and metadata, including parameter names, but excludes parameter values and result rows. Retention is at most 100 records per connection for seven days, additionally bounded to 1,000 records/16 MiB globally. SQL may itself contain sensitive literals. Expired entries are hidden on access and pruned during history access or metadata writes; an unused offline profile is not subject to scheduled erasure. History is not a tamper-evident audit trail and is excluded from telemetry/diagnostic serialization.
+
+Use **Settings → Database connections → connection actions → Clear query history** to delete that controller's stored SQL and runtime result cache for the connection across projects. Running queries for it are cancelled before deletion finishes. Removing the connection also clears its history. Open panels, remote execution-host history and agent conversations retain data already supplied under their own retention; clearing controller history does not erase external transcripts.
+
+Unsent SQL and parameter drafts stay in window memory. Layout restores the connection reference, without saving result rows or parameter values; unsent drafts are lost on restart. Keep SQL in a file when it needs durable storage.
