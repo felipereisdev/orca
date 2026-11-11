@@ -14,7 +14,13 @@ import { createDatabaseRuntimeClient } from '@/runtime/database/database-runtime
 import type { DatabaseConnectionSummary } from '../../../../shared/database/database-contracts'
 import { openDatabaseExplorer } from '@/lib/database/database-explorer-tabs'
 import { useTranslate } from '@/i18n/use-translate'
-export function DatabaseWorkspaceMenu({ worktreeId }: { worktreeId: string }) {
+export function DatabaseWorkspaceMenu({
+  worktreeId,
+  groupId
+}: {
+  worktreeId: string
+  groupId?: string
+}) {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<DatabaseConnectionSummary[]>([])
@@ -49,8 +55,8 @@ export function DatabaseWorkspaceMenu({ worktreeId }: { worktreeId: string }) {
   }, [open, client, worktreeId])
   return (
     <DropdownMenuSub open={open} onOpenChange={setOpen}>
-      <DropdownMenuSubTrigger disabled={!client}>
-        <Database />
+      <DropdownMenuSubTrigger disabled={!client} variant="launch-row">
+        <Database className="size-4 text-muted-foreground" />
         {t('database.workspace.open', 'Database connections')}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="max-w-80">
@@ -68,6 +74,7 @@ export function DatabaseWorkspaceMenu({ worktreeId }: { worktreeId: string }) {
                 if (controllerRuntimeId) {
                   openDatabaseExplorer({
                     worktreeId,
+                    groupId,
                     connection: { connectionId: connection.id, controllerRuntimeId }
                   })
                 }

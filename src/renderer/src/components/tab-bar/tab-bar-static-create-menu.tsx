@@ -14,6 +14,7 @@ import {
 } from './use-tab-bar-runtime-model'
 import type { TabBarProps } from './tab-bar-props'
 import { resolveWindowsShellLaunchTarget } from './windows-shell-launch'
+import { DatabaseWorkspaceMenu } from '../database/DatabaseWorkspaceMenu'
 
 export function TabBarStaticCreateMenu({
   groupId,
@@ -191,6 +192,9 @@ export function TabBarStaticCreateMenu({
     onNewSimulatorTab ? (
       <MobileEmulatorTabIntroCallout />
     ) : null
+  const databaseMenuItem = !terminalOnly ? (
+    <DatabaseWorkspaceMenu worktreeId={props.worktreeId} groupId={groupId} />
+  ) : null
 
   return newTabMenuOrder === 'markdown-first' ? (
     <>
@@ -200,6 +204,7 @@ export function TabBarStaticCreateMenu({
       {defaultTerminalMenuItems}
       {newBrowserMenuItem}
       {newSimulatorMenuItem}
+      {databaseMenuItem}
       {mobileEmulatorIntroMenuBlock}
     </>
   ) : (
@@ -210,6 +215,7 @@ export function TabBarStaticCreateMenu({
       {pluginNewFileMenuItems}
       {openMarkdownMenuItem}
       {newSimulatorMenuItem}
+      {databaseMenuItem}
       {mobileEmulatorIntroMenuBlock}
     </>
   )

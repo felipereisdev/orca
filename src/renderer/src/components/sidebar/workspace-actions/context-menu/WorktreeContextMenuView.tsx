@@ -1,4 +1,3 @@
-import { DatabaseWorkspaceMenu } from '@/components/database/DatabaseWorkspaceMenu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,7 +142,6 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
                 : worktree.displayName}
             </span>
           </DropdownMenuLabel>
-          {!isMultiContext && <DatabaseWorkspaceMenu worktreeId={worktree.id} />}
           {!isMultiContext && <WorktreeWslHostStartMenuItem worktreeId={worktree.id} />}
           {isMultiContext ? (
             sleepItems

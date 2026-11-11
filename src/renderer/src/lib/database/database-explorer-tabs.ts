@@ -32,11 +32,13 @@ export const requestedDatabaseQuery = (worktreeId: string, entityId: string) =>
   requestedQueries.get(JSON.stringify([worktreeId, entityId])) ?? null
 export function openDatabaseExplorer({
   worktreeId,
+  groupId,
   connection,
   queryId,
   sessionId
 }: {
   worktreeId: string
+  groupId?: string
   connection: DatabaseConnectionRef
   queryId?: string
   sessionId?: string
@@ -62,7 +64,12 @@ export function openDatabaseExplorer({
   const tabId = createNonSecureContextUuid()
   const label = '@database'
   const drawHere = () =>
-    state.createUnifiedTab(worktreeId, 'database', { id: tabId, entityId, label }).id
+    state.createUnifiedTab(worktreeId, 'database', {
+      id: tabId,
+      entityId,
+      label,
+      targetGroupId: groupId
+    }).id
   if (
     !ORCA_LAYOUT_OWNER_IS_MAIN ||
     !openContentTabThroughLayoutOwner(state, {
@@ -72,7 +79,7 @@ export function openDatabaseExplorer({
         type: 'openDatabaseTab',
         tabId,
         entityId,
-        groupId: state.activeGroupIdByWorktree[worktreeId]
+        groupId: groupId ?? state.activeGroupIdByWorktree[worktreeId]
       },
       facts: { label },
       shown: (id) => useAppStore.getState().activateTab(id, { worktreeId }),
