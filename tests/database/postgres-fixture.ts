@@ -1,43 +1,19 @@
+import { createDatabaseTlsFixture } from './database-tls-fixture'
+import { runDatabaseFixtureProcess as command } from './database-fixture-process'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { runProcess } from '@orca/process-host'
 import { Client, type ClientConfig } from 'pg'
 import type { DatabaseConnection } from '../../src/shared/database/database-contracts'
 
 export async function createPostgresFixture() {
-  const directory = await mkdtemp(join(tmpdir(), 'orca-database-postgres-'))
+  const tls = await createDatabaseTlsFixture('postgres')
+  const { directory } = tls
   const name = `orca-database-${randomUUID()}`
-  const command = async (program: string, args: string[]) => {
-    const result = await runProcess({ program, args, timeoutMs: 30_000 })
-    if (result.code !== 0) {
-      throw new Error(`${program} fixture failed: ${result.stderr}`)
-    }
-    return result.stdout.trim()
-  }
   const close = async () => {
     await runProcess({ program: 'docker', args: ['rm', '-f', name], timeoutMs: 15_000 })
-    await rm(directory, { recursive: true, force: true })
+    await tls.close()
   }
   try {
-    await command('openssl', [
-      'req',
-      '-x509',
-      '-newkey',
-      'rsa:2048',
-      '-nodes',
-      '-days',
-      '1',
-      '-subj',
-      '/CN=localhost',
-      '-addext',
-      'subjectAltName=DNS:localhost,IP:127.0.0.1',
-      '-keyout',
-      join(directory, 'server.key'),
-      '-out',
-      join(directory, 'server.crt')
-    ])
     await command('docker', [
       'run',
       '-d',
@@ -57,7 +33,7 @@ export async function createPostgresFixture() {
       'cp /fixtures/server.key /tmp/server.key && chown postgres:postgres /tmp/server.key && chmod 600 /tmp/server.key && exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/fixtures/server.crt -c ssl_key_file=/tmp/server.key'
     ])
     const port = Number((await command('docker', ['port', name, '5432/tcp'])).split(':').at(-1))
-    const ca = await readFile(join(directory, 'server.crt'), 'utf8')
+    const ca = tls.certificate
     const adminConfig: ClientConfig = {
       host: '127.0.0.1',
       port,

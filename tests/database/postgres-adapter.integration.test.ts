@@ -1,3 +1,4 @@
+import { captureDatabaseResult as capture } from './capture-database-result'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createPostgresAdapter } from '../../src/main/database/adapters/postgres-adapter'
 import type {
@@ -18,26 +19,6 @@ afterAll(async () => {
   await fixture?.close()
 })
 
-function capture(limit = 1000) {
-  const rows: unknown[][] = []
-  const names: string[] = []
-  const sink: DatabaseResultSink = {
-    markTruncated: () => {},
-    columns: (columns) => {
-      names.push(...columns.map((column) => column.name))
-    },
-    row: (values) => {
-      if (rows.length >= limit) {
-        return false
-      }
-      rows.push([...values])
-      return true
-    },
-    remainingBytes: 5 * 1024 * 1024,
-    stopped: false
-  }
-  return { rows, names, sink }
-}
 async function execute(sql: string, sink: DatabaseResultSink, signal = AbortSignal.timeout(5000)) {
   return adapter.execute(
     fixture.configuration,

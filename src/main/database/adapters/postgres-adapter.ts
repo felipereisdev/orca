@@ -1,5 +1,6 @@
+import { createDatabaseAdapterSessions } from './database-adapter-sessions'
 import Cursor from 'pg-cursor'
-import { types, type QueryResult } from 'pg'
+import { types, type QueryResult, type Client } from 'pg'
 import type { DatabaseParameter } from '../../../shared/database/database-query-contracts'
 import type { DatabaseAdapter } from './database-adapter'
 import { assertPostgresPrivilegeProfile } from './postgres-privilege-profile'
@@ -37,32 +38,8 @@ function bindPostgresParameters(parameters: DatabaseParameter[]): unknown[] {
 }
 
 export function createPostgresAdapter(): DatabaseAdapter {
-  const active = new Map<AbortController, Promise<void>>()
-  let disposed = false
-  const session: typeof withPostgresSession = async (config, credentials, signal, operation) => {
-    if (disposed) {
-      throw new Error('PostgreSQL adapter is closed')
-    }
-    const controller = new AbortController()
-    let settled!: () => void
-    active.set(
-      controller,
-      new Promise<void>((resolve) => {
-        settled = resolve
-      })
-    )
-    try {
-      return await withPostgresSession(
-        config,
-        credentials,
-        AbortSignal.any([signal, controller.signal, AbortSignal.timeout(config.limits.timeoutMs)]),
-        operation
-      )
-    } finally {
-      active.delete(controller)
-      settled()
-    }
-  }
+  const sessions = createDatabaseAdapterSessions<Client>(withPostgresSession)
+  const session = sessions.run
   return {
     preflight: (config, credentials, signal) =>
       session(config, credentials, signal, assertPostgresPrivilegeProfile),
@@ -107,12 +84,6 @@ export function createPostgresAdapter(): DatabaseAdapter {
           await cursor.close().catch(() => {})
         }
       }),
-    dispose: async () => {
-      disposed = true
-      for (const controller of active.keys()) {
-        controller.abort(new Error('PostgreSQL adapter disposed'))
-      }
-      await Promise.all(active.values())
-    }
+    dispose: sessions.dispose
   }
 }
