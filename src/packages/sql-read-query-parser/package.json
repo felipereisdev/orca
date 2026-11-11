@@ -1,0 +1,33 @@
+{
+  "name": "@orca/sql-read-query-parser",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dialect parsing for Orca read-only database query admission",
+  "files": [
+    "dist"
+  ],
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "orca-source": "./src/parse-sql.ts",
+      "types": "./dist/parse-sql.d.ts",
+      "default": "./dist/parse-sql.js"
+    }
+  },
+  "scripts": {
+    "generate": "node scripts/generate-parsers.mjs",
+    "build": "node scripts/build-parsers.mjs"
+  },
+  "dependencies": {
+    "antlr4ng": "3.0.16"
+  },
+  "devDependencies": {
+    "antlr-ng": "1.0.10",
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2",
+    "typescript-api": "npm:typescript@6.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

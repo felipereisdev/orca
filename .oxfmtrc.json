@@ -5,6 +5,8 @@
   "printWidth": 100,
   "trailingComma": "none",
   "ignorePatterns": [
+    "src/packages/sql-read-query-parser/grammars/**",
+    "src/packages/sql-read-query-parser/generated*/**",
     "cloud/**",
     "resources/licenses/**",
     "resources/plugins/launch/*/**",

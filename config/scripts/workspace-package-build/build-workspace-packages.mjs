@@ -14,9 +14,18 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { resolvePnpmCliInvocation } from '../tool-invocation/pnpm-cli-invocation.mjs'
 
 const root = resolve(import.meta.dirname, '../../..')
-const PACKAGES = [{ name: '@orca/process-host', dir: 'src/packages/process-host' }]
+const PACKAGES = [
+  { name: '@orca/process-host', dir: 'src/packages/process-host' },
+  { name: '@orca/sql-read-query-parser', dir: 'src/packages/sql-read-query-parser' }
+]
 // Outputs and build scratch space, not inputs.
-const NON_INPUTS = new Set(['dist', 'node_modules', '.dist-build.lock'])
+const NON_INPUTS = new Set([
+  'dist',
+  'node_modules',
+  '.dist-build.lock',
+  'generated',
+  'generated-src'
+])
 const COMPILER_PACKAGES = ['typescript', 'tsx', '@types/node']
 
 function listFiles(directory, base = directory) {
