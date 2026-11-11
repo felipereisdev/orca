@@ -1,4 +1,5 @@
 import { withOrcaClaudeChatEntrypoint } from '../../shared/agent-launch/startup/claude-chat-entrypoint'
+import { explicitClaudeAccountEnv } from '../claude-accounts/environment'
 import { waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
 import {
   assertStructuredAgentResolutionCurrent,
@@ -125,7 +126,8 @@ export function createClaudeModelCatalogProbe(
     cwd?: string,
     lookup: AgentModelCatalogLookup = 'recover',
     operation?: StructuredAgentResolutionOperation,
-    launchDirectory = cwd
+    launchDirectory = cwd,
+    claudeAccountId?: string
   ) => {
     assertStructuredAgentResolutionCurrent(operation)
     const configuredArgs = claudeStructuredLaunchArgs(
@@ -154,12 +156,17 @@ export function createClaudeModelCatalogProbe(
     assertStructuredAgentResolutionCurrent(operation)
     const { command, prefixArgs, env, account } = await resolveClaudeStructuredInvocation(
       launchDeps,
-      (base) => ({
-        ...base,
-        ...claudeConfigDirEnvPatch(requireLegacyAgentSessionAccountHome(accountHome).path, {
-          env: base
-        })
-      }),
+      (base) =>
+        claudeAccountId
+          ? explicitClaudeAccountEnv(base, claudeAccountId, {
+              CLAUDE_CONFIG_DIR: requireLegacyAgentSessionAccountHome(accountHome).path
+            })
+          : {
+              ...base,
+              ...claudeConfigDirEnvPatch(requireLegacyAgentSessionAccountHome(accountHome).path, {
+                env: base
+              })
+            },
       sources
     )
     assertStructuredAgentResolutionCurrent(operation)
@@ -175,6 +182,7 @@ export function createClaudeModelCatalogProbe(
     const args = argsFor(true, settingSources)
     return {
       identity: {
+        ...(claudeAccountId ? { claudeAccountId } : {}),
         command,
         prefixArgs,
         args,
@@ -276,9 +284,15 @@ export function createClaudeModelCatalogProbe(
           home,
           options?.cwd ?? options?.workspacePath ?? process.cwd(),
           'recover',
-          options?.operation
+          options?.operation,
+          options?.workspacePath,
+          options?.claudeAccountId
         )
       ).run(options?.signal),
-    { resolve, resolveLegacy: (home, operation) => resolve(home, undefined, 'recover', operation) }
+    {
+      resolve,
+      resolveLegacy: (home, operation, claudeAccountId) =>
+        resolve(home, undefined, 'recover', operation, undefined, claudeAccountId)
+    }
   )
 }

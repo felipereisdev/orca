@@ -48,7 +48,7 @@ export async function resolveAgentModelCatalogScope(
     const resolved =
       savedOnly() || !deps.store.probeDue(fingerprint)
         ? null
-        : await probe?.resolveLegacy?.(home, operation).catch(() => null)
+        : await probe?.resolveLegacy?.(home, operation, params.claudeAccountId).catch(() => null)
     if (!current()) {
       return null
     }
@@ -82,7 +82,7 @@ export async function resolveAgentModelCatalogScope(
     return { base, fingerprint: base, exact: false, cwd: listIn }
   }
   const resolve = (lookup: AgentModelCatalogLookup) =>
-    probe?.resolve?.(home, listIn, lookup, operation, cwd).catch(() => null)
+    probe?.resolve?.(home, listIn, lookup, operation, cwd, params.claudeAccountId).catch(() => null)
   const scopeKey = (resolved: AgentModelCatalogResolvedProbe | null | undefined) =>
     agentModelCatalogScopeFingerprint(base, listIn, resolved?.identity)
   let resolved = await resolve(savedOnly() ? 'saved' : 'snapshot')

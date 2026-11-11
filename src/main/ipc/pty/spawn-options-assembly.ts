@@ -1,4 +1,5 @@
 import { withClaudeAgentViewPlugin } from '../../../shared/claude-agent-view-launch'
+import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../claude-accounts/environment'
 import { resolveStartupShell } from '../../../shared/agent-launch/startup/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { getAppEnvironment } from '../../../shared/app-environment'
@@ -58,17 +59,7 @@ export function assemblePtySpawnEnvDeletions(input: {
       ) ?? [],
       // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
       PI_PROCESS_OWNER_ENV_KEYS,
-      env?.ORCA_CLAUDE_ACCOUNT_ID
-        ? [
-            'ANTHROPIC_API_KEY',
-            'ANTHROPIC_AUTH_TOKEN',
-            'CLAUDE_CODE_OAUTH_TOKEN',
-            'AWS_BEARER_TOKEN_BEDROCK',
-            'ORCA_CLAUDE_PROFILE_POINTER',
-            'ORCA_CLAUDE_INJECTED_CONFIG_DIR',
-            'ORCA_CLAUDE_USER_CONFIG_DIR'
-          ]
-        : [],
+      env?.ORCA_CLAUDE_ACCOUNT_ID ? CLAUDE_EXPLICIT_ENV_DELETIONS : [],
       input.agentTeamsEnvToDelete,
       // Disable legacy hooks on old hosts while preserving ORCA_REAL pointers needed by Windows shims.
       input.isDaemonHostSpawn || input.connectionId ? LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS : [],

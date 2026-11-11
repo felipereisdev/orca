@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { HostAccountLaunchEnv } from '../../../../shared/agent-launch/startup/host-account-launch-env'
@@ -7,7 +7,7 @@ import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runt
 import { claudeProfileMissing } from '../../../claude-accounts/claude-profile-launch-errors'
 import { claudeProfileMarkerPath } from '../../../claude-accounts/claude-profile-paths'
 import {
-  readClaudeFolderLogin,
+  readClaudeFolderLoginAsync,
   isSameClaudeLogin
 } from '../../../claude-accounts/claude-account-folder'
 import { wslClaudeProfile } from '../../../claude-accounts/claude-profile-wsl-paths'
@@ -23,10 +23,16 @@ export async function prepareHostClaudeAccountLaunch(
     throw claudeProfileMissing()
   }
   const { profile } = wslClaudeProfile(homedir(), launchEnv.wslDistro, accountId)
-  if (profile.home !== account.configDir || !existsSync(claudeProfileMarkerPath(profile))) {
+  if (
+    profile.home !== account.configDir ||
+    !(await stat(claudeProfileMarkerPath(profile)).then(
+      (entry) => entry.isFile(),
+      () => false
+    ))
+  ) {
     throw claudeProfileMissing()
   }
-  const login = readClaudeFolderLogin(join(profile.home, '.claude.json'))
+  const login = await readClaudeFolderLoginAsync(join(profile.home, '.claude.json'))
   if (account.needsSignIn || !login || !isSameClaudeLogin(account, login)) {
     throw new AgentSessionPreSpawnError(
       new Error('Sign in to this Claude account again before launching it.'),

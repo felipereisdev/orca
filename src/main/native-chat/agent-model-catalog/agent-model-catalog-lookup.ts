@@ -32,6 +32,7 @@ export function createAgentModelCatalogLookup(
     return {
       key: JSON.stringify([bindingKey, identity, passive]),
       launch: {
+        claudeAccountId: params.claudeAccountId,
         agent: params.agent,
         accountHome: params.accountHome,
         records,

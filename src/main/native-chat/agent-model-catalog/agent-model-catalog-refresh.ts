@@ -30,6 +30,7 @@ const AGENT_MODEL_CATALOG_REFRESH_MS = AGENT_MODEL_CATALOG_PICKER_WAIT_MS
 
 /** What a refresh resolves, captured when it starts; no reader's session, deadline or callback. */
 export type AgentModelCatalogLaunch = {
+  claudeAccountId?: string
   accountHome?: AgentSessionAccountHome
   agent: string
   records: AgentModelCatalogReadRecords
@@ -143,7 +144,13 @@ export function createAgentModelCatalogRefreshes(context: {
       const scope = await bounded(
         resolveAgentModelCatalogScope(
           deps,
-          { agent, workspacePath, savedOnly: launch.passive, legacy: launch.legacy },
+          {
+            agent,
+            workspacePath,
+            savedOnly: launch.passive,
+            legacy: launch.legacy,
+            claudeAccountId: launch.claudeAccountId ?? record?.claudeAccountId
+          },
           scoped,
           base,
           probeHome,
@@ -166,6 +173,7 @@ export function createAgentModelCatalogRefreshes(context: {
         probeHome
       ) {
         const lister = scopedAgentModelCatalogLister({
+          claudeAccountId: launch.claudeAccountId ?? record?.claudeAccountId,
           legacy: launch.legacy,
           signal: lifetime,
           resolved,

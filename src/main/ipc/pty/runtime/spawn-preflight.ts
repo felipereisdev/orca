@@ -1,7 +1,4 @@
-import {
-  preparePinnedClaudeTerminalEnv,
-  withClaudeProfileTerminalEnv
-} from '../../../claude-accounts/claude-profile-installed-router'
+import { prepareClaudeTerminalLaunch } from '../../../claude-accounts/claude-profile-installed-router'
 import type { PtySpawnResult } from '../../../providers/pty-provider-contract'
 import { LocalPtyProvider } from '../../../providers/local-pty/local-pty-provider'
 import { isValidTerminalTabId } from '../../../../shared/workspace-layout/terminal-tab-id'
@@ -103,12 +100,13 @@ export async function prepareRuntimePtySpawn(
   ctx.expectedWslDistro = target.expectedWslDistro
   ctx.wslHoldReadAnchor = target.wslHoldReadAnchor
   ctx.codexSelectionTarget = target.codexSelectionTarget
-  args.env = await preparePinnedClaudeTerminalEnv(args.env, ctx.codexSelectionTarget)
-  args.env = withClaudeProfileTerminalEnv(args.env, ctx.codexSelectionTarget)
-  ctx.claudeAuth =
-    ctx.isClaudeLaunch && ctx.deps.prepareClaudeAuth
-      ? await ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget)
-      : null
+  const preparedClaude = await prepareClaudeTerminalLaunch(
+    args.env,
+    ctx.codexSelectionTarget,
+    ctx.isClaudeLaunch ? ctx.deps.prepareClaudeAuth : undefined
+  )
+  args.env = preparedClaude.env
+  ctx.claudeAuth = preparedClaude.claudeAuth
 
   ctx.shouldPersistHostSessionBinding = args.persistHostSessionBinding === true
   if (ctx.shouldPersistHostSessionBinding) {

@@ -94,3 +94,21 @@ export async function preparePinnedClaudeTerminalEnv(
   const prepared = await prepareExplicitClaudeAccountLaunch(accountId, target)
   return explicitClaudeAccountEnv(env, accountId, prepared.envPatch)
 }
+
+export async function prepareClaudeTerminalLaunch(
+  env: Record<string, string> | undefined,
+  target: ClaudeAccountSelectionTarget,
+  prepareDefault?: (target: ClaudeAccountSelectionTarget) => Promise<ClaudeRuntimeAuthPreparation>
+) {
+  const accountId = env?.ORCA_CLAUDE_ACCOUNT_ID
+  const claudeAuth = accountId
+    ? await prepareExplicitClaudeAccountLaunch(accountId, target)
+    : ((await prepareDefault?.(target)) ?? null)
+  return {
+    env:
+      accountId && claudeAuth
+        ? explicitClaudeAccountEnv(env ?? {}, accountId, claudeAuth.envPatch)
+        : withClaudeProfileTerminalEnv(env, target),
+    claudeAuth
+  }
+}

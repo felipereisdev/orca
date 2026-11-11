@@ -17,6 +17,7 @@ export type AgentModelCatalogLookup = 'saved' | 'snapshot' | 'recover'
 export type AgentModelCatalogProbe = ((
   accountHome: AgentSessionAccountHome,
   options?: {
+    claudeAccountId?: string
     signal?: AbortSignal
     workspacePath?: string
     cwd?: string
@@ -26,7 +27,8 @@ export type AgentModelCatalogProbe = ((
 ) => Promise<AgentModelCatalogSuccess>) & {
   resolveLegacy?: (
     home: AgentSessionAccountHome,
-    operation?: StructuredAgentResolutionOperation
+    operation?: StructuredAgentResolutionOperation,
+    claudeAccountId?: string
   ) => Promise<AgentModelCatalogResolvedProbe>
   resolve?: (
     home: AgentSessionAccountHome,
@@ -34,7 +36,8 @@ export type AgentModelCatalogProbe = ((
     lookup?: AgentModelCatalogLookup,
     operation?: StructuredAgentResolutionOperation,
     /** Where a chat would launch, for resolving the executable; the listing still runs in `cwd`. */
-    launchDirectory?: string
+    launchDirectory?: string,
+    claudeAccountId?: string
   ) => Promise<AgentModelCatalogResolvedProbe>
 }
 

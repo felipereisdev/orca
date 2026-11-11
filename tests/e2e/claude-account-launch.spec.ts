@@ -5,13 +5,17 @@ import { test, SUPPORTED } from './helpers/structured-claude-stub'
 import { expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { waitForTerminalOutput } from './helpers/terminal'
-import { buildFakeAgentCommandOverride } from './helpers/fake-agent-command-override'
 
-test.use({ seedTestRepo: false })
+test.use({
+  seedTestRepo: false,
+  orcaAppExtraEnv: { ANTHROPIC_CUSTOM_HEADERS: 'Authorization: test-other-account' }
+})
 
 async function choose(page: Page, label: string, surface: 'terminal' | 'chat') {
   await page.getByRole('button', { name: 'New tab', exact: true }).click()
-  await page.getByRole('button', { name: `Configure Claude (${label})`, exact: true }).click()
+  await page
+    .getByRole('button', { name: `Configure Claude (${label})`, exact: true })
+    .press('ArrowRight')
   await page
     .getByRole('button', {
       name: surface === 'chat' ? 'Launch chat' : 'Launch terminal',
@@ -66,6 +70,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
       await store.getState().updateSettings({
         uiLanguage: 'en',
         theme: 'dark',
+        claudeCodeThemeSyncOffer: 'settled',
         defaultTuiAgent: 'claude',
         nativeChatProviders: { claude: true, codex: true },
         agentCmdOverrides: { claude: command },
@@ -84,7 +89,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
         .fetchFolderWorkspaces({ runtimeEnvironmentId: null, throwOnError: true })
       store.getState().setActiveFolderWorkspace(workspace.id)
     },
-    { folder, accounts, command: buildFakeAgentCommandOverride(claudeStub.command) }
+    { folder, accounts, command: 'claude' }
   )
 
   await page.getByRole('button', { name: 'New tab', exact: true }).click()
@@ -94,12 +99,50 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
   await page.screenshot({ path: testInfo.outputPath('accounts-menu.png') })
   await page.keyboard.press('Escape')
 
+  for (const [label, draft] of [
+    ['Pessoal', 'private draft'],
+    ['Empresa', 'company draft']
+  ]) {
+    await page.getByRole('button', { name: 'New tab', exact: true }).click()
+    await page.getByRole('button', { name: `Configure Claude (${label})`, exact: true }).click()
+    const panel = page.getByRole('menu', { name: `Configure Claude (${label})`, exact: true })
+    await expect(panel.getByRole('textbox').last()).toBeEmpty()
+    await panel.getByRole('textbox').last().fill(draft)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+  }
+  for (const [label, draft] of [
+    ['Pessoal', 'private draft'],
+    ['Empresa', 'company draft']
+  ]) {
+    await page.getByRole('button', { name: 'New tab', exact: true }).click()
+    await page.getByRole('button', { name: `Configure Claude (${label})`, exact: true }).click()
+    const composer = page
+      .getByRole('menu', { name: `Configure Claude (${label})`, exact: true })
+      .getByRole('textbox')
+      .last()
+    await expect(composer).toHaveText(draft)
+    await composer.fill('')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+  }
+
   for (const [terminalLabel, terminalId, chatLabel, chatId, defaultId] of [
     ['Empresa', 'work', 'Pessoal', 'personal', 'work'],
     ['Pessoal', 'personal', 'Empresa', 'work', 'personal']
   ]) {
     await choose(page, terminalLabel, 'terminal')
     await waitForTerminalOutput(page, `ACCOUNT:${terminalId}`, 20_000)
+    await expect
+      .poll(() =>
+        launches(claudeStub.launchLog)
+          .filter(
+            (launch) => launch.accountId === terminalId && !launch.args.includes('stream-json')
+          )
+          .map((launch) => launch.configDir)
+      )
+      .toContain(join(root, 'claude-profiles', terminalId, 'home'))
+    await waitForTerminalOutput(page, 'AUTH_HEADERS:clean', 10_000)
     await page.screenshot({ path: testInfo.outputPath(`terminal-${terminalId}.png`) })
     await choose(page, chatLabel, 'chat')
     await page.evaluate(

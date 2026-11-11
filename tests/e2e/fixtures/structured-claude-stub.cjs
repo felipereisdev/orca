@@ -18,7 +18,12 @@ if (args.includes('--version') || args.includes('-v')) {
   process.exit(0)
 }
 if (process.env.ORCA_CLAUDE_ACCOUNT_ID && !args.includes('stream-json')) {
-  process.stdout.write(`ACCOUNT:${process.env.ORCA_CLAUDE_ACCOUNT_ID}\n`)
+  process.stdout.write(
+    `ACCOUNT:${process.env.ORCA_CLAUDE_ACCOUNT_ID}:${process.env.CLAUDE_CONFIG_DIR}\n`
+  )
+  process.stdout.write(
+    `AUTH_HEADERS:${process.env.ANTHROPIC_CUSTOM_HEADERS ? 'inherited' : 'clean'}\n`
+  )
 }
 
 function argValue(name) {

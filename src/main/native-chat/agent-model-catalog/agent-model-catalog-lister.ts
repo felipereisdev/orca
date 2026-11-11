@@ -227,6 +227,7 @@ export function refreshAgentModelCatalogListing(input: {
 }
 
 export function scopedAgentModelCatalogLister(input: {
+  claudeAccountId?: string
   legacy?: boolean
   signal: AbortSignal
   resolved: AgentModelCatalogResolvedProbe | undefined
@@ -255,6 +256,7 @@ export function scopedAgentModelCatalogLister(input: {
         throw new AgentModelCatalogListingStoppedError('catalog scope unavailable')
       }
       return await probe(probeHome, {
+        claudeAccountId: input.claudeAccountId,
         signal: attemptSignal,
         workspacePath,
         ...(selectedModels ? { selectedModels } : {}),
