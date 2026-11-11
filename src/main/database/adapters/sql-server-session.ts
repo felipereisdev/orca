@@ -32,7 +32,7 @@ export async function withSqlServerSession<T>(
     pool: { min: 0, max: 1 },
     options: {
       encrypt: true,
-      trustServerCertificate: false,
+      trustServerCertificate: config.endpoint.tls.trustServerCertificate === true,
       serverName: config.endpoint.tls.serverName,
       cryptoCredentialsDetails: { ca: config.endpoint.tls.caCertificate },
       appName: 'orca-read-only',

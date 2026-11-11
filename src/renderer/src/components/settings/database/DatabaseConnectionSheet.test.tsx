@@ -43,3 +43,33 @@ it('persists project selection and refuses an endpoint update from a stale edit 
   await screen.findByRole('alert')
   expect(state.configuration.endpoint.server).toBe('original-db')
 })
+
+it('keeps certificate verification by default and persists an explicit SQL Server trust choice', async () => {
+  const { client, options, state } = createDatabaseClientFixture()
+  state.configuration = { ...state.configuration, engine: 'sql-server' }
+  const open = () =>
+    render(
+      <ConfirmationDialogProvider>
+        <DatabaseConnectionSheet
+          client={client}
+          connectionId={state.configuration.id}
+          options={options}
+          onClose={() => {}}
+          onSaved={() => {}}
+        />
+      </ConfirmationDialogProvider>
+    )
+  open()
+  const trust = await screen.findByRole('checkbox', { name: 'Trust server certificate' })
+  expect(trust.getAttribute('aria-checked')).toBe('false')
+  fireEvent.click(trust)
+  fireEvent.click(screen.getByRole('button', { name: 'Save connection' }))
+  await waitFor(() => expect(state.configuration.endpoint.tls.trustServerCertificate).toBe(true))
+  cleanup()
+  open()
+  expect(
+    (await screen.findByRole('checkbox', { name: 'Trust server certificate' })).getAttribute(
+      'aria-checked'
+    )
+  ).toBe('true')
+})

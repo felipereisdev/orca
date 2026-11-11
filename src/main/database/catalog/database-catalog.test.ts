@@ -44,6 +44,15 @@ function openCatalog() {
 }
 
 describe('global database connection catalog', () => {
+  it('refuses a SQL Server certificate-trust option on another engine', async () => {
+    const { catalog } = openCatalog()
+    await expect(
+      catalog.save({
+        ...input,
+        endpoint: { ...input.endpoint, tls: { enabled: true, trustServerCertificate: true } }
+      })
+    ).rejects.toThrow()
+  })
   it('refuses a private key in the public certificate field before catalog persistence', async () => {
     const { catalog, store } = openCatalog()
     await expect(

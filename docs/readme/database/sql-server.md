@@ -1,6 +1,6 @@
 # SQL Server read-only connections
 
-The adapter uses the portable `mssql`/Tedious driver, verified TLS, an explicit TCP port and database, and a fresh private session for every operation. It has been exercised with SQL Server 2022 CU18 (16.0.4185.3). SQL authentication is supported; integrated Windows authentication is outside this initial profile. Never enable `trustServerCertificate` to bypass a certificate failure. Supply the issuing PEM CA and certificate server name instead.
+The adapter uses the portable `mssql`/Tedious driver, verified TLS, an explicit TCP port and database, and a fresh private session for every operation. It has been exercised with SQL Server 2022 CU18 (16.0.4185.3). SQL authentication is supported; integrated Windows authentication is outside this initial profile. Certificate verification is enabled by default. For a local development server with a self-signed certificate, the explicit **Trust server certificate** checkbox sets `trustServerCertificate: true` while keeping encryption enabled. This skips certificate identity verification only for that saved connection. For verified connections, supply the issuing PEM CA and certificate server name.
 
 ## Provisioning
 

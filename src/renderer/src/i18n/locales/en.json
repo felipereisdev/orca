@@ -24814,7 +24814,9 @@
       "username": "Username",
       "password": "Password",
       "tls": "TLS certificate settings",
-      "tlsHelp": "TLS and certificate verification are always enabled",
+      "tlsHelp": "TLS encryption is always enabled. Certificates are verified unless explicitly trusted.",
+      "trustServerCertificate": "Trust server certificate",
+      "trustServerCertificateHelp": "For local development. When enabled, encryption stays on but the server certificate is not verified.",
       "tlsName": "Certificate server name (optional)",
       "ca": "CA certificate in PEM format (optional)",
       "executionHost": "Execute on",
@@ -24836,9 +24838,7 @@
       "save": "Save connection",
       "hostUnavailable": "The execution host or protected credential storage is unavailable",
       "credentialsRequired": "Enter both a username and password",
-      "invalidDetails": "Review the highlighted connection details before saving",
-      "aliasPlaceholder": "faturacao-hmg",
-      "environmentPlaceholder": "HMG"
+      "invalidDetails": "Review the highlighted connection details before saving"
     },
     "catalog": {
       "connection": "Connection",

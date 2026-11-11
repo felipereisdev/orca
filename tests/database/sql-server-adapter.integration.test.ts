@@ -138,6 +138,72 @@ describe('SQL Server with a dedicated reader and verified TLS', () => {
       await profile.close()
     }
   })
+  it('persists explicit server-certificate trust while keeping the session encrypted', async () => {
+    const profile = createDatabaseTestProfile()
+    const runtime = new OrcaRuntimeService(profile.store)
+    const dispatcher = new RpcDispatcher({ runtime, methods: DATABASE_METHODS })
+    try {
+      const saved = await dispatcher.dispatch({
+        id: 'trust-save',
+        authToken: 'fixture',
+        method: 'database.save',
+        params: {
+          configuration: {
+            ...fixture.configuration,
+            id: undefined,
+            alias: 'trusted-local',
+            endpoint: {
+              ...fixture.configuration.endpoint,
+              tls: { enabled: true, trustServerCertificate: true }
+            }
+          },
+          credentials: fixture.credentials
+        }
+      })
+      if (
+        !saved.ok ||
+        !saved.result ||
+        typeof saved.result !== 'object' ||
+        !('id' in saved.result)
+      ) {
+        throw new Error('Expected saved connection')
+      }
+      const tested = await dispatcher.dispatch({
+        id: 'trust-test',
+        authToken: 'fixture',
+        method: 'database.testConnection',
+        params: { connectionId: saved.result.id }
+      })
+      expect(tested).toMatchObject({ ok: true, result: { readOnlyProfile: true } })
+      const configuration = profile.store.getDatabaseCatalog().connections[0]
+      const release = await fixture.lock()
+      let running: Promise<void> | undefined
+      const captured = capture()
+      try {
+        running = adapter.execute(
+          configuration,
+          fixture.credentials,
+          validateDatabaseReadQuery('sql-server', 'SELECT id FROM approved.blocked'),
+          [],
+          captured.sink,
+          AbortSignal.timeout(10000)
+        )
+        await fixture.waitForBlockedReader()
+        const transport = await fixture.admin(
+          "SELECT c.encrypt_option FROM sys.dm_exec_connections c JOIN sys.dm_exec_sessions s ON s.session_id = c.session_id WHERE s.program_name = N'orca-read-only'"
+        )
+        expect(transport.recordset).toEqual([{ encrypt_option: 'TRUE' }])
+      } finally {
+        await release()
+        await running
+      }
+      expect(captured.rows).toEqual([['7']])
+    } finally {
+      await disposeRuntimeDatabase(runtime)
+      await profile.close()
+    }
+  })
+
   it('refuses mutations, unsafe paths, administrators, writable grants and unverified certificates', async () => {
     for (const sql of [
       'SELECT * INTO approved.copy FROM approved.invoices',

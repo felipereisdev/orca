@@ -796,6 +796,8 @@
     "database.form.save",
     "database.form.saveBeforeTest",
     "database.form.testSaved",
+    "database.form.trustServerCertificate",
+    "database.form.trustServerCertificateHelp",
     "database.form.verified",
     "database.history.clear",
     "database.history.clearHelp",

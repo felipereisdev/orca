@@ -24,7 +24,12 @@ export type DatabaseEndpoint = {
   port: number
   /** Oracle uses a service name in this field. */
   database: string
-  tls: { enabled: true; caCertificate?: string; serverName?: string }
+  tls: {
+    enabled: true
+    caCertificate?: string
+    serverName?: string
+    trustServerCertificate?: boolean
+  }
 }
 
 export type DatabaseCredentials = {

@@ -52,6 +52,7 @@ export const databaseConnectionSchema = z.object({
       .regex(/^[^\0\r\n;()\\/]+$/),
     tls: z.object({
       enabled: z.literal(true),
+      trustServerCertificate: z.boolean().optional(),
       caCertificate: z
         .string()
         .max(65_536)
@@ -77,6 +78,9 @@ const state = z.object({
 
 export function parseDatabaseConnection(value: unknown): DatabaseConnection {
   const parsed = databaseConnectionSchema.parse(value)
+  if (parsed.endpoint.tls.trustServerCertificate && parsed.engine !== 'sql-server') {
+    throw new Error('Explicit server certificate trust is only supported for SQL Server')
+  }
   if (!parsed.credentialRef.startsWith(`${parsed.id}:`)) {
     throw new Error('Credential does not belong to this connection')
   }

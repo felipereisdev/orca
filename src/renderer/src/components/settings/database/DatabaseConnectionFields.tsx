@@ -1,3 +1,4 @@
+import { DatabaseCertificateTrust } from './DatabaseCertificateTrust'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,6 +28,7 @@ const databaseEnvironments = [
 export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDraftController }) {
   const t = useTranslate()
   const { draft, update } = form
+  const trustsCertificate = draft.engine === 'sql-server' && draft.trustServerCertificate
   const environments =
     draft.environment && !databaseEnvironments.includes(draft.environment)
       ? [...databaseEnvironments, draft.environment]
@@ -203,12 +205,21 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           </div>
         </div>
       </div>
+      {draft.engine === 'sql-server' ? (
+        <DatabaseCertificateTrust
+          checked={draft.trustServerCertificate}
+          onChange={(value) => update('trustServerCertificate', value)}
+        />
+      ) : null}
       <details className="space-y-3">
         <summary className="cursor-pointer text-sm">
           {t('database.form.tls', 'TLS certificate settings')}
         </summary>
         <p className="text-xs text-muted-foreground">
-          {t('database.form.tlsHelp', 'TLS and certificate verification are always enabled')}
+          {t(
+            'database.form.tlsHelp',
+            'TLS encryption is always enabled. Certificates are verified unless explicitly trusted.'
+          )}
         </p>
         <div className="space-y-2">
           <Label htmlFor="database-tls-name">
@@ -216,6 +227,7 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           </Label>
           <Input
             id="database-tls-name"
+            disabled={trustsCertificate}
             aria-invalid={form.invalidFields.has('serverName')}
             value={draft.serverName}
             onChange={(event) => update('serverName', event.target.value)}
@@ -227,6 +239,7 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           </Label>
           <Textarea
             id="database-ca"
+            disabled={trustsCertificate}
             aria-invalid={form.invalidFields.has('caCertificate')}
             rows={4}
             maxLength={65536}

@@ -18,6 +18,7 @@ export type DatabaseConnectionDraft = {
   database: string
   caCertificate: string
   serverName: string
+  trustServerCertificate: boolean
   username: string
   password: string
 }
@@ -36,6 +37,7 @@ export function databaseConnectionDraft(
     database: connection?.endpoint.database ?? '',
     caCertificate: connection?.endpoint.tls.caCertificate ?? '',
     serverName: connection?.endpoint.tls.serverName ?? '',
+    trustServerCertificate: connection?.endpoint.tls.trustServerCertificate === true,
     username: '',
     password: ''
   }
@@ -58,6 +60,8 @@ export function databaseConnectionInput(
       database: draft.database,
       tls: {
         enabled: true,
+        trustServerCertificate:
+          draft.engine === 'sql-server' ? draft.trustServerCertificate : undefined,
         caCertificate: draft.caCertificate || undefined,
         serverName: draft.serverName || undefined
       }
