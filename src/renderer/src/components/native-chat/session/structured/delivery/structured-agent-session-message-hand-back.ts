@@ -1,3 +1,7 @@
+import {
+  seedDatabaseMentionReferences,
+  type DatabaseMentionReference
+} from '../../../../../../../shared/database/database-mention-reference'
 import { agentSessionAttachmentUploadIdOfPath } from '../../../../../../../shared/agent-session/agent-session-attachments'
 import type { AgentJournalMessageItem } from '../../../../../../../shared/agent-session/journal/agent-session-journal-types'
 import type { NativeChatComposerDraftImage } from '../../../drafts/native-chat-composer-draft-storage'
@@ -24,7 +28,8 @@ export function returnMessageToComposer(
   imageConnectionIds?: readonly (string | null)[],
   /** Uploads the host no longer stores: their chips come back asking to be attached again. */
   expiredUploadIds?: ReadonlySet<string>,
-  skills?: AgentJournalMessageItem['skills']
+  skills?: AgentJournalMessageItem['skills'],
+  databaseReferences?: readonly DatabaseMentionReference[]
 ): boolean {
   // Its `[Image #k]` markers become chips for its k-th image, by the ids its images get below.
   const imageIds = blocks.flatMap((block, index) =>
@@ -57,8 +62,13 @@ export function returnMessageToComposer(
   return appendToNativeChatComposerDraft(composerScopeKey, {
     text,
     images,
-    ...(skills?.length
-      ? { document: seedPromptSkillReferences(promptTextContent(text), skills) }
+    ...(skills?.length || databaseReferences?.length
+      ? {
+          document: seedDatabaseMentionReferences(
+            seedPromptSkillReferences(promptTextContent(text), skills),
+            databaseReferences ?? []
+          )
+        }
       : {})
   })
 }
@@ -77,6 +87,7 @@ export function handBackStructuredAgentSessionMessage(
     body.blocks,
     imageConnectionIds,
     expiredUploadIds,
-    body.skills
+    body.skills,
+    body.databaseReferences
   )
 }

@@ -59,7 +59,7 @@ export function createDatabaseExplorerState(connection: DatabaseConnectionRef) {
                   sql: result.record.sql,
                   connection: {
                     connectionId: result.record.source.connectionId,
-                    controllerRuntimeId: result.record.source.controllerRuntimeId
+                    controllerRuntimeId: state.connection.controllerRuntimeId
                   }
                 }
               : {})

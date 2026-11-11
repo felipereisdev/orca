@@ -10,7 +10,7 @@ const source = z.object({
   executionHostId: databaseProjectSchema.shape.executionHostId,
   controllerRuntimeId: z.string().min(1).max(1024)
 })
-const record = z.object({
+export const databaseQueryRecordSchema = z.object({
   queryId: z.string().uuid(),
   source,
   project: databaseProjectSchema,
@@ -31,10 +31,10 @@ const cell = z.union([
   z.object({ kind: z.literal('preview'), text: z.string().max(4096), truncated: z.literal(true) })
 ])
 export const databaseQueryResultSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.enum(['queued', 'running']), record }),
+  z.object({ status: z.enum(['queued', 'running']), record: databaseQueryRecordSchema }),
   z.object({
     status: z.literal('completed'),
-    record,
+    record: databaseQueryRecordSchema,
     columns: z
       .array(
         z.object({
@@ -49,5 +49,8 @@ export const databaseQueryResultSchema = z.discriminatedUnion('status', [
     truncated: z.boolean(),
     limits: databaseLimitsSchema
   }),
-  z.object({ status: z.enum(['failed', 'cancelled', 'expired']), record })
+  z.object({
+    status: z.enum(['failed', 'cancelled', 'expired']),
+    record: databaseQueryRecordSchema
+  })
 ])

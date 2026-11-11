@@ -1,10 +1,17 @@
+import {
+  databaseSessionQuery,
+  databaseSessionQueryRecord
+} from '../../../database/database-session-query'
+import { resolveRuntimeDatabaseMentions } from '../../../database/database-mention-context'
 import { defineMethod, type RpcContext } from '../../core'
 import {
   DatabaseExecutionHost,
   DatabaseScope,
+  DatabaseMentions,
   DatabaseDescribe,
   DatabaseStartQuery,
   DatabaseQueryId,
+  DatabaseSessionQuery,
   DatabaseSave,
   DatabaseConfigurationId,
   DatabaseRemove
@@ -45,6 +52,15 @@ export const DATABASE_METHODS = [
     handler: async (params, context) => {
       const actor = await databaseActor(context, params)
       return (await runtimeDatabaseCommands(context.runtime)).catalog.list(actor.project)
+    }
+  }),
+  defineMethod({
+    name: 'database.resolveMentions',
+    permission: 'workspace',
+    params: DatabaseMentions,
+    handler: async (params, context) => {
+      await databaseActor(context, params)
+      return resolveRuntimeDatabaseMentions(context.runtime, params, params.references)
     }
   }),
   defineMethod({
@@ -112,6 +128,18 @@ export const DATABASE_METHODS = [
         params.queryId,
         await databaseActor(context, params)
       )
+  }),
+  defineMethod({
+    name: 'database.sessionQueryRecord',
+    permission: 'workspace',
+    params: DatabaseSessionQuery,
+    handler: (params, context) => databaseSessionQueryRecord(context, params)
+  }),
+  defineMethod({
+    name: 'database.sessionQuery',
+    permission: 'workspace',
+    params: DatabaseSessionQuery,
+    handler: (params, context) => databaseSessionQuery(context, params)
   }),
   defineMethod({
     name: 'database.queryHistory',

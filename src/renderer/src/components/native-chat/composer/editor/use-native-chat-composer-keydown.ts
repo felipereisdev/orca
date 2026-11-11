@@ -1,4 +1,8 @@
 import {
+  nativeChatMentionChoices,
+  type NativeChatMentionChoice
+} from '../pickers/native-chat-mention-items'
+import {
   useCallback,
   useRef,
   type Dispatch,
@@ -20,7 +24,7 @@ import {
 export type UseNativeChatComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
   mentionFiles: NativeChatMentionFiles
-  completeMention: (path: string) => void
+  completeMention: (path: NativeChatMentionChoice) => void
   activeSuggestion: number
   draft: string
   /** Image chips count as composer content, like typed text. */
@@ -80,7 +84,10 @@ export function useNativeChatComposerKeyDown({
       }
 
       if (autocomplete.mode !== 'none') {
-        const items = autocomplete.mode === 'slash' ? autocomplete.items : mentionFiles.files
+        const items =
+          autocomplete.mode === 'slash'
+            ? autocomplete.items
+            : nativeChatMentionChoices(mentionFiles)
         if (event.key === 'ArrowDown' && items.length > 0) {
           event.preventDefault()
           setActiveSuggestion((index) => (index + 1) % items.length)
@@ -96,8 +103,8 @@ export function useNativeChatComposerKeyDown({
         if (picks && items.length > 0) {
           event.preventDefault()
           if (autocomplete.mode === 'mention') {
-            const { files } = mentionFiles
-            completeMention(files[Math.min(activeSuggestion, files.length - 1)])
+            const choices = nativeChatMentionChoices(mentionFiles)
+            completeMention(choices[Math.min(activeSuggestion, choices.length - 1)])
             return
           }
           const item = autocomplete.items[activeSuggestion] ?? autocomplete.items[0]
@@ -110,7 +117,11 @@ export function useNativeChatComposerKeyDown({
           return
         }
         // Why: the files are still on their way, so Enter here is a pick that came early, not a send.
-        if (picks && autocomplete.mode === 'mention' && mentionFiles.loading) {
+        if (
+          picks &&
+          autocomplete.mode === 'mention' &&
+          (mentionFiles.loading || mentionFiles.databasesLoading)
+        ) {
           event.preventDefault()
           return
         }

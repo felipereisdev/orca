@@ -11,7 +11,7 @@ import { sameDatabaseProject } from '../catalog/database-project-scope'
 import { DatabaseQueryAdmission, type DatabaseQueryJob } from './database-query-admission'
 import { DatabaseQueryOutput } from './database-query-output'
 import { DatabaseQueryRecords } from './database-query-records'
-import { authorizeDatabaseQuery, type DatabaseActor } from './database-query-actor'
+import { readAuthorizedDatabaseQueryRecord, type DatabaseActor } from './database-query-actor'
 import { executeDatabaseQueryOnHost } from './database-query-executor'
 export type { DatabaseActor } from './database-query-actor'
 
@@ -132,13 +132,17 @@ export class DatabaseQueryService {
     return { queryId: record.queryId, source: structuredClone(record.source) }
   }
 
+  queryRecord(queryId: string, actor: DatabaseActor): DatabaseQueryRecord {
+    return readAuthorizedDatabaseQueryRecord(
+      this.jobs.get(queryId)?.record ?? this.records.find(queryId),
+      actor,
+      this.options.controllerRuntimeId
+    )
+  }
+
   result(queryId: string, actor: DatabaseActor): DatabaseQuerySnapshot | ExpiredDatabaseResult {
     const job = this.jobs.get(queryId)
-    const record = job?.record ?? this.records.find(queryId)
-    if (!record) {
-      throw new Error('Database query was not found')
-    }
-    authorizeDatabaseQuery(record, actor, this.options.controllerRuntimeId)
+    const record = this.queryRecord(queryId, actor)
     if (record.status === 'completed') {
       const cached = this.records.get(queryId)
       if (cached) {
@@ -205,8 +209,7 @@ export class DatabaseQueryService {
   }
 
   async cancel(queryId: string, actor: DatabaseActor): Promise<void> {
-    const record = this.result(queryId, actor).record
-    authorizeDatabaseQuery(record, actor, this.options.controllerRuntimeId)
+    this.queryRecord(queryId, actor)
     const job = this.jobs.get(queryId)
     if (!job) {
       return

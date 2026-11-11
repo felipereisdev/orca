@@ -213,10 +213,12 @@ import {
   DatabaseConfigurationId,
   DatabaseDescribe,
   DatabaseExecutionHost,
+  DatabaseMentions,
   DatabaseQueryId,
   DatabaseRemove,
   DatabaseSave,
   DatabaseScope,
+  DatabaseSessionQuery,
   DatabaseStartQuery
 } from './database-params'
 import {
@@ -1056,7 +1058,10 @@ export const RPC_PARAMS_BY_METHOD = {
   'database.queryResult': DatabaseQueryId,
   'database.remove': DatabaseRemove,
   'database.removeBinding': DatabaseBindingRef,
+  'database.resolveMentions': DatabaseMentions,
   'database.save': DatabaseSave,
+  'database.sessionQuery': DatabaseSessionQuery,
+  'database.sessionQueryRecord': DatabaseSessionQuery,
   'database.settingsOptions': null,
   'database.startBindingQuery': DatabaseBindingStart,
   'database.startQuery': DatabaseStartQuery,

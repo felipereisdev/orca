@@ -44,6 +44,7 @@ export default function WorkspaceDatabaseExplorer({
       worktreeId={worktreeId}
       requestedQuery={queryId?.queryId ?? null}
       requestedVersion={queryId?.version}
+      requestedSessionId={queryId?.sessionId}
     />
   )
 }

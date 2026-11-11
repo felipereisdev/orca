@@ -1,6 +1,6 @@
 import { settleStructuredLaunchFirstMessageFromJournal } from '@/lib/agent-session/launch/structured-agent-session-launch-input'
 import type { AgentJournalCursor } from '../../../../../../../shared/agent-session/journal/agent-session-journal-identity'
-import { structuredAgentSessionSendBody } from '../../../../../../../shared/agent-session/requests/structured-agent-session-send-mutation'
+import { structuredAgentSessionInputBody as messageBody } from '../../../../../../../shared/agent-session/requests/structured-agent-session-send-mutation'
 import type { AgentJournalSubmission } from '../../../../../../../shared/agent-session/journal/agent-session-journal-types'
 import type { StructuredAgentSessionFirstMessage } from '../../../../../../../shared/agent-session/structured-agent-session-create'
 import { agentSessionWriteNotDoneParts } from '../../../../../../../shared/agent-session/failures/agent-session-refusal-notice'
@@ -58,7 +58,13 @@ export function sendStructuredAgentSessionMessage(
     reservation.legacy()
     void input.prepareAttachments(input, reservation.active).then(
       (prepared) => {
-        if (reservation.prepare({ ...prepared, skills: input.skills })) {
+        if (
+          reservation.prepare({
+            ...prepared,
+            skills: input.skills,
+            databaseReferences: input.databaseReferences
+          })
+        ) {
           reservation.send(input.target)
         }
       },
@@ -82,7 +88,10 @@ export type StructuredAgentSessionReservedSend = {
   legacy: () => void
   active: () => boolean
   prepare: (
-    input: Pick<StructuredAgentSessionSendInput, 'text' | 'attachments' | 'skills'>
+    input: Pick<
+      StructuredAgentSessionSendInput,
+      'text' | 'attachments' | 'skills' | 'databaseReferences'
+    >
   ) => boolean
   /** Sends it once the chat exists; null when the reservation was released or dropped meanwhile. */
   send: (target: RuntimeClientTarget) => StructuredAgentSessionSent | null
@@ -166,7 +175,7 @@ export function reserveStructuredAgentSessionSend(
         return false
       }
       updateStructuredAgentSessionPendingSend(current.sessionId, current.clientMessageId, {
-        body: structuredAgentSessionSendBody(input.text, input.attachments ?? [], input.skills),
+        body: messageBody(input),
         previewUris: (input.attachments ?? []).map((image) => image.previewUri)
       })
       return true

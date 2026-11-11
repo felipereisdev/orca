@@ -1,3 +1,4 @@
+import type { DatabaseMentionReference } from '../../database/database-mention-reference'
 import type { AgentJournalCursor, AgentJournalItemIdentity } from './agent-session-journal-identity'
 import type { AgentJournalTurnScope } from './agent-session-journal-turn-scope'
 import type { AgentSessionProviderContextBoundary } from '../agent-session-provider-context'
@@ -78,6 +79,7 @@ export type AgentJournalMessageItem = {
   /** The skills the user picked from the menu for this message, by the file the agent selects
    *  each by. The text still carries each `$name`; agents that select by name ignore this. */
   skills?: AgentJournalSkillRef[]
+  databaseReferences?: DatabaseMentionReference[]
   /** Present on a message another agent sent through Orca; absent, the person's. Host-written,
    *  outside every fingerprint, never sent to the provider. */
   from?: AgentMessageSource

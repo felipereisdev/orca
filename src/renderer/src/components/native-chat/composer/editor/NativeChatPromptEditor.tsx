@@ -1,3 +1,4 @@
+import { NativeChatDatabaseReference, insertDatabaseReference } from './NativeChatDatabaseReference'
 import { insertAgentReferences, NativeChatAgentReference } from './native-chat-agent-reference'
 import {
   nativeChatDraftPositions,
@@ -102,6 +103,7 @@ function NativePromptEditor({
         NativeChatAgentReference,
         NativeChatSkill,
         NativeChatFileReference,
+        NativeChatDatabaseReference,
         NativeChatImageReference,
         NativeChatUnkernedRunDecorations,
         // A disabled box still says why it is disabled, as the plain text box's placeholder does.
@@ -346,6 +348,8 @@ function NativePromptEditor({
                 to: promptTextPosition(doc, to ?? 0)
               })
             },
+            insertDatabaseReference: (from, to, reference) =>
+              insertDatabaseReference(editor, from, to, reference),
             insertSkill: (from, to, token, path) => {
               const { doc } = editor.state
               const range = { from: promptTextPosition(doc, from), to: promptTextPosition(doc, to) }

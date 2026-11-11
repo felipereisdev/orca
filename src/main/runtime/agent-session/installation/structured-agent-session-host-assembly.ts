@@ -76,6 +76,7 @@ export async function installOnJournal(
     recoveryCapsule: new AgentSessionRecoveryCapsule(deps.stateDirectory),
     journalDatabase,
     claimKeyId: deps.claimKeyId,
+    validateDatabaseMentions: deps.validateDatabaseMentions,
     usageLimitAutoContinue: deps.usageLimitAutoContinue,
     ...(deps.idleSweep ? { idleSweep: deps.idleSweep } : {}),
     probeOwner: createStructuredAgentSessionOwnerProbe(deps.hostId),

@@ -1,3 +1,4 @@
+import { databaseMentionReferenceSchema } from '../database/database-mention-reference'
 import { z } from 'zod'
 import {
   databaseConnectionInputSchema,
@@ -61,6 +62,10 @@ export const DatabaseScope = z
     (scope) => Boolean(scope.project) !== Boolean(scope.worktree),
     'Select one database project or workspace'
   )
+export const DatabaseMentions = DatabaseScope.safeExtend({
+  references: z.array(databaseMentionReferenceSchema).min(1).max(16)
+})
+
 export const DatabaseDescribe = DatabaseScope.safeExtend({
   connection: z.string().min(1).max(128),
   schema: z.string().max(256).optional(),
@@ -75,6 +80,10 @@ export const DatabaseStartQuery = DatabaseScope.safeExtend({
   'SQL exceeds its byte limit'
 )
 export const DatabaseQueryId = DatabaseScope.safeExtend({ queryId: z.string().uuid() })
+export const DatabaseSessionQuery = DatabaseScope.safeExtend({
+  queryId: z.string().uuid(),
+  sessionId: z.string().min(1).max(2048)
+})
 export const DatabaseSave = z.object({
   configuration: databaseConnectionInputSchema,
   credentials: z

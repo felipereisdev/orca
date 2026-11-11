@@ -1,3 +1,4 @@
+import type { DatabaseMentionReference } from '../../../../../../shared/database/database-mention-reference'
 import type { OrchestrationAgentReference } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import type { HTMLAttributes, RefObject } from 'react'
 import { linkedSelectionText } from '../../paste/native-chat-pasted-links'
@@ -16,6 +17,7 @@ export type NativeChatComposerInput = Pick<
   insertAgentReferences?: (references: OrchestrationAgentReference[]) => void
   contains?: (node: Node | null) => boolean
   insertText?: (text: string) => void
+  insertDatabaseReference?: (from: number, to: number, reference: DatabaseMentionReference) => void
   insertSkill?: (from: number, to: number, token: string, path?: string) => void
   /** Deletes every chip of one image, as when its thumbnail goes. */
   removeImageReferences?: (attachmentId: string) => void

@@ -14,7 +14,8 @@ export function useDatabaseExplorer(
   worktreeId: string,
   controller: DatabaseExplorerState,
   requestedQuery: string | null,
-  requestedVersion = 0
+  requestedVersion = 0,
+  requestedSessionId?: string
 ) {
   const t = useTranslate()
   const submitting = useRef(false)
@@ -124,10 +125,12 @@ export function useDatabaseExplorer(
     if (requestedQuery) {
       void controller.openQuery(requestedQuery, async (id) => {
         await verify()
-        return client.result(scope, id)
+        return requestedSessionId
+          ? client.sessionQuery(scope, id, requestedSessionId)
+          : client.result(scope, id)
       })
     }
-  }, [client, scope, controller, requestedQuery, requestedVersion, verify])
+  }, [client, scope, controller, requestedQuery, requestedVersion, requestedSessionId, verify])
   async function execute() {
     if (submitting.current) {
       return

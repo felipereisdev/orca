@@ -1,3 +1,4 @@
+import { databaseMentionAdmission } from './database-mention-admission'
 // Share mutation admission/planning/publication. Conversation writes need no child lease;
 // provider-only effects start their child before admission, sends start through delivery.
 
@@ -88,7 +89,9 @@ export function sendStructuredAgentSessionTurn(
         ...plan,
         run: async (ctx) => {
           const record = context.deps.store.getRecord(ctx.sessionId)
-          const blocked = structuredAgentSessionSendBlock(record)
+          const blocked =
+            structuredAgentSessionSendBlock(record) ??
+            (await databaseMentionAdmission(context.deps, record, params.body.databaseReferences))
           if (blocked) {
             return blocked
           }

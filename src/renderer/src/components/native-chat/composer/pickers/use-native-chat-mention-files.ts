@@ -1,3 +1,7 @@
+import {
+  useNativeChatDatabaseMentions,
+  type NativeChatDatabaseMention
+} from './use-native-chat-database-mentions'
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { useRuntimeFileListForWorktree } from '@/components/quick-open-file-list'
@@ -14,6 +18,9 @@ export type NativeChatMentionFiles = {
   files: readonly string[]
   loading: boolean
   failed: boolean
+  databases?: NativeChatDatabaseMention[]
+  databasesLoading?: boolean
+  databasesError?: string
 }
 
 /** `query` is null while no `@` token is open. */
@@ -30,6 +37,7 @@ export function useNativeChatMentionFiles(args: {
       ? (structuredWorktreeId ?? findTerminalTabWorktreeId(state.tabsByWorktree, terminalTabId))
       : null
   )
+  const databases = useNativeChatDatabaseMentions(structuredWorktreeId, query)
   const worktreePath = useFileListWorktree(worktreeId)?.path ?? null
   const history = useQuickOpenHistory(worktreeId, worktreePath)
   const list = useRuntimeFileListForWorktree({
@@ -49,8 +57,9 @@ export function useNativeChatMentionFiles(args: {
               .slice(0, MENTION_FILE_LIMIT)
               .map((item) => item.path),
       loading: list.loading,
-      failed
+      failed,
+      ...databases
     }),
-    [failed, history, list.files, list.loading, query]
+    [failed, history, list.files, list.loading, query, databases]
   )
 }

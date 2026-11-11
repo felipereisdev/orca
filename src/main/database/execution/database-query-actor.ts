@@ -22,3 +22,15 @@ export function authorizeDatabaseQuery(
     throw new Error('Database query is unavailable in this session')
   }
 }
+
+export function readAuthorizedDatabaseQueryRecord(
+  record: DatabaseQueryRecord | undefined,
+  actor: DatabaseActor,
+  controllerRuntimeId: string
+): DatabaseQueryRecord {
+  if (!record) {
+    throw new Error('Database query was not found')
+  }
+  authorizeDatabaseQuery(record, actor, controllerRuntimeId)
+  return structuredClone(record)
+}

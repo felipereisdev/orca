@@ -24916,6 +24916,16 @@
       "open": "Database connections",
       "loading": "Loading connections…",
       "empty": "No connections associated with this project"
+    },
+    "mention": {
+      "files": "Files",
+      "connections": "Database connections",
+      "loading": "Loading database connections…",
+      "workspaceRequired": "Select a project workspace before sending database references",
+      "draftChanged": "Your message changed while checking database connections. Send it again."
+    },
+    "queryCard": {
+      "open": "Open query"
     }
   }
 }

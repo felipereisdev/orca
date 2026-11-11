@@ -25,16 +25,25 @@ export function DatabaseExplorerPane({
   controller,
   worktreeId,
   requestedQuery = null,
-  requestedVersion = 0
+  requestedVersion = 0,
+  requestedSessionId
 }: {
   client: DatabaseRuntimeClient
   controller: DatabaseExplorerState
   worktreeId: string
   requestedQuery?: string | null
   requestedVersion?: number
+  requestedSessionId?: string
 }) {
   const t = useTranslate()
-  const view = useDatabaseExplorer(client, worktreeId, controller, requestedQuery, requestedVersion)
+  const view = useDatabaseExplorer(
+    client,
+    worktreeId,
+    controller,
+    requestedQuery,
+    requestedVersion,
+    requestedSessionId
+  )
   const [schemaVisible, setSchemaVisible] = useState(true)
   const add = (quote: string, button: HTMLButtonElement) => {
     const box = button.getBoundingClientRect()

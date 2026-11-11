@@ -25,6 +25,7 @@ export type StructuredAgentSessionRuntimeDeps = StructuredAgentSessionTransportO
    *  probe and not ours to spawn for. */
   hostId: string
   /** Key id this host's claims are minted under. */
+  validateDatabaseMentions?: StructuredAgentSessionHostDeps['validateDatabaseMentions']
   claimKeyId: string
   resolveWorkspacePath: (workspaceId: string) => Promise<string>
   resolveCodexCommand?: (options?: {

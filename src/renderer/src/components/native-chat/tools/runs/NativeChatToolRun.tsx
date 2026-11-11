@@ -1,3 +1,4 @@
+import { NativeChatDatabaseRunQueries } from './NativeChatDatabaseRunQueries'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NativeChatExpandable } from '../../messages/disclosure/NativeChatExpandable'
@@ -236,6 +237,7 @@ export function NativeChatToolRun({
           <NativeChatBrowserRunPageButton calls={headerBlocks.filter(isToolCallBlock)} />
         </div>
       )}
+      <NativeChatDatabaseRunQueries blocks={blocks} />
       {/* A read's result is the image the agent saw, so it shows without opening the run. */}
       <NativeChatImageAttachments
         blocks={viewedImages}

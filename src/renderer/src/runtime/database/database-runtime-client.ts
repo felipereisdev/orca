@@ -1,4 +1,8 @@
 import type {
+  DatabaseMentionReference,
+  ResolvedDatabaseMention
+} from '../../../../shared/database/database-mention-reference'
+import type {
   DatabaseSettingsOptions,
   DatabaseHostCapabilities
 } from '../../../../shared/database/database-settings-options'
@@ -18,7 +22,10 @@ import type {
   DatabaseQueryHandle,
   DatabaseQueryRecord
 } from '../../../../shared/database/database-query-contracts'
-import { databaseQueryResultSchema } from '../../../../shared/database/database-query-result-schema'
+import {
+  databaseQueryResultSchema,
+  databaseQueryRecordSchema
+} from '../../../../shared/database/database-query-result-schema'
 import { DATABASE_RUNTIME_CAPABILITIES } from '../../../../shared/database/database-runtime-capabilities'
 import type { DatabaseScope } from '../../../../shared/rpc-contract/database-params'
 import { callRuntimeRpc } from '../rpc/calls/runtime-rpc-call'
@@ -89,6 +96,8 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
         signal
       ),
     list: (scope: Scope) => call<DatabaseConnectionSummary[]>('database.list', scope),
+    resolveMentions: (scope: Scope, references: readonly DatabaseMentionReference[]) =>
+      call<ResolvedDatabaseMention[]>('database.resolveMentions', { ...scope, references }),
     describe: (
       scope: Scope,
       connection: string,
@@ -109,6 +118,14 @@ export function createDatabaseRuntimeClient(target: RuntimeClientTarget) {
       ),
     result: async (scope: Scope, queryId: string) =>
       databaseQueryResultSchema.parse(await call('database.queryResult', { ...scope, queryId })),
+    sessionQueryRecord: async (scope: Scope, queryId: string, sessionId: string) =>
+      databaseQueryRecordSchema.parse(
+        await call('database.sessionQueryRecord', { ...scope, queryId, sessionId })
+      ),
+    sessionQuery: async (scope: Scope, queryId: string, sessionId: string) =>
+      databaseQueryResultSchema.parse(
+        await call('database.sessionQuery', { ...scope, queryId, sessionId })
+      ),
     cancel: (scope: Scope, queryId: string) =>
       call<void>('database.cancelQuery', { ...scope, queryId }),
     history: (scope: Scope) => call<DatabaseQueryRecord[]>('database.queryHistory', scope)

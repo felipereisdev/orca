@@ -1,3 +1,4 @@
+import type { DatabaseMentionReference } from '../../../../shared/database/database-mention-reference'
 import type {
   AgentModelCatalogSource,
   AgentModelCatalogService
@@ -165,6 +166,10 @@ export type StructuredAgentSessionHostDeps = {
   /** Advisory recovery storage, independent of conversation backups. */
   recoveryCapsule?: AgentSessionRecoveryCapsule
   journalDatabase: JournalHostDatabase
+  validateDatabaseMentions?: (
+    record: AgentSessionRecord,
+    references: readonly DatabaseMentionReference[]
+  ) => Promise<void>
   claimKeyId: string
   probeOwner?: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>
   probeOwners?: (

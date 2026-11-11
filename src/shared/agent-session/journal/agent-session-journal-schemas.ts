@@ -1,3 +1,4 @@
+import { databaseMentionReferenceSchema } from '../../database/database-mention-reference'
 // Validate replayed JSON deeply before unguarded reducers/renderers read it; malformed rows fail load without deletion.
 // Extend with keys, open-union tags or a new row v; never tighten existing types/bounds/closed sets.
 // Unknown keys and string vocabularies survive; unknown bodies/blocks/goals/subjects remain undrawn and writable.
@@ -183,6 +184,7 @@ const MessageBody = z.object({
     .object({ name: z.string().min(1), instructions: z.string().min(1).optional() })
     .optional(),
   skills: z.array(z.object({ name: z.string().min(1), path: z.string().min(1) })).optional(),
+  databaseReferences: z.array(databaseMentionReferenceSchema).max(16).optional(),
   // Open like `sentAs`: a state a newer host writes reads as completed, never malformed.
   state: z.string().min(1).optional(),
   completedAt: z.number().finite().optional()

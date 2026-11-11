@@ -129,6 +129,9 @@ export function useStructuredAgentSessionSends(args: {
         ...(delivery ? { delivery } : {}),
         ...captured,
         ...(takesSkills && request?.skills?.length ? { skills: request.skills } : {}),
+        ...(request?.databaseReferences?.length
+          ? { databaseReferences: request.databaseReferences }
+          : {}),
         ...(stopping ? { sentWhileStopping: true as const } : {})
       })
       if (!sent) {

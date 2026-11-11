@@ -1,3 +1,4 @@
+import type { DatabaseMentionReference } from '../../database/database-mention-reference'
 import type {
   AgentJournalItemBody,
   AgentJournalMessageItem,
@@ -100,7 +101,8 @@ export class SkillRefLimitError extends Error {}
 export function structuredAgentSessionSendBody(
   text: string,
   attachments: readonly StructuredAgentSessionAttachment[],
-  skills: readonly AgentJournalSkillRef[] = []
+  skills: readonly AgentJournalSkillRef[] = [],
+  databaseReferences: readonly DatabaseMentionReference[] = []
 ): z.infer<typeof SendBody> {
   const picked = pickedSkillsInText(text, skills)
   if (picked.length > MAX_SKILL_REFS) {
@@ -113,7 +115,8 @@ export function structuredAgentSessionSendBody(
       ...(text.trim().length > 0 ? [{ type: 'text' as const, text: text.trimEnd() }] : []),
       ...attachments.map((attachment) => ({ type: 'image-ref' as const, path: attachment.path }))
     ],
-    ...(picked.length > 0 ? { skills: picked } : {})
+    ...(picked.length > 0 ? { skills: picked } : {}),
+    ...(databaseReferences.length ? { databaseReferences: [...databaseReferences] } : {})
   }
 }
 
@@ -144,4 +147,18 @@ function textNamesSkill(text: string, name: string, sigil: '$' | '/'): boolean {
     }
   }
   return false
+}
+
+export function structuredAgentSessionInputBody(input: {
+  text: string
+  attachments?: readonly StructuredAgentSessionAttachment[]
+  skills?: readonly AgentJournalSkillRef[]
+  databaseReferences?: readonly DatabaseMentionReference[]
+}) {
+  return structuredAgentSessionSendBody(
+    input.text,
+    input.attachments ?? [],
+    input.skills,
+    input.databaseReferences
+  )
 }

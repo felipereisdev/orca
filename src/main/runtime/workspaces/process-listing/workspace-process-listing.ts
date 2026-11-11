@@ -1,3 +1,4 @@
+import { runtimeDatabaseMentionValidator } from '../../database/database-mention-context'
 import { getRepoHostIdentityForParts } from '../../../../shared/repo-host-identity'
 import { createRepoRowExecutionHostLookup } from '../../../../shared/execution-host/worktree-execution-host-resolution'
 import { resolveWorktreeHostRouting } from '../catalog/worktree-launch-host-repo'
@@ -258,6 +259,7 @@ export abstract class OrcaRuntimeWithGetWorktreePs extends RuntimeChatWorkerEven
       legacySessionTabIds: this.legacyStructuredSessionTabIds,
       hostId: LOCAL_EXECUTION_HOST_ID,
       claimKeyId: this.agentSessionClaimSigner.keyId,
+      validateDatabaseMentions: runtimeDatabaseMentionValidator(this),
       logger,
       ...catalogDeps,
       claudeCliFlags: claudeCliFlagSupport,

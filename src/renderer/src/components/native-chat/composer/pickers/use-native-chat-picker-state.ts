@@ -1,3 +1,5 @@
+import { useNativeChatMentionCompletion } from './use-native-chat-mention-completion'
+import type { NativeChatMentionChoice } from './native-chat-mention-items'
 import {
   writeNativeChatComposerText,
   type NativeChatComposerInput
@@ -18,7 +20,6 @@ import type { AgentType } from '../../../../../../shared/agent-status/contracts/
 import { getNativeChatAgentProfile } from '../../../../../../shared/native-chat/native-chat-agent-profiles'
 
 import {
-  applyMentionSuggestion,
   deriveComposerAutocomplete,
   editReplacesTriggerToken,
   isSkillPickerTriggered,
@@ -50,7 +51,7 @@ export type NativeChatPickerState = {
   /** The draft still leads with the skill the user picked from the menu. */
   isPickedSkill: (draft: string) => boolean
   completeItem: (item: NativeChatPickerItem) => void
-  completeMention: (path: string) => void
+  completeMention: (path: NativeChatMentionChoice) => void
   dismiss: (triggerKey: string) => void
   handleDraftOrCaretChange: (value: string, caret: number) => void
   /** Arrow-key highlight moves; a catalog refresh keeps the row they land on until the next edit. */
@@ -232,15 +233,14 @@ export function useNativeChatPickerState(args: {
     [agent, autocomplete, commitCompletion, liveDraft, textareaRef]
   )
 
-  const completeMention = useCallback(
-    (path: string) => {
-      if (disabledRef.current || autocomplete.mode !== 'mention') {
-        return
-      }
-      commitCompletion(applyMentionSuggestion(...liveDraft(), path))
-    },
-    [autocomplete, commitCompletion, liveDraft]
-  )
+  const completeMention = useNativeChatMentionCompletion({
+    autocomplete,
+    disabled: disabledRef,
+    input: textareaRef,
+    isComposing,
+    liveDraft,
+    commit: commitCompletion
+  })
 
   const handleDraftOrCaretChange = useCallback(
     (value: string, nextCaret: number) => {

@@ -19,7 +19,7 @@ export function databaseExplorerState(worktreeId: string, entityId: string) {
   return state
 }
 let queryOpenVersion = 0
-const requestedQueries = new Map<string, { queryId: string; version: number }>()
+const requestedQueries = new Map<string, { queryId: string; version: number; sessionId?: string }>()
 const listeners = new Set<() => void>()
 export const subscribeDatabaseQueryOpen = (listener: () => void) => {
   listeners.add(listener)
@@ -32,17 +32,20 @@ export const requestedDatabaseQuery = (worktreeId: string, entityId: string) =>
 export function openDatabaseExplorer({
   worktreeId,
   connection,
-  queryId
+  queryId,
+  sessionId
 }: {
   worktreeId: string
   connection: DatabaseConnectionRef
   queryId?: string
+  sessionId?: string
 }) {
   const entityId = JSON.stringify(reference.parse(connection))
   if (queryId) {
     requestedQueries.set(JSON.stringify([worktreeId, entityId]), {
       queryId,
-      version: ++queryOpenVersion
+      version: ++queryOpenVersion,
+      ...(sessionId ? { sessionId } : {})
     })
     listeners.forEach((listener) => listener())
   }

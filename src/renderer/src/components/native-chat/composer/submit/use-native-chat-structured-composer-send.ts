@@ -1,3 +1,5 @@
+import { databaseMentionsInPrompt } from '../../../../../../shared/database/database-mention-reference'
+import { prepareNativeChatDatabaseReferences } from './native-chat-database-reference-send'
 import { serializeNativeChatAgentReferences } from '../pickers/native-chat-agent-reference-send'
 import {
   hasNativeChatStagedFiles,
@@ -14,7 +16,7 @@ import {
   promptSkillRefs
 } from '../editor/native-chat-prompt-document'
 import type { StructuredAgentSessionAttachmentPreparation } from '../../session/structured/delivery/structured-agent-session-send-slot'
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { completeNativeChatStructuredUserAction } from './native-chat-structured-user-action'
 import {
   isStructuredAgentSessionHostCommand,
@@ -73,8 +75,12 @@ export function useNativeChatStructuredComposerSend({
   setDraft,
   setCaret
 }: UseNativeChatStructuredComposerSendArgs): NativeChatStructuredComposerSend {
+  const databaseResolution = useRef(false)
   return useCallback<NativeChatStructuredComposerSend>(
     async (text, attachments = imageAttachments, intent): Promise<boolean> => {
+      if (databaseResolution.current) {
+        return false
+      }
       // Picked commands must also wait for pending attachments to acquire paths.
       if (!structuredTransport || attachments.some((attachment) => attachment.pending)) {
         return false
@@ -85,6 +91,27 @@ export function useNativeChatStructuredComposerSend({
       const submitted = readNativeChatComposerDraft(draftScopeKey)
       const submittedText = text
       text = projectNativeChatPastedText(text, submitted.pastedTextFiles)
+      let databaseContext = ''
+      let databaseReferences
+      try {
+        databaseReferences =
+          submittedText === submitted.text ? databaseMentionsInPrompt(submitted.document) : []
+        if (databaseReferences.length) {
+          databaseResolution.current = true
+          databaseContext = (
+            await prepareNativeChatDatabaseReferences(
+              draftScopeKey,
+              submittedText,
+              structuredTransport
+            )
+          ).context
+        }
+      } catch (error) {
+        structuredTransport.onError(error instanceof Error ? error.message : String(error))
+        return false
+      } finally {
+        databaseResolution.current = false
+      }
       const pickedModeSkill = promptHasInteractionModeSkill(agent, text, submitted.document)
       const hostCommand =
         !pickedModeSkill &&
@@ -134,6 +161,9 @@ export function useNativeChatStructuredComposerSend({
           submitted.pastedTextFiles,
           hostCommand ? 'goal' : 'message'
         )
+      }
+      if (databaseContext) {
+        text += `\n\n${databaseContext}`
       }
       const submission = captureNativeChatComposerSubmission(draftScopeKey)
       let consumed = false
@@ -208,6 +238,7 @@ export function useNativeChatStructuredComposerSend({
         promptSkillRefs(submission.draft?.document),
         {
           ...intent,
+          ...(databaseReferences.length ? { databaseReferences } : {}),
           ...(prepareAttachments
             ? { prepareAttachments, onSettled: () => stagedInput?.release() }
             : {})

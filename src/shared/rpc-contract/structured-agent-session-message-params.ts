@@ -1,3 +1,4 @@
+import { databaseMentionReferenceSchema } from '../database/database-mention-reference'
 import * as z from 'zod'
 import { isAgentSessionOptions } from '../agent-session/lifecycle/agent-session-record'
 import { measureUtf8ByteLength } from '../utf8-byte-limits'
@@ -43,7 +44,8 @@ export const SendBodyStructure = z
     kind: z.literal('message'),
     role: z.literal('user'),
     blocks: z.array(SendBlock).min(1).max(MAX_BLOCKS),
-    skills: z.array(SendSkillRef).min(1).max(MAX_SKILL_REFS).optional()
+    skills: z.array(SendSkillRef).min(1).max(MAX_SKILL_REFS).optional(),
+    databaseReferences: z.array(databaseMentionReferenceSchema).min(1).max(16).optional()
   })
   .strict()
 
