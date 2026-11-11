@@ -30,12 +30,7 @@ import { CodexSwitcherMenu } from './CodexSwitcherMenu'
 import { ProviderDetailsMenu } from './ProviderDetailsMenu'
 import { AntigravityUsageMenu } from './AntigravityUsageMenu'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/overlay-interaction/close-all-context-menus'
-import { ProviderSegment, UsageOverflowChip, getUsageTone } from './StatusBarProviderSegment'
-import {
-  UsageUnitLabel,
-  getUsageUnitLabelState,
-  usageChipShowsPercentage
-} from './usage-unit-label'
+import { StatusBarUsageIndicators } from './StatusBarUsageIndicators'
 import { useStatusBarController } from './use-status-bar-controller'
 import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
 import { StatusBarVisibilityMenu } from './StatusBarVisibilityMenu'
@@ -83,6 +78,7 @@ export function StatusBarSurface({
     compact,
     floatingTerminalActionLabel,
     floatingTerminalShortcut,
+    footerUsageEntries,
     handleManageAccounts,
     handleOpenProviderAccounts,
     handleRefresh,
@@ -114,12 +110,6 @@ export function StatusBarSurface({
     usageTightestOnly
   } = controller
   const usageMode = usageTightestOnly ? 'compact' : statusBarUsageMode
-  const unitLabelState = getUsageUnitLabelState(
-    rosterProviders,
-    collapsedUsageProviders,
-    usageMode,
-    t
-  )
 
   return (
     <div
@@ -162,40 +152,14 @@ export function StatusBarSurface({
                     className="inline-flex items-center gap-3 rounded px-1 py-0.5 hover:bg-accent/70"
                     aria-label={t('auto.components.status.bar.UsageRosterPanel.title', 'Usage')}
                   >
-                    {unitLabelState !== 'absent' ? (
-                      <UsageUnitLabel
-                        collapsed={unitLabelState === 'collapsed'}
-                        display={usagePercentageDisplay}
-                      />
-                    ) : null}
-                    {rosterProviders.map((p) => (
-                      // Why: collapsed chips leave the row but stay measurable, so the density hook can bring them back.
-                      <span
-                        key={p.provider}
-                        data-usage-chip={p.provider}
-                        data-usage-urgent={getUsageTone(p) === 'urgent'}
-                        data-usage-percentage={usageChipShowsPercentage(p, usageMode, t)}
-                        data-usage-collapsed={collapsedUsageProviders.includes(p.provider)}
-                        aria-hidden={collapsedUsageProviders.includes(p.provider)}
-                        className="inline-flex data-[usage-collapsed=true]:invisible data-[usage-collapsed=true]:absolute"
-                      >
-                        <ProviderSegment
-                          p={p}
-                          compact={compact}
-                          display={usagePercentageDisplay}
-                          mode={usageMode}
-                        />
-                      </span>
-                    ))}
-                    {collapseUsage ? (
-                      <UsageOverflowChip
-                        providerCount={rosterProviders.length}
-                        hidden={rosterProviders.filter((p) =>
-                          collapsedUsageProviders.includes(p.provider)
-                        )}
-                        display={usagePercentageDisplay}
-                      />
-                    ) : null}
+                    <StatusBarUsageIndicators
+                      entries={footerUsageEntries}
+                      collapsedIds={collapsedUsageProviders}
+                      compact={compact}
+                      mode={usageMode}
+                      display={usagePercentageDisplay}
+                      collapseUsage={collapseUsage}
+                    />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -233,6 +197,11 @@ export function StatusBarSurface({
                             claude={p}
                             usageState={claudeUsageState}
                             usageAccounts={claudeUsageAccounts}
+                            usageOwner={
+                              remoteOwner
+                                ? { kind: 'environment', environmentId: remoteOwner.environmentId }
+                                : undefined
+                            }
                             compact={compact}
                             iconOnly={false}
                             asSubmenu

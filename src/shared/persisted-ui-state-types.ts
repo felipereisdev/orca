@@ -143,6 +143,7 @@ export type PersistedUIState = {
   /** One-shot migration flag for adding the default-on Muse status item. */
   _museStatusBarDefaultAdded?: boolean
   statusBarItems: StatusBarItem[]
+  statusBarClaudeAccountIdsByScope?: Record<string, string[]>
   statusBarVisible: boolean
   /** Why: this is client-side presentation, not a provider/account or execution-host setting. */
   usagePercentageDisplay?: UsagePercentageDisplay

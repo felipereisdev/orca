@@ -30,6 +30,7 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PairedUiState, PairingLocalUiField } from '../../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../../shared/persisted-ui-state-types'
 import { normalizeStatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
+import { normalizeStatusBarAccountSelection } from '../../../../shared/status-bar-account-selection'
 import { normalizeTerminalCustomThemes } from '../../../../shared/terminal-themes/terminal-custom-themes'
 import { splitLegacyTerminalColorOverrides } from '../../../../shared/terminal-themes/terminal-color-overrides'
 import {
@@ -77,6 +78,9 @@ export function mergeWebUIState(
     ),
     statusBarUsageMode: normalizeStatusBarUsageMode(
       safeUpdates.statusBarUsageMode ?? base.statusBarUsageMode
+    ),
+    statusBarClaudeAccountIdsByScope: normalizeStatusBarAccountSelection(
+      safeUpdates.statusBarClaudeAccountIdsByScope ?? base.statusBarClaudeAccountIdsByScope
     )
   }
 }
@@ -91,6 +95,7 @@ export function mergeHostWebUIState(
     hideWorkspacesFromOtherDevices: local.hideWorkspacesFromOtherDevices === true,
     manualRepoOrder: local.manualRepoOrder,
     workspaceHostOrder: local.workspaceHostOrder,
+    statusBarClaudeAccountIdsByScope: local.statusBarClaudeAccountIdsByScope,
     sidebarOpen: local.sidebarOpen,
     showAgentModels: local.showAgentModels !== false,
     agentsVisibleHostIds: local.agentsVisibleHostIds,

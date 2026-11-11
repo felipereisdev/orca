@@ -35,6 +35,7 @@ import { clampCombinedDiffFileTreeWidth } from '../../../../../shared/combined-d
 import { parsePersistedAutomationHostFilter } from '../../../../../shared/automations/ownership/automation-host-filter'
 import { normalizeUsagePercentageDisplay } from '../../../../../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../../../../../shared/status-bar-usage-mode'
+import { normalizeStatusBarAccountSelection } from '../../../../../shared/status-bar-account-selection'
 import { normalizeBrowserPageZoomLevel } from '../../../../../shared/browser-page-zoom'
 import { normalizeKagiSessionLink } from '../../../../../shared/browser-url'
 import { isReleaseChannel } from '../../../../../shared/release-channel'
@@ -186,6 +187,9 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           workspaceBoardColumnWidth: clampWorkspaceBoardColumnWidth(ui.workspaceBoardColumnWidth),
           syncTaskStatusFromWorkspaceBoard: ui.syncTaskStatusFromWorkspaceBoard === true,
           statusBarItems: statusBarItemsWithGrok,
+          statusBarClaudeAccountIdsByScope: normalizeStatusBarAccountSelection(
+            ui.statusBarClaudeAccountIdsByScope
+          ),
           statusBarVisible: ui.statusBarVisible ?? true,
           usagePercentageDisplay: normalizeUsagePercentageDisplay(ui.usagePercentageDisplay),
           statusBarUsageMode: normalizeStatusBarUsageMode(ui.statusBarUsageMode),

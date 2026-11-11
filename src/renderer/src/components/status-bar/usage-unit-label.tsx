@@ -4,6 +4,7 @@ import type { StatusBarUsageMode } from '../../../../shared/status-bar-usage-mod
 import type { UsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { getStatusBarUsageSections } from './status-bar-usage-sections'
+import type { StatusBarUsageEntry } from './status-bar-usage-entries'
 
 export type UsageUnitLabelState = 'absent' | 'collapsed' | 'shown'
 
@@ -16,16 +17,18 @@ export function usageChipShowsPercentage(
 }
 
 export function getUsageUnitLabelState(
-  providers: readonly ProviderRateLimits[],
+  providers: readonly (ProviderRateLimits | StatusBarUsageEntry)[],
   collapsedProviders: readonly string[],
   mode: StatusBarUsageMode,
   t?: Translate
 ): UsageUnitLabelState {
-  const withPercentage = providers.filter((p) => usageChipShowsPercentage(p, mode, t))
+  const withPercentage = providers.filter((p) =>
+    usageChipShowsPercentage('limits' in p ? p.limits : p, mode, t)
+  )
   if (withPercentage.length === 0) {
     return 'absent'
   }
-  return withPercentage.every((p) => collapsedProviders.includes(p.provider))
+  return withPercentage.every((p) => collapsedProviders.includes('limits' in p ? p.id : p.provider))
     ? 'collapsed'
     : 'shown'
 }

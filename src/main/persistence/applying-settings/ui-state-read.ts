@@ -13,6 +13,7 @@ import {
 } from '../../../shared/workspace-statuses'
 import { normalizeUsagePercentageDisplay } from '../../../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../../../shared/status-bar-usage-mode'
+import { normalizeStatusBarAccountSelection } from '../../../shared/status-bar-account-selection'
 import { clampMarkdownTocPanelWidth } from '../../../shared/markdown-toc-panel-width'
 import { clampCombinedDiffFileTreeWidth } from '../../../shared/combined-diff-file-tree-width'
 import {
@@ -59,6 +60,9 @@ export function getPersistedUI(
     syncTaskStatusFromWorkspaceBoard: state.ui?.syncTaskStatusFromWorkspaceBoard === true,
     usagePercentageDisplay: normalizeUsagePercentageDisplay(state.ui?.usagePercentageDisplay),
     statusBarUsageMode: normalizeStatusBarUsageMode(state.ui?.statusBarUsageMode),
+    statusBarClaudeAccountIdsByScope: normalizeStatusBarAccountSelection(
+      state.ui?.statusBarClaudeAccountIdsByScope
+    ),
     statusBarCompactChangeNoticeDismissed:
       state.ui?.statusBarCompactChangeNoticeDismissed !== false,
     trayMinimizeNoticeShown: state.ui?.trayMinimizeNoticeShown === true,

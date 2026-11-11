@@ -36,12 +36,12 @@ export function ClaudeAccountUsagePanel({
 }) {
   const t = useTranslate()
   const [choice, setChoice] = useState<string | null>(null)
-  const targets = group?.targets ?? []
+  const accountOptions = group?.targets ?? []
   const selected =
-    targets.find((target) => JSON.stringify(target.id) === choice) ??
-    targets.find((target) => target.active) ??
-    targets.find((target) => !target.needsSignIn) ??
-    targets[0]
+    accountOptions.find((target) => JSON.stringify(target.id) === choice) ??
+    accountOptions.find((target) => target.active) ??
+    accountOptions.find((target) => !target.needsSignIn) ??
+    accountOptions[0]
   const account = accounts.find((candidate) => candidate.id === selected?.id)
   const selectedAccountId = selected?.id
   const preview = previews.find((candidate) => candidate.accountId === selected?.id)
@@ -86,7 +86,7 @@ export function ClaudeAccountUsagePanel({
           />
         </SelectTrigger>
         <SelectContent position="popper" align="start" className="max-w-[calc(100vw-1rem)]">
-          {targets.map((target) => (
+          {accountOptions.map((target) => (
             <SelectItem
               key={JSON.stringify(target.id)}
               value={JSON.stringify(target.id)}

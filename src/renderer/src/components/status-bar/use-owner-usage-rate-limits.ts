@@ -12,6 +12,7 @@ import type { RateLimitState } from '../../../../shared/rate-limit-types'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
 import { useAppStore } from '../../store'
+import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
 import {
   resolveOwnerUsageRateLimits,
   type OwnerUsageFailureReason,
@@ -59,7 +60,17 @@ export function useOwnerUsageRateLimits(local: RateLimitState): OwnerUsageRateLi
   const t = useTranslate()
   const languageRevision = useUiLanguageRevision()
   // Why: route by the focused workspace's owner, never by the Active Server setting.
-  const { target } = useActiveAccountOwner(LOCAL_TARGET)
+  const pairedEnvironmentId = useAppStore((s) =>
+    isPairedWebClientWindow() ? (s.runtimeEnvironments[0]?.id ?? null) : null
+  )
+  const fallback = useMemo<RuntimeClientTarget>(
+    () =>
+      pairedEnvironmentId
+        ? { kind: 'environment', environmentId: pairedEnvironmentId }
+        : LOCAL_TARGET,
+    [pairedEnvironmentId]
+  )
+  const { target } = useActiveAccountOwner(fallback)
   const ownerId = runtimeTargetEnvironmentId(target)
   const ownerName = useAppStore(
     (s) => s.runtimeEnvironments.find((environment) => environment.id === ownerId)?.name ?? null

@@ -32,6 +32,7 @@ import { GroupedPoolUsage } from './usage-grouped-pools'
 import { formatStatusBarSectionLabel, isGroupedUsagePool } from './usage-pool-label'
 import { useResetCountdownClock } from '@/hooks/useResetCountdownClock'
 import { useNow } from '@/hooks/use-now'
+import type { StatusBarUsageEntry } from './status-bar-usage-entries'
 
 const CALM_STALE_USAGE_MAX_AGE_MS = 30 * 60_000
 
@@ -131,21 +132,21 @@ export function UsageOverflowChip({
   providerCount,
   display
 }: {
-  hidden: readonly ProviderRateLimits[]
+  hidden: readonly StatusBarUsageEntry[]
   providerCount: number
   display: UsagePercentageDisplay
 }): React.JSX.Element {
   const t = useTranslate()
-  const tones = hidden.map(getUsageTone)
+  const tones = hidden.map((entry) => getUsageTone(entry.limits))
   const tone = tones.includes('urgent')
     ? 'urgent'
     : tones.includes('warning')
       ? 'warning'
       : 'normal'
   const names = hidden
-    .map((p) => {
+    .map(({ limits: p, accountLabel }) => {
       const tightest = getTightestUsageSection(p, t)
-      const name = getProviderDisplayName(p.provider)
+      const name = accountLabel ?? getProviderDisplayName(p.provider)
       return tightest
         ? `${name} ${formatUsagePercentageLabel(tightest.window.usedPercent, display, t)}`
         : name
@@ -240,12 +241,14 @@ export function ProviderSegment({
   p,
   compact,
   display,
-  mode = 'verbose'
+  mode = 'verbose',
+  accountLabel
 }: {
   p: ProviderRateLimits | null
   compact: boolean
   display: UsagePercentageDisplay
   mode?: StatusBarUsageMode
+  accountLabel?: string
 }): React.JSX.Element {
   const t = useTranslate()
   const provider = p?.provider ?? 'claude'
@@ -259,6 +262,12 @@ export function ProviderSegment({
       : getTightestUsageSection(p, t)
     : null
   const sections = getStatusBarUsageSections(p, mode, t)
+  const identity = (
+    <>
+      <ProviderIcon provider={provider} />
+      {accountLabel ? <span className="max-w-28 truncate">{accountLabel}</span> : null}
+    </>
+  )
   const groupedBuckets = sections.map((section) => section.window).filter(isGroupedUsagePool)
   const showLabels = mode === 'verbose' || !compact
   const now = useResetCountdownClock(
@@ -273,7 +282,7 @@ export function ProviderSegment({
   if (!p || p.status === 'idle' || (p.status === 'fetching' && !tightest)) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
-        <ProviderIcon provider={provider} />
+        {identity}
         <span>···</span>
       </span>
     )
@@ -281,9 +290,7 @@ export function ProviderSegment({
 
   if (p.status === 'unavailable') {
     return (
-      <span className="inline-flex items-center gap-1 text-muted-foreground/50">
-        <ProviderIcon provider={provider} /> --
-      </span>
+      <span className="inline-flex items-center gap-1 text-muted-foreground/50">{identity} --</span>
     )
   }
 
@@ -293,7 +300,7 @@ export function ProviderSegment({
         className="inline-flex items-center gap-1 text-muted-foreground"
         title={getProviderUsageErrorMessage(p, t)}
       >
-        <ProviderIcon provider={provider} />
+        {identity}
         {/* Why "--" when compact: an icon alone would read as a healthy chip. */}
         {compact ? '--' : <OwnerNotSetUpLabel placeholder={p.usageMetadata.ownerNotSetUp} />}
       </span>
@@ -303,7 +310,7 @@ export function ProviderSegment({
   if (p.status === 'error' && !tightest) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
-        <ProviderIcon provider={provider} />
+        {identity}
         {!calm && <AlertTriangle size={11} className="text-muted-foreground/80" />}
         {!compact && <span className="text-[11px] font-medium">{statusLabel}</span>}
       </span>
@@ -319,7 +326,7 @@ export function ProviderSegment({
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <ProviderIcon provider={provider} />
+      {identity}
       {mode === 'verbose' && tightest && !compact ? (
         <MiniBar usedPct={clampUsedPercent(tightest.window.usedPercent)} display={display} />
       ) : null}

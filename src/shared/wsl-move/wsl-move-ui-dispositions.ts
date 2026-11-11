@@ -118,6 +118,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'workspaceBoardColumnWidth',
   'syncTaskStatusFromWorkspaceBoard',
   'statusBarItems',
+  'statusBarClaudeAccountIdsByScope',
   'statusBarVisible',
   'usagePercentageDisplay',
   'statusBarUsageMode',

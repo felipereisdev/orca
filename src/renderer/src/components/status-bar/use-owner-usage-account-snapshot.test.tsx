@@ -4,18 +4,23 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { ProviderRateLimits } from '../../../../shared/rate-limit-types'
 import type { ProviderAccountsSnapshot } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
 import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 type Handlers = {
   onSnapshot: (snapshot: ProviderAccountsSnapshot) => void
   onError: (error: unknown) => void
 }
 const source = vi.hoisted(() => {
-  const state: { ownerId: string; streams: Handlers[] } = { ownerId: 'server-a', streams: [] }
+  const state: { ownerId: string | null; pairedId: string | null; streams: Handlers[] } = {
+    ownerId: 'server-a',
+    pairedId: null,
+    streams: []
+  }
   return state
 })
 vi.mock('../../runtime/provider-accounts/ownership/use-active-account-owner', () => ({
-  useActiveAccountOwner: () => ({
-    target: { kind: 'environment', environmentId: source.ownerId },
+  useActiveAccountOwner: (fallback: RuntimeClientTarget) => ({
+    target: source.ownerId ? { kind: 'environment', environmentId: source.ownerId } : fallback,
     wslHostDistro: null
   })
 }))
@@ -26,7 +31,11 @@ vi.mock('@/runtime/provider-accounts/observations/runtime-provider-accounts-clie
   }
 }))
 vi.mock('../../store', () => ({
-  useAppStore: (selector: (state: unknown) => unknown) => selector({ runtimeEnvironments: [] })
+  useAppStore: (selector: (state: unknown) => unknown) =>
+    selector({ runtimeEnvironments: source.pairedId ? [{ id: source.pairedId }] : [] })
+}))
+vi.mock('@/lib/desktop-window-chrome', () => ({
+  isPairedWebClientWindow: () => source.pairedId !== null
 }))
 const { useOwnerUsageRateLimits } = await import('./use-owner-usage-rate-limits')
 
@@ -97,7 +106,23 @@ const local = createEmptyRateLimitState({
 afterEach(() => {
   cleanup()
   source.ownerId = 'server-a'
+  source.pairedId = null
   source.streams.length = 0
+})
+
+it('uses the paired host for a web client without a focused workspace and separates a new pairing', () => {
+  source.ownerId = null
+  source.pairedId = 'paired-a'
+  const { result, rerender } = renderHook(() => useOwnerUsageRateLimits(local))
+  expect(result.current.remoteOwner?.environmentId).toBe('paired-a')
+  act(() => source.streams[0].onSnapshot(snapshot('work', 7, 'personal', 17)))
+  expect(result.current.claudeAccounts?.activeAccountId).toBe('work')
+  expect(result.current.rateLimits.claude?.session?.usedPercent).toBe(7)
+  source.pairedId = 'paired-b'
+  rerender()
+  expect(result.current.remoteOwner?.environmentId).toBe('paired-b')
+  expect(result.current.claudeAccounts).toBeNull()
+  expect(result.current.rateLimits.inactiveClaudeAccounts).toEqual([])
 })
 
 it('publishes account selection and usage from the same remote snapshot', () => {

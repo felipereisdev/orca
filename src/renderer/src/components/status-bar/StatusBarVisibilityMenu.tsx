@@ -7,7 +7,8 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
-import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import { GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from './icons'
+import { ClaudeFooterVisibilityMenu } from './ClaudeFooterVisibilityMenu'
 import { useTranslate } from '@/i18n/use-translate'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import type { StatusBarController } from './use-status-bar-controller'
@@ -20,6 +21,7 @@ export function StatusBarVisibilityMenu({
   const t = useTranslate()
   const {
     detectedAgentIds,
+    footerClaudeAccounts,
     menuOpen,
     menuPoint,
     recordFeatureInteraction,
@@ -40,16 +42,13 @@ export function StatusBarVisibilityMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent className="min-w-0 w-fit" sideOffset={0} align="start">
         {isStatusBarItemAvailable('claude', detectedAgentIds) && (
-          <DropdownMenuCheckboxItem
-            checked={statusBarItems.includes('claude')}
-            onCheckedChange={() => {
+          <ClaudeFooterVisibilityMenu
+            accounts={footerClaudeAccounts}
+            onToggleProvider={() => {
               recordFeatureInteraction('usage-tracking')
               toggleStatusBarItem('claude')
             }}
-          >
-            <ClaudeIcon size={14} />
-            {t('auto.components.status.bar.StatusBar.3885eb74d8', 'Claude Usage')}
-          </DropdownMenuCheckboxItem>
+          />
         )}
         {isStatusBarItemAvailable('codex', detectedAgentIds) && (
           <DropdownMenuCheckboxItem

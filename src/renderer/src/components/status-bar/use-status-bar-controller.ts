@@ -17,6 +17,8 @@ import { useStatusBarDensity } from './status-bar-density'
 import { getUsageOwnerHostScope, useOwnerUsageRateLimits } from './use-owner-usage-rate-limits'
 import { isOwnerNotSetUpPlaceholder } from './owner-usage-rate-limits'
 import { useTranslate } from '@/i18n/use-translate'
+import { useClaudeFooterAccounts } from './use-claude-footer-accounts'
+import { buildOwnerUsageProviderSettings } from './owner-usage-provider-settings'
 
 export function useStatusBarController(floatingTerminalOpen: boolean) {
   const t = useTranslate()
@@ -26,6 +28,13 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const { rateLimits, claudeAccounts, remoteOwner, refreshRemote } =
     useOwnerUsageRateLimits(localRateLimits)
   const remoteOwned = remoteOwner !== null
+  const statusBarVisible = useAppStore((s) => s.statusBarVisible)
+  const footerClaudeAccounts = useClaudeFooterAccounts(
+    rateLimits,
+    claudeAccounts,
+    remoteOwner,
+    statusBarVisible
+  )
   const settings = useAppStore((s) => s.settings)
   const refreshRateLimits = useAppStore((s) => s.refreshRateLimits)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
@@ -37,7 +46,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const setStatusBarUsageMode = useAppStore((s) => s.setStatusBarUsageMode)
   const [usageMenuOpen, setUsageMenuOpen] = useState(false)
   const usageMenuFocusHandoff = useStatusBarMenuFocusHandoff()
-  const statusBarVisible = useAppStore((s) => s.statusBarVisible)
   const statusBarItems = useAppStore((s) => s.statusBarItems)
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   // Why: reuse the floating-button's unread dot so activity shows for either trigger location (see FloatingTerminalToggleButton).
@@ -86,6 +94,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   }, [ensureDetectedAgents])
 
   const refreshDetectedAgents = useAppStore((s) => s.refreshDetectedAgents)
+  const refreshClaudePreviews = footerClaudeAccounts.refreshPreviews
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) {
       return
@@ -95,6 +104,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
       // Why: re-run PATH detection so a freshly-installed/removed CLI's bar appears/hides without restarting Orca.
       await Promise.all([
         (refreshRemote ?? refreshRateLimits)(),
+        refreshClaudePreviews?.(),
         refreshDetectedAgents(undefined, { wakeWslDistro: true })
       ])
     } finally {
@@ -102,7 +112,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
         setIsRefreshing(false)
       }
     }
-  }, [isRefreshing, refreshRemote, refreshRateLimits, refreshDetectedAgents])
+  }, [isRefreshing, refreshRemote, refreshRateLimits, refreshDetectedAgents, refreshClaudePreviews])
 
   if (!statusBarVisible) {
     return null
@@ -111,6 +121,19 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode } =
     rateLimits
   const muse = rateLimits.muse
+  const providerSnapshots = {
+    claude,
+    codex,
+    gemini,
+    opencodeGo,
+    kimi,
+    antigravity,
+    minimax,
+    grok,
+    cursor,
+    zcode,
+    muse
+  }
 
   // Antigravity has no saved credential; the checked item and detected CLI establish setup.
   const antigravityUsageConfigured =
@@ -118,16 +141,13 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     statusBarItems.includes('antigravity') &&
     isStatusBarItemAvailable('antigravity', detectedAgentIds)
   // Use owner-specific durable setup flags; viewer credentials cannot establish remote configuration.
-  const usageSettings = {
-    ...(remoteOwned ? {} : settings),
-    antigravityUsageConfigured,
-    minimaxCookieConfigured: rateLimits.minimaxCookieConfigured,
-    minimaxApiKeyConfigured: rateLimits.minimaxApiKeyConfigured,
-    opencodeGoApiKeyConfigured: rateLimits.opencodeGoApiKeyConfigured,
-    grokAuthConfigured: rateLimits.grokAuthConfigured,
-    cursorAuthConfigured: rateLimits.cursorAuthConfigured,
-    zcodePlanApiKeyConfigured: rateLimits.zcodePlanApiKeyConfigured
-  }
+  const usageSettings = buildOwnerUsageProviderSettings({
+    settings,
+    remoteOwned,
+    claudeAccounts,
+    rateLimits,
+    antigravityUsageConfigured
+  })
   const visibleClaude = getVisibleUsageProvider('claude', claude, usageSettings)
   const visibleCodex = getVisibleUsageProvider('codex', codex, usageSettings)
   const visibleGemini = getVisibleUsageProvider('gemini', gemini, usageSettings)
@@ -183,39 +203,13 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const showPorts = statusBarItems.includes('ports')
   const showFloatingTerminalToggle =
     floatingTerminalEnabled && floatingTerminalTriggerLocation === 'status-bar'
-  // Why: meter-only children (excludes resource-usage) so the % display callout anchors to a real meter cluster.
-  const hasVisibleUsageMeters =
-    showClaude ||
-    showCodex ||
-    showGemini ||
-    showOpencodeGo ||
-    showKimi ||
-    showAntigravity ||
-    showMiniMax ||
-    showGrok ||
-    showCursor ||
-    showZcode ||
-    showMuse
-  const anyVisible = hasVisibleUsageMeters || showResourceUsage
   // Why: include Settings so durable managed accounts count — a configured user isn't shown the empty state while snapshots hydrate.
-  const isEmptyUsageState = isUsageEmptyState(
-    { claude, codex, gemini, opencodeGo, kimi, antigravity, minimax, grok, cursor, zcode, muse },
-    usageSettings
-  )
+  const isEmptyUsageState = isUsageEmptyState(providerSnapshots, usageSettings)
   // Why: one-time nudge — once dismissed, stays hidden even if providers reconnect later.
   const showEmptyUsageCta = isEmptyUsageState && !usageEmptyStateDismissed
-  const anyFetching =
-    claude?.status === 'fetching' ||
-    codex?.status === 'fetching' ||
-    gemini?.status === 'fetching' ||
-    opencodeGo?.status === 'fetching' ||
-    kimi?.status === 'fetching' ||
-    antigravity?.status === 'fetching' ||
-    minimax?.status === 'fetching' ||
-    grok?.status === 'fetching' ||
-    cursor?.status === 'fetching' ||
-    zcode?.status === 'fetching' ||
-    muse?.status === 'fetching'
+  const anyFetching = Object.values(providerSnapshots).some(
+    (provider) => provider?.status === 'fetching'
+  )
 
   const floatingTerminalActionLabel = floatingTerminalOpen
     ? t('auto.components.status.bar.floatingWorkspace.minimize', 'Minimize Floating Workspace')
@@ -239,6 +233,9 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     .filter((p): p is ProviderRateLimits => p !== null)
     // Why: the bar collapses chips from the end, so placeholders give way first.
     .sort((a, b) => Number(isOwnerNotSetUpPlaceholder(a)) - Number(isOwnerNotSetUpPlaceholder(b)))
+  const hasVisibleUsageMeters = rosterProviders.length > 0
+  const anyVisible = hasVisibleUsageMeters || showResourceUsage
+  const footerUsageEntries = footerClaudeAccounts.entries(rosterProviders)
 
   // Why: the shown accounts are the owning host's; without a scope Settings opens on the default host.
   const hostScope = getUsageOwnerHostScope(remoteOwner)
@@ -278,6 +275,8 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   }
 
   return {
+    footerClaudeAccounts,
+    footerUsageEntries,
     claudeUsageState: rateLimits,
     claudeUsageAccounts: claudeAccounts,
     antigravityAccounts: rateLimits.antigravityAccounts,

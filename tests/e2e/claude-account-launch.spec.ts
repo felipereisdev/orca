@@ -67,6 +67,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
   await page.evaluate(
     async ({ folder, command }) => {
       const store = window.__store!
+      store.setState({ fetchInactiveClaudeAccountUsage: async () => {} })
       await store.getState().updateSettings({
         uiLanguage: 'en',
         theme: 'dark',

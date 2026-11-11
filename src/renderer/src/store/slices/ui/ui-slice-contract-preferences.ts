@@ -118,6 +118,8 @@ export type UISlicePreferences = {
   agentDashboardDrawerOpen: boolean
   setAgentDashboardDrawerOpen: (open: boolean) => void
   statusBarItems: StatusBarItem[]
+  statusBarClaudeAccountIdsByScope: Record<string, string[]>
+  setStatusBarClaudeAccounts: (scope: string, ids: string[]) => void
   toggleStatusBarItem: (item: StatusBarItem) => void
   statusBarVisible: boolean
   setStatusBarVisible: (v: boolean) => void

@@ -2,6 +2,7 @@ import type React from 'react'
 import type { ProviderRateLimits, RateLimitState } from '../../../../shared/rate-limit-types'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
 import type { ChatAccountAction } from './ProviderAccountChatButton'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { useActiveAccountOwner } from '@/runtime/provider-accounts/ownership/use-active-account-owner'
 import { ClaudeSwitcherForOwner } from './ClaudeSwitcherForOwner'
 import { getProviderAccountsOwnerKey } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
@@ -15,6 +16,7 @@ export type ClaudeSwitcherMenuProps = {
   chatAction?: ChatAccountAction
   usageState?: RateLimitState
   usageAccounts?: ClaudeRateLimitAccountsState | null
+  usageOwner?: RuntimeClientTarget
 }
 
 export function ClaudeSwitcherMenu(props: ClaudeSwitcherMenuProps): React.JSX.Element | null {
@@ -30,7 +32,7 @@ export function ClaudeSwitcherMenu(props: ClaudeSwitcherMenuProps): React.JSX.El
 }
 
 function FocusedClaudeSwitcher(props: ClaudeSwitcherMenuProps): React.JSX.Element | null {
-  const owner = useActiveAccountOwner({ kind: 'local' })
+  const owner = useActiveAccountOwner(props.usageOwner ?? { kind: 'local' })
   return (
     <ClaudeSwitcherForOwner
       key={`${getProviderAccountsOwnerKey(owner.target)}:${owner.wslHostDistro ?? ''}`}

@@ -4,11 +4,9 @@ import { hasUsageData } from '../../../../shared/usage-provider-windows'
 
 export type UsageProviderSettings = Pick<
   GlobalSettings,
-  | 'codexManagedAccounts'
-  | 'claudeManagedAccounts'
-  | 'opencodeSessionCookie'
-  | 'geminiCliOAuthEnabled'
+  'codexManagedAccounts' | 'opencodeSessionCookie' | 'geminiCliOAuthEnabled'
 > & {
+  claudeManagedAccounts?: readonly { id: string }[]
   // Antigravity setup is a checked item plus PATH detection; agy usage needs no Gemini OAuth.
   antigravityUsageConfigured: boolean
   // Why: MiniMax/Grok sign-in live on disk, not in settings; main sets these each poll.

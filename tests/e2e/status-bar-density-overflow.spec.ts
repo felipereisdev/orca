@@ -16,11 +16,13 @@ test('ten usage providers survive a narrow viewport and expand again', async ({
   page.on('console', (message) => captureDensityError(message.text()))
 
   await page.setViewportSize({ width: 1800, height: 800 })
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const store = window.__store
     if (!store) {
       throw new Error('store unavailable')
     }
+    await store.getState().updateSettings({ uiLanguage: 'en' })
+    await store.getState().ensureDetectedAgents()
     const limits = (provider: ProviderRateLimits['provider']): ProviderRateLimits => ({
       provider,
       session: { usedPercent: 25, windowMinutes: 300, resetsAt: null, resetDescription: null },

@@ -241,6 +241,20 @@ export function createUiPreferenceActions(set: UISliceSet, get: UISliceGet): Par
     },
 
     statusBarItems: [...DEFAULT_STATUS_BAR_ITEMS],
+    statusBarClaudeAccountIdsByScope: {},
+    setStatusBarClaudeAccounts: (scope, ids) => {
+      const state = get()
+      const statusBarClaudeAccountIdsByScope = {
+        ...state.statusBarClaudeAccountIdsByScope,
+        [scope]: [...new Set(ids)]
+      }
+      const statusBarItems =
+        ids.length && !state.statusBarItems.includes('claude')
+          ? [...state.statusBarItems, 'claude' as const]
+          : state.statusBarItems
+      window.api.ui.set({ statusBarClaudeAccountIdsByScope, statusBarItems }).catch(console.error)
+      set({ statusBarClaudeAccountIdsByScope, statusBarItems })
+    },
     toggleStatusBarItem: (item) =>
       set((s) => {
         const current = s.statusBarItems || DEFAULT_STATUS_BAR_ITEMS
