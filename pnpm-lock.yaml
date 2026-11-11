@@ -214,10 +214,12 @@ patchedDependencies:
   minimatch@10.2.6: 4324868e550a69eee9addc4801001bee415e98339c9b2b88d6ab4fc6028741c6
   minimatch@9.0.9: c356feccb9147b4d6a1cc72b10270defcb95d14cb42ee74ddfe7219341417161
   monaco-editor@0.55.1: 53b71f7d8a7c00b76ffdb73ce83d18e31692f193f5fafa6a390e48f5b3fdd636
+  mssql@12.7.14: 3b6aedb7b3f6d9cc3f4fe53be8bbd761daf39202c98eee2896be0ea2c480402f
   node-pty@1.1.0: 37dc98d9a4bcfc67153fa2fbf30689563ff49dcf8e6f0578484cbacdf1e38af5
   oracledb@26.0.0: 449931ba19c8388a6c70876bb6d7ec3235b1fbab250fa6b775f9807cabdf76fe
   oxlint-plugin-anti-slop@0.1.2: c10c871702365a0c2c59e9f1c5fb92df97cae5755d534c0a3d83c6368f6feafe
   pdfjs-dist@6.3.289: 424fde648e16c965ce45c55bdda49ecb3a4aa992c856900714c841c3f13f8415
+  powershell-utils@0.2.1: 01c6702c750e3dd1ca90fb6b09cd124d0e39cfefe887a778e779662ca38d988a
   prosemirror-view@1.42.3: 3340ccbcc4e3302f3ae1c0eda3911015966add2e7e0df76abd89fbef4f3902f7
   sprintf-js@1.1.3: 05316a8b01f155fe19a1e0cb4042c81d43d798a76755c407684e1199a18b1e08
   vitest@5.0.5: 166c034c864f98267e7d479f083b8d37ea9a7b08d6662313dd38e7c69c9a3eb4
@@ -271,7 +273,7 @@ importers:
         version: 3.0.2
       mssql:
         specifier: 12.7.14
-        version: 12.7.14(supports-color@7.2.0)
+        version: 12.7.14(patch_hash=3b6aedb7b3f6d9cc3f4fe53be8bbd761daf39202c98eee2896be0ea2c480402f)(supports-color@7.2.0)
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0(patch_hash=37dc98d9a4bcfc67153fa2fbf30689563ff49dcf8e6f0578484cbacdf1e38af5)
@@ -14927,7 +14929,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  mssql@12.7.14(supports-color@7.2.0):
+  mssql@12.7.14(patch_hash=3b6aedb7b3f6d9cc3f4fe53be8bbd761daf39202c98eee2896be0ea2c480402f)(supports-color@7.2.0):
     dependencies:
       '@tediousjs/connection-string': 1.1.0
       commander: 11.1.0
@@ -15095,7 +15097,7 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-in-ssh: 1.0.0
       is-inside-container: 1.0.0
-      powershell-utils: 0.2.1
+      powershell-utils: 0.2.1(patch_hash=01c6702c750e3dd1ca90fb6b09cd124d0e39cfefe887a778e779662ca38d988a)
       wsl-utils: 1.0.1
 
   opentype.js@2.0.0: {}
@@ -15453,7 +15455,7 @@ snapshots:
       commander: 9.5.0
     optional: true
 
-  powershell-utils@0.2.1: {}
+  powershell-utils@0.2.1(patch_hash=01c6702c750e3dd1ca90fb6b09cd124d0e39cfefe887a778e779662ca38d988a): {}
 
   prelude-ls@1.2.1:
     optional: true
@@ -16776,7 +16778,7 @@ snapshots:
   wsl-utils@1.0.1:
     dependencies:
       is-wsl: 3.1.1
-      powershell-utils: 0.2.1
+      powershell-utils: 0.2.1(patch_hash=01c6702c750e3dd1ca90fb6b09cd124d0e39cfefe887a778e779662ca38d988a)
 
   xmlbuilder@15.1.1: {}
 

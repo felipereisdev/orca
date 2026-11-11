@@ -144,3 +144,5 @@ patchedDependencies:
   minimatch@10.2.5: config/patches/minimatch@10.2.5.patch
   minimatch@10.2.6: config/patches/minimatch@10.2.6.patch
   oracledb@26.0.0: config/patches/oracledb@26.0.0.patch
+  mssql@12.7.14: config/patches/mssql@12.7.14.patch
+  powershell-utils@0.2.1: config/patches/powershell-utils@0.2.1.patch

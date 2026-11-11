@@ -27,3 +27,5 @@ Cancellation waits for the request's attention/cancellation response and destroy
 ## Verification
 
 `ORCA_BACKGROUND_LAUNCH=1 pnpm test:database tests/database/sql-server-adapter.integration.test.ts` requires Docker, OpenSSL and the `mcr.microsoft.com/mssql/server:2022-CU18-ubuntu-22.04` image. The disposable server binds only a random loopback port and uses generated TLS certificates and fixture-only passwords. No project secrets or existing databases are consulted. Tests cover exact numbers, duplicate/null cells, permission rejection, typed parameters, oversized values and cancellation confirmed at the server.
+
+The pinned `mssql` package and its transitive `powershell-utils` dependency carry ASCII representation patches for Unicode characters in regular expressions. The expressions keep the same code points and behavior while satisfying the headless server bundle’s ASCII gate. Revalidate that gate and the live SQL Server suite when upgrading the driver.

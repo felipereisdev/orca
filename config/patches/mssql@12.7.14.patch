@@ -1,0 +1,13 @@
+diff --git a/lib/utils.js b/lib/utils.js
+index b0e50a8bda7296b3aed3d7170f46a0fb321bf9d3..ebce5f9da7c36ba3b2ab93684f47bd5b9d5434db 100644
+--- a/lib/utils.js
++++ b/lib/utils.js
+@@ -28,7 +28,7 @@ const getPoolId = (obj) => {
+ // exception is the invisible format characters, which are rejected outright.
+ // Only the two zero-width joiners are taken from the format characters; the rest of that
+ // category includes ZERO WIDTH SPACE, which the server does treat as a separator.
+-const PARAM_NAME = /^(?:[\p{L}\p{N}\p{M}\p{Pc}@#$・･]|\u200C|\u200D)*$/u
++const PARAM_NAME = /^(?:[\p{L}\p{N}\p{M}\p{Pc}@#$\u30FB\uFF65]|\u200C|\u200D)*$/u
+ // A table-valued parameter's type name is emitted into the parameter declaration, and a
+ // stored procedure's name is emitted into an `exec`, so both are checked the way the server
+ // reads a qualified name: one or more parts separated by `.`, each either bare, holding only

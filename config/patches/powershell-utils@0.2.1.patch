@@ -1,0 +1,13 @@
+diff --git a/index.js b/index.js
+index 9e602ec67e2853c7517061e4d522033cb4400e06..3cca2706b8a80a34b2d35238f8c5872aa4a9ecf7 100644
+--- a/index.js
++++ b/index.js
+@@ -37,7 +37,7 @@ const encodeCommand = command => Buffer.from(command, 'utf16le').toString('base6
+ /*
+ PowerShell's tokenizer treats the typographic single quotes U+2018, U+2019, U+201A, and U+201B as string delimiters, exactly like the ASCII one, and it does not require the closing quote to match the opening quote. Escaping only the ASCII quote would let any of the others terminate the string and inject a statement. Doubling works for all of them.
+ */
+-const escapeArgument = value => `'${String(value).replaceAll(/['‘’‚‛]/g, match => match + match)}'`;
++const escapeArgument = value => `'${String(value).replaceAll(/['\u2018\u2019\u201A\u201B]/g, match => match + match)}'`;
+ 
+ const createArguments = command => [...argumentsPrefix, encodeCommand(command)];
+ 
