@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { AgentLaunchPickerMenu } from '../agent/AgentLaunchPickerMenu'
 import { buildClaudeAccountPickerEntries } from '../agent/claude-account-picker-entries'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch/picker/agent-launch-picker'
+import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
 
 const base: AgentPickerEntry = {
   agent: 'claude',
@@ -41,7 +42,7 @@ const accounts = {
     }
   ]
 }
-function Menu() {
+function Menu({ roster = accounts }: { roster?: ClaudeRateLimitAccountsState }) {
   return (
     <DropdownMenu defaultOpen>
       <DropdownMenuTrigger asChild>
@@ -49,7 +50,7 @@ function Menu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80">
         <AgentLaunchPickerMenu
-          entries={buildClaudeAccountPickerEntries(base, accounts, {
+          entries={buildClaudeAccountPickerEntries(base, roster, {
             runtime: 'host',
             wslDistro: null
           })}
@@ -61,3 +62,22 @@ function Menu() {
 }
 export const accountsMenu = defineFixture({ width: 390, render: () => <Menu /> })
 export const wide = defineFixture({ width: 1280, render: () => <Menu /> })
+export const noAccounts = defineFixture({
+  width: 390,
+  render: () => <Menu roster={{ activeAccountId: null, accounts: [] }} />
+})
+export const accountsInAnotherRuntime = defineFixture({
+  width: 390,
+  render: () => (
+    <Menu
+      roster={{
+        ...accounts,
+        accounts: accounts.accounts.map((account) => ({
+          ...account,
+          managedAuthRuntime: 'wsl',
+          wslDistro: 'Ubuntu'
+        }))
+      }}
+    />
+  )
+})

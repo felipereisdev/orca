@@ -65,7 +65,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
     }
   })
   await page.evaluate(
-    async ({ folder, accounts, command }) => {
+    async ({ folder, command }) => {
       const store = window.__store!
       await store.getState().updateSettings({
         uiLanguage: 'en',
@@ -75,8 +75,8 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
         nativeChatProviders: { claude: true, codex: true },
         agentCmdOverrides: { claude: command },
         agentDefaultArgs: { claude: '' },
-        claudeManagedAccounts: accounts,
-        activeClaudeManagedAccountId: 'personal'
+        claudeManagedAccounts: [],
+        activeClaudeManagedAccountId: null
       })
       const group = await window.api.projectGroups.create({ name: 'Accounts', parentPath: folder })
       const workspace = await window.api.folderWorkspaces.create({
@@ -89,13 +89,25 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
         .fetchFolderWorkspaces({ runtimeEnvironmentId: null, throwOnError: true })
       store.getState().setActiveFolderWorkspace(workspace.id)
     },
-    { folder, accounts, command: 'claude' }
+    { folder, command: 'claude' }
   )
 
+  await page.getByRole('button', { name: 'New tab', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Configure Claude', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.evaluate(async (accounts) => {
+    await window.__store!.getState().updateSettings({
+      claudeManagedAccounts: accounts,
+      activeClaudeManagedAccountId: 'personal'
+    })
+  }, accounts)
   await page.getByRole('button', { name: 'New tab', exact: true }).click()
   await expect(
     page.getByRole('button', { name: 'Configure Claude (Empresa)', exact: true })
   ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Configure Claude', exact: true })
+  ).not.toBeAttached()
   await page.screenshot({ path: testInfo.outputPath('accounts-menu.png') })
   await page.keyboard.press('Escape')
 

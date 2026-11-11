@@ -82,7 +82,8 @@ export function useAgentLaunchPickerInventorySource(
     target ?? { kind: 'local' },
     `${context?.key ?? ''}:${open}`,
     initialAccounts,
-    open
+    open,
+    accountVariants
   )
   const projectRuntime = route.projectRuntime
   const accountTarget =
