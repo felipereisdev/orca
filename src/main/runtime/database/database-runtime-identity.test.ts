@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { createDatabaseTestProfile } from '../../database/catalog/testing/database-profile-fixture'
 import { createSqliteTestStore } from '../../persistence/persistence-test-harness'
@@ -10,6 +10,7 @@ import { disposeRuntimeDatabase } from './runtime-database-service-slot'
 import { databaseQueryRecordSchema } from '../../../shared/database/database-query-result-schema'
 
 it('restores controller references and history after reopening the profile and can erase old SQL', async () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1794391201000)
   const profile = createDatabaseTestProfile()
   let store = profile.store
   let runtime = new OrcaRuntimeService(store)
@@ -73,8 +74,8 @@ it('restores controller references and history after reopening the profile and c
       sessionId: null,
       sql: 'SELECT 7',
       parameterNames: [],
-      createdAt: Date.now(),
-      finishedAt: Date.now(),
+      createdAt: 1794391200000,
+      finishedAt: 1794391200100,
       status: 'completed',
       rowCount: 1,
       truncated: false
@@ -114,5 +115,6 @@ it('restores controller references and history after reopening the profile and c
     await disposeRuntimeDatabase(runtime)
     await store.freezeWritesAsync()
     await profile.close()
+    clock.mockRestore()
   }
 })
