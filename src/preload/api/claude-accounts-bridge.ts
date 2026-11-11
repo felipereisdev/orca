@@ -12,6 +12,8 @@ export const claudeAccountsApi = {
     ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
   waitForSignInLink: (): Promise<string | null> =>
     ipcRenderer.invoke('claudeAccounts:waitForSignInLink'),
+  rename: (args: { accountId: string; label: string | null }) =>
+    ipcRenderer.invoke('claudeAccounts:rename', args),
   remove: (args: { accountId: string }) => ipcRenderer.invoke('claudeAccounts:remove', args),
   select: (args: {
     accountId: string | null

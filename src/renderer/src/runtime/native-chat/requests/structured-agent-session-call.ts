@@ -3,6 +3,7 @@ import { AGENT_SESSION_REWIND_RUNTIME_CAPABILITY } from '../../../../../shared/a
 import '../../../../../shared/agent-session/structured-agent-session-surface-capabilities'
 import '../../../../../shared/agent-session/lifecycle/agent-session-stop-capabilities'
 import '../../../../../shared/agent-session/agent-session-create-capabilities'
+import { structuredAgentSessionHostCapabilityState } from '../host-capabilities/structured-agent-session-host-support'
 import { callRuntimeRpc } from '../../rpc/calls/runtime-rpc-call'
 import { runtimeEnvironmentSupportsCapability } from '../../rpc/compatibility/runtime-capability-proof'
 import '../../hosts/capabilities/local-runtime-capabilities'
@@ -22,6 +23,16 @@ export async function callStructuredAgentSession<TResult>(
     expectedEnvironmentPairingRevision?: number
   } = {}
 ): Promise<TResult> {
+  if (
+    params &&
+    typeof params === 'object' &&
+    'claudeAccountId' in params &&
+    params.claudeAccountId !== undefined &&
+    (await structuredAgentSessionHostCapabilityState(target, 'agent-session.claude-account.v1')) !==
+      'supported'
+  ) {
+    throw new Error('Update Orca on this host to choose a Claude account for this session.')
+  }
   if (
     method === 'agentSession.rewind' &&
     target.kind === 'environment' &&

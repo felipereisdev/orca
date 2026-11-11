@@ -61,6 +61,7 @@ export type AgentModelCatalogService = {
 }
 
 export type AgentModelCatalogReadParams = {
+  accountHome?: AgentSessionAccountHome
   agent: string
   records?: AgentModelCatalogReadRecords | null
   operation?: AgentModelCatalogReadOperation

@@ -1,3 +1,4 @@
+import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/agent-session-account-home'
 import type { PrioritySemaphore } from '../../../shared/priority-semaphore'
 import { independentAgentModelCatalog } from '../../../shared/agent-session/options/agent-model-catalog-ownership'
 import type {
@@ -29,6 +30,7 @@ const AGENT_MODEL_CATALOG_REFRESH_MS = AGENT_MODEL_CATALOG_PICKER_WAIT_MS
 
 /** What a refresh resolves, captured when it starts; no reader's session, deadline or callback. */
 export type AgentModelCatalogLaunch = {
+  accountHome?: AgentSessionAccountHome
   agent: string
   records: AgentModelCatalogReadRecords
   workspacePath?: string | null
@@ -294,7 +296,7 @@ async function resolveAccount(
   }
   const account = scoped
     ? recordCatalogKey(scoped, folder)
-    : await newChatCatalogKey(deps, agent, folder)
+    : await newChatCatalogKey(deps, agent, folder, launch.accountHome)
   if (!current() || !account) {
     return null
   }

@@ -70,6 +70,7 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
     setup: {
       id: string
       agent: AgentPickerEntry['agent']
+      entryId?: string
       preset?: AgentPickerSetupIdentity
       label: string
     } | null
@@ -110,19 +111,25 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
   const reasonId = useId()
   const unavailable = entry.rows.find((row) => row.kind === 'chat-unavailable')
   const setDefault =
-    onSetDefault && entry.surfaces.length ? () => onSetDefault(entry.agent) : undefined
+    onSetDefault && !entry.claudeAccountId && entry.surfaces.length
+      ? () => onSetDefault(entry.agent)
+      : undefined
   if (setupDisabled) {
     return (
       <AgentDefaultContextMenu isDefault={isDefault} onSetDefault={setDefault}>
         <DropdownMenuItem
           className="min-h-9"
-          disabled={disabled || launchBlocked || !entry.surfaces.length}
+          disabled={disabled || entry.accountNeedsSignIn || launchBlocked || !entry.surfaces.length}
           data-search-default={searchDefault || undefined}
           aria-description={launchBlocked ? terminalPendingLabel(t) : undefined}
           onSelect={(event) => {
             onSelectAgent?.(entry.agent)
             if (
-              runLaunch(pickerLaunchRow(entry, selected?.surface ?? entry.defaultSurface)) === false
+              runLaunch(
+                pickerLaunchRow(entry, selected?.surface ?? entry.defaultSurface),
+                undefined,
+                entry
+              ) === false
             ) {
               event.preventDefault()
             }
@@ -152,10 +159,12 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
       mode={mode}
       terminalBlocked={terminalBlocked}
       open={openSetup === setupId}
-      disabled={disabled || setupDisabled || !entry.surfaces.length}
+      disabled={disabled || entry.accountNeedsSignIn || setupDisabled || !entry.surfaces.length}
       onOpenChange={(next) => {
         if (next || openSetup === setupId) {
-          onSetupOpenChange(next ? { id: setupId, agent: entry.agent, preset, label } : null)
+          onSetupOpenChange(
+            next ? { id: setupId, agent: entry.agent, entryId: entry.entryId, preset, label } : null
+          )
         }
         if (next && openSetup !== setupId) {
           onSelectAgent?.(entry.agent)
@@ -183,7 +192,7 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
           data-search-default={searchDefault || undefined}
           onClick={(event) => {
             event.preventDefault()
-            if (disabled || launchBlocked || !entry.surfaces.length) {
+            if (disabled || entry.accountNeedsSignIn || launchBlocked || !entry.surfaces.length) {
               return
             }
             const draft = initial ?? (mode === 'select' ? selected : undefined)
@@ -195,7 +204,7 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
                     ? row.kind === 'chat'
                     : row.kind === 'terminal' || row.kind === 'cli'
                 ) ?? pickerLaunchRow(entry, surface))
-            const result = draft ? runLaunch(row, draft, entry) : runLaunch(row, undefined)
+            const result = draft ? runLaunch(row, draft, entry) : runLaunch(row, undefined, entry)
             if (result !== false) {
               closeMenu()
             }
@@ -223,7 +232,11 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
               <AgentIcon agent={entry.agent} size={14} />
               <span className="min-w-0 flex-1 truncate text-left">{label}</span>
               {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
-              {launchBlocked ? (
+              {entry.accountNeedsSignIn ? (
+                <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
+                  {t('accounts.signInAgainSettings', 'Sign in again in Settings → Accounts')}
+                </span>
+              ) : launchBlocked ? (
                 <span
                   id={reasonId}
                   className="min-w-0 shrink truncate text-xs text-muted-foreground"

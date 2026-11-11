@@ -87,11 +87,12 @@ export function useAgentPickerSetup({
 }) {
   const currentSurface = surface ?? initial?.surface
   const [, publish] = useReducer((version: number) => version + 1, 0)
-  const key = JSON.stringify([entry.draftTarget?.key, entry.agent, draftId])
+  const key = JSON.stringify([entry.draftTarget?.key, entry.entryId ?? entry.agent, draftId])
   const launchKey = nativeChatLaunchPromptDraftScopeKey(
     entry.worktreeId ?? '',
     entry.agent,
-    entry.rows[0]?.executionHostId ?? 'local'
+    entry.rows[0]?.executionHostId ?? 'local',
+    entry.claudeAccountId
   )
   const originalPreset = useMemo(
     () =>

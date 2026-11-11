@@ -1,3 +1,4 @@
+import { ClaudeChatAccountLabel } from '../../../provider-accounts/ClaudeChatAccountLabel'
 import { Fragment } from 'react'
 import { MessageSquarePlus, SquareSplitVertical } from 'lucide-react'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
@@ -55,6 +56,13 @@ export function NativeChatPaneHeader({
       data-pane-title-surface={light ? 'light' : 'dark'}
       style={HEADER_STYLE}
     >
+      {nativeChat.agent === 'claude' ? (
+        <ClaudeChatAccountLabel
+          tabId={tabId}
+          worktreeId={worktreeId}
+          sessionId={nativeChat.sessionId}
+        />
+      ) : null}
       <div className="pane-title-actions ml-auto flex shrink-0 items-center gap-0">
         {handOff && focused ? (
           <Tooltip>

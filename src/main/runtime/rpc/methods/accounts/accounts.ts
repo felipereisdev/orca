@@ -1,3 +1,4 @@
+import { CLAUDE_ACCOUNT_NAME_METHODS } from './claude-account-name-method'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
 import type { OrcadFeature } from '../../orcad-feature-readiness'
 import { rpcCallerOperationKey } from '../../rpc-caller-identity'
@@ -181,6 +182,7 @@ const ACCOUNT_METHOD_DEFINITIONS = [
     handler: async (params, { runtime }) =>
       runtime.consumeCodexRateLimitResetCredit(params.idempotencyKey, params.expectedScope)
   }),
+  ...CLAUDE_ACCOUNT_NAME_METHODS,
   defineMethod({
     name: 'accounts.removeClaude',
     permission: 'accounts-admin',

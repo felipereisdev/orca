@@ -1,3 +1,5 @@
+import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
+import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../../claude-accounts/environment'
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/agent-session-acquired-account'
 import { prepareClaudeLaunchAccount } from '../../claude-launch-account'
 import { assertStructuredAgentResolutionCurrent } from '../../../native-chat/structured-agent-command-resolution'
@@ -131,6 +133,7 @@ export type ClaudeStructuredLaunch = {
 }
 
 export type ClaudeStructuredLaunchPartDeps = {
+  prepareClaudeAccountLaunch?: (accountId: string) => Promise<ClaudeRuntimeAuthPreparation>
   resolveLaunchArgs: () => Promise<string[]> | string[]
   resolveCommand?: ClaudeEnvDeps['resolveCommand']
   /** Explicit policy identifies the account for sign-in errors; use claudeStructuredAuthPolicyForSettings. */
@@ -263,7 +266,13 @@ export function claudeStructuredLaunchPart(
       sources,
       { runtimeOnPath: false }
     )
-    const accountRecipe = await prepareClaudeLaunchAccount(router, env, accountHome.path)
+    const accountRecipe = await prepareClaudeLaunchAccount(
+      router,
+      env,
+      accountHome.path,
+      record.claudeAccountId,
+      deps.prepareClaudeAccountLaunch
+    )
     const launchHome = accountRecipe.home
     const resumesTranscript = resumedWithoutRouter ?? (await resumes(launchHome))
     if (fork?.throughEntryId && !resumesTranscript) {
@@ -312,7 +321,7 @@ export function claudeStructuredLaunchPart(
           : {})
       },
       env,
-      inheritedEnvToDelete: [],
+      inheritedEnvToDelete: record.claudeAccountId ? CLAUDE_EXPLICIT_ENV_DELETIONS : [],
       // The agent runtime follows Orca's CLI directory on PATH so another orca cannot shadow it.
       cliRuntimeCommand: command
     }

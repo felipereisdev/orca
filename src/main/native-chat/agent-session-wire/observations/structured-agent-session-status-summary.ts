@@ -71,6 +71,7 @@ export function structuredAgentSessionStatusSummary({
   const launchDirectory = record ? agentSessionPinnedLaunchDirectory(record) : undefined
   return {
     sessionId,
+    ...(record?.claudeAccountId ? { claudeAccountId: record.claudeAccountId } : {}),
     ...(usageLimitContinue ? { usageLimitContinue } : {}),
     workspaceId: session.params.location.workspaceId,
     agent: session.params.provider,

@@ -115,6 +115,8 @@ export function buildAgentPickerLaunchOptions(
       ? buildTabAgentLaunchOptionsFromRows([row], commandOverrides, t).map((option) => ({
           ...option,
           label: entry.label,
+          aliases: [...option.aliases, ...(entry.aliases ?? []).map(normalizeAgentAlias)],
+          ...(entry.entryId ? { id: entry.entryId } : {}),
           pickerEntry: entry
         }))
       : []
@@ -193,14 +195,19 @@ export function matchingAgentPickerLaunchOptions(
       agent: setup.entry.agent,
       label: setup.label,
       aliases: [],
-      id: `setup:${setup.entry.agent}:${setup.model.id}:${setup.choices.options?.effort ?? ''}:${surface}`,
+      id: `setup:${setup.entry.entryId ?? setup.entry.agent}:${setup.model.id}:${setup.choices.options?.effort ?? ''}:${surface}`,
       row: {
         agent: setup.entry.agent,
         kind: surface === 'chat' ? 'chat' : 'cli',
         executionHostId: setup.entry.rows[0]?.executionHostId
       },
       preset: { model: setup.model.id, effort: setup.choices.options?.effort },
-      setup: { agent: setup.entry.agent, surface, choices: setup.choices },
+      setup: {
+        agent: setup.entry.agent,
+        ...(setup.entry.claudeAccountId ? { claudeAccountId: setup.entry.claudeAccountId } : {}),
+        surface,
+        choices: setup.choices
+      },
       pickerEntry: setup.entry
     }
   })

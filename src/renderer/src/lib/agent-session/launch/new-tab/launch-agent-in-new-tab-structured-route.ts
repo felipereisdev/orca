@@ -50,6 +50,7 @@ export function launchStructuredAgentFromNewTab(args: {
         args.openTerminal(
           adoptAgentSessionLaunchVerdict({
             route: 'terminal-tui',
+            claudeAccountId: plan.claudeAccountId,
             requestId: plan.requestId,
             agent: plan.agent,
             worktreeId: args.worktreeId

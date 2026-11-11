@@ -20,7 +20,7 @@ export const AI_VAULT_CHAT_FORK_SOURCE_CAPABILITY = 'ai-vault.chat-fork-source.v
 export type AiVaultChatForkSource = Pick<
   AiVaultSession,
   'agent' | 'sessionId' | 'filePath' | 'cwd' | 'codexHome'
-> & { executionHostPlatform: NodeJS.Platform; sourceAgent: AiVaultAgent }
+> & { executionHostPlatform: NodeJS.Platform; sourceAgent: AiVaultAgent; claudeAccountId?: string }
 
 export type AiVaultPrepareChatForkArgs = {
   sourceChat: { sessionId: string; workspaceId: string }

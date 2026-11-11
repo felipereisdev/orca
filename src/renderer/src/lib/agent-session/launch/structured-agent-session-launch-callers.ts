@@ -17,6 +17,7 @@ import type { StructuredAgentSessionCreateGate } from './structured-agent-sessio
 
 export type StructuredAgentLaunchOptions = StructuredLaunchPromptOptions & {
   /** The user action this start serves; only a re-delivery of it joins its chat. */
+  claudeAccountId?: string
   requestId: AgentLaunchRequestId
   /** Background launches never ask host publication to select their tab. */
   activate?: boolean

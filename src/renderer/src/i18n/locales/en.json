@@ -22881,7 +22881,9 @@
         "body_one": "{{count}} Claude session is still running on {{previous}}. Restarting continues the conversation on {{next}}. Busy sessions wait for idle before restarting.",
         "body_other": "{{count}} Claude sessions are still running on {{previous}}. Restarting continues each conversation on {{next}}. Busy sessions wait for idle before restarting.",
         "restartCount_one": "Restart {{count}} session"
-      }
+      },
+      "accountName": "Account name",
+      "launchAccount": "Claude ({{account}})"
     },
     "managedData": {
       "description": "Add accounts by running this command in a terminal on the Orca host. Selection applies to new explicit agent launches on that host; direct SSH relay and Windows-hosted WSL launches use their own credentials.",
@@ -22917,7 +22919,8 @@
         "failed": "Sign-in failed. Try again."
       }
     },
-    "remoteScopeAccountsAddHere": "Showing accounts managed by {{value0}}. New accounts sign in there; you finish in this device’s browser."
+    "remoteScopeAccountsAddHere": "Showing accounts managed by {{value0}}. New accounts sign in there; you finish in this device’s browser.",
+    "signInAgainSettings": "Sign in again in Settings → Accounts"
   },
   "fileSearch": {
     "failed": "Search failed. Try again.",

@@ -31,6 +31,7 @@ import { importedAgentSessionForkTipSettled } from './imported-agent-session-for
 import { structuredAgentSessionForkBoundary } from './structured-agent-session-fork-boundary'
 
 export type StructuredAgentSessionForkInput = {
+  claudeAccountId?: string
   host: StructuredAgentSessionHost
   sessionId: string
   throughItemId: string
@@ -70,6 +71,9 @@ async function resolveForkSource(input: StructuredAgentSessionForkInput) {
       )
     }
     const record = host.deps.store.requireWritableRecord(input.sessionId)
+    if (input.claudeAccountId && input.claudeAccountId !== record.claudeAccountId) {
+      throw new Error('The requested account does not belong to the source session.')
+    }
     const metadata = structuredAgentRuntimeMetadata(input.agent)
     const capability = host.deps.agents.capabilities(input.agent)?.fork
     const { head, pendingClear } = activeProviderContext(record)

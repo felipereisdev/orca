@@ -13,6 +13,7 @@ type SetupHandle = { scopeKey: string; active: boolean; readonly initialScope: s
 export type LaunchDraftSource = NativeChatComposerDraftOwner & {
   scopeKey: string
   agent: string
+  claudeAccountId?: string
   origin: string
   /** Authored options per slot: the plain row's empty slot, or a search preset's own. */
   options?: Map<string, AgentPickerRetainedSetup>
@@ -55,9 +56,21 @@ export function setPendingLaunchReadoptions(events: readonly SshRepoReadoption[]
 let sequence = 0
 const prefix = 'agent-setup:'
 const referencePrefix = 'agent-setup-reference:'
-const scopeOf = (owner: NativeChatComposerDraftOwner, agent: string): string =>
-  prefix + JSON.stringify([owner.executionHostId, owner.workspaceId, agent])
-function setupOf(scope: string): (NativeChatComposerDraftOwner & { agent: string }) | undefined {
+const scopeOf = (
+  owner: NativeChatComposerDraftOwner,
+  agent: string,
+  claudeAccountId?: string
+): string =>
+  prefix +
+  JSON.stringify([
+    owner.executionHostId,
+    owner.workspaceId,
+    agent,
+    ...(claudeAccountId ? [claudeAccountId] : [])
+  ])
+function setupOf(
+  scope: string
+): (NativeChatComposerDraftOwner & { agent: string; claudeAccountId?: string }) | undefined {
   if (!scope.startsWith(prefix)) {
     return undefined
   }
@@ -66,7 +79,12 @@ function setupOf(scope: string): (NativeChatComposerDraftOwner & { agent: string
     if (Array.isArray(value) && typeof value[0] === 'string' && typeof value[1] === 'string') {
       const host = parseExecutionHostId(value[0])
       if (host) {
-        return { executionHostId: host.id, workspaceId: value[1], agent: String(value[2]) }
+        return {
+          executionHostId: host.id,
+          workspaceId: value[1],
+          agent: String(value[2]),
+          ...(typeof value[3] === 'string' ? { claudeAccountId: value[3] } : {})
+        }
       }
     }
   } catch {
@@ -116,7 +134,8 @@ export function nativeChatLaunchPromptDraftOwner(
 export function nativeChatLaunchPromptDraftScopeKey(
   workspaceId: string,
   agent: string,
-  executionHostId = 'local'
+  executionHostId = 'local',
+  claudeAccountId?: string
 ): string {
   const initialOwner = {
     workspaceId,
@@ -129,7 +148,10 @@ export function nativeChatLaunchPromptDraftScopeKey(
         JSON.stringify([initialOwner.executionHostId, getRepoIdFromWorktreeId(workspaceId)])
       ) ?? initialOwner.executionHostId
   }
-  return referenceFor(scopeOf(owner, agent), scopeOf(initialOwner, agent))
+  return referenceFor(
+    scopeOf(owner, agent, claudeAccountId),
+    scopeOf(initialOwner, agent, claudeAccountId)
+  )
 }
 /** The first authored write creates the session source, as main kept only authored setups. */
 export function retainLaunchDraftSource(scope: string): LaunchDraftSource | undefined {
@@ -172,7 +194,11 @@ export function associateLaunchDraftContext(
   source: LaunchDraftSource,
   executionHostId: ExecutionHostId
 ): void {
-  const key = scopeOf({ workspaceId: source.workspaceId, executionHostId }, source.agent)
+  const key = scopeOf(
+    { workspaceId: source.workspaceId, executionHostId },
+    source.agent,
+    source.claudeAccountId
+  )
   if (source.references.has(key)) {
     return
   }
@@ -189,7 +215,7 @@ export function relocateLaunchDraftSource(
   if (setups.get(source.scopeKey) === source) {
     setups.delete(source.scopeKey)
   }
-  const key = scopeOf(owner, source.agent)
+  const key = scopeOf(owner, source.agent, source.claudeAccountId)
   const target = setups.get(key) ?? source
   if (target !== source) {
     for (const [slot, draft] of source.options ?? []) {

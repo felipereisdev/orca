@@ -141,6 +141,7 @@ export async function prepareStructuredChatCliFork(
     return {
       ...result,
       cliForkSource: {
+        ...(record.claudeAccountId ? { claudeAccountId: record.claudeAccountId } : {}),
         agent: copy.agent,
         sourceAgent: metadata.sessionHistory.rowAgents.at(-1) ?? agent,
         sessionId: copy.sessionId,

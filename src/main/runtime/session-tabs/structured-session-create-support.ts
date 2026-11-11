@@ -27,7 +27,10 @@ import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentS
 import { ensureStructuredAgentSessionHostUnlessRefused } from '../agent-session/structured-agent-session-host-refusal'
 import { getProfileUserDataPath } from '../../orca-profiles/profile-storage-paths'
 import { isFloatingWorkspaceSelector } from '../../../shared/floating-workspace-worktree'
-import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/agent-session-account-home'
+import {
+  agentSessionAccountHomesEqual,
+  type AgentSessionAccountHome
+} from '../../../shared/agent-session/lifecycle/agent-session-account-home'
 import type { StructuredAgentId } from '../../../shared/agent-session/lifecycle/agent-session-provider-handle'
 import type { StructuredAgentCreateSupportReply } from '../../../shared/agent-session/structured-agent-create-support-reply'
 
@@ -137,22 +140,6 @@ export abstract class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport exte
     return hostLaunchDirectory ? { ...resolved, hostLaunchDirectory } : resolved
   }
 
-  /** Resolve catalog account home through the same host create-intent resolver when no session record exists. */
-  async resolveStructuredAgentAccountHome(
-    agent: StructuredAgentId
-  ): Promise<AgentSessionAccountHome> {
-    const resolveAccountHome = this.structuredAgentAccountHomeResolver(agent, '', 'read')
-    if (!resolveAccountHome) {
-      throw agentSessionRefusalError('structured_agent_session_unsupported', {
-        reason: 'hostUnsupported'
-      })
-    }
-    // A read, not a launch: only the account push is awaited, never a folder refresh.
-    await this.accounts.prepareHostAgentLaunch(null)
-    const launchEnv = this.structuredAgentLaunchEnv(agent, this.requireStore().getSettings())
-    return resolveAccountHome({ launchEnv, location: null })
-  }
-
   protected async resolveStructuredAgentSessionIntent(
     input: StructuredAgentSessionCreateIntentInput,
     resolveAccountHome: (
@@ -210,7 +197,9 @@ export abstract class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport exte
       ? (await this.resolveRuntimeFileTarget(input.worktree)).worktree.path
       : ''
     const permissionMode = options?.[AGENT_CHAT_PERMISSION_MODE_OPTION_ID]
-    const selectedAccountHome = await resolveAccountHome({ launchEnv, location }, permissionMode)
+    const selectedAccountHome =
+      (await this.resolveExplicitClaudeAccountHome(input.agent, input.claudeAccountId)) ??
+      (await resolveAccountHome({ launchEnv, location }, permissionMode))
     // Adoption pins the transcript's actual account home; fresh-create defaults may open a blank conversation under the old name.
     const adoption =
       resumeFrom && transcriptImport
@@ -232,6 +221,13 @@ export abstract class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport exte
             workspaceCwd: workspaceCwd
           })
         : null
+    if (
+      input.claudeAccountId &&
+      adoption &&
+      !agentSessionAccountHomesEqual(adoption.accountHome, selectedAccountHome)
+    ) {
+      throw new Error('The requested account does not belong to the source conversation.')
+    }
     return {
       envelope: {
         sessionId: input.envelope.sessionId,
@@ -243,6 +239,7 @@ export abstract class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport exte
       provider: input.agent,
       agent: input.agent,
       accountHome: adoption ? adoption.accountHome : selectedAccountHome,
+      ...(input.claudeAccountId ? { claudeAccountId: input.claudeAccountId } : {}),
       ...(options ? { options } : {}),
       ...(input.resumeFrom && adoption
         ? {

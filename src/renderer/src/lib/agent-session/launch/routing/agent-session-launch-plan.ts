@@ -43,6 +43,7 @@ import { awaitLocalRuntimeCapabilities } from '../../../../runtime/hosts/capabil
 export type AgentLaunchSurface = 'chat' | 'terminal'
 
 export type AgentSessionLaunchRequest = AgentLaunchRouteArgs & {
+  claudeAccountId?: string
   requestId: AgentLaunchRequestId
   requestedSurface?: AgentLaunchSurface
   selectedExecutionHostId?: ExecutionHostId
@@ -63,6 +64,7 @@ export type AgentSessionLaunchVerdict = Pick<
 > & {
   route: AgentLaunchRoute
   requestedSurface?: AgentLaunchSurface
+  claudeAccountId?: string
   requestId: AgentLaunchRequestId
   agent: TuiAgent
   worktreeId?: string
@@ -106,6 +108,7 @@ export type AgentSessionLaunchPlan = Readonly<AgentSessionLaunchVerdict> & {
 
 function structuredLaunchOptions(verdict: AgentSessionLaunchVerdict): StructuredAgentLaunchOptions {
   return {
+    claudeAccountId: verdict.claudeAccountId,
     requestId: verdict.requestId,
     ...(verdict.prompt !== undefined ? { prompt: verdict.prompt } : {}),
     ...(verdict.promptAttachments?.length ? { promptAttachments: verdict.promptAttachments } : {}),
@@ -305,6 +308,7 @@ export function planAgentSessionLaunch(
   return adoptAgentSessionLaunchVerdict({
     route,
     ...(request.requestedSurface ? { requestedSurface: request.requestedSurface } : {}),
+    claudeAccountId: request.claudeAccountId,
     requestId: request.requestId,
     agent: request.agent,
     ...(executionHostId ? { executionHostId } : {}),

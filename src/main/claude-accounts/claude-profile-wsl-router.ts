@@ -17,6 +17,7 @@ import { describeWslProcessFailure } from '../wsl/execution/wsl-process-failure'
 import { blockedWslDistroForPath } from '../wsl/filesystem/wsl-unc-access-gate'
 import { claudeProfileMarkerPath, type ClaudeProfileDescriptor } from './claude-profile-paths'
 import type { ClaudeProfileRouterSettings } from './claude-profile-router'
+import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
 import { claudeProfileMissing, claudeProfileSetupFailed } from './claude-profile-launch-errors'
 import {
   isSameClaudeLogin,
@@ -174,6 +175,38 @@ export class ClaudeWslProfileRouter {
     const { home, profile } = await this.resolve(distro)
     await this.assertPresent(distro, profile)
     return this.preparationFor(distro, home, profile)
+  }
+
+  async prepareAccountLaunch(
+    distro: string,
+    accountId: string
+  ): Promise<ClaudeRuntimeAuthPreparation> {
+    const saved = findClaudeAccount(this.args.getSettings(), accountId)
+    if (
+      !saved ||
+      saved.managedAuthRuntime !== 'wsl' ||
+      getClaudeWslSelectionKey(saved.wslDistro) !== getClaudeWslSelectionKey(distro)
+    ) {
+      throw claudeProfileMissing()
+    }
+    const home = parseWslUncPath((await getWslHomeAsync(distro)) ?? '')?.linuxPath
+    if (!home) {
+      throw claudeProfileMissing()
+    }
+    const { profile } = wslClaudeProfile(home, distro, accountId)
+    await this.assertPresent(distro, profile)
+    const login = await guestLogin(distro, posix.join(profile.home, '.claude.json'))
+    if (!login || !isSameClaudeLogin(saved, login)) {
+      throw new AgentSessionPreSpawnError(
+        new Error('Sign in to this Claude account again before launching it.'),
+        { reason: 'notSignedIn' }
+      )
+    }
+    await this.setUp(distro, home, accountId)
+    return {
+      ...this.preparationFor(distro, home, profile),
+      envPatch: { CLAUDE_CONFIG_DIR: profile.home }
+    }
   }
 
   async prepareAccount(distro: string, accountId: string): Promise<string> {

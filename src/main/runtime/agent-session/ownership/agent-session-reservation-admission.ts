@@ -56,6 +56,7 @@ export type AgentSessionReserveRequest = {
   sessionId: string
   location: AgentSessionExecutionLocation
   provider: StructuredAgentId
+  claudeAccountId?: string
   accountHome: AgentSessionAccountHome
   /** Arguments pinned on first reservation so owner replacement repeats the same launch. */
   launchArgs?: AgentSessionLaunchArgs

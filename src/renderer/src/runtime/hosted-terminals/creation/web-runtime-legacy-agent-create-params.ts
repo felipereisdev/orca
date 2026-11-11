@@ -12,6 +12,7 @@ export function buildLegacyAgentCreateTerminalParams(
   const legacy = legacyAgentLaunch ?? args
   return {
     worktree: toRuntimeWorktreeSelector(args.worktreeId),
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     ...trustOptions,
     afterTabId: args.afterTabId ? toHostSessionTabId(args.afterTabId) : undefined,
     targetGroupId: args.targetGroupId,

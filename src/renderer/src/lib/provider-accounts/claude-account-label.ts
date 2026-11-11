@@ -10,6 +10,7 @@ export function getClaudeAccountLabel(
     return translate('accounts.claude.systemDefault', 'System default')
   }
   return (
+    state.accounts.find((account) => account.id === accountId)?.label ??
     state.accounts.find((account) => account.id === accountId)?.email ??
     translate('accounts.claude.unnamedAccount', 'Claude account')
   )

@@ -38,6 +38,7 @@ import type {
 } from '../../native-chat/structured-agent-cli-conversations'
 
 export type StructuredAgentSessionCreateIntentInput = {
+  claudeAccountId?: string
   envelope: { sessionId: string; clientOperationId: string }
   worktree: string
   agent: StructuredAgentId
@@ -48,6 +49,7 @@ export type StructuredAgentSessionCreateIntentInput = {
 }
 
 export function resolveCommittedStructuredAgentSessionAdoptionIntent(input: {
+  claudeAccountId?: string
   host: StructuredAgentSessionHost | null
   envelope: { sessionId: string; clientOperationId: string }
   agent: StructuredAgentId
@@ -74,6 +76,9 @@ export function resolveCommittedStructuredAgentSessionAdoptionIntent(input: {
   if (!replay || !agentSessionExecutionLocationsEqual(replay.record.location, input.location)) {
     return null
   }
+  if (input.claudeAccountId && input.claudeAccountId !== replay.record.claudeAccountId) {
+    throw new Error('The requested account does not belong to the source session.')
+  }
   return {
     envelope: {
       sessionId: input.envelope.sessionId,
@@ -85,6 +90,7 @@ export function resolveCommittedStructuredAgentSessionAdoptionIntent(input: {
     provider: input.agent,
     agent: input.agent,
     accountHome: replay.record.accountHome,
+    ...(replay.record.claudeAccountId ? { claudeAccountId: replay.record.claudeAccountId } : {}),
     ...(input.forkFrom
       ? {
           options: {

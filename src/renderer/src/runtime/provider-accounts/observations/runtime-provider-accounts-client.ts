@@ -251,6 +251,19 @@ export async function selectCodexProviderAccount(
   return window.api.codexAccounts.select(selection)
 }
 
+export async function renameClaudeProviderAccount(
+  target: RuntimeClientTarget,
+  accountId: string,
+  label: string | null
+): Promise<ClaudeRateLimitAccountsState> {
+  return target.kind === 'environment'
+    ? callRuntimeRpc<ClaudeRateLimitAccountsState>(target, 'accounts.renameClaude', {
+        accountId,
+        label
+      })
+    : window.api.claudeAccounts.rename({ accountId, label })
+}
+
 export async function removeClaudeProviderAccount(
   target: RuntimeClientTarget,
   accountId: string

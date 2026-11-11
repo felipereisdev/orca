@@ -33,6 +33,7 @@ export function createAgentModelCatalogLookup(
       key: JSON.stringify([bindingKey, identity, passive]),
       launch: {
         agent: params.agent,
+        accountHome: params.accountHome,
         records,
         workspacePath: params.workspacePath,
         inSessionWorkspace: params.inSessionWorkspace,

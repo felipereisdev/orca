@@ -6,6 +6,7 @@ import { Badge } from '../../../ui/badge'
 import { Button } from '../../../ui/button'
 import { ButtonGroup } from '../../../ui/button-group'
 import { Label } from '../../../ui/label'
+import { ClaudeAccountNameInput } from './claude-account-name-input'
 import { ClaudeIcon } from '../../../status-bar/icons'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
@@ -305,7 +306,9 @@ export function renderClaudeAccountsSection(
                         className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-sm font-medium">{account.email}</span>
+                          <span className="truncate text-sm font-medium">
+                            {account.label || account.email}
+                          </span>
                           <Badge
                             variant="outline"
                             className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/70"
@@ -333,6 +336,12 @@ export function renderClaudeAccountsSection(
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
+                        <ClaudeAccountNameInput
+                          account={account}
+                          disabled={isBusy}
+                          model={model}
+                          runtime={accountRuntimeView}
+                        />
                         <ButtonGroup>
                           <Button
                             variant="ghost"

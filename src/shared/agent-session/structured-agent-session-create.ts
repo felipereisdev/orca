@@ -22,6 +22,7 @@ export type StructuredAgentSessionCreateParams = {
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: StructuredAgentId
+  claudeAccountId?: string
   forkFrom?: StructuredAgentSessionForkSource
   resumeFrom?: StructuredAgentSessionResumeSource
   /** Sent only to a host advertising `AGENT_SESSION_CREATE_TAB_ID_RUNTIME_CAPABILITY`. */
@@ -59,6 +60,7 @@ export function structuredAgentSessionCreateParams(args: {
   sessionId: string
   worktree: string
   agent: StructuredAgentId
+  claudeAccountId?: string
   forkFrom?: StructuredAgentSessionForkSource
   resumeFrom?: StructuredAgentSessionResumeSource
   tabId?: string
@@ -76,6 +78,7 @@ export function structuredAgentSessionCreateParams(args: {
   const fields = {
     worktree: args.worktree,
     agent: args.agent,
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
     ...(args.forkFrom ? { forkFrom: args.forkFrom } : {}),
     ...(args.tabId ? { tabId: args.tabId } : {}),

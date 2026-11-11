@@ -107,6 +107,7 @@ async function resolveAndCommitStructuredAgentSessionCreate(
         envelope: params.envelope,
         worktree: params.worktree,
         agent: params.agent,
+        ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
         caller: callerFor(ctx),
         structuredAgentCliSourceEvidence: ctx.structuredAgentCliSourceEvidence,
         ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {}),
@@ -156,6 +157,12 @@ export async function handleStructuredAgentSessionCreateSupport(
   ctx: RpcContext
 ) {
   requireStructuredCreateSupportAdmission(ctx, params.agent)
+  if (params.claudeAccountId) {
+    if (params.agent !== 'claude') {
+      throw new Error('An explicit Claude account requires Claude.')
+    }
+    await ctx.runtime.prepareClaudeAccountLaunch(params.claudeAccountId)
+  }
   const support = await ctx.runtime.getStructuredAgentSessionCreateSupport(
     params.worktree,
     params.agent

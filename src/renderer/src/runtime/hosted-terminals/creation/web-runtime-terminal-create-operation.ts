@@ -85,6 +85,18 @@ export async function createWebRuntimeSessionTerminalResult(
   let createdLeafId: string | undefined
   try {
     const agent = args.launchAgent ?? args.agent
+    if (args.claudeAccountId) {
+      const { runtimeEnvironmentSupportsCapability } =
+        await import('../../rpc/compatibility/runtime-capability-proof')
+      if (
+        !(await runtimeEnvironmentSupportsCapability(
+          environmentId,
+          'agent-session.claude-account.v1'
+        ))
+      ) {
+        throw new Error('Update Orca on this host to choose a Claude account for this session.')
+      }
+    }
     const agentArgsOverride =
       args.agentArgs !== undefined
         ? args.agentArgs
@@ -113,6 +125,7 @@ export async function createWebRuntimeSessionTerminalResult(
                       params: {
                         ...(await keyboardOptions(environmentId)),
                         kind: 'explicit',
+                        ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
                         worktree: toRuntimeWorktreeSelector(args.worktreeId),
                         agent,
                         providerSession: await agentProviderSessionForHostEnsure(
@@ -148,6 +161,7 @@ export async function createWebRuntimeSessionTerminalResult(
                           ...agentSessionCreateRequest({
                             ...args,
                             agent,
+                            claudeAccountId: args.claudeAccountId,
                             agentArgs: args.agentArgs
                           }),
                           ...(args.cwd ? { startupCwd: args.cwd } : {}),

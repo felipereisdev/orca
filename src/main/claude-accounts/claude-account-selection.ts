@@ -128,6 +128,7 @@ export class ClaudeAccountSelection {
   private savedSummary(account: ClaudeManagedAccount): ClaudeManagedAccountSummary {
     return {
       id: account.id,
+      ...(account.label ? { label: account.label } : {}),
       email: account.email,
       managedAuthRuntime: account.managedAuthRuntime ?? 'host',
       wslDistro: account.wslDistro ?? null,
@@ -138,6 +139,24 @@ export class ClaudeAccountSelection {
       updatedAt: account.updatedAt,
       lastAuthenticatedAt: account.lastAuthenticatedAt
     }
+  }
+
+  rename(accountId: string, label: string | null): ClaudeRateLimitAccountsState {
+    this.requireAccount(accountId)
+    const value = label?.trim() || undefined
+    if (value && (value.length > 80 || /[\p{Cc}]/u.test(value))) {
+      throw new Error(
+        'Account name must be at most 80 characters and contain no control characters.'
+      )
+    }
+    this.saveSettings({
+      claudeManagedAccounts: this.store
+        .getSettings()
+        .claudeManagedAccounts.map((account) =>
+          account.id === accountId ? { ...account, label: value } : account
+        )
+    })
+    return this.list()
   }
 
   async remove(accountId: string): Promise<ClaudeRateLimitAccountsState> {

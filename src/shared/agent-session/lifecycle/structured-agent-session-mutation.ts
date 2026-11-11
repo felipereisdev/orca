@@ -4,7 +4,6 @@ import type {
   StructuredAgentSessionForkSource,
   StructuredAgentSessionResumeSource
 } from '../structured-agent-session-create'
-import type { StructuredAgentId } from './agent-session-provider-handle'
 
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -47,7 +46,8 @@ export function structuredAgentSessionDomainFingerprint(input: {
 export function structuredAgentSessionCreateFingerprint(input: {
   sessionId: string
   worktree: string
-  agent: StructuredAgentId
+  agent: string
+  claudeAccountId?: string
   forkFrom?: StructuredAgentSessionForkSource
   resumeFrom?: StructuredAgentSessionResumeSource
   tabId?: string
@@ -61,6 +61,7 @@ export function structuredAgentSessionCreateFingerprint(input: {
     fields: {
       worktree: input.worktree,
       agent: input.agent,
+      ...(input.claudeAccountId ? { claudeAccountId: input.claudeAccountId } : {}),
       // Dropping undefined preserves blank-create digests; resume intent must not replay as blank create.
       resumeFrom: input.resumeFrom,
       forkFrom: input.forkFrom,

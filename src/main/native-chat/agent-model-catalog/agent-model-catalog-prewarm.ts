@@ -8,11 +8,12 @@ import { agentModelCatalogFingerprint } from './agent-model-catalog-fingerprint'
 export async function newChatCatalogKey(
   deps: Pick<AgentModelCatalogServiceDeps, 'resolveAccountHome'>,
   agent: string,
-  folder?: string
+  folder?: string,
+  explicitHome?: AgentSessionAccountHome
 ): Promise<{ fingerprint: string; accountHome: AgentSessionAccountHome } | null> {
   let accountHome: AgentSessionAccountHome
   try {
-    accountHome = await deps.resolveAccountHome(agent)
+    accountHome = explicitHome ?? (await deps.resolveAccountHome(agent))
   } catch {
     return null
   }

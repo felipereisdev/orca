@@ -24,6 +24,7 @@ export async function agentSessionCreateCapabilities(environmentId: string) {
 }
 
 export function agentSessionCreateRequest(args: {
+  claudeAccountId?: string
   worktreeId: string
   agent: TuiAgent
   agentArgs?: string | null
@@ -36,6 +37,7 @@ export function agentSessionCreateRequest(args: {
   return {
     worktree: toRuntimeWorktreeSelector(args.worktreeId),
     agent: args.agent,
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.agentArgs !== undefined ? { agentArgs: args.agentArgs } : {}),
     ...(args.sessionOptions !== undefined
       ? {

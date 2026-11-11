@@ -12,6 +12,7 @@ import {
   CLAUDE_PROFILE_SETUP_FAILED_MESSAGE,
   CLAUDE_USER_CONFIG_DIR_ENV
 } from '../../shared/claude-profile-routing'
+import { prepareExplicitClaudeProfile } from './claude-explicit-profile-launch'
 import { claudeProfileMissing } from './claude-profile-launch-errors'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
@@ -190,6 +191,16 @@ export class ClaudeProfileRouter {
       this.args.refreshWaitMs
     )
     return this.preparation()
+  }
+
+  prepareAccountLaunch(accountId: string): Promise<ClaudeRuntimeAuthPreparation> {
+    return prepareExplicitClaudeProfile(this, accountId, () =>
+      prepareClaudeProfileForLaunch(
+        this.describe(accountId),
+        (profile) => this.setUp(profile),
+        this.args.refreshWaitMs
+      )
+    )
   }
 
   accountHome(accountId: string): string {

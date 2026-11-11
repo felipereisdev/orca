@@ -69,6 +69,7 @@ export type CodexManagedAccountRuntimeSelection = {
 }
 
 export type ClaudeManagedAccount = {
+  label?: string
   id: string
   email: string
   managedAuthPath: string
@@ -84,6 +85,7 @@ export type ClaudeManagedAccount = {
 }
 
 export type ClaudeManagedAccountSummary = {
+  label?: string
   id: string
   email: string
   managedAuthRuntime?: 'host' | 'wsl'

@@ -38,6 +38,7 @@ import type { AgentTerminalLaunchCompletion } from '@/lib/agent-session/launch/s
 
 /** Paired web tabs are host-owned; never create a local tab, and return tabId:null. */
 export async function launchAgentInWebHostTab(args: {
+  claudeAccountId?: string
   agent: TuiAgent
   worktreeId: string
   workspaceExecutionHostId?: LaunchAgentInNewTabArgs['workspaceExecutionHostId']
@@ -129,6 +130,7 @@ export async function launchAgentInWebHostTab(args: {
       ...(args.selectWorktree !== undefined ? { selectWorktree: args.selectWorktree } : {}),
       ...(cwd?.trim() ? { cwd } : {}),
       ...(viewMode ? { viewMode } : {}),
+      ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
       agentSessionKind: 'fresh',
       launchAgent: agent,
       agent,

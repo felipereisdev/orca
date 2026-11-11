@@ -80,7 +80,8 @@ export function useTabBarCreateMenuController({
     worktreeId,
     agentMenu,
     newTabMenuOpen && showAgentLaunchItems,
-    selectedPickerAgent
+    selectedPickerAgent,
+    true
   )
   const pendingNewTabMenuFocusRef = useRef<{ focus: () => void; synchronous?: true } | null>(null)
   const pendingNewTabMenuFocusAnimationRef = useRef<number | null>(null)
@@ -227,9 +228,7 @@ export function useTabBarCreateMenuController({
   })
   const launchAgentFromNewTabEntry = (option: TabAgentLaunchOption) => {
     if (option.row) {
-      return option.setup
-        ? launchAgentRow(option.row, option.setup, option.pickerEntry)
-        : launchAgentRow(option.row)
+      return launchAgentRow(option.row, option.setup, option.pickerEntry)
     }
     return false
   }

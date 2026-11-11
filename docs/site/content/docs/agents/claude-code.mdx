@@ -18,6 +18,14 @@ In any worktree, open a terminal and pick **Claude Code** from the agent combobo
 
 Orca fetches your Claude usage from Anthropic with your existing Claude Code login and shows current usage plus rate-limit proximity in the status bar. See [Usage & rate-limit tracking](/docs/agents/usage-tracking).
 
+## Choose an account for each session
+
+Add your accounts in **Settings → Accounts → Claude** and optionally give them names such as **Personal** and **Work**. The new-tab menu then offers a Claude entry for each saved account, alongside the existing default Claude entry.
+
+Each account entry can open a **Terminal** or **Chat** wherever that surface is supported. Sessions keep their selected account when resumed or restarted, so work and personal accounts can run simultaneously in the same workspace. Changing the default account does not move sessions launched with an explicit account.
+
+Accounts belong to the computer or runtime executing Claude. If an account needs a new login, sign in to that account again; Orca does not substitute another account. Separate account authentication does not fully isolate local conversation history, plugins, or instructions shared by the existing profiles.
+
 ## Account hot-swap
 
 Orca supports multiple Claude accounts and can swap between them in one click, matching the Codex flow. Switching accounts works even with live Claude sessions running — Orca holds the in-progress switch behind a guard so you don't trigger overlapping auth refreshes. See [Hot-swap Codex accounts](/docs/agents/codex-hot-swap) — the Claude flow is identical in shape.

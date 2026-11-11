@@ -1,3 +1,4 @@
+import { isExplicitClaudeAccountRecord } from '../../claude-profile-routing'
 import { isOptionalUsageLimitContinueCancel } from './agent-session-usage-limit-continue'
 import type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
 import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
@@ -118,6 +119,7 @@ export type AgentSessionRecord = {
   provider: string
   providerHandleChain: AgentSessionProviderHandleLink[]
   providerContextBoundary?: AgentSessionProviderContextBoundary
+  claudeAccountId?: string
   accountHome: AgentSessionAccountHome
   /** Optional host-written construction observation; checked independently of record readability. */
   acquiredAccount?: unknown
@@ -312,6 +314,7 @@ export function isPersistedAgentSessionObservationRecord(
       isAgentSessionId(record.sessionId) &&
       isAgentSessionExecutionLocation(record.location) &&
       isStructuredAgentId(record.provider) &&
+      isExplicitClaudeAccountRecord(record) &&
       isAgentSessionAccountHome(record.accountHome) &&
       (record.launchDirectory === undefined ||
         isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&

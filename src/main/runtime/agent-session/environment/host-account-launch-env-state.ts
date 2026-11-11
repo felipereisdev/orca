@@ -1,3 +1,5 @@
+import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
+import { prepareHostClaudeAccountLaunch } from './host-claude-account-launch'
 import { retireAtRestCommandContext } from '../../../native-chat/agent-session-wire/options/at-rest-command-context'
 import { agentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/commit-message-agent-environment'
@@ -110,6 +112,39 @@ export class HostAccountLaunchEnvState {
     if (agent === 'claude' && this.refreshClaudeProfile) {
       await refreshSelectedClaudeProfile(this.refreshClaudeProfile, () => this.hostLaunchEnv)
     }
+  }
+
+  accountSnapshot() {
+    const entries = Object.entries(this.hostLaunchEnv?.claudeAccounts ?? {})
+    return {
+      claude: {
+        accounts: entries.map(([id, account]) => ({
+          id,
+          email: account.email,
+          label: account.label,
+          organizationUuid: account.organizationUuid,
+          organizationName: account.organizationName,
+          needsSignIn: account.needsSignIn,
+          home: account.configDir,
+          authMethod: 'subscription-oauth' as const,
+          managedAuthRuntime: 'host' as const,
+          createdAt: 0,
+          updatedAt: 0,
+          lastAuthenticatedAt: 0
+        })),
+        activeAccountId:
+          entries.find(
+            ([, account]) => account.configDir === this.hostLaunchEnv?.claude.CLAUDE_CONFIG_DIR
+          )?.[0] ?? null
+      },
+      codex: { accounts: [], activeAccountId: null },
+      rateLimits: createEmptyRateLimitState()
+    }
+  }
+
+  async prepareClaudeAccountLaunch(accountId: string) {
+    await this.firstHostLaunchEnv.wait()
+    return prepareHostClaudeAccountLaunch(accountId, this.hostLaunchEnv, this.refreshClaudeProfile)
   }
 
   /** The desktop-selected account env for a process `agent` starts here; empty when none. */

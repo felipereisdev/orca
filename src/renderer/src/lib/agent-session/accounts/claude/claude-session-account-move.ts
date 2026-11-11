@@ -1,3 +1,4 @@
+import { claudePaneAccountId } from './claude-pane-account-selection'
 /** Find sessions affected by account selection; resume preserves the session while launch reads the newly selected account folder. */
 
 /** Find sessions affected by account selection; resume preserves the session while launch reads the newly selected account folder. */
@@ -120,7 +121,11 @@ function* localClaudePanes(
         ) {
           continue
         }
-        const entry = state.agentStatusByPaneKey[makePaneKey(tab.id, leafId)]
+        const paneKey = makePaneKey(tab.id, leafId)
+        if (claudePaneAccountId(state, paneKey)) {
+          continue
+        }
+        const entry = state.agentStatusByPaneKey[paneKey]
         if (entry?.agentType !== 'claude' || entry.structuredHostOwned) {
           continue
         }

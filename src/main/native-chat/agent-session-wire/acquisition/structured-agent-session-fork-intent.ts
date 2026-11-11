@@ -8,6 +8,7 @@ import type { StructuredAgentSessionHost } from '../host/structured-agent-sessio
 import type { AgentSessionAttachParams } from './structured-agent-session-attach'
 
 export async function resolveStructuredAgentSessionForkIntent(input: {
+  claudeAccountId?: string
   host: StructuredAgentSessionHost | null
   forkFrom: { sessionId: string; throughItemId: string }
   agent: StructuredAgentId

@@ -39,6 +39,7 @@ export type AgentStartupPlanInputs = {
 
 /** Share settings-to-launch mapping so hosts cannot omit precedence flags and let configured args override explicit model picks. Keep host, actual PTY shell and launch overrides as parameters. */
 export function resolveAgentStartupPlanInputs(args: {
+  claudeAccountId?: string
   agent: TuiAgent
   settings: AgentStartupSettings
   platform: NodeJS.Platform
@@ -77,7 +78,10 @@ export function resolveAgentStartupPlanInputs(args: {
     agent,
     cmdOverrides: settings.agentCmdOverrides ?? {},
     agentArgs: options.agentArgs ?? null,
-    agentEnv: resolveTuiAgentLaunchEnv(agent, settings, platform),
+    agentEnv: {
+      ...resolveTuiAgentLaunchEnv(agent, settings, platform),
+      ...(args.claudeAccountId ? { ORCA_CLAUDE_ACCOUNT_ID: args.claudeAccountId } : {})
+    },
     platform,
     shell,
     isRemote,

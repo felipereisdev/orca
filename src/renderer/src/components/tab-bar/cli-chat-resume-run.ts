@@ -167,6 +167,7 @@ export async function runCliChatResume(
     const closes = close !== 'keep'
     const verdict = adoptAgentSessionLaunchVerdict({
       route: 'structured-native-chat',
+      ...(source.claudeAccountId ? { claudeAccountId: source.claudeAccountId } : {}),
       requestId: newAgentLaunchRequestId(),
       agent,
       worktreeId: source.workspaceId,

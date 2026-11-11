@@ -83,6 +83,7 @@ export abstract class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithG
           request.placement?.tabId ?? null,
           request.placement?.leafId ?? null,
           request.viewMode ?? null,
+          ...(request.claudeAccountId ? [request.claudeAccountId] : []),
           ...(request.terminalKittyKeyboardProtocol === true ? ['kitty-keyboard'] : [])
         ])
       )
@@ -202,6 +203,7 @@ export abstract class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithG
           launchPreferences: request.launchPreferences,
           // Account env is re-prepared per attempt; exclude from fingerprints and let first spawn win.
           accountEnv: request.accountEnv,
+          claudeAccountId: request.claudeAccountId,
           terminalImageViewerSupported: caller.terminalImageViewerSupported,
           terminalKittyKeyboardProtocol: request.terminalKittyKeyboardProtocol,
           cwd: startupCwd,

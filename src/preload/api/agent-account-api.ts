@@ -57,6 +57,10 @@ export type ClaudeAccountsApi = {
   }) => Promise<ClaudeRateLimitAccountsState>
   /** The pending sign-in's link once Claude hands it over; null if it ends without one. */
   waitForSignInLink: () => Promise<string | null>
+  rename: (args: {
+    accountId: string
+    label: string | null
+  }) => Promise<ClaudeRateLimitAccountsState>
   remove: (args: { accountId: string }) => Promise<ClaudeRateLimitAccountsState>
   select: (args: {
     accountId: string | null

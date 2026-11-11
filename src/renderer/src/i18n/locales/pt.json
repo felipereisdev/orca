@@ -22279,7 +22279,9 @@
         "reasonSharedSession": "Também aberta em outro painel",
         "sharedOne": "1 sessão do Claude permanece em {{previous}} porque outro painel tem a mesma conversa aberta. Reiniciar pode reabrir a conversa do outro painel.",
         "sharedOther": "{{count}} sessões do Claude permanecem em {{previous}} porque outro painel tem a mesma conversa aberta. Reiniciar pode reabrir a conversa do outro painel."
-      }
+      },
+      "accountName": "Nome da conta",
+      "launchAccount": "Claude ({{account}})"
     },
     "managedData": {
       "description": "Adicione contas executando este comando em um terminal no host do Orca. A seleção se aplica a novos agentes iniciados explicitamente nesse host; relay SSH direto e agentes iniciados no WSL hospedado no Windows usam suas próprias credenciais.",
@@ -22315,7 +22317,8 @@
         "failed": "Falha no login. Tente novamente."
       }
     },
-    "remoteScopeAccountsAddHere": "Mostrando contas gerenciadas por {{value0}}. Novas contas são conectadas lá; você conclui no navegador deste dispositivo."
+    "remoteScopeAccountsAddHere": "Mostrando contas gerenciadas por {{value0}}. Novas contas são conectadas lá; você conclui no navegador deste dispositivo.",
+    "signInAgainSettings": "Inicie sessão novamente em Definições → Contas"
   },
   "fileSearch": {
     "failed": "A busca falhou. Tente novamente.",

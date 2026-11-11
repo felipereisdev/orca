@@ -9,6 +9,21 @@ export const HostAccountLaunchEnvParams = z
     wslDistro: z.string().trim().min(1).max(256),
     /** For a `claude` the host starts directly: the selected account's CLAUDE_CONFIG_DIR. */
     claude: AgentLaunchAccountEnv,
+    claudeAccounts: z
+      .record(
+        z.string().regex(/^[a-zA-Z0-9_-]+$/),
+        z
+          .object({
+            configDir: z.string().min(1).max(4096),
+            email: z.string(),
+            label: z.string().max(80).optional(),
+            organizationUuid: z.string().nullish(),
+            organizationName: z.string().nullish(),
+            needsSignIn: z.literal(true).optional()
+          })
+          .strict()
+      )
+      .optional(),
     /** For every other process: the pointer a typed `claude` follows, plus CODEX_HOME. */
     terminal: AgentLaunchAccountEnv
   })

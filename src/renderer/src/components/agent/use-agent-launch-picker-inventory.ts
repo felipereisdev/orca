@@ -1,3 +1,5 @@
+import { useProviderAccountList } from '../status-bar/use-provider-account-list'
+import { buildClaudeAccountPickerEntries } from './claude-account-picker-entries'
 import { useAppStateView, useAppStateViewActive } from '@/store/retained-views/app-state-view'
 import { hostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
@@ -54,7 +56,8 @@ export function useAgentLaunchPickerInventorySource(
   worktreeId: string | undefined,
   model: NewTabAgentMenuModel,
   open: boolean,
-  selected?: AgentPickerEntry['agent']
+  selected?: AgentPickerEntry['agent'],
+  accountVariants = false
 ): AgentPickerInventorySource {
   const store = useAppStateView()
   const viewActive = useAppStateViewActive()
@@ -64,16 +67,30 @@ export function useAgentLaunchPickerInventorySource(
   }, [selected])
   const context = model.state === 'settled' ? model.pickerContext : undefined
   const settings = context ? context.settings : store.getState().settings
-  const executionHostId =
-    context?.executionHostId ??
-    buildAgentLaunchRouteInput(store.getState(), {
-      agent: 'claude',
-      workspace: context?.workspace ?? {
-        kind: worktreeId ? workspaceKindForWorktreeId(worktreeId) : 'floating',
-        ...(worktreeId ? { worktreeId } : {})
-      }
-    }).executionHostId
+  const route = buildAgentLaunchRouteInput(store.getState(), {
+    agent: 'claude',
+    workspace: context?.workspace ?? {
+      kind: worktreeId ? workspaceKindForWorktreeId(worktreeId) : 'floating',
+      ...(worktreeId ? { worktreeId } : {})
+    }
+  })
+  const executionHostId = context?.executionHostId ?? route.executionHostId
   const target = structuredAgentSessionTargetForHost(executionHostId)
+  const initialAccounts = useMemo(() => ({ accounts: [], activeAccountId: null }), [])
+  const accountList = useProviderAccountList(
+    'claude',
+    target ?? { kind: 'local' },
+    `${context?.key ?? ''}:${open}`,
+    initialAccounts,
+    open
+  )
+  const projectRuntime = route.projectRuntime
+  const accountTarget =
+    target?.kind === 'local' &&
+    projectRuntime?.status === 'resolved' &&
+    projectRuntime.runtime.kind === 'wsl'
+      ? { runtime: 'wsl' as const, wslDistro: projectRuntime.runtime.distro }
+      : { runtime: 'host' as const, wslDistro: null }
   const registeredAgents = readHostStructuredAgentsForRuntime(
     executionHostId,
     target?.kind === 'local' ? null : context?.runtimeId
@@ -136,6 +153,7 @@ export function useAgentLaunchPickerInventorySource(
         worktreeId,
         selector,
         executionHostId,
+        accountVariants ? accountList.accounts : null,
         model.state === 'settled' ? model.rows : [],
         model.state === 'settled' ? model.detection.detectedIds : [],
         model.state === 'settled' ? model.defaultTuiAgent : undefined,
@@ -148,7 +166,16 @@ export function useAgentLaunchPickerInventorySource(
           nativeChatPermissionMode: settings.nativeChatPermissionMode
         }
       ]),
-    [context, worktreeId, selector, executionHostId, model, settings]
+    [
+      context,
+      worktreeId,
+      selector,
+      executionHostId,
+      model,
+      settings,
+      accountVariants,
+      accountList.accounts
+    ]
   )
   const build = (defaults: AgentPickerDefaultSettings | null | undefined) =>
     model.state === 'settled'
@@ -158,16 +185,22 @@ export function useAgentLaunchPickerInventorySource(
           (agent) => agentPickerChoiceSeeds(agent, defaults),
           formatAgentTypeLabel,
           model.defaultTuiAgent
-        ).map((entry) => ({
-          ...entry,
-          ...(!target ||
-          !entry.surfaces.length ||
-          (registeredAgents &&
-            !registeredAgents.some(({ agent }) => agent === entry.agent) &&
-            !getAgentSessionOptionLaunchCatalog(entry.agent))
-            ? { catalogRead: 'unsupported' as const }
-            : {})
-        }))
+        )
+          .flatMap((entry) =>
+            accountVariants && target
+              ? buildClaudeAccountPickerEntries(entry, accountList.accounts, accountTarget)
+              : [entry]
+          )
+          .map((entry) => ({
+            ...entry,
+            ...(!target ||
+            !entry.surfaces.length ||
+            (registeredAgents &&
+              !registeredAgents.some(({ agent }) => agent === entry.agent) &&
+              !getAgentSessionOptionLaunchCatalog(entry.agent))
+              ? { catalogRead: 'unsupported' as const }
+              : {})
+          }))
       : []
   const fallback = useMemo(
     () =>
@@ -235,6 +268,7 @@ export function useAgentLaunchPickerInventorySource(
             {
               ...(selector ? { worktree: selector } : {}),
               agent: entry.agent,
+              ...(entry.claudeAccountId ? { claudeAccountId: entry.claudeAccountId } : {}),
               ...(waitForListing ? { waitForListing } : {})
             }
           ),
@@ -246,7 +280,8 @@ export function useAgentLaunchPickerInventorySource(
             seedOptions?: Record<string, string>
           }>(target, 'agentSession.createSupport', {
             worktree: selector,
-            agent: entry.agent
+            agent: entry.agent,
+            ...(entry.claudeAccountId ? { claudeAccountId: entry.claudeAccountId } : {})
           })
           const parsed = parseStructuredLaunchSeedOptions(support?.seedOptions)
           if (!parsed) {

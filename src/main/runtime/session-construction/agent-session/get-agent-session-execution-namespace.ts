@@ -202,6 +202,7 @@ export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends O
       launchConfig: startup.launchConfig,
       startupCommandDelivery: startup.startupCommandDelivery,
       launchAgent: request.agent,
+      claudeAccountId: request.claudeAccountId,
       // Host-built resumes must name their session so readers can address it.
       resumeProviderSession: identity.providerSession,
       ...(request.resumeOrigin ? { resumeOrigin: request.resumeOrigin } : {}),

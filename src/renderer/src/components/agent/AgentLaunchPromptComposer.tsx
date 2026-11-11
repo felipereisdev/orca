@@ -36,7 +36,8 @@ export function agentLaunchPromptScopeKey(entry: AgentPickerEntry): string {
   return nativeChatLaunchPromptDraftScopeKey(
     entry.worktreeId ?? '',
     entry.agent,
-    entry.rows[0]?.executionHostId ?? 'local'
+    entry.rows[0]?.executionHostId ?? 'local',
+    entry.claudeAccountId
   )
 }
 

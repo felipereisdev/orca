@@ -118,6 +118,9 @@ function createClaudeAdapter(
       CLAUDE_STRUCTURED_AGENT,
       structuredAgentLaunchSources(context),
       claudeStructuredLaunchPart({
+        ...(deps.prepareClaudeAccountLaunch
+          ? { prepareClaudeAccountLaunch: deps.prepareClaudeAccountLaunch }
+          : {}),
         resolveLaunchArgs: () => deps.resolveLaunchArgs('claude'),
         ...(deps.resolveClaudeCommand ? { resolveCommand: deps.resolveClaudeCommand } : {}),
         resolveAuthPolicy: deps.resolveClaudeAuthPolicy,

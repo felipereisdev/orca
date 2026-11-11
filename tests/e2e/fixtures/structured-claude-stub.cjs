@@ -3,11 +3,22 @@ const { randomUUID } = require('node:crypto')
 const fs = require('node:fs')
 
 const [launchLog, ...args] = process.argv.slice(2)
-fs.appendFileSync(launchLog, `${JSON.stringify({ pid: process.pid, args })}\n`)
+fs.appendFileSync(
+  launchLog,
+  `${JSON.stringify({
+    pid: process.pid,
+    args,
+    accountId: process.env.ORCA_CLAUDE_ACCOUNT_ID,
+    configDir: process.env.CLAUDE_CONFIG_DIR
+  })}\n`
+)
 
 if (args.includes('--version') || args.includes('-v')) {
   process.stdout.write('2.1.280 (Claude Code)\n')
   process.exit(0)
+}
+if (process.env.ORCA_CLAUDE_ACCOUNT_ID && !args.includes('stream-json')) {
+  process.stdout.write(`ACCOUNT:${process.env.ORCA_CLAUDE_ACCOUNT_ID}\n`)
 }
 
 function argValue(name) {

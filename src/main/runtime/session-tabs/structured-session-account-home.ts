@@ -6,6 +6,7 @@ import { agentWorkspaceTrustDecisionForWorkspace } from '../../agent-launch/trus
 import { OrcaRuntimeWithStructuredSessionCliWriterHost } from './structured-session-cli-writer-host'
 import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/agent-session-account-home'
 import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
+import { agentSessionRefusalError } from '../../../shared/agent-session/failures/agent-session-wire-refusals'
 
 export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRuntimeWithStructuredSessionCliWriterHost {
   /** Resolve account home through this host's agent registration; null means unregistered and create refuses. */
@@ -54,6 +55,36 @@ export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRu
       )
   }
 
+  /** Resolve catalog account home through the same host create-intent resolver when no session record exists. */
+  async resolveStructuredAgentAccountHome(
+    agent: StructuredAgentId
+  ): Promise<AgentSessionAccountHome> {
+    const resolveAccountHome = this.structuredAgentAccountHomeResolver(agent, '', 'read')
+    if (!resolveAccountHome) {
+      throw agentSessionRefusalError('structured_agent_session_unsupported', {
+        reason: 'hostUnsupported'
+      })
+    }
+    // A read, not a launch: only the account push is awaited, never a folder refresh.
+    await this.accounts.prepareHostAgentLaunch(null)
+    const launchEnv = this.structuredAgentLaunchEnv(agent, this.requireStore().getSettings())
+    return resolveAccountHome({ launchEnv, location: null })
+  }
+
+  protected async resolveExplicitClaudeAccountHome(
+    agent: string,
+    accountId?: string
+  ): Promise<AgentSessionAccountHome | null> {
+    if (!accountId) {
+      return null
+    }
+    if (agent !== 'claude') {
+      throw new Error('An explicit Claude account requires Claude.')
+    }
+    const prepared = await this.accounts.prepareClaudeAccountLaunch(accountId)
+    return { variable: 'CLAUDE_CONFIG_DIR', path: prepared.configDir }
+  }
+
   /** The account home a start of this chat would launch under now, read without side effects; null
    *  for an agent whose chats keep the account they were created on. `identity` names it before its
    *  folder exists; the default read checks availability. */
@@ -61,6 +92,13 @@ export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRu
     record: AgentSessionRecord,
     purpose: 'read' | 'identity' = 'read'
   ): Promise<AgentSessionAccountHome | null> {
+    if (record.claudeAccountId) {
+      if (record.provider !== 'claude') {
+        throw new Error('An explicit Claude account requires Claude.')
+      }
+      const prepared = await this.accounts.prepareClaudeAccountLaunch(record.claudeAccountId)
+      return { variable: 'CLAUDE_CONFIG_DIR', path: prepared.configDir }
+    }
     const { provider, location } = record
     if (!structuredAgentRuntimeMetadata(provider)?.launchFollowsSelection?.()) {
       return null
@@ -75,6 +113,13 @@ export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRu
     record: AgentSessionRecord,
     launchDirectory: string
   ): Promise<AgentSessionAccountHome | null> {
+    if (record.claudeAccountId) {
+      if (record.provider !== 'claude') {
+        throw new Error('An explicit Claude account requires Claude.')
+      }
+      const prepared = await this.accounts.prepareClaudeAccountLaunch(record.claudeAccountId)
+      return { variable: 'CLAUDE_CONFIG_DIR', path: prepared.configDir }
+    }
     const { provider, location } = record
     if (!structuredAgentRuntimeMetadata(provider)?.launchFollowsSelection?.()) {
       return null

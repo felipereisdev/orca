@@ -110,7 +110,19 @@ export const STRUCTURED_AGENT_SESSION_OPTIONS_READ_METHODS = [
             ? undefined
             : ctx.runtime.resolveStructuredAgentCatalogWorkspacePath(worktree)
         const later = !waits && isFloatingWorkspaceSelector(worktree)
+        if (params.claudeAccountId && params.agent !== 'claude') {
+          throw new Error('An explicit Claude account requires Claude.')
+        }
+        const explicitAccount = params.claudeAccountId
+          ? await ctx.runtime.prepareClaudeAccountLaunch(params.claudeAccountId)
+          : undefined
+        if (record && params.claudeAccountId && record.claudeAccountId !== params.claudeAccountId) {
+          throw new Error('The requested account does not belong to this session.')
+        }
         const request = {
+          ...(explicitAccount
+            ? { accountHome: { variable: 'CLAUDE_CONFIG_DIR', path: explicitAccount.configDir } }
+            : {}),
           ...params,
           ...scope,
           ...(waits && resolving ? { deadline } : {}),

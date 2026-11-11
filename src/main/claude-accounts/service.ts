@@ -100,6 +100,10 @@ export class ClaudeAccountService {
     return this.serializeMutation(() => this.registration.cancel(signIn))
   }
 
+  renameAccount(accountId: string, label: string | null): Promise<ClaudeRateLimitAccountsState> {
+    return this.serializeMutation(async () => this.selection.rename(accountId, label))
+  }
+
   removeAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
     this.supersedePendingLogin()
     return this.serializeMutation(() => this.selection.remove(accountId))

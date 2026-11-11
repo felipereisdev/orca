@@ -61,16 +61,20 @@ export function structuredLaunchIdentity(
     resumeFrom?: StructuredAgentSessionResumeSource
     forkFrom?: StructuredAgentSessionForkSource
     executionHostId?: string
+    claudeAccountId?: string
   } = {}
 ): string {
   const { resumeFrom, forkFrom, executionHostId = LOCAL_EXECUTION_HOST_ID } = scope
+  const accountScope = scope.claudeAccountId
+    ? `:account:${executionHostId}:${scope.claudeAccountId}`
+    : ''
   if (forkFrom) {
     return `${agent}:${worktreeId}:fork:${executionHostId}:${forkFrom.sessionId}:${forkFrom.throughItemId}`
   }
   // A conversation id names a transcript on one host; never join a resume running on another.
   return resumeFrom
     ? `${agent}:${worktreeId}:resume:${executionHostId}:${resumeFrom.providerSessionId}`
-    : `${agent}:${worktreeId}`
+    : `${agent}:${worktreeId}${accountScope}`
 }
 
 export function getStructuredAgentSessionLaunchLifecycle(

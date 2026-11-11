@@ -23,6 +23,9 @@ export type AgentPickerSurface = 'chat' | 'terminal'
 export type AgentPickerDraftOwner = object
 export type AgentPickerModel = AgentSessionModelOption & { isLegacy?: true; hidden?: true }
 export type AgentPickerEntry = {
+  entryId?: string
+  claudeAccountId?: string
+  accountNeedsSignIn?: true
   textGeneration?: TextActionPickerCatalog
   agent: TuiAgent
   label: string
@@ -44,6 +47,7 @@ export type AgentPickerEntry = {
   structuredDefaultsPending?: boolean
 }
 export type AgentPickerDraft = {
+  claudeAccountId?: string
   agent: TuiAgent
   surface: AgentPickerSurface
   choices: AgentDedicatedChoices
@@ -68,7 +72,13 @@ export function agentPickerDraft(
   entry: AgentPickerEntry,
   surface = entry.defaultSurface
 ): AgentPickerDraft {
-  return { agent: entry.agent, surface, choices: {}, arguments: undefined }
+  return {
+    agent: entry.agent,
+    surface,
+    choices: {},
+    arguments: undefined,
+    ...(entry.claudeAccountId ? { claudeAccountId: entry.claudeAccountId } : {})
+  }
 }
 
 export function editAgentPickerDraft(

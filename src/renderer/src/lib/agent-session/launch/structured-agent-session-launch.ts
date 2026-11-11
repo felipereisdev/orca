@@ -4,7 +4,7 @@ import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-ag
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import {
   abandonStructuredAgentSessionLaunchIntent,
-  createStructuredAgentSessionLaunchIntent,
+  createStructuredAgentLaunchFromOptions,
   retryStructuredAgentSessionLaunchIntent
 } from '@/lib/launch-structured-agent-session'
 import {
@@ -197,15 +197,7 @@ function structuredAgentLaunchState(
     return joined
   }
 
-  const intent = createStructuredAgentSessionLaunchIntent(
-    worktreeId,
-    agent,
-    options.executionHostId,
-    options.resumeFrom,
-    options.hostSeedOptions,
-    options.activate,
-    options.forkFrom
-  )
+  const intent = createStructuredAgentLaunchFromOptions(worktreeId, agent, options)
   // A fork inherits its source's options.
   intent.explicitLaunchOptions =
     !options.forkFrom && options.launchOptions ? { ...options.launchOptions } : undefined

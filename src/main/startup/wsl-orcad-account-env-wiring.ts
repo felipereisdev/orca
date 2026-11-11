@@ -1,6 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { withClaudeProfileTerminalEnv } from '../claude-accounts/claude-profile-installed-router'
-import { getSelectedClaudeAccountIdForTarget } from '../claude-accounts/runtime-selection'
+import {
+  getClaudeWslSelectionKey,
+  getSelectedClaudeAccountIdForTarget
+} from '../claude-accounts/runtime-selection'
 import { getSelectedCodexAccountIdForTarget } from '../codex-accounts/runtime-selection'
 import type { Store } from '../persistence/loading-store/store'
 import { installWslOrcadAccountEnvDependencies } from '../wsl/orcad/wsl-orcad-account-env'
@@ -45,6 +48,34 @@ export function installWslOrcadAccountShim(store: Pick<Store, 'getSettings'>): v
         throw new Error('Claude account service is not initialized')
       }
       return auth.prepareForClaudeLaunch(target)
+    },
+    claudeAccounts: async (distro) => {
+      const accounts = state.claudeAccounts?.listAccounts().accounts ?? []
+      const entries = accounts.filter(
+        (account) =>
+          account.managedAuthRuntime === 'wsl' &&
+          getClaudeWslSelectionKey(account.wslDistro) === getClaudeWslSelectionKey(distro)
+      )
+      return Object.fromEntries(
+        await Promise.all(
+          entries.map(async (account) => {
+            const folder = await state.claudeRuntimeAuth!.prepareAccountFolder(account.id, {
+              runtime: 'wsl',
+              wslDistro: distro
+            })
+            return [
+              account.id,
+              {
+                configDir: folder.configDir,
+                email: account.email,
+                ...(account.label ? { label: account.label } : {}),
+                ...(account.organizationUuid ? { organizationUuid: account.organizationUuid } : {}),
+                ...(account.needsSignIn ? { needsSignIn: true as const } : {})
+              }
+            ]
+          })
+        )
+      )
     },
     claudeTerminalEnv: (target) => withClaudeProfileTerminalEnv({}, target),
     prepareCodexHome: async (target) => {

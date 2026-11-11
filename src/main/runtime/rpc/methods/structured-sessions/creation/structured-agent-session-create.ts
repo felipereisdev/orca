@@ -1,3 +1,4 @@
+import { structuredAgentSessionCreateFingerprint } from '../../../../../../shared/agent-session/lifecycle/structured-agent-session-mutation'
 import type { StructuredSessionSurface } from '../../../../agent-session/structured-agent-session-close'
 import { structuredAgentSessionTabId } from '../../../../../../shared/agent-session/view/structured-agent-session-projection'
 import { seededPermissionMode } from '../../../../../../shared/native-chat/input/native-chat-session-option-defaults'
@@ -56,6 +57,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: string
+  claudeAccountId?: string
   forkFrom?: { sessionId: string; throughItemId: string }
   resumeFrom?: StructuredAgentSessionResumeSource
   tabId?: string
@@ -63,19 +65,9 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
   optionsMode?: 'replace-model-selection'
   options?: Readonly<Record<string, string>>
 }): string {
-  return computeAgentSessionPayloadFingerprint({
-    method: 'agentSession.create',
-    sessionId: params.envelope.sessionId,
-    fields: {
-      worktree: params.worktree,
-      agent: params.agent,
-      resumeFrom: params.resumeFrom,
-      forkFrom: params.forkFrom,
-      tabId: params.tabId,
-      firstMessage: params.firstMessage,
-      optionsMode: params.optionsMode,
-      options: params.options
-    }
+  return structuredAgentSessionCreateFingerprint({
+    ...params,
+    sessionId: params.envelope.sessionId
   })
 }
 
@@ -87,6 +79,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: StructuredAgentId
+  claudeAccountId?: string
   caller: StructuredAgentSessionCaller
   forkFrom?: { sessionId: string; throughItemId: string }
   resumeFrom?: StructuredAgentSessionResumeSource
@@ -120,6 +113,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     envelope: args.envelope,
     worktree: args.worktree,
     agent: args.agent,
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     callerKey: args.caller.callerKey,
     structuredAgentCliSourceEvidence,
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
@@ -291,6 +285,7 @@ export async function createStructuredAgentSessionForWorktree(args: {
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: StructuredAgentId
+  claudeAccountId?: string
   activate: boolean
   optionsMode?: 'replace-model-selection'
   options?: Readonly<Record<string, string>>

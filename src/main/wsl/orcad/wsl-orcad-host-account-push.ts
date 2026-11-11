@@ -1,4 +1,5 @@
 /** Push selected distro account homes on connect/selection changes so host-initiated CLI, automation, chat and text-generation launches use the same account. */
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../shared/agent-session/agent-session-create-capabilities'
 import type { HostAccountLaunchEnv } from '../../../shared/agent-launch/startup/host-account-launch-env'
 import { HOST_ACCOUNT_LAUNCH_ENV_RUNTIME_CAPABILITY } from '../../../shared/orcad-runtime-capabilities'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
@@ -60,6 +61,12 @@ async function pushOnce(
     return
   }
   const launchEnv = await prepareWslOrcadHostLaunchEnv(push.distro, dependencies)
+  if (
+    dependencies.claudeAccounts &&
+    (await push.hostSupports(CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY)) === 'supported'
+  ) {
+    launchEnv.claudeAccounts = await dependencies.claudeAccounts(push.distro)
+  }
   const response = await push.call('accounts.setHostLaunchEnv', launchEnv)
   if (!response.ok) {
     throw new Error(response.error.message)

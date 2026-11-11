@@ -53,6 +53,16 @@ export class ClaudeRuntimeAuthService {
     return wsl ? wsl.router.prepareLaunch(wsl.distro) : this.router.prepareLaunch()
   }
 
+  prepareForClaudeAccountLaunch(
+    accountId: string,
+    target?: ClaudeAccountSelectionTarget
+  ): Promise<ClaudeRuntimeAuthPreparation> {
+    const wsl = this.wslRouteFor(target)
+    return wsl
+      ? wsl.router.prepareAccountLaunch(wsl.distro, accountId)
+      : this.router.prepareAccountLaunch(accountId)
+  }
+
   async prepareForRateLimitFetch(
     target?: ClaudeAccountSelectionTarget
   ): Promise<ClaudeRuntimeAuthPreparation> {

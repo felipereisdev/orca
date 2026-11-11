@@ -1,3 +1,4 @@
+import { AccountHome, ClaudeAccountIdParam } from './structured-agent-session-account-params'
 import { AgentSessionSelectionSchema } from '../agent-session/options/agent-session-execution-options'
 import {
   SendBody,
@@ -81,12 +82,7 @@ export const ExecutionLocation = z
   })
   .strict()
 
-export const AccountHome = z
-  .object({
-    variable: z.enum(['CLAUDE_CONFIG_DIR', 'CODEX_HOME']),
-    path: z.string().min(1).max(4096)
-  })
-  .strict()
+export { AccountHome } from './structured-agent-session-account-params'
 
 /** Only Claude/Codex handles have wire forms; other agents attach through host-resolved intent. */
 export const AttachParams = z
@@ -105,6 +101,7 @@ export const CreateSupportParams = z
   .object({
     worktree: Identifier('Invalid worktree selector'),
     agent: StructuredAgent,
+    claudeAccountId: ClaudeAccountIdParam.optional(),
     resumeFrom: ResumeWriterAdmission.optional()
   })
   .strict()
@@ -134,6 +131,7 @@ export const CreateIntentParams = z
     envelope: MutationEnvelope,
     worktree: Identifier('Invalid worktree selector'),
     agent: StructuredAgent,
+    claudeAccountId: ClaudeAccountIdParam.optional(),
     ...SOURCE_FIELDS,
     ...CREATE_TAB_FIELDS,
     /** Both fields require `agentSession.create.message.v1` on the executing host. */
@@ -268,6 +266,7 @@ export const AvailabilityParams = z.strictObject({})
  * Send waitForListing only after the host reports one in progress; old hosts refuse the key. */
 export const ModelCatalogParams = z.strictObject({
   agent: StructuredAgent,
+  claudeAccountId: ClaudeAccountIdParam.optional(),
   sessionId: SessionId.optional(),
   worktree: Identifier('Invalid worktree selector').optional(),
   waitForListing: z.boolean().optional(),

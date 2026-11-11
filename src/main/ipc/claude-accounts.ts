@@ -18,6 +18,11 @@ export function registerClaudeAccountHandlers(claudeAccounts: ClaudeAccountServi
       claudeAccounts.reauthenticateAccount(args.accountId, args.copyLink)
   )
   ipcMain.handle('claudeAccounts:waitForSignInLink', () => claudeAccounts.waitForSignInLink())
+  ipcMain.handle(
+    'claudeAccounts:rename',
+    (_event, args: { accountId: string; label: string | null }) =>
+      claudeAccounts.renameAccount(args.accountId, args.label)
+  )
   ipcMain.handle('claudeAccounts:remove', (_event, args: { accountId: string }) =>
     claudeAccounts.removeAccount(args.accountId)
   )

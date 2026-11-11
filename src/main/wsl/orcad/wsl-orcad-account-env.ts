@@ -1,3 +1,4 @@
+import type { HostAccountLaunchEnv } from '../../../shared/agent-launch/startup/host-account-launch-env'
 /** D10: desktop prepares distro-local account homes for orcad. Patch caller-built launches/plain shells, agent.launch accountEnv, and capability-advertised agent-session creates; leave bare-command Settings defaults untouched. */
 import { errorMessage } from '../../../shared/error-message'
 import { posix } from 'node:path'
@@ -18,6 +19,7 @@ import {
 export type WslAccountTarget = { runtime: 'wsl'; wslDistro: string }
 
 export type WslOrcadAccountEnvDependencies = {
+  claudeAccounts?: (distro: string) => Promise<NonNullable<HostAccountLaunchEnv['claudeAccounts']>>
   /** `ClaudeRuntimeAuthService.prepareForClaudeLaunch`: waits for a first account setup. */
   prepareClaudeLaunch(target: WslAccountTarget): Promise<ClaudeRuntimeAuthPreparation>
   /** The pointer-only env a non-Claude pane gets, so a typed `claude` still follows the account. */

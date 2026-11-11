@@ -189,7 +189,7 @@ export type AgentSessionSubscribeEvent =
 // ─── Status feed ────────────────────────────────────────────────────────────
 
 /** Host-projected list status avoids client transcript replay; older hosts lack this additive method. */
-export type AgentSessionStatusSummary = {
+export type AgentSessionStatusSummary = Pick<AgentSessionRecord, 'claudeAccountId'> & {
   usageLimitContinue?: {
     turnItemId: string
     resetsAt: number

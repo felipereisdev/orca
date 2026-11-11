@@ -91,6 +91,7 @@ function openAgentInNewTab(
   // Resolve structured ownership first; only terminal routes plan CLI arguments.
   const route = routeNewTabLaunch(store, args, {
     agent,
+    claudeAccountId: args.claudeAccountId,
     requestedSurface: args.requestedSurface,
     preferredSurface: args.preferredSurface,
     selectedExecutionHostId: args.selectedExecutionHostId,
@@ -166,6 +167,7 @@ function openAgentInNewTab(
       base: resolveAgentStartupPlanInputs({
         agent,
         settings: { ...store.settings, agentLaunchChoices },
+        claudeAccountId: args.claudeAccountId,
         agentArgs,
         sessionOptions,
         sessionOptionsYieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
@@ -187,6 +189,7 @@ function openAgentInNewTab(
       agent,
       worktreeId,
       environmentId: runtimeEnvironmentId,
+      claudeAccountId: args.claudeAccountId,
       workspaceExecutionHostId: args.workspaceExecutionHostId,
       groupId,
       cwd: initialCwd,

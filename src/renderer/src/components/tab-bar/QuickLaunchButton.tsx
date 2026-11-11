@@ -106,6 +106,9 @@ export function useTabAgentMenuLaunch({
             }
           : {}),
         agent,
+        ...((pickerEntry?.claudeAccountId ?? draft?.claudeAccountId)
+          ? { claudeAccountId: pickerEntry?.claudeAccountId ?? draft?.claudeAccountId }
+          : {}),
         ...(draft
           ? agentPickerFreshLaunchInputs(
               draft,
@@ -118,6 +121,7 @@ export function useTabAgentMenuLaunch({
           : {}),
         worktreeId,
         groupId,
+        ...(pickerEntry?.claudeAccountId ? { quickCommandLabel: pickerEntry.label } : {}),
         // A caller's prompt (notes) owns the launch; otherwise the picker panel's typed one.
         ...(prompt !== undefined ? { prompt } : draft?.prompt ? { prompt: draft.prompt } : {}),
         ...(promptDelivery !== undefined ? { promptDelivery } : {}),

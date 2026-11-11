@@ -81,6 +81,7 @@ export type StructuredAgentModelCatalogDeps = Pick<
   | 'resolveAgentAccountHome'
   | 'resolveLaunchArgs'
   | 'resolveClaudeAuthPolicy'
+  | 'prepareClaudeAccountLaunch'
   | 'resolveClaudeCommand'
   | 'resolveCodexCommand'
   | 'resolveCodexAccountKind'

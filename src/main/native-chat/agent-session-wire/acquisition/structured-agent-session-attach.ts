@@ -47,6 +47,7 @@ export type AgentSessionAttachParams = {
   location: AgentSessionExecutionLocation
   provider: StructuredAgentId
   agent: StructuredAgentId
+  claudeAccountId?: string
   accountHome: AgentSessionAccountHome
   /** Retain native in params because fingerprints include it. */
   runtimeKind: 'native'
@@ -92,6 +93,7 @@ export function attachFingerprintFields(params: AgentSessionAttachParams): Recor
     provider: params.provider,
     agent: params.agent,
     accountHome: params.accountHome,
+    ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
     runtimeKind: params.runtimeKind,
     providerHandle: params.providerHandle,
     // Adoption changes identity; transcript location is transient and excluded.
@@ -212,6 +214,7 @@ export function reserveRequestFor(input: {
     location: params.location,
     provider: params.provider,
     accountHome: params.accountHome,
+    ...(params.claudeAccountId ? { claudeAccountId: params.claudeAccountId } : {}),
     ...(params.options ? { options: params.options, models: input.models } : {}),
     ...(params.envelope.expectedRuntimeFence === null && params.surfaceTabId
       ? { surfaceTabId: params.surfaceTabId }

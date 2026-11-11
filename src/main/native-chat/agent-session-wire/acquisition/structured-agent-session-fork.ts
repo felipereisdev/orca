@@ -121,6 +121,7 @@ export async function prepareStructuredAgentSessionFork(
     provider: input.agent,
     agent: input.agent,
     accountHome: record.accountHome,
+    ...(record.claudeAccountId ? { claudeAccountId: record.claudeAccountId } : {}),
     runtimeKind: 'native',
     options: {
       ...record.options,

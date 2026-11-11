@@ -90,3 +90,24 @@ function isAuthLikeCustomHeaders(value: string | undefined): boolean {
   }
   return /authorization|x-api-key|api-key|bearer/i.test(value)
 }
+
+export function explicitClaudeAccountEnv(
+  env: Record<string, string>,
+  accountId: string,
+  patch: ClaudeEnvPatch
+): Record<string, string> {
+  const result = applyClaudeEnvPatch({ ...env }, patch, { stripAuthEnv: true })
+  delete result.ORCA_CLAUDE_PROFILE_POINTER
+  delete result.ORCA_CLAUDE_INJECTED_CONFIG_DIR
+  delete result.ORCA_CLAUDE_USER_CONFIG_DIR
+  result.ORCA_CLAUDE_ACCOUNT_ID = accountId
+  return result
+}
+
+export const CLAUDE_EXPLICIT_ENV_DELETIONS = [
+  ...CLAUDE_AUTH_ENV_VARS,
+  'ANTHROPIC_CUSTOM_HEADERS',
+  'ORCA_CLAUDE_PROFILE_POINTER',
+  'ORCA_CLAUDE_INJECTED_CONFIG_DIR',
+  'ORCA_CLAUDE_USER_CONFIG_DIR'
+] as const

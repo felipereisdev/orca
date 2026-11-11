@@ -10,6 +10,7 @@ export type LaunchAgentInNewTabArgs = LaunchAgentInNewTabRequest & {
   requestedSurface?: AgentSessionLaunchRequest['requestedSurface']
   preferredSurface?: AgentSessionLaunchRequest['preferredSurface']
   selectedExecutionHostId?: AgentSessionLaunchRequest['selectedExecutionHostId']
+  claudeAccountId?: string
   agent: TuiAgent
   worktreeId: string
   /** Workspace owner captured by the action, independent of selection after an await. */

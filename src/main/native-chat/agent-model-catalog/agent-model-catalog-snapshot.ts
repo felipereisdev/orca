@@ -87,6 +87,7 @@ export function agentModelCatalogRequestKey(
         !params.legacy))
   return JSON.stringify({
     agent: params.agent,
+    explicitAccountHome: params.accountHome,
     account: record && [
       record.provider,
       record.accountHome,

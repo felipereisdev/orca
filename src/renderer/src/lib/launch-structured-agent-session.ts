@@ -1,3 +1,4 @@
+import type { StructuredAgentLaunchOptions } from './agent-session/launch/structured-agent-session-launch-callers'
 import type { StructuredLaunchSurfaceAddress } from './agent-session/launch/structured-agent-session-launch-record'
 import type { TuiAgent } from '../../../shared/agent-launch/catalog/tui-agent'
 import {
@@ -101,7 +102,8 @@ export function createStructuredAgentSessionLaunchIntent(
   resumeFrom?: StructuredAgentSessionResumeSource,
   hostSeedOptions?: LaunchSeed,
   activate = true,
-  forkFrom?: StructuredAgentSessionForkSource
+  forkFrom?: StructuredAgentSessionForkSource,
+  claudeAccountId?: string
 ): StructuredAgentSessionLaunchIntent {
   const owner = structuredAgentSessionOwnerTarget(
     worktreeId,
@@ -124,7 +126,8 @@ export function createStructuredAgentSessionLaunchIntent(
     sessionId,
     resumeFrom,
     hostSeedOptions,
-    forkFrom
+    forkFrom,
+    claudeAccountId
   )
 }
 
@@ -135,7 +138,8 @@ function buildStructuredAgentSessionLaunchIntent(
   sessionId: string,
   resumeFrom: StructuredAgentSessionResumeSource | undefined,
   hostSeedOptions: LaunchSeed,
-  forkFrom: StructuredAgentSessionForkSource | undefined
+  forkFrom: StructuredAgentSessionForkSource | undefined,
+  claudeAccountId?: string
 ): StructuredAgentSessionLaunchIntent {
   const state = useAppStore.getState()
   return {
@@ -148,6 +152,7 @@ function buildStructuredAgentSessionLaunchIntent(
       sessionId,
       worktree: toRuntimeWorktreeSelector(worktreeId),
       agent,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
       ...(resumeFrom ? { resumeFrom } : {}),
       ...(forkFrom ? { forkFrom } : {}),
       randomUuid: createBrowserUuid
@@ -184,7 +189,8 @@ export function retryStructuredAgentSessionLaunchIntent(
       intent.sessionId,
       fresh ? undefined : intent.params.resumeFrom,
       intent.seedOptions,
-      intent.params.forkFrom
+      intent.params.forkFrom,
+      intent.params.claudeAccountId
     ),
     forkRequiresInheritedOriginal: intent.forkRequiresInheritedOriginal,
     explicitLaunchOptions: intent.explicitLaunchOptions
@@ -196,6 +202,7 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
   executionHostId: ExecutionHostId
   sessionId: string
   agent: TuiAgent
+  claudeAccountId?: string
   clientOperationId: string
   payloadFingerprint: string
   expectedRuntimeFence: number | null
@@ -227,6 +234,7 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
       },
       worktree: toRuntimeWorktreeSelector(args.worktreeId),
       agent: args.agent,
+      ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
       ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
       ...(args.forkFrom ? { forkFrom: args.forkFrom } : {}),
       ...(args.firstMessage ? { firstMessage: args.firstMessage } : {}),
@@ -254,3 +262,20 @@ export {
   launchStructuredAgentSession,
   type StructuredLaunchHostSeedListener
 } from './agent-session/launch/structured-agent-session-launch-create-call'
+
+export function createStructuredAgentLaunchFromOptions(
+  worktreeId: string,
+  agent: TuiAgent,
+  options: StructuredAgentLaunchOptions
+): StructuredAgentSessionLaunchIntent {
+  return createStructuredAgentSessionLaunchIntent(
+    worktreeId,
+    agent,
+    options.executionHostId,
+    options.resumeFrom,
+    options.hostSeedOptions,
+    options.activate,
+    options.forkFrom,
+    options.claudeAccountId
+  )
+}

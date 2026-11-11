@@ -58,6 +58,17 @@ export function assemblePtySpawnEnvDeletions(input: {
       ) ?? [],
       // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
       PI_PROCESS_OWNER_ENV_KEYS,
+      env?.ORCA_CLAUDE_ACCOUNT_ID
+        ? [
+            'ANTHROPIC_API_KEY',
+            'ANTHROPIC_AUTH_TOKEN',
+            'CLAUDE_CODE_OAUTH_TOKEN',
+            'AWS_BEARER_TOKEN_BEDROCK',
+            'ORCA_CLAUDE_PROFILE_POINTER',
+            'ORCA_CLAUDE_INJECTED_CONFIG_DIR',
+            'ORCA_CLAUDE_USER_CONFIG_DIR'
+          ]
+        : [],
       input.agentTeamsEnvToDelete,
       // Disable legacy hooks on old hosts while preserving ORCA_REAL pointers needed by Windows shims.
       input.isDaemonHostSpawn || input.connectionId ? LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS : [],

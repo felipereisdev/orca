@@ -1,3 +1,5 @@
+export const CLAUDE_ACCOUNT_ID_ENV = 'ORCA_CLAUDE_ACCOUNT_ID'
+
 /** The pane's path to the which-account file the `claude` shell function re-reads on every launch. */
 export const CLAUDE_PROFILE_POINTER_ENV = 'ORCA_CLAUDE_PROFILE_POINTER'
 
@@ -12,3 +14,15 @@ export const CLAUDE_PROFILE_MISSING_MESSAGE =
 
 export const CLAUDE_PROFILE_SETUP_FAILED_MESSAGE =
   'The selected Claude account could not be set up. Try again or choose another account.'
+
+export function isExplicitClaudeAccountRecord(record: {
+  provider?: unknown
+  claudeAccountId?: unknown
+}): boolean {
+  return (
+    record.claudeAccountId === undefined ||
+    (record.provider === 'claude' &&
+      typeof record.claudeAccountId === 'string' &&
+      /^[a-zA-Z0-9_-]+$/.test(record.claudeAccountId))
+  )
+}

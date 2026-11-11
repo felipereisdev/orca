@@ -36,6 +36,7 @@ export class AgentSessionPromptAnswerRejectedError extends Error {
 
 export type AgentSessionPreSpawnReason = Extract<
   AgentSessionRefusalReason<'agent_session_operation_invalid'>,
+  | 'notSignedIn'
   | 'managedAccountEnvOverride'
   | 'accountSwitchInProgress'
   | 'managedAccountUnsupported'

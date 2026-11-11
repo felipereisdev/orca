@@ -115,6 +115,7 @@ export class ClaudeAccountRegistration {
         ...accounts.filter((entry) => entry.id !== signIn.accountId),
         {
           id: signIn.accountId,
+          ...(saved?.label ? { label: saved.label } : {}),
           email: login.email,
           organizationUuid: login.organizationUuid,
           organizationName: login.organizationName,

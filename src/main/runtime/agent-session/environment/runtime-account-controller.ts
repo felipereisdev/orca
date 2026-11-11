@@ -1,4 +1,14 @@
-import type { ClaudeAccountService } from '../../../claude-accounts/service'
+import type { RateLimitService } from '../../../rate-limits/service/rate-limit-service'
+import {
+  selectedClaudeAccountId,
+  type RuntimeAccountServices,
+  type AccountsSnapshot
+} from './runtime-provider-account-state'
+export type { RuntimeAccountServices, AccountsSnapshot } from './runtime-provider-account-state'
+import {
+  installClaudeHostAccountResolver,
+  prepareExplicitClaudeAccountLaunch
+} from '../../../claude-accounts/claude-profile-installed-router'
 import { hasAppEnvironment } from '../../../../shared/app-environment'
 import { getManagedDataAccountService } from '../../../managed-data-accounts/service'
 import type {
@@ -9,24 +19,16 @@ import type {
   ManagedDataAccountProvider,
   ManagedDataAccountsState
 } from '../../../../shared/managed-account-types'
-import type { CodexAccountService } from '../../../codex-accounts/service'
-import type { CodexResetCreditRejectedBeforeProviderReason } from '../../../codex-accounts/codex-account-service-types'
 import type { CodexAccountSelectionTarget } from '../../../../shared/codex-selection-lane'
-import type { RateLimitService } from '../../../rate-limits/service/rate-limit-service'
 import type {
   HostAccountSignInChannel,
   HostAccountSignInProvider,
   HostAccountSignInStatus
 } from '../../../../shared/host-account-sign-in-types'
-import type {
-  CodexRateLimitResetOutcome,
-  RateLimitState
-} from '../../../../shared/rate-limit-types'
 import type { CodexResetCreditExpectedScope } from '../../../../shared/codex-reset-credit-scope'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/commit-message-agent-environment'
 import {
   getClaudeSelectionTargetForAccount,
-  getSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
 } from '../../../claude-accounts/runtime-selection'
 import {
@@ -37,31 +39,8 @@ import type { HostClaudeProfileRefresh } from './host-claude-profile-refresh'
 import { HostAccountLaunchEnvState } from './host-account-launch-env-state'
 import type { RuntimeNotifier } from '../../client/events/runtime-notifier-contract'
 
-export type RuntimeAccountServices = {
-  claudeAccounts: ClaudeAccountService
-  codexAccounts: CodexAccountService
-  rateLimits: RateLimitService
-}
-
-export type AccountsSnapshot = {
-  opencode?: ManagedDataAccountsState
-  devin?: ManagedDataAccountsState
-  claude: ClaudeRateLimitAccountsState
-  codex: CodexRateLimitAccountsState
-  rateLimits: RateLimitState
-}
-
-export type CodexRateLimitResetRpcResult = {
-  scope: CodexResetCreditExpectedScope
-  snapshot: AccountsSnapshot
-} & (
-  | { outcome: CodexRateLimitResetOutcome }
-  | {
-      status: 'rejectedBeforeProvider'
-      retryDisposition: 'discardAttempt'
-      reason: CodexResetCreditRejectedBeforeProviderReason
-    }
-)
+export type { CodexRateLimitResetRpcResult } from './codex-account-reset-rpc-result'
+import type { CodexRateLimitResetRpcResult } from './codex-account-reset-rpc-result'
 
 type ClaudeSelectionNotifier = Pick<RuntimeNotifier, 'claudeAccountSelected'>
 
@@ -69,11 +48,13 @@ export class RuntimeAccountController {
   private services: RuntimeAccountServices | null = null
   private commitMessageAgentEnvironment: CommitMessageAgentEnvironmentResolvers | null = null
   private readonly hostAccounts = new HostAccountLaunchEnvState(() => this.services !== null)
+  private readonly hostAccountListeners = new Set<(snapshot: AccountsSnapshot) => void>()
 
   constructor(private readonly getNotifier: () => ClaudeSelectionNotifier | null = () => null) {}
 
   setServices(services: RuntimeAccountServices): void {
     this.services = services
+    installClaudeHostAccountResolver(undefined)
   }
 
   setCommitMessageAgentEnvironment(resolvers: CommitMessageAgentEnvironmentResolvers): void {
@@ -87,6 +68,7 @@ export class RuntimeAccountController {
   /** Refused where this host has account services of its own: they already decide every launch. */
   setHostLaunchEnv(launchEnv: HostAccountLaunchEnv): void {
     this.hostAccounts.setHostLaunchEnv(launchEnv)
+    this.hostAccountListeners.forEach((listener) => listener(this.getStreamSnapshot()))
   }
 
   /** orcad's store: starts from the last pushed env, so launches before a reconnect keep it. */
@@ -96,11 +78,21 @@ export class RuntimeAccountController {
     options: { expectDesktopPush?: boolean; refreshClaudeProfile?: HostClaudeProfileRefresh } = {}
   ): void {
     this.hostAccounts.restoreHostLaunchEnv(saved, persist, options)
+    if (!this.services) {
+      installClaudeHostAccountResolver((id) => this.hostAccounts.prepareClaudeAccountLaunch(id))
+      this.hostAccountListeners.forEach((listener) => listener(this.getStreamSnapshot()))
+    }
   }
 
   /** Before a launch for `agent` this host starts: the first account push, then a Claude refresh. */
   prepareHostAgentLaunch(agent: string | null | undefined): Promise<void> {
     return this.hostAccounts.prepareHostAgentLaunch(agent)
+  }
+
+  prepareClaudeAccountLaunch(accountId: string, target?: ClaudeAccountSelectionTarget) {
+    return this.services
+      ? prepareExplicitClaudeAccountLaunch(accountId, target)
+      : this.hostAccounts.prepareClaudeAccountLaunch(accountId)
   }
 
   /** The desktop-selected account env for a process `agent` starts here; empty when none. */
@@ -123,6 +115,9 @@ export class RuntimeAccountController {
   }
 
   getSnapshot(): AccountsSnapshot {
+    if (!this.services) {
+      return this.hostAccounts.accountSnapshot()
+    }
     const { claudeAccounts, codexAccounts, rateLimits } = this.requireServices()
     return {
       ...this.dataAccountsSnapshot(),
@@ -133,6 +128,9 @@ export class RuntimeAccountController {
   }
 
   getStreamSnapshot(): AccountsSnapshot {
+    if (!this.services) {
+      return this.hostAccounts.accountSnapshot()
+    }
     const { claudeAccounts, codexAccounts, rateLimits } = this.requireServices()
     return {
       ...this.streamDataAccountsSnapshot(),
@@ -188,6 +186,9 @@ export class RuntimeAccountController {
   }
 
   async refreshForMobile(): Promise<void> {
+    if (!this.services) {
+      return
+    }
     const { rateLimits } = this.requireServices()
     await Promise.allSettled([
       rateLimits.refresh(),
@@ -197,6 +198,9 @@ export class RuntimeAccountController {
   }
 
   async refreshForMobileSubscriber(): Promise<void> {
+    if (!this.services) {
+      return
+    }
     const { rateLimits } = this.requireServices()
     await Promise.allSettled([
       rateLimits.refreshIfStale(),
@@ -262,6 +266,10 @@ export class RuntimeAccountController {
     return { outcome: result.outcome, scope: result.scope, snapshot }
   }
 
+  renameClaude(accountId: string, label: string | null): Promise<ClaudeRateLimitAccountsState> {
+    return this.requireServices().claudeAccounts.renameAccount(accountId, label)
+  }
+
   removeClaude(accountId: string): Promise<ClaudeRateLimitAccountsState> {
     return this.requireServices().claudeAccounts.removeAccount(accountId)
   }
@@ -303,6 +311,10 @@ export class RuntimeAccountController {
   }
 
   onChanged(listener: (snapshot: AccountsSnapshot) => void): () => void {
+    if (!this.services) {
+      this.hostAccountListeners.add(listener)
+      return () => this.hostAccountListeners.delete(listener)
+    }
     const services = this.requireServices()
     const unsubscribeData = hasAppEnvironment()
       ? getManagedDataAccountService().onChanged(() => listener(this.getStreamSnapshot()))
@@ -331,17 +343,4 @@ export class RuntimeAccountController {
     }
     return this.services
   }
-}
-
-function selectedClaudeAccountId(
-  state: ClaudeRateLimitAccountsState,
-  target: ClaudeAccountSelectionTarget
-): string | null {
-  return getSelectedClaudeAccountIdForTarget(
-    {
-      activeClaudeManagedAccountId: state.activeAccountId,
-      activeClaudeManagedAccountIdsByRuntime: state.activeAccountIdsByRuntime
-    },
-    target
-  )
 }

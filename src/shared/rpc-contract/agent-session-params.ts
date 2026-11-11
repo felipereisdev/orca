@@ -145,6 +145,12 @@ export const ExplicitEnsure = z
     placement: Placement.optional(),
     spawnIntent: SpawnIntentParam.optional(),
     /** Sent only to hosts advertising `agent-session.account-env.v1`; outside replay identity. */
+    claudeAccountId: z
+      .string()
+      .min(1)
+      .max(512)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .optional(),
     accountEnv: AgentLaunchAccountEnv.optional()
   })
   .strict()
@@ -197,6 +203,12 @@ export const CreateAgentSessionParams: z.ZodType<RuntimeCreateAgentSessionReques
     placement: Placement.optional(),
     viewMode: z.enum(['terminal', 'chat']).optional(),
     /** Sent only to hosts advertising `agent-session.account-env.v1`; outside the fingerprint. */
+    claudeAccountId: z
+      .string()
+      .min(1)
+      .max(512)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .optional(),
     accountEnv: AgentLaunchAccountEnv.optional()
   })
   .strict()

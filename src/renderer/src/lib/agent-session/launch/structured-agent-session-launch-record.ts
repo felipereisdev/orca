@@ -45,6 +45,7 @@ export function parseStructuredLaunchSurfaceAddress(
 
 export type StructuredAgentLaunchPersistedRecord = {
   surfaceAddress?: StructuredLaunchSurfaceAddress
+  claudeAccountId?: string
   sessionId: string
   // Older records lack host because chats could only launch locally then; restore them as local.
   executionHostId: ExecutionHostId
@@ -75,6 +76,7 @@ export function structuredAgentLaunchRecordFor(
   const pairedSeed = intent.target.kind === 'local' ? undefined : intent.seedOptions
   return {
     ...(intent.surfaceAddress ? { surfaceAddress: intent.surfaceAddress } : {}),
+    ...(intent.params.claudeAccountId ? { claudeAccountId: intent.params.claudeAccountId } : {}),
     sessionId: intent.sessionId,
     executionHostId: intent.executionHostId,
     agent: intent.agent,

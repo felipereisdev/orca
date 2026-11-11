@@ -15,6 +15,7 @@ export function structuredStatusSummariesEqual(
     a.usageLimitContinue?.resetsAt === b.usageLimitContinue?.resetsAt &&
     a.usageLimitContinue?.state === b.usageLimitContinue?.state &&
     a.agent === b.agent &&
+    a.claudeAccountId === b.claudeAccountId &&
     a.status === b.status &&
     a.hostExecutionOwned === b.hostExecutionOwned &&
     a.hostExecutionPhase === b.hostExecutionPhase &&

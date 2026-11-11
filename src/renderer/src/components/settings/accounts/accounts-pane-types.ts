@@ -32,6 +32,7 @@ export type AccountsPaneProps = {
 }
 
 export type ProviderAccountAction =
+  | `rename:${string}`
   | 'idle'
   | 'adding'
   | `reauth:${string}`

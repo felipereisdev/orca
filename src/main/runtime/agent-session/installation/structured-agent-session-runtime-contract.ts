@@ -1,3 +1,4 @@
+import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
 import type { StructuredAgentSessionHostDeps } from '../../../native-chat/agent-session-wire/host/structured-agent-session-host-types'
 import type { AgentSessionAccountKind } from '../../../../shared/agent-session/agent-session-availability'
 import type { StructuredAgentSessionTransportOverrides } from '../structured-agent-session-transport-overrides'
@@ -46,6 +47,7 @@ export type StructuredAgentSessionRuntimeDeps = StructuredAgentSessionTransportO
   /** Required, and asserted at install time — saved Arguments must never be silently omitted. */
   resolveLaunchArgs: (provider: AgentSessionRecord['provider']) => Promise<string[]> | string[]
   /** Required, and asserted at install time — an absent policy must not degrade to a guess. */
+  prepareClaudeAccountLaunch?: (accountId: string) => Promise<ClaudeRuntimeAuthPreparation>
   resolveClaudeAuthPolicy: () => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
   usageLimitAutoContinue?: StructuredAgentSessionHostDeps['usageLimitAutoContinue']
   idleSweep?: StructuredAgentSessionHostDeps['idleSweep']

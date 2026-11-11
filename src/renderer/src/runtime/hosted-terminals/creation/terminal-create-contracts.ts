@@ -17,6 +17,7 @@ export type WebRuntimeTerminalCreateOutcome =
   | { status: 'failed'; message: string }
 
 export type CreateWebRuntimeSessionTerminalArgs = {
+  claudeAccountId?: string
   worktreeId: string
   environmentId?: string | null
   afterTabId?: string

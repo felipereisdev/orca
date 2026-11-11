@@ -34,10 +34,9 @@ import { findOptionOccurrence } from '../../command-option-occurrence'
 import { assertOpenCodeCopyUsesLocalStore } from '../../opencode-launch-command'
 import { CLI_CONVERSATION_ADOPTING_AGENTS } from '../../structured-agent-cli-conversation-adoption'
 import type { GlobalSettings } from '../../global-settings-types'
-import { parseWslUncPath } from '../../wsl-paths'
 import { managedDataAccountResumeEnv } from '../../managed-data-account-resume'
 
-export type AiVaultResumeCommandSession = Pick<
+export type AiVaultResumeCommandSession = { claudeAccountId?: string } & Pick<
   AiVaultSession,
   'agent' | 'sessionId' | 'cwd' | 'codexHome'
 > &
@@ -74,16 +73,7 @@ type AiVaultResumeStartupArgs = {
   commandOverride?: string | null
 }
 
-export function getAiVaultResumeCodexHome(
-  codexHome: string | null,
-  platform: NodeJS.Platform
-): string | null {
-  // Translate WSL UNC Codex homes to POSIX only for Linux targets.
-  if (!codexHome || platform !== 'linux') {
-    return codexHome
-  }
-  return parseWslUncPath(codexHome)?.linuxPath ?? codexHome
-}
+export { getAiVaultResumeCodexHome } from './ai-vault-resume-path'
 
 export function getAiVaultAgentProviderSession(
   session: Pick<AiVaultSession, 'agent' | 'sessionId'> & { filePath?: string }
@@ -152,6 +142,7 @@ export function buildAiVaultLocalResumeStartup(
         ),
       agentEnv: {
         ...resolveTuiAgentLaunchEnv(session.agent, settings, platform),
+        ...(session.claudeAccountId ? { ORCA_CLAUDE_ACCOUNT_ID: session.claudeAccountId } : {}),
         ...managedDataAccountResumeEnv(session)
       },
       resumeInLaunchCwd: true,
@@ -234,7 +225,10 @@ export function buildAiVaultForkStartup(
       undefined,
       resolveStartupShell(platform, liveShell)
     ),
-    agentEnv: resolveTuiAgentLaunchEnv(session.agent, settings, platform),
+    agentEnv: {
+      ...resolveTuiAgentLaunchEnv(session.agent, settings, platform),
+      ...(session.claudeAccountId ? { ORCA_CLAUDE_ACCOUNT_ID: session.claudeAccountId } : {})
+    },
     resumeInLaunchCwd: true,
     fork: true
   })

@@ -46,6 +46,18 @@ export const SelectCodexAccountForTargetParams = SelectAccountParams.extend({
   target: CodexSelectionTarget
 })
 
+export const RenameClaudeAccountParams = z
+  .object({
+    accountId: z.string().min(1).max(512),
+    label: z
+      .string()
+      .trim()
+      .max(80)
+      .regex(/^[^\p{Cc}]*$/u)
+      .nullable()
+  })
+  .strict()
+
 export const RemoveAccountParams = z.object({
   accountId: z.string().min(1, 'Missing accountId')
 })

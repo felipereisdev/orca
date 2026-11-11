@@ -1,3 +1,4 @@
+import { prepareClaudeAccountTerminalLaunch } from './runtime-claude-account-terminal-launch'
 import type { RuntimeAccountController } from '../../agent-session/environment/runtime-account-controller'
 import { applyRemoteViewerLaunchEnv } from './remote-viewer-launch-env'
 import type { SessionOptionValue } from '../../../../shared/native-chat/input/native-chat-session-options'
@@ -291,9 +292,16 @@ export async function prepareHostAgentTerminalLaunch(
   workspace: TerminalWorkspaceLaunchScope,
   opts: TerminalCreateOptions,
   resolvedLaunch: TerminalCreateOptions,
-  accounts: Pick<RuntimeAccountController, 'prepareHostAgentLaunch' | 'hostLaunchEnvFor'>
+  accounts: Pick<
+    RuntimeAccountController,
+    'prepareHostAgentLaunch' | 'hostLaunchEnvFor' | 'prepareClaudeAccountLaunch'
+  >
 ): Promise<TerminalCreateOptions> {
   const launch = applyRemoteViewerLaunchEnv(resolvedLaunch, opts.terminalImageViewerSupported)
+  const explicit = await prepareClaudeAccountTerminalLaunch(workspace, opts, launch, accounts)
+  if (explicit) {
+    return explicit
+  }
   // An SSH workspace's shell runs on that machine, where this distro's account paths mean nothing.
   if (workspace.connectionId) {
     return launch

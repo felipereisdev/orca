@@ -119,6 +119,7 @@ export type RuntimeEnsureAgentSessionRequest =
       placement?: { tabId?: string; leafId?: string }
       spawnIntent?: SpawnIntent
       /** Account routing env a desktop prepared for a host with no account services (WSL orcad). */
+      claudeAccountId?: string
       accountEnv?: Record<string, string>
     }
 
@@ -128,6 +129,7 @@ export type RuntimeEnsureAgentSessionResult = {
 }
 
 export type RuntimeCreateAgentSessionRequest = {
+  claudeAccountId?: string
   clientOperationId: string
   terminalKittyKeyboardProtocol?: boolean
   worktree: string

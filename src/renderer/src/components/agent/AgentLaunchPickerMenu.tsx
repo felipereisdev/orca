@@ -100,6 +100,7 @@ export function AgentLaunchPickerMenu({
   const [activeSetup, setActiveSetup] = useState<{
     id: string
     agent: AgentPickerEntry['agent']
+    entryId?: string
     preset?: AgentPickerSetupIdentity
     label: string
   } | null>(null)
@@ -108,17 +109,23 @@ export function AgentLaunchPickerMenu({
   const setups = setupDisabled ? [] : searchAgentPickerSetups(entries, query)
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const visible = entries.filter((entry) =>
-    words.every((word) => `${entry.agent} ${entry.label}`.toLowerCase().includes(word))
+    words.every((word) =>
+      `${entry.agent} ${entry.label} ${(entry.aliases ?? []).join(' ')}`
+        .toLowerCase()
+        .includes(word)
+    )
   )
   // Filtering changes presentation; an active owner survives its result row disappearing.
   if (activeSetup) {
-    const entry = entries.find((entry) => entry.agent === activeSetup.agent)
+    const entry = entries.find(
+      (entry) => (entry.entryId ?? entry.agent) === (activeSetup.entryId ?? activeSetup.agent)
+    )
     if (
       entry &&
       activeSetup.preset &&
       !setups.some(
         (setup) =>
-          setup.entry.agent === entry.agent &&
+          (setup.entry.entryId ?? setup.entry.agent) === (entry.entryId ?? entry.agent) &&
           setup.model.id === activeSetup.preset?.model &&
           setup.choices.options?.effort === activeSetup.preset.effort
       )
@@ -218,7 +225,7 @@ export function AgentLaunchPickerMenu({
             const source = draftForEntry?.(entry)
             return (
               <AgentPickerMenuRow
-                key={entry.agent}
+                key={entry.entryId ?? entry.agent}
                 draftScope={draftScope}
                 entry={entry}
                 mode={mode}
@@ -232,9 +239,13 @@ export function AgentLaunchPickerMenu({
                 terminalBlocked={terminalBlocked}
                 runLaunch={runLaunch}
                 onSelectAgent={onSelectAgent}
-                isDefault={defaultAgent === entry.agent}
+                isDefault={!entry.claudeAccountId && defaultAgent === entry.agent}
                 onSetDefault={onSetDefault}
-                shortcut={mode !== 'select' ? shortcutLabels?.get(entry.agent) : undefined}
+                shortcut={
+                  mode !== 'select' && !entry.claudeAccountId
+                    ? shortcutLabels?.get(entry.agent)
+                    : undefined
+                }
               />
             )
           })}
@@ -242,7 +253,7 @@ export function AgentLaunchPickerMenu({
             const source = draftForEntry?.(setup.entry)
             return (
               <AgentPickerMenuRow
-                key={`${setup.entry.agent}:${setup.model.id}:${setup.choices.options?.effort ?? ''}`}
+                key={`${setup.entry.entryId ?? setup.entry.agent}:${setup.model.id}:${setup.choices.options?.effort ?? ''}`}
                 draftScope={draftScope}
                 draftId={`${setup.model.id}:${setup.choices.options?.effort ?? ''}`}
                 initialModel={setup.model.id}

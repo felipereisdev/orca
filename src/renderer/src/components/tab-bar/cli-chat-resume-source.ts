@@ -1,3 +1,4 @@
+import { claudePaneAccountId } from '@/lib/agent-session/accounts/claude/claude-pane-account-selection'
 import type { AppState } from '@/store/types'
 import {
   collectAgentPaneConversations,
@@ -11,6 +12,7 @@ import {
 import { resolvePaneResumeInNewChatOffer } from './tab-session-history-switch'
 
 export type CliChatResumeSource = {
+  claudeAccountId?: string
   tabId: string
   workspaceId: string
   paneKey: string
@@ -51,6 +53,9 @@ export function resolveCliChatResumeSource(
     return null
   }
   return {
+    ...(claudePaneAccountId(state, conversation.paneKey)
+      ? { claudeAccountId: claudePaneAccountId(state, conversation.paneKey) }
+      : {}),
     tabId: conversation.tabId,
     workspaceId: conversation.worktreeId,
     paneKey: conversation.paneKey,
