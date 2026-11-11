@@ -7,6 +7,7 @@ import { createNonSecureContextUuid } from '../../../../shared/non-secure-contex
 import type { DatabaseConnectionRef } from '../../../../shared/database/database-contracts'
 import { openContentTabThroughLayoutOwner } from '@/runtime/workspace-layout/intents/layout-owner-content-tab-open'
 import { createDatabaseExplorerState } from '@/components/database/database-explorer-state'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
 
 const explorers = new Map<string, ReturnType<typeof createDatabaseExplorerState>>()
 export function databaseExplorerState(worktreeId: string, entityId: string) {
@@ -63,6 +64,7 @@ export function openDatabaseExplorer({
   const drawHere = () =>
     state.createUnifiedTab(worktreeId, 'database', { id: tabId, entityId, label }).id
   if (
+    !ORCA_LAYOUT_OWNER_IS_MAIN ||
     !openContentTabThroughLayoutOwner(state, {
       worktreeId,
       entityId,
