@@ -1,0 +1,22 @@
+diff --git a/lib/thin/sqlnet/ntTcp.js b/lib/thin/sqlnet/ntTcp.js
+index 43e15605b783ea17816b21cb01e221dda88a895c..942b3a55439d26b1f6c07e784112dc22f1b06760 100644
+--- a/lib/thin/sqlnet/ntTcp.js
++++ b/lib/thin/sqlnet/ntTcp.js
+@@ -241,7 +241,7 @@ class NTTCP {
+         try {
+           secureContext = tls.createSecureContext({
+             cert: this.atts.wallet,
+-            key: this.atts.wallet,
++            key: /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----/.test(this.atts.wallet || '') ? this.atts.wallet : undefined,
+             passphrase: this.atts.walletPassword,
+             ca: this.atts.wallet,
+           });
+@@ -525,7 +525,7 @@ class NTTCP {
+       this.doDNMatch = true;
+       const secureContext = tls.createSecureContext({
+         cert: this.atts.wallet,
+-        key: this.atts.wallet,
++        key: /-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----/.test(this.atts.wallet || '') ? this.atts.wallet : undefined,
+         passphrase: this.atts.walletPassword,
+         ca: this.atts.wallet,
+       });

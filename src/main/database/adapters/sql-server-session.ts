@@ -14,7 +14,7 @@ export async function withSqlServerSession<T>(
   config: DatabaseConnection,
   credentials: DatabaseCredentials,
   signal: AbortSignal,
-  operation: (session: SqlServerSession) => Promise<T>
+  operation: (session: SqlServerSession, signal: AbortSignal) => Promise<T>
 ): Promise<T> {
   signal.throwIfAborted()
   if (!config.endpoint.tls.enabled) {
@@ -95,7 +95,7 @@ export async function withSqlServerSession<T>(
     await session.query(
       `SET NOCOUNT ON; SET XACT_ABORT ON; SET DEADLOCK_PRIORITY LOW; SET LOCK_TIMEOUT ${config.limits.timeoutMs}`
     )
-    const value = await operation(session)
+    const value = await operation(session, signal)
     signal.throwIfAborted()
     return value
   } finally {

@@ -6,7 +6,7 @@ export type DatabaseSessionOperation<Client> = <T>(
   configuration: DatabaseConnection,
   credentials: DatabaseCredentials,
   signal: AbortSignal,
-  operation: (client: Client) => Promise<T>
+  operation: (client: Client, signal: AbortSignal) => Promise<T>
 ) => Promise<T>
 export function createDatabaseAdapterSessions<Client>(connect: DatabaseSessionOperation<Client>) {
   const active = new Map<AbortController, Promise<void>>()

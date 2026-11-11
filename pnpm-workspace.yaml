@@ -65,6 +65,8 @@ allowBuilds:
   koffi: false
   msw: false
   node-pty: true
+  # Thin mode needs no native client installation or viability check.
+  oracledb: false
   ssh2: false
   '@orca/windows-registry': false
   '@orca/windows-security': false
@@ -141,3 +143,4 @@ patchedDependencies:
   minimatch@9.0.9: config/patches/minimatch@9.0.9.patch
   minimatch@10.2.5: config/patches/minimatch@10.2.5.patch
   minimatch@10.2.6: config/patches/minimatch@10.2.6.patch
+  oracledb@26.0.0: config/patches/oracledb@26.0.0.patch

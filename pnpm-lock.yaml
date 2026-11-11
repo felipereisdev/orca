@@ -215,6 +215,7 @@ patchedDependencies:
   minimatch@9.0.9: c356feccb9147b4d6a1cc72b10270defcb95d14cb42ee74ddfe7219341417161
   monaco-editor@0.55.1: 53b71f7d8a7c00b76ffdb73ce83d18e31692f193f5fafa6a390e48f5b3fdd636
   node-pty@1.1.0: 37dc98d9a4bcfc67153fa2fbf30689563ff49dcf8e6f0578484cbacdf1e38af5
+  oracledb@26.0.0: 449931ba19c8388a6c70876bb6d7ec3235b1fbab250fa6b775f9807cabdf76fe
   oxlint-plugin-anti-slop@0.1.2: c10c871702365a0c2c59e9f1c5fb92df97cae5755d534c0a3d83c6368f6feafe
   pdfjs-dist@6.3.289: 424fde648e16c965ce45c55bdda49ecb3a4aa992c856900714c841c3f13f8415
   prosemirror-view@1.42.3: 3340ccbcc4e3302f3ae1c0eda3911015966add2e7e0df76abd89fbef4f3902f7
@@ -274,6 +275,9 @@ importers:
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0(patch_hash=37dc98d9a4bcfc67153fa2fbf30689563ff49dcf8e6f0578484cbacdf1e38af5)
+      oracledb:
+        specifier: 26.0.0
+        version: 26.0.0(patch_hash=449931ba19c8388a6c70876bb6d7ec3235b1fbab250fa6b775f9807cabdf76fe)
       pg:
         specifier: 8.23.1
         version: 8.23.1(@types/pg@8.23.1)
@@ -434,6 +438,9 @@ importers:
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
+      '@types/oracledb':
+        specifier: 26.0.1
+        version: 26.0.1
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
@@ -4514,6 +4521,9 @@ packages:
   '@types/node@25.9.5':
     resolution: {integrity: sha512-OScDchr2fwuUmWdf4kZ9h7PcJiYDVInhJizG/biAq3cAvqwYktuy/TYGGdZNMtNTFUP7rnb0NU4TUdm82kt4Rg==}
 
+  '@types/oracledb@26.0.1':
+    resolution: {integrity: sha512-+PN2zINSM1vNtRiIz5D2WDboSuMv1YIe66XI3y+X1m4VGz9Ley4yyP65EwnANsBeF1qH/EpKjr5oj6sVIlq8ag==}
+
   '@types/pg-cursor@2.7.2':
     resolution: {integrity: sha512-m3xT8bVFCvx98LuzbvXyuCdT/Hjdd/v8ml4jL4K1QF70Y8clOfCFdgoaEB1FWdcSwcpoFYZTJQaMD9/GQ27efQ==}
 
@@ -7243,6 +7253,10 @@ packages:
   ora@9.4.1:
     resolution: {integrity: sha512-6VlU9MLXbjVQD04AZCMX28hVtA5bUoadvUqO76MUCVA0ilwJbMiHsITRPfyVm6p/BC0Av/BXMujx39WCe1LEqw==}
     engines: {node: '>=20'}
+
+  oracledb@26.0.0:
+    resolution: {integrity: sha512-ywUqFidj/mPjRjfpOQdzcXT98lhiJzavPCbyPF9JYivcgrpHx7ENj4ZGQDclrpGXeozUBLc5BNXV7yj5qTMxDw==}
+    engines: {node: '>=14.17'}
 
   orderedmap@2.1.1:
     resolution: {integrity: sha512-TvAWxi0nDe1j/rtMcWcIj94+Ffe6n7zhow33h40SKxmsmozs6dz/e+EajymfoFcHd7sxNn8yHM8839uixMOV6g==}
@@ -11989,6 +12003,10 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
+  '@types/oracledb@26.0.1':
+    dependencies:
+      '@types/node': 24.19.2
+
   '@types/pg-cursor@2.7.2':
     dependencies:
       '@types/node': 24.19.2
@@ -15113,6 +15131,8 @@ snapshots:
       log-symbols: 7.0.1
       stdin-discarder: 0.3.2
       string-width: 8.2.1
+
+  oracledb@26.0.0(patch_hash=449931ba19c8388a6c70876bb6d7ec3235b1fbab250fa6b775f9807cabdf76fe): {}
 
   orderedmap@2.1.1: {}
 

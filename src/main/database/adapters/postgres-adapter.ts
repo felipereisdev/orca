@@ -49,7 +49,7 @@ export function createPostgresAdapter(): DatabaseAdapter {
         return describePostgres(client, request)
       }),
     execute: (config, credentials, query, parameters, sink, signal) =>
-      session(config, credentials, signal, async (client) => {
+      session(config, credentials, signal, async (client, activeSignal) => {
         if (query.engine !== 'postgres') {
           throw new Error('PostgreSQL query dialect mismatch')
         }
@@ -72,7 +72,7 @@ export function createPostgresAdapter(): DatabaseAdapter {
         )
         try {
           while (!sink.stopped) {
-            signal.throwIfAborted()
+            activeSignal.throwIfAborted()
             const batch = await new Promise<QueryResult<unknown[]>>((resolve, reject) => {
               cursor.read(1, (error, _rows, result) => (error ? reject(error) : resolve(result)))
             })

@@ -30,7 +30,7 @@ export async function withPostgresSession<T>(
   config: DatabaseConnection,
   credentials: DatabaseCredentials,
   signal: AbortSignal,
-  operation: (client: Client) => Promise<T>
+  operation: (client: Client, signal: AbortSignal) => Promise<T>
 ): Promise<T> {
   signal.throwIfAborted()
   const options = clientConfig(config, credentials)
@@ -66,7 +66,7 @@ export async function withPostgresSession<T>(
     pid = (await client.query<{ pid: number }>('SELECT pg_catalog.pg_backend_pid() AS pid')).rows[0]
       .pid
     await client.query('BEGIN READ ONLY')
-    const value = await operation(client)
+    const value = await operation(client, signal)
     signal.throwIfAborted()
     await client.query('ROLLBACK')
     return value

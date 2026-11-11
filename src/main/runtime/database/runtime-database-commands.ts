@@ -18,6 +18,7 @@ import type {
 import { DatabaseCatalog } from '../../database/catalog/database-catalog'
 import { DatabaseCredentialStore } from '../../database/credentials/database-credential-store'
 import { DatabaseQueryService } from '../../database/execution/database-query-service'
+import { createOracleAdapter } from '../../database/adapters/oracle-adapter'
 import { createSqlServerAdapter } from '../../database/adapters/sql-server-adapter'
 import { createPostgresAdapter } from '../../database/adapters/postgres-adapter'
 import type { DatabaseAdapter } from '../../database/adapters/database-adapter'
@@ -35,7 +36,8 @@ export class RuntimeDatabaseCommands {
   private readonly persistence: ReturnType<typeof requireDatabasePersistence>
   private readonly adapters = new Map<DatabaseEngine, DatabaseAdapter>([
     ['postgres', createPostgresAdapter()],
-    ['sql-server', createSqlServerAdapter()]
+    ['sql-server', createSqlServerAdapter()],
+    ['oracle', createOracleAdapter()]
   ])
 
   constructor(private readonly runtime: DatabaseRuntimeHost) {
