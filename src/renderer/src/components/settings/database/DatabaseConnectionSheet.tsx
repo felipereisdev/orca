@@ -63,7 +63,7 @@ export function DatabaseConnectionSheet({
       }}
     >
       <SheetContent className="w-full sm:max-w-xl" showCloseButton={!form.saving}>
-        <div className="settings-view-shell flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 border-b">
             <SheetHeader>
               <SheetTitle>

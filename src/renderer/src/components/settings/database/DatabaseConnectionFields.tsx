@@ -14,9 +14,23 @@ import type { DatabaseConnectionDraftController } from './use-database-connectio
 import { databaseEngineNames } from './database-connection-draft'
 import { databaseConnectionSchema } from '../../../../../shared/database/database-configuration-schema'
 
+const databaseEnvironments = [
+  'local',
+  'development',
+  'testing',
+  'staging',
+  'production',
+  'sandbox',
+  'demo'
+]
+
 export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDraftController }) {
   const t = useTranslate()
   const { draft, update } = form
+  const environments =
+    draft.environment && !databaseEnvironments.includes(draft.environment)
+      ? [...databaseEnvironments, draft.environment]
+      : databaseEnvironments
   const engines = databaseConnectionSchema.shape.engine.options
     .filter((engine) => engine === draft.engine || form.capabilities?.engines.includes(engine))
     .map((engine) => ({ id: engine, label: databaseEngineNames[engine] }))
@@ -43,7 +57,6 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
             autoFocus
             maxLength={96}
             pattern="[a-z][a-z0-9-]*"
-            placeholder={t('database.form.aliasPlaceholder', 'faturacao-hmg')}
             value={draft.alias}
             onChange={(event) => update('alias', event.target.value)}
             variant="code"
@@ -66,7 +79,7 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
               }
             }}
           >
-            <SelectTrigger id="database-engine">
+            <SelectTrigger id="database-engine" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -82,15 +95,26 @@ export function DatabaseConnectionFields({ form }: { form: DatabaseConnectionDra
           <Label htmlFor="database-environment">
             {t('database.form.environment', 'Environment')}
           </Label>
-          <Input
-            id="database-environment"
-            aria-invalid={form.invalidFields.has('environment')}
-            required
-            maxLength={80}
-            placeholder={t('database.form.environmentPlaceholder', 'HMG')}
+          <Select
             value={draft.environment}
-            onChange={(event) => update('environment', event.target.value)}
-          />
+            onValueChange={(value) => update('environment', value)}
+            required
+          >
+            <SelectTrigger
+              id="database-environment"
+              className="w-full"
+              aria-invalid={form.invalidFields.has('environment')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {environments.map((environment) => (
+                <SelectItem key={environment} value={environment}>
+                  {environment}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="space-y-3">

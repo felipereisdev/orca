@@ -2,7 +2,6 @@ import { HostCombobox } from '@/components/host-picker/HostCombobox'
 import RepoMultiCombobox from '@/components/ui/repo-multi-combobox'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { SettingsRow } from '../form-controls/SettingsFormControls'
 import { databaseProjectIdentityKey } from '../../../../../shared/database/database-project-scope'
 import type { DatabaseSettingsOptions } from '../../../../../shared/database/database-settings-options'
 import type { DatabaseConnectionDraftController } from './use-database-connection-draft'
@@ -29,35 +28,37 @@ export function DatabaseConnectionScopeFields({
   }
   return (
     <div className="space-y-3">
-      <SettingsRow
-        label={t('database.form.executionHost', 'Execute on')}
-        description={
-          form.original
-            ? t(
-                'database.form.hostLocked',
-                'Create a new connection to move credentials to another host'
-              )
-            : undefined
-        }
-        control={
-          <HostCombobox
-            ariaLabel={t('database.form.executionHost', 'Execute on')}
-            value={form.draft.executionHostId}
-            options={hosts}
-            disabled={form.pending || Boolean(form.original)}
-            onChange={(id) => {
-              const host = parseExecutionHostId(id)
-              if (host) {
-                form.update('executionHostId', host.id)
-              }
-            }}
-          />
-        }
-      />
+      <div className="space-y-2">
+        <Label htmlFor="database-execution-host">
+          {t('database.form.executionHost', 'Execute on')}
+        </Label>
+        <HostCombobox
+          id="database-execution-host"
+          ariaLabel={t('database.form.executionHost', 'Execute on')}
+          value={form.draft.executionHostId}
+          options={hosts}
+          disabled={form.pending || Boolean(form.original)}
+          onChange={(id) => {
+            const host = parseExecutionHostId(id)
+            if (host) {
+              form.update('executionHostId', host.id)
+            }
+          }}
+        />
+        {form.original ? (
+          <p className="text-xs text-muted-foreground">
+            {t(
+              'database.form.hostLocked',
+              'Create a new connection to move credentials to another host'
+            )}
+          </p>
+        ) : null}
+      </div>
       <div className="space-y-2">
         <Label>{t('database.form.projects', 'Associated projects')}</Label>
         <RepoMultiCombobox
           repos={projects}
+          triggerClassName="h-9"
           selected={selected}
           ariaLabel={t('database.form.projects', 'Associated projects')}
           allowEmpty

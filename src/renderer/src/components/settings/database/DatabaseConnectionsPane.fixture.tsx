@@ -78,13 +78,27 @@ export const narrow = defineFixture({ width: 390, render: () => <Preview /> })
 export const add = defineFixture({
   width: 1200,
   render: () => <Preview />,
-  interact: (frame) => {
-    const button = [...frame.querySelectorAll('button')].find((element) =>
-      element.textContent?.includes('New connection')
-    )
-    button?.click()
+  interact: openNewConnection
+})
+export const environments = defineFixture({
+  width: 1200,
+  render: () => <Preview />,
+  interact: async (frame) => {
+    openNewConnection(frame)
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    document
+      .getElementById('database-environment')
+      ?.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })
+      )
   }
 })
+function openNewConnection(frame: HTMLElement) {
+  const button = [...frame.querySelectorAll('button')].find((element) =>
+    element.textContent?.includes('New connection')
+  )
+  button?.click()
+}
 export const hostUnavailable = defineFixture({
   width: 1200,
   render: () => <Preview state="host-unavailable" />,
