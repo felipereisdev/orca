@@ -6,6 +6,10 @@ const { readPeMachine } = require('./scripts/native-build/windows/windows-pe-mac
 
 /** Files a runtime package publishes that no desktop package, or only Windows, loads. */
 const RUNTIME_PACKAGE_EXCLUDED_FILES = {
+  oracledb: {
+    everyPlatform: [],
+    nonWindows: ['build/Release/*-win32-*.node', 'build/Release/*-win32-*.node-buildinfo.txt']
+  },
   // ssh2 uses pagent.exe only on Windows; C source/build script are build-only everywhere.
   ssh2: {
     everyPlatform: ['util/pagent.c', 'util/build_pagent.bat'],
