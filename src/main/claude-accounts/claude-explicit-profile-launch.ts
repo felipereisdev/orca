@@ -1,8 +1,8 @@
-import type { ClaudeProfileRouter } from './claude-profile-router'
+import type { ClaudeProfileRouter } from './profiles/routing/claude-profile-router'
 import type { ClaudeRuntimeAuthPreparation } from './runtime-auth/runtime-auth-types'
-import { claudeProfileMissing } from './claude-profile-launch-errors'
-import { isSameClaudeLogin } from './claude-account-folder'
-import { isDirectory } from './claude-profile-homes'
+import { claudeProfileMissing } from './profiles/routing/claude-profile-launch-errors'
+import { isSameClaudeLogin } from './sign-in/claude-account-folder'
+import { isDirectory } from './profiles/claude-profile-homes'
 import { AgentSessionPreSpawnError } from '../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
 
 export async function prepareExplicitClaudeProfile(

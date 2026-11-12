@@ -8,8 +8,11 @@ import {
   installClaudeProfileRouter,
   preparePinnedClaudeTerminalEnv,
   withClaudeProfileTerminalEnv
-} from './claude-profile-installed-router'
-import { ClaudeProfileRouter, type ClaudeProfileRouterSettings } from './claude-profile-router'
+} from './profiles/routing/claude-profile-installed-router'
+import {
+  ClaudeProfileRouter,
+  type ClaudeProfileRouterSettings
+} from './profiles/routing/claude-profile-router'
 
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))

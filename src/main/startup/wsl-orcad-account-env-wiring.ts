@@ -1,9 +1,9 @@
 import { BrowserWindow } from 'electron'
-import { withClaudeProfileTerminalEnv } from '../claude-accounts/claude-profile-installed-router'
+import { withClaudeProfileTerminalEnv } from '../claude-accounts/profiles/routing/claude-profile-installed-router'
 import {
   getClaudeWslSelectionKey,
   getSelectedClaudeAccountIdForTarget
-} from '../claude-accounts/runtime-selection'
+} from '../claude-accounts/selection/runtime-selection'
 import { getSelectedCodexAccountIdForTarget } from '../codex-accounts/runtime-selection'
 import type { Store } from '../persistence/loading-store/store'
 import { installWslOrcadAccountEnvDependencies } from '../wsl/orcad/wsl-orcad-account-env'

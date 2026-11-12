@@ -3,7 +3,7 @@ import type { DatabaseQueryRecord } from '../../../shared/database/database-quer
 import type { DatabaseExecutionBinding } from '../../../shared/database/database-execution-binding'
 import { parseDatabaseCatalog } from '../../database/catalog/database-catalog-validation'
 import type { StoreRuntimeState } from './store-runtime-state'
-import type { PrimaryStateWriteOperations } from './primary-state-writes'
+import type { PrimaryStateWriteOperations } from './profile-writing/primary-state-writes'
 
 function retainedHistory(records: DatabaseQueryRecord[]): DatabaseQueryRecord[] {
   const cutoff = Date.now() - 7 * 24 * 60 * 60_000

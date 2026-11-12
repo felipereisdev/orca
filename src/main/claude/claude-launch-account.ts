@@ -1,7 +1,10 @@
 import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth/runtime-auth-types'
 import type { ClaudeAccountRecipe } from '../../shared/agent-session/lifecycle/agent-session-acquired-account'
-import type { ClaudeProfileRouter } from '../claude-accounts/claude-profile-router'
-import { explicitClaudeAccountEnv, applyClaudeEnvPatch } from '../claude-accounts/environment'
+import type { ClaudeProfileRouter } from '../claude-accounts/profiles/routing/claude-profile-router'
+import {
+  explicitClaudeAccountEnv,
+  applyClaudeEnvPatch
+} from '../claude-accounts/runtime-auth/environment'
 import { resolveStructuredClaudeAccountHomePath } from '../runtime/agent-session/environment/structured-agent-account-home'
 
 /** The account a launch runs under is the current selection; the receipt records what it used. */

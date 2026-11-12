@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { MobileAnimatedInterpolation } from '../platform/animated-handles'
 import {
   classifyConnection,
   isConnectionOutage,
@@ -76,8 +77,11 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     presentedConnState === 'connected'
       ? showLoadingState && visibleTabs.length === 0
         ? t('session.presentation.loadingTabs', 'Loading tabs')
-        : // The tab count lives in the tab bar, so the header names the branch instead.
-          (scope.worktreeBranch ?? MOBILE_SESSION_STATUS_LABELS.connected)
+        : visibleTabs.length === 1
+          ? t('session.presentation.oneTab', '1 tab')
+          : t('session.presentation.tabCount', '{{tabCount}} tabs', {
+              tabCount: visibleTabs.length
+            })
       : showConnectionRetry
         ? t('session.presentation.tapToRetry', '{{status}} — tap to retry', {
             status: verdictDisplayLabel(connectionVerdict)
@@ -94,7 +98,7 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     !scope.activeBrowserTab
   const dockBottomInset = dockShown && (sideRail || padAvailable) ? 0 : insets.bottom
   const reducedMotion = useReducedMotionEnabled()
-  const toastRise = useMemo(
+  const toastRise = useMemo<MobileAnimatedInterpolation | 0>(
     () =>
       reducedMotion === false
         ? toastOpacityRef.current.interpolate({

@@ -1,12 +1,12 @@
 import { withClaudeAgentViewPlugin } from '../../../shared/claude-agent-view-launch'
-import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../claude-accounts/environment'
+import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../claude-accounts/runtime-auth/environment'
 import { resolveStartupShell } from '../../../shared/agent-launch/startup/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { getAppEnvironment } from '../../../shared/app-environment'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
 import { withCodexTerminalServerIsolationEnv } from '../../../shared/codex-terminal-server-isolation'
-import { getLegacyOpenCodeEnvKeysToDelete } from '../../opencode/legacy-shared-config-dir'
+import { getLegacyOpenCodeEnvKeysToDelete } from '../../opencode/status-hooks/legacy-shared-config-dir'
 import { prepareOpenCodePtyLaunch } from '../../opencode/opencode-pty-launch'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../pty/shell-startup/legacy-terminal-shim-dir'
 import { PI_PROCESS_OWNER_ENV_KEYS } from '../../pty/shell-startup/pi-process-owner-env'
@@ -26,9 +26,9 @@ import { promoteAgentTeamsShimPath, deleteRequestedEnvKeys } from './host-env/pa
 import { resolveConfiguredTerminalShellArgs } from './configured-terminal-shell-args'
 import { ptySizes } from './delivery/visibility-state'
 import {
-  canonicalClaudeSessionStampEnvKey,
-  stripInheritedClaudeSessionEnv
-} from '../../../shared/agent-launch/startup/claude-parent-session-env'
+  canonicalAgentSessionStampEnvKey,
+  stripInheritedAgentSessionEnv
+} from '../../../shared/agent-launch/startup/parent-agent-session-env'
 import { shouldSeedPreAttachPtySize } from './delivery/attached-pty-size'
 
 type TrustInput = Parameters<typeof applyAgentWorkspaceTrustToSpawn>[0]
@@ -50,12 +50,12 @@ export function assemblePtySpawnEnvDeletions(input: {
   const isolated = withCodexTerminalServerIsolationEnv(input.env, input.settings)
   const env = isolated ? { ...isolated } : undefined
   if (env) {
-    stripInheritedClaudeSessionEnv(env, { launchEnv: isolated })
+    stripInheritedAgentSessionEnv(env, { launchEnv: isolated })
   }
   let envToDelete =
     mergePtyEnvDeletions(
       input.callerEnvToDelete?.map((key) =>
-        canonicalClaudeSessionStampEnvKey(key, process.platform)
+        canonicalAgentSessionStampEnvKey(key, process.platform)
       ) ?? [],
       // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
       PI_PROCESS_OWNER_ENV_KEYS,
@@ -95,7 +95,6 @@ export type PtySpawnLaunchOptionsInput = {
     connectionId?: string | null
     shellOverride?: string
     telemetry?: { agent_kind?: unknown }
-    skipAgentWorkspaceTrust?: unknown
   }
   env: Record<string, string> | undefined
   /** Mutated: OpenCode prep may add the keys its launch must drop. */
@@ -212,7 +211,6 @@ export async function assemblePtySpawnLaunchOptions(input: PtySpawnLaunchOptions
     launchAgent: args.launchAgent,
     worktreeId: args.worktreeId,
     trustWorktreeId: args.trustWorktreeId,
-    skipForThisLaunch: args.skipAgentWorkspaceTrust === true,
     cwd: input.cwd,
     store: input.store,
     isFreshLaunch: !input.preAdoptedStablePane && launchCommand !== undefined,

@@ -1,5 +1,5 @@
 import { withOrcaClaudeChatEntrypoint } from '../../shared/agent-launch/startup/claude-chat-entrypoint'
-import { explicitClaudeAccountEnv } from '../claude-accounts/environment'
+import { explicitClaudeAccountEnv } from '../claude-accounts/runtime-auth/environment'
 import { waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
 import {
   assertStructuredAgentResolutionCurrent,

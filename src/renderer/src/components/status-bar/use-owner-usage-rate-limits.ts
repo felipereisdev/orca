@@ -12,7 +12,7 @@ import type { RateLimitState } from '../../../../shared/rate-limit-types'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
 import { useAppStore } from '../../store'
-import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
+import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
 import {
   resolveOwnerUsageRateLimits,
   type OwnerUsageFailureReason,

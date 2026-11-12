@@ -17,13 +17,12 @@ import { useTranslate } from '@/i18n/use-translate'
 import type { TabGroup } from '../../../../shared/tab-types'
 import { isStructuredTab } from '../../../../shared/agent-session/view/structured-agent-session-tab'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
-import { useClientHostedBrowserRows } from '@/lib/pane-manager/client-hosted-browser-row-state'
+import { useClientHostedBrowserRows } from '@/runtime/browser/client-hosting/client-hosted-browser-row-state'
 import { resolveClientHostedBrowserRowStripGroupId } from '../tab-bar/client-hosted-browser-row-strip-placement'
 import { useEditorGroupFileDropOwner } from '../editor/use-editor-group-file-drop-owner'
 import { cn } from '@/lib/class-names'
 import { UNFOCUSED_SPLIT_GROUP_OPACITY } from './split-group-dim'
 import { useWindowBackdropActive } from '@/app-shell/appearance/window-backdrop'
-import { useThemeBackgroundStore } from '@/store/appearance/theme-background'
 import { EditorRevealFlash } from './EditorRevealFlash'
 import { SplitPaneLanding } from './SplitPaneLanding'
 import { isSplitLandingGroup } from '@/store/slices/tabs/split-landing-groups'
@@ -77,6 +76,7 @@ export default function TabGroupPanel({
   const t = useTranslate()
   const rightSidebarOpen = useAppStore((state) => state.rightSidebarOpen)
   const sidebarOpen = useAppStore((state) => state.sidebarOpen)
+  const reserveRightTitlebarSpace = reserveClosedExplorerToggleSpace && !rightSidebarOpen
   const model = useTabGroupWorkspaceModel({ groupId, worktreeId })
   const {
     activeTab,
@@ -128,7 +128,6 @@ export default function TabGroupPanel({
   )
   const attachEditorFileDropOwner = useEditorGroupFileDropOwner({ worktreeId, groupId })
   const backdropActive = useWindowBackdropActive()
-  const themeBackgroundActive = useThemeBackgroundStore((state) => state.active)
   // Why: per-group anchor-name lets the worktree-level overlay position panes via CSS anchor positioning, so moving a tab between groups re-targets the anchor instead of remounting xterm (loses alt-screen TUI state) or reloading `<webview>`.
   const bodyAnchorName = tabGroupBodyAnchorName(groupId)
   // Why: memoize so a fresh style object each render doesn't break downstream memoization keyed on referential equality.
@@ -310,6 +309,8 @@ export default function TabGroupPanel({
               />
             ) : null}
             <div className="min-w-0 flex-1 h-full">{tabBar}</div>
+            {/* Why: overflowing tabs eat all strip whitespace; keep a window-drag handle while the right sidebar header is closed. */}
+            {reserveRightTitlebarSpace ? <div className="w-10 shrink-0" /> : null}
             <div
               className={actionChromeClassName}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -324,7 +325,7 @@ export default function TabGroupPanel({
               ) : null}
             </div>
             {/* Why: Electron drag hit-test respects no-drag only on DOM descendants, not z-index siblings, so this no-drag spacer keeps the floating right-sidebar toggle + window controls clickable. */}
-            {reserveClosedExplorerToggleSpace && !rightSidebarOpen ? (
+            {reserveRightTitlebarSpace ? (
               <div
                 className="shrink-0"
                 style={
@@ -342,10 +343,10 @@ export default function TabGroupPanel({
       <div
         ref={setBodyRef}
         data-tab-group-body-id={groupId}
-        // Why: the pane overlays paint terminals and chats above this body; only they show the theme image.
+        // Why: the pane overlays paint terminals and chats above this body; only they show the backdrop.
         data-translucent-tab-body={
           activeTab?.contentType === 'terminal' ||
-          (activeTab && isStructuredTab(activeTab) && themeBackgroundActive)
+          (activeTab && isStructuredTab(activeTab) && backdropActive)
             ? ''
             : undefined
         }

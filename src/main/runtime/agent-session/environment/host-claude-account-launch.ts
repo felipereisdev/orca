@@ -4,13 +4,13 @@ import { join } from 'node:path'
 import type { HostAccountLaunchEnv } from '../../../../shared/agent-launch/startup/host-account-launch-env'
 import type { HostClaudeProfileRefresh } from './host-claude-profile-refresh'
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
-import { claudeProfileMissing } from '../../../claude-accounts/claude-profile-launch-errors'
-import { claudeProfileMarkerPath } from '../../../claude-accounts/claude-profile-paths'
+import { claudeProfileMissing } from '../../../claude-accounts/profiles/routing/claude-profile-launch-errors'
+import { claudeProfileMarkerPath } from '../../../claude-accounts/profiles/claude-profile-paths'
 import {
   readClaudeFolderLoginAsync,
   isSameClaudeLogin
-} from '../../../claude-accounts/claude-account-folder'
-import { wslClaudeProfile } from '../../../claude-accounts/claude-profile-wsl-paths'
+} from '../../../claude-accounts/sign-in/claude-account-folder'
+import { wslClaudeProfile } from '../../../claude-accounts/profiles/wsl/claude-profile-wsl-paths'
 import { AgentSessionPreSpawnError } from '../../../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
 
 export async function prepareHostClaudeAccountLaunch(

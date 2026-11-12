@@ -1,4 +1,4 @@
-import { explicitClaudeAccountEnv } from '../../../claude-accounts/environment'
+import { explicitClaudeAccountEnv } from '../../../claude-accounts/runtime-auth/environment'
 import type { TerminalWorkspaceLaunchScope } from '../../orchestration/terminal-authority/structured-sessions/runtime-legacy-worker-terminal-recovery-types'
 import type { RuntimeAccountController } from '../../agent-session/environment/runtime-account-controller'
 import type { TerminalCreateOptions } from './terminal-create-options'

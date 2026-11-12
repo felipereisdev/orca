@@ -14,6 +14,7 @@ import {
 import { normalizeUsagePercentageDisplay } from '../../../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../../../shared/status-bar-usage-mode'
 import { normalizeStatusBarAccountSelection } from '../../../shared/status-bar-account-selection'
+import { normalizeStatusBarUsageFormat } from '../../../shared/status-bar-usage-format'
 import { clampMarkdownTocPanelWidth } from '../../../shared/markdown-toc-panel-width'
 import { clampCombinedDiffFileTreeWidth } from '../../../shared/combined-diff-file-tree-width'
 import {
@@ -63,6 +64,7 @@ export function getPersistedUI(
     statusBarClaudeAccountIdsByScope: normalizeStatusBarAccountSelection(
       state.ui?.statusBarClaudeAccountIdsByScope
     ),
+    statusBarUsageFormat: normalizeStatusBarUsageFormat(state.ui?.statusBarUsageFormat),
     statusBarCompactChangeNoticeDismissed:
       state.ui?.statusBarCompactChangeNoticeDismissed !== false,
     trayMinimizeNoticeShown: state.ui?.trayMinimizeNoticeShown === true,

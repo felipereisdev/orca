@@ -8,7 +8,8 @@ import {
 } from './cli-chat-resume-close-admission'
 import { useSyncExternalStore } from 'react'
 import { useAppStore } from '@/store'
-import { newAgentLaunchRequestId } from '@/lib/agent-session/launch/routing/agent-launch-request-id'
+
+import { createNonSecureContextUuid } from '../../../../shared/non-secure-context-uuid'
 import { adoptAgentSessionLaunchVerdict } from '@/lib/agent-session/launch/routing/agent-session-launch-plan'
 import type { StructuredAgentSessionCreateGate } from '@/lib/agent-session/launch/structured-agent-session-launch-errors'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/agent-session/structured-agent-session-provisional-tab'
@@ -168,7 +169,7 @@ export async function runCliChatResume(
     const verdict = adoptAgentSessionLaunchVerdict({
       route: 'structured-native-chat',
       ...(source.claudeAccountId ? { claudeAccountId: source.claudeAccountId } : {}),
-      requestId: newAgentLaunchRequestId(),
+      requestId: createNonSecureContextUuid(),
       agent,
       worktreeId: source.workspaceId,
       executionHostId: source.executionHostId,

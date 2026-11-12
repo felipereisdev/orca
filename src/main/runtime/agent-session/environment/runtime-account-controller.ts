@@ -8,7 +8,7 @@ export type { RuntimeAccountServices, AccountsSnapshot } from './runtime-provide
 import {
   installClaudeHostAccountResolver,
   prepareExplicitClaudeAccountLaunch
-} from '../../../claude-accounts/claude-profile-installed-router'
+} from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { hasAppEnvironment } from '../../../../shared/app-environment'
 import { getManagedDataAccountService } from '../../../managed-data-accounts/service'
 import type {
@@ -30,7 +30,7 @@ import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-gener
 import {
   getClaudeSelectionTargetForAccount,
   type ClaudeAccountSelectionTarget
-} from '../../../claude-accounts/runtime-selection'
+} from '../../../claude-accounts/selection/runtime-selection'
 import {
   hostAccountsManagedByDesktopMessage,
   type HostAccountLaunchEnv

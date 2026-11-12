@@ -1,3 +1,4 @@
+import type { AgentJournalBoundedPayload } from './agent-session-journal-bounded-payload'
 import type { DatabaseMentionReference } from '../../database/database-mention-reference'
 import type { AgentJournalCursor, AgentJournalItemIdentity } from './agent-session-journal-identity'
 import type { AgentJournalTurnScope } from './agent-session-journal-turn-scope'
@@ -42,14 +43,7 @@ export function journalRowSchemaVersion(bodies: readonly { kind: string }[]): nu
 /** A tool output or diff body. A row keeps the whole value (`truncated: false`). `truncated: true`
  *  marks a head: the copy sent to a client (fetch the whole item with `agentSession.item`), a
  *  call still running, or a row an older build saved, whose remainder is gone. */
-export type AgentJournalBoundedPayload = {
-  head: string
-  /** Byte length of the ORIGINAL payload, not of `head`. */
-  byteLength: number
-  /** sha256 of the original payload, for identification only. */
-  digest: string
-  truncated: boolean
-}
+export type { AgentJournalBoundedPayload } from './agent-session-journal-bounded-payload'
 
 // ─── Render-model items ─────────────────────────────────────────────────────
 
@@ -135,12 +129,27 @@ export type AgentJournalResolution = {
   resolvedAt: number | null
 }
 
+export const AGENT_JOURNAL_PROMPT_INTENTS = [
+  'allow_once',
+  'allow_always',
+  'reject_once',
+  'reject_always'
+] as const
+/** What choosing an approval option means, set by the provider adapter that knows its own options. */
+export type AgentJournalPromptIntent = (typeof AGENT_JOURNAL_PROMPT_INTENTS)[number]
+
+export function isAgentJournalPromptIntent(value: unknown): value is AgentJournalPromptIntent {
+  return AGENT_JOURNAL_PROMPT_INTENTS.some((intent) => intent === value)
+}
+
 export type AgentJournalPromptOption = {
   id: string
   label: string
   description?: string
   /** A block the user compares before choosing (a mockup or snippet), shown as plain monospace text. */
   preview?: string
+  /** Approvals only; absent when the option neither grants nor refuses this one call (a stop). */
+  intent?: AgentJournalPromptIntent
 }
 
 export type AgentJournalFreeTextInput = {

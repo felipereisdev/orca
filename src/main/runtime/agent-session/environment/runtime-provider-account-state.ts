@@ -1,7 +1,7 @@
 import {
   getSelectedClaudeAccountIdForTarget,
   type ClaudeAccountSelectionTarget
-} from '../../../claude-accounts/runtime-selection'
+} from '../../../claude-accounts/selection/runtime-selection'
 import type { ClaudeAccountService } from '../../../claude-accounts/service'
 import type { CodexAccountService } from '../../../codex-accounts/service'
 import type { RateLimitService } from '../../../rate-limits/service/rate-limit-service'

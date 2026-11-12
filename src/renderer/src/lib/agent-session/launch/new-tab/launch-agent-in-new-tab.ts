@@ -317,5 +317,3 @@ function openAgentInNewTab(
     ...(promptDeliveryResult ? { promptDeliveryResult } : {})
   }
 }
-
-export const launchAgentInNewTab = launchAgentInNewTabWithOutcome

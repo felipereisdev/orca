@@ -19,12 +19,7 @@ import type {
 import { contextStructuredAgentSessionCurrentWork } from '../observations/structured-agent-session-current-work'
 import { shouldQueueStructuredAgentSessionSend } from '../delivery/structured-agent-session-queued-gate'
 import type { AgentJournalMessageItem } from '../../../../shared/agent-session/journal/agent-session-journal-types'
-import type {
-  AgentSessionThreadGoalChange,
-  AgentSessionThreadGoalResult
-} from '../../../../shared/agent-session/agent-session-thread-goal-wire'
 import type { AgentSessionPromptRequest } from './structured-agent-session-turns-prompt'
-import { refuseThreadGoalUnsupported, threadGoalPlan } from './structured-agent-session-thread-goal'
 import {
   mutateStructuredAgentSession,
   runStructuredAgentSessionMutation,
@@ -47,16 +42,14 @@ import { agentSessionMutationAdmitsNow } from './structured-agent-session-mutati
 import { runQueueableStructuredAgentSessionSend } from '../delivery/structured-agent-session-queued-send'
 import { cancelStructuredAgentSessionPrompt } from './structured-agent-session-prompt-cancel'
 import { mutateWithChatStop } from './structured-agent-session-chat-stop'
-import {
-  runWithReadyStructuredAgentSessionOperation,
-  runAfterRewindStart
-} from './structured-agent-session-ready-operation'
-
-import { openWithReadyStructuredAgentSessionChild } from './structured-agent-session-operation-child'
+import { runAfterRewindStart } from './structured-agent-session-ready-operation'
 
 import type { StructuredAgentSessionCaller } from '../host/structured-agent-session-host-types'
 import '../options/structured-agent-session-options-read'
-import { recordStructuredAgentSessionOptionIntent } from '../options/structured-agent-session-option-intent'
+import {
+  noteStructuredAgentSessionOptionPick,
+  recordStructuredAgentSessionOptionIntent
+} from '../options/structured-agent-session-option-intent'
 import { confirmIdleStructuredAgentSessionOption } from '../options/structured-agent-session-idle-option'
 
 export function sendStructuredAgentSessionTurn(
@@ -268,6 +261,7 @@ export async function setStructuredAgentSessionOption(
           readsWithoutModel: caller.readsOptionsWithoutModel !== false
         })
         if (picked.ok) {
+          noteStructuredAgentSessionOptionPick(context, ctx, params, !noChoice)
           confirmIdleStructuredAgentSessionOption(context, ctx, params)
         }
         return picked
@@ -286,29 +280,4 @@ export async function setStructuredAgentSessionOption(
   )
 }
 
-export async function changeStructuredAgentSessionThreadGoal(
-  context: StructuredAgentSessionMutationContext,
-  caller: StructuredAgentSessionCaller,
-  params: { envelope: AgentSessionMutationEnvelope; change: AgentSessionThreadGoalChange }
-): Promise<AgentSessionMutationResult<AgentSessionThreadGoalResult>> {
-  const plan = threadGoalPlan(params)
-  return runWithReadyStructuredAgentSessionOperation(
-    context,
-    caller.callerKey,
-    params.envelope,
-    plan,
-    (selection) =>
-      runStructuredAgentSessionMutation(
-        context,
-        caller,
-        params.envelope,
-        threadGoalPlan({ ...params, signal: selection.signal }),
-        openWithReadyStructuredAgentSessionChild(context, params.envelope, selection)
-      ),
-    {
-      goal: true,
-      beforeAgent: (record) =>
-        refuseThreadGoalUnsupported(context.deps.adapter, context.deps.agents, record?.provider)
-    }
-  )
-}
+export { changeStructuredAgentSessionThreadGoal } from './structured-agent-session-thread-goal-mutation'

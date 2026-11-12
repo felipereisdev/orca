@@ -1,3 +1,4 @@
+import { ClaudeAccountIdParam } from './structured-agent-session-account-params'
 import * as z from 'zod'
 import { TERMINAL_KITTY_FILE_MAX_BYTES } from '../terminal/images/terminal-kitty-file'
 import { OptionalFiniteNumber, OptionalString, requiredString } from './rpc-param-primitives'
@@ -10,6 +11,7 @@ import {
 } from '../windows-terminal-shell'
 import { TERMINAL_PANE_SPLIT_SOURCES } from '../feature-education-telemetry'
 import { OptionalExecutionHostId } from './worktree-params'
+import { AGENT_STATUS_INTERACTIVE_PROMPT_MAX_LENGTH } from '../agent-status/contracts/agent-status-types'
 
 // Refuse at the authoritative host boundary instead of returning an opaque relay spawn failure.
 export const WindowsShellOverrideParam = z
@@ -186,6 +188,12 @@ export const TerminalSend = TerminalHandle.extend({
     })
     .optional(),
   requireAgentStatus: z.enum(['sendable']).optional(),
+  // A startup-dialog card's choice: refused unless the screen still reads as this card. Older hosts strip it.
+  requireStartupDialog: z
+    .string()
+    .min(1)
+    .max(AGENT_STATUS_INTERACTIVE_PROMPT_MAX_LENGTH)
+    .optional(),
   // Why: terminal-generated replies are valid input but must not transfer the shared terminal floor.
   inputKind: z.enum(['query-reply']).optional(),
   // Identify the driver; older clients fall back to the latest mobile actor (docs/mobile-presence-lock.md).
@@ -239,12 +247,7 @@ export const ResumeProviderSessionParam = z.object({
 })
 
 export const TerminalCreateParams = z.object({
-  claudeAccountId: z
-    .string()
-    .min(1)
-    .max(512)
-    .regex(/^[a-zA-Z0-9_-]+$/)
-    .optional(),
+  claudeAccountId: ClaudeAccountIdParam.optional(),
   worktree: OptionalString,
   clientMutationId: z.string().min(1).max(128).optional(),
   reconcileExisting: z.boolean().optional(),

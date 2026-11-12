@@ -1,3 +1,4 @@
+import { normalizeStatusBarPreferences } from '../../../../shared/status-bar-preferences'
 import { normalizeAgentLaunchChoices } from '../../../../shared/agent-launch/choices/agent-launch-choices'
 import {
   hasLegacyMatchTerminalSidebar,
@@ -29,8 +30,6 @@ import {
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PairedUiState, PairingLocalUiField } from '../../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../../shared/persisted-ui-state-types'
-import { normalizeStatusBarUsageMode } from '../../../../shared/status-bar-usage-mode'
-import { normalizeStatusBarAccountSelection } from '../../../../shared/status-bar-account-selection'
 import { normalizeTerminalCustomThemes } from '../../../../shared/terminal-themes/terminal-custom-themes'
 import { splitLegacyTerminalColorOverrides } from '../../../../shared/terminal-themes/terminal-color-overrides'
 import {
@@ -76,12 +75,7 @@ export function mergeWebUIState(
     usagePercentageDisplay: normalizeUsagePercentageDisplay(
       safeUpdates.usagePercentageDisplay ?? base.usagePercentageDisplay
     ),
-    statusBarUsageMode: normalizeStatusBarUsageMode(
-      safeUpdates.statusBarUsageMode ?? base.statusBarUsageMode
-    ),
-    statusBarClaudeAccountIdsByScope: normalizeStatusBarAccountSelection(
-      safeUpdates.statusBarClaudeAccountIdsByScope ?? base.statusBarClaudeAccountIdsByScope
-    )
+    ...normalizeStatusBarPreferences(safeUpdates, base)
   }
 }
 
@@ -97,6 +91,7 @@ export function mergeHostWebUIState(
     workspaceHostOrder: local.workspaceHostOrder,
     statusBarClaudeAccountIdsByScope: local.statusBarClaudeAccountIdsByScope,
     sidebarOpen: local.sidebarOpen,
+    activityBarPosition: local.activityBarPosition,
     showAgentModels: local.showAgentModels !== false,
     agentsVisibleHostIds: local.agentsVisibleHostIds,
     agentsFilterRepoIds: local.agentsFilterRepoIds,
