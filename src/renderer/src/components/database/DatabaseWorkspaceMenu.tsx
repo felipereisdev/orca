@@ -59,7 +59,12 @@ export function DatabaseWorkspaceMenu({
         <Database className="size-4 text-muted-foreground" />
         {t('database.workspace.open', 'Database connections')}
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="max-w-80">
+      <DropdownMenuSubContent
+        sideOffset={4}
+        collisionPadding={8}
+        scrollable
+        className="w-72 max-w-[calc(100vw-1rem)]"
+      >
         {error ? (
           <DropdownMenuLabel className="whitespace-normal">{error}</DropdownMenuLabel>
         ) : !controllerRuntimeId ? (
@@ -69,6 +74,7 @@ export function DatabaseWorkspaceMenu({
         ) : entries.length ? (
           entries.map((connection) => (
             <DropdownMenuItem
+              variant="create"
               key={connection.id}
               onSelect={() => {
                 if (controllerRuntimeId) {
@@ -80,8 +86,9 @@ export function DatabaseWorkspaceMenu({
                 }
               }}
             >
-              <span>@{connection.alias}</span>
-              <span className="text-muted-foreground">{connection.environment}</span>
+              <Database className="size-4 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">@{connection.alias}</span>
+              <span className="shrink-0 text-muted-foreground">{connection.environment}</span>
             </DropdownMenuItem>
           ))
         ) : (

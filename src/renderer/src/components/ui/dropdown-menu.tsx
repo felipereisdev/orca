@@ -14,6 +14,7 @@ import { MENU_SURFACE_CLASS } from './menu-surface'
 import { PortalContainerContext, usePortalContainer } from './portal-container-context'
 
 const DropdownMenuCloseContext = React.createContext<() => void>(() => {})
+const createMenuRowClass = 'gap-2 rounded-[7px] px-2 py-1.5 text-xs leading-5 font-medium'
 
 function useDropdownMenuClose() {
   return React.useContext(DropdownMenuCloseContext)
@@ -107,7 +108,7 @@ function DropdownMenuItem({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean
   /** `launch`: rows in the shared agent menu. */
-  variant?: 'default' | 'destructive' | 'launch'
+  variant?: 'default' | 'destructive' | 'launch' | 'create'
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -116,6 +117,7 @@ function DropdownMenuItem({
       data-variant={variant}
       className={cn(
         "relative flex cursor-default items-center gap-2 rounded-md px-2.5 py-1 text-[13px] leading-4 font-normal outline-hidden select-none focus:bg-black/8 dark:focus:bg-white/14 data-[search-default]:bg-black/8 dark:data-[search-default]:bg-white/14 data-[context-menu-open]:bg-black/8 dark:data-[context-menu-open]:bg-white/14 data-[disabled]:pointer-events-none data-[disabled]:opacity-40 aria-disabled:opacity-40 data-[inset]:pl-8 data-[current=true]:bg-accent data-[current=true]:data-[disabled]:opacity-100 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive! data-[variant=launch]:rounded-[7px] data-[variant=launch]:px-2 data-[variant=launch]:py-1 data-[variant=launch]:text-[12px] data-[variant=launch]:leading-4 data-[variant=launch]:font-medium",
+        variant === 'create' && createMenuRowClass,
         className
       )}
       onPointerMove={keepFocusWhileMenuCloses(onPointerMove)}
@@ -238,8 +240,10 @@ const dropdownMenuSubTriggerVariants = cva(
       variant: {
         default:
           'focus:bg-black/8 dark:focus:bg-white/14 data-[state=open]:bg-black/8 dark:data-[state=open]:bg-white/14 data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
-        'create-row':
-          'gap-2 rounded-[7px] px-2 py-1.5 text-xs leading-5 font-medium focus:bg-black/8 dark:focus:bg-white/14 data-[state=open]:bg-black/8 dark:data-[state=open]:bg-white/14 data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
+        'create-row': [
+          createMenuRowClass,
+          'focus:bg-black/8 dark:focus:bg-white/14 data-[state=open]:bg-black/8 dark:data-[state=open]:bg-white/14 data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+        ],
         'launch-row':
           'gap-0 rounded-[7px] p-0 text-xs leading-5 font-medium focus:bg-accent focus:text-accent-foreground focus-within:bg-accent focus-within:text-accent-foreground data-[search-default]:bg-accent data-[search-default]:text-accent-foreground has-[[data-context-menu-open]]:bg-accent has-[[data-context-menu-open]]:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
       }
