@@ -111,8 +111,8 @@ export function getCreateReferenceInputs(
     }
     return undefined
   }
-  const legacy = ['issue', 'pr', 'linear-issue', 'gitlab-issue', 'gitlab-mr'].find((name) =>
-    flags.has(name)
+  const legacy = ['jira-issue', 'issue', 'pr', 'linear-issue', 'gitlab-issue', 'gitlab-mr'].find(
+    (name) => flags.has(name)
   )
   if (legacy) {
     throw new RuntimeClientError('invalid_argument', `Cannot combine --reference with --${legacy}.`)

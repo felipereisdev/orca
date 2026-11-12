@@ -68,9 +68,14 @@ export function getAgileFieldIds(
       await acquire(requestSignal)
       try {
         const fields = await settleJiraSummaryRead(
-          jiraRequest<JiraRecord[]>(entry, `${apiBasePath(entry.site)}/field`, {
-            signal: requestSignal
-          }),
+          jiraRequest<JiraRecord[]>(
+            entry,
+            `${apiBasePath(entry.site)}/field`,
+            {
+              signal: requestSignal
+            },
+            4 * 1024 * 1024
+          ),
           requestSignal
         )
         return pickAgileFieldIds(Array.isArray(fields) ? fields : [])
@@ -84,8 +89,8 @@ export function getAgileFieldIds(
         }
         return fields
       })
-      .catch((error) => {
-        console.warn('[jira] field discovery failed:', error)
+      .catch(() => {
+        console.warn('[jira] field discovery unavailable; continuing without agile fields.')
         if (cache.get(key) === pending) {
           discoveryExpiresAt.set(key, Date.now() + FAILED_DISCOVERY_RETRY_MS)
         }

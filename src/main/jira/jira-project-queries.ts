@@ -5,6 +5,7 @@ import { clearToken, getClients, isAuthError } from './client'
 import { mapProject } from './jira-issue-mapping'
 import { fetchPagedRecords, type JiraRecord } from './jira-record-pages'
 import { requireStrictJiraSite, shouldSurfaceSiteFailure } from './jira-read-failure'
+import { sanitizeJiraAgentError } from './jira-agent-request'
 
 export async function readProjectsForClient(
   entry: JiraClientForSite,
@@ -48,6 +49,12 @@ export async function listProjects(
       try {
         return await readProjectsForClient(entry)
       } catch (error) {
+        if (strict) {
+          if (isAuthError(error)) {
+            clearToken(entry.site.id)
+          }
+          throw sanitizeJiraAgentError(error)
+        }
         if (isAuthError(error)) {
           clearToken(entry.site.id)
           if (shouldSurfaceSiteFailure(siteId, entries.length)) {
@@ -55,9 +62,6 @@ export async function listProjects(
           }
         } else {
           console.warn('[jira] listProjects failed:', error)
-        }
-        if (strict) {
-          throw error
         }
         return []
       } finally {

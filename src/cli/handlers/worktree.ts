@@ -1,3 +1,8 @@
+import {
+  assertWorktreeJiraFlagsCompatible,
+  resolveWorktreeCreateReferences,
+  resolveWorktreeJiraLink
+} from './worktree-jira-issue-link'
 import { withFolderSetupSupportWarning } from './folder-setup-support-warning'
 import { withWorktreeSelectorRecovery } from '../worktree-selector-recovery'
 import type {
@@ -57,11 +62,7 @@ import {
   withSetupDecisionRecovery
 } from './worktree-setup-decision-recovery'
 import { assertGitLabLinkFlagProjectsMatch } from './worktree-gitlab-link-context'
-import {
-  assertReferenceWritesSupported,
-  getCreateReferenceInputs,
-  resolveReferenceInputs
-} from '../reference-input'
+import { getCreateReferenceInputs } from '../reference-input'
 
 function getOptionalStartupAgent(flags: Map<string, string | boolean>): TuiAgent | undefined {
   const agent = getPresentStringFlag(flags, 'agent')
@@ -119,6 +120,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
   },
   'worktree create': async (context) => {
     const { flags, client, cwd, json, rawArgs } = context
+    assertWorktreeJiraFlagsCompatible(flags)
     const referenceInputs = getCreateReferenceInputs(flags)
     assertWorktreeParentFlagsCompatible(flags)
     assertWorkspaceTargetFlagsCompatible(flags)
@@ -166,12 +168,8 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       ? { repo: `id:${cwdContext.repoId}` }
       : await getCreateRepoTarget(flags, undefined, client, explicitParentWorkspace)
     await assertGitLabLinkFlagProjectsMatch(flags, client, repoTarget)
-    const linkedItems = referenceInputs
-      ? await resolveReferenceInputs(context, referenceInputs)
-      : undefined
-    if (linkedItems) {
-      await assertReferenceWritesSupported(client)
-    }
+    const jiraLink = await resolveWorktreeJiraLink(context, repoTarget)
+    const linkedItems = await resolveWorktreeCreateReferences(context, referenceInputs)
     const create = {
       // Older hosts drop `repoHostId` and keep refusing an id on several hosts, as before.
       ...repoTarget,
@@ -183,6 +181,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       ...reviewLinks,
       ...linearIssueLink,
       ...(linkedItems ? { linkedItems } : {}),
+      ...jiraLink,
       comment: getOptionalStringFlag(flags, 'comment'),
       runHooks: flags.get('run-hooks') === true,
       activate,
@@ -216,7 +215,9 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     printLineageSummary(created.result, json)
     printResult(created, json, formatWorktreeShow)
   },
-  'worktree set': async ({ flags, client, cwd, json }) => {
+  'worktree set': async (context) => {
+    const { flags, client, cwd, json } = context
+    assertWorktreeJiraFlagsCompatible(flags)
     assertWorktreeParentFlagsCompatible(
       flags,
       'Choose either --parent-worktree or --no-parent, not both.'
@@ -228,16 +229,18 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       allowNull: true
     })
     const worktree = await getRequiredWorktreeSelector(flags, 'worktree', cwd, client)
-    if (await setIfFolderWorkspace(client, flags, worktree, json)) {
+    if (await setIfFolderWorkspace(context, worktree)) {
       return
     }
     await assertGitLabLinkFlagProjectsMatch(flags, client, { worktree })
+    const jiraLink = await resolveWorktreeJiraLink(context, { worktree })
     const parentFields = await resolveSetParentFields(flags, cwd, client)
     const pending = callNamingParentEnvironment<RuntimeWorktreeSetResult>(client, 'worktree.set', {
       worktree,
       displayName: getOptionalStringFlag(flags, 'display-name'),
       ...reviewLinks,
       ...linearIssueLink,
+      ...jiraLink,
       // An explicit empty value clears the stored comment.
       comment: getOptionalStringFlagAllowingEmpty(flags, 'comment'),
       workspaceStatus: getOptionalStringFlag(flags, 'workspace-status'),

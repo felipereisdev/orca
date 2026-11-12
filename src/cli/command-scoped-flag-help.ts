@@ -2,6 +2,22 @@
 const FILE_OPEN_FOCUS_HELP =
   "--focus                Bring the user to the file (switches Orca's window to its worktree)"
 
+const JIRA_FLAG_HELP: Record<string, string> = {
+  site: '--site <id|all>        Connected Jira site; all is supported for list/search',
+  current: '--current              Read the Jira issue linked to the current Orca workspace',
+  comments: '--comments             Include Jira comments as Markdown',
+  attachments: '--attachments          Include Jira attachment IDs, filenames and sizes',
+  links: '--links                Include linked Jira issues',
+  subtasks: '--subtasks             Include Jira subtasks',
+  full: '--full                 Include all optional Jira issue sections within limits',
+  jql: '--jql <query>          Jira Query Language expression',
+  project: '--project <key>        Restrict issue search to a Jira project',
+  filter: '--filter <preset>      assigned, reported, open or done (all aliases open)',
+  limit: '--limit <n>            Maximum issues (default 20, capped at 50)',
+  out: '--out <dir>            Save attachments on the CLI machine (default current directory)',
+  all: '--all                  Download every listed attachment within limits'
+}
+
 const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
   'extension reload': {
     'extension-id':
@@ -27,6 +43,8 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     limit: '--limit <n>            Maximum matching workspaces (default 50)'
   },
   'worktree create': {
+    'jira-issue': '--jira-issue <key|url> Verify and attach a Jira issue before setup starts',
+    'jira-site': '--jira-site <id>      Connected Jira site for --jira-issue',
     branch: '--branch <name>        Git branch name to use instead of the prefixed default',
     reference:
       '--reference <url-or-jira-key> Attach an issue/review URL or Jira key; repeat for several',
@@ -34,6 +52,9 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     pr: '--pr <number>          Linked GitHub pull request number',
     'gitlab-issue': '--gitlab-issue <number|url> Linked GitLab issue in the source project',
     'gitlab-mr': '--gitlab-mr <number|url> Linked GitLab merge request in the source project'
+  },
+  'jira attachment download': {
+    id: '--id <id>             Download one attachment belonging to the issue'
   },
   'skills get': {
     full: '--full                 Print the full guide with bundled references',
@@ -76,6 +97,8 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     cursor: '--cursor <cursor>      Cursor printed by the previous page of removed work'
   },
   'worktree set': {
+    'jira-issue': '--jira-issue <key|url> Verify and attach a Jira issue to this workspace',
+    'jira-site': '--jira-site <id>      Connected Jira site for --jira-issue',
     unread: '--unread               Mark the workspace unread in the sidebar',
     read: '--read                 Mark the workspace read, clearing the unread dot'
   },
@@ -129,5 +152,8 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
 }
 
 export function formatCommandScopedFlagHelp(command: string, flag: string): string | undefined {
-  return COMMAND_SCOPED_FLAG_HELP[command]?.[flag]
+  return (
+    COMMAND_SCOPED_FLAG_HELP[command]?.[flag] ??
+    (command.startsWith('jira ') ? JIRA_FLAG_HELP[flag] : undefined)
+  )
 }

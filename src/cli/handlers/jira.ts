@@ -1,27 +1,18 @@
 import type {
-  JiraComment,
   JiraConnectionStatus,
   JiraCreateField,
-  JiraIssue,
-  JiraIssueFilter,
   JiraIssueType,
   JiraPriority,
   JiraProject,
   JiraTransition,
   JiraUser
 } from '../../shared/jira/jira-types'
-import { isResolvedJiraIssueMatch, parseJiraIssueUrl } from '../../shared/jira/jira-issue-url'
+import type { JiraIssueContextResult } from '../../shared/jira/jira-agent-access'
 import type { CommandHandler, HandlerContext } from '../dispatch'
-import {
-  getOptionalPositiveIntegerFlag,
-  getOptionalStringFlag,
-  getRequiredStringFlag
-} from '../flags'
+import { getOptionalStringFlag, getRequiredStringFlag } from '../flags'
 import { printResult } from '../format'
 import {
   formatJiraCommentList,
-  formatJiraIssue,
-  formatJiraIssueList,
   formatJiraIssueTypeList,
   formatJiraPriorityList,
   formatJiraProjectList,
@@ -29,97 +20,47 @@ import {
   formatJiraUserList
 } from '../jira-format'
 import { resolveJiraTarget } from '../jira-target'
-import { RuntimeClientError } from '../runtime-client'
 import { JIRA_WRITE_HANDLERS } from './jira-write'
+import { readJiraIssue } from './jira-issue-read'
+import { listJiraIssues, searchJiraIssues } from './jira-collection-read'
+import { downloadJiraAttachments } from './jira-attachment-download'
+import { callJiraRead } from '../jira-read-call'
+import { JIRA_LINK_WRITE_HANDLERS } from './jira-link-write'
 
 function issueTarget(context: HandlerContext) {
   return resolveJiraTarget(context, getRequiredStringFlag(context.flags, 'key'))
 }
 
-function parseFilter(context: HandlerContext): JiraIssueFilter | undefined {
-  const value = getOptionalStringFlag(context.flags, 'filter')?.trim().toLowerCase()
-  if (
-    value === undefined ||
-    value === 'assigned' ||
-    value === 'reported' ||
-    value === 'all' ||
-    value === 'done'
-  ) {
-    return value
-  }
-  throw new RuntimeClientError(
-    'invalid_argument',
-    '--filter must be assigned, reported, all or done.'
-  )
-}
-
 export const JIRA_HANDLERS: Record<string, CommandHandler> = {
   ...JIRA_WRITE_HANDLERS,
+  ...JIRA_LINK_WRITE_HANDLERS,
+  'jira label remove': JIRA_WRITE_HANDLERS['jira label rm'],
   'jira connection': async (context) => {
-    const response = await context.client.call<JiraConnectionStatus>('jira.status')
-    printResult(response, context.json, (status) =>
+    const response = await callJiraRead<JiraConnectionStatus>(context, 'jira.status')
+    const status = {
+      ...response.result,
+      ...(response.result.credentialError
+        ? { credentialError: 'Reconnect Jira in Orca Tasks on the execution host.' }
+        : {})
+    }
+    printResult({ ...response, result: status }, context.json, (status) =>
       [
         ...(status.sites ?? []).map(
           (site) =>
             `${site.id}\t${site.siteUrl}${status.selectedSiteId === site.id ? '\t(selected)' : ''}`
         ),
-        ...(status.credentialError ? [status.credentialError] : []),
+        ...(status.credentialError ? ['Reconnect Jira in Orca Tasks on the execution host.'] : []),
         'Saved Orca Jira connections; this does not verify access or agent MCP authentication.'
       ].join('\n')
     )
   },
-  'jira issue': async (context) => {
-    const target = await issueTarget(context)
-    const response = await context.client.call<JiraIssue | null>('jira.getIssue', {
-      key: target.key,
-      siteId: target.siteId,
-      strict: true
-    })
-    const issue = response.result
-    const parsed = parseJiraIssueUrl(issue?.url ?? '')
-    if (
-      !issue ||
-      !parsed ||
-      !isResolvedJiraIssueMatch(parsed, target.site, issue) ||
-      issue.key.toUpperCase() !== target.key
-    ) {
-      throw new RuntimeClientError(
-        'jira_issue_unavailable',
-        'Jira did not return the requested issue on the selected site.'
-      )
-    }
-    printResult({ ...response, result: issue }, context.json, formatJiraIssue)
-  },
-  'jira list': async (context) => {
-    const filter = parseFilter(context)
-    const limit = getOptionalPositiveIntegerFlag(context.flags, 'limit')
-    const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraIssue[]>('jira.listIssues', {
-      filter,
-      limit,
-      siteId: target.siteId,
-      strict: true
-    })
-    printResult(response, context.json, formatJiraIssueList)
-  },
-  'jira search': async (context) => {
-    const jql = getRequiredStringFlag(context.flags, 'jql').trim()
-    const limit = getOptionalPositiveIntegerFlag(context.flags, 'limit')
-    if (!jql) {
-      throw new RuntimeClientError('invalid_argument', 'JQL cannot be blank.')
-    }
-    const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraIssue[]>('jira.searchIssues', {
-      jql,
-      limit,
-      siteId: target.siteId,
-      strict: true
-    })
-    printResult(response, context.json, formatJiraIssueList)
-  },
+  'jira issue': readJiraIssue,
+  'jira list': listJiraIssues,
+  'jira search': searchJiraIssues,
+  'jira attachment download': downloadJiraAttachments,
   'jira project list': async (context) => {
     const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraProject[]>('jira.listProjects', {
+    const response = await callJiraRead<JiraProject[]>(context, 'jira.listProjects', {
       siteId: target.siteId,
       strict: true
     })
@@ -128,7 +69,7 @@ export const JIRA_HANDLERS: Record<string, CommandHandler> = {
   'jira project types': async (context) => {
     const projectIdOrKey = getRequiredStringFlag(context.flags, 'project')
     const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraIssueType[]>('jira.listIssueTypes', {
+    const response = await callJiraRead<JiraIssueType[]>(context, 'jira.listIssueTypes', {
       projectIdOrKey,
       siteId: target.siteId,
       strict: true
@@ -139,7 +80,7 @@ export const JIRA_HANDLERS: Record<string, CommandHandler> = {
     const projectIdOrKey = getRequiredStringFlag(context.flags, 'project')
     const issueTypeId = getRequiredStringFlag(context.flags, 'type')
     const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraCreateField[]>('jira.listCreateFields', {
+    const response = await callJiraRead<JiraCreateField[]>(context, 'jira.listCreateFields', {
       projectIdOrKey,
       issueTypeId,
       siteId: target.siteId,
@@ -158,16 +99,29 @@ export const JIRA_HANDLERS: Record<string, CommandHandler> = {
   },
   'jira comment list': async (context) => {
     const target = await issueTarget(context)
-    const response = await context.client.call<JiraComment[]>('jira.issueComments', {
+    const response = await callJiraRead<JiraIssueContextResult>(context, 'jira.issueContext', {
       key: target.key,
       siteId: target.siteId,
-      strict: true
+      comments: true
     })
-    printResult(response, context.json, formatJiraCommentList)
+    const truncated = response.result.truncated
+    const commentsResponse = {
+      ...response,
+      result: response.result.comments ?? [],
+      truncated,
+      _meta: { ...response._meta, truncated }
+    }
+    printResult(
+      commentsResponse,
+      context.json,
+      (comments) =>
+        formatJiraCommentList(comments) +
+        (truncated ? '\nContent truncated. Read the full issue in Jira.' : '')
+    )
   },
   'jira status list': async (context) => {
     const target = await issueTarget(context)
-    const response = await context.client.call<JiraTransition[]>('jira.listTransitions', {
+    const response = await callJiraRead<JiraTransition[]>(context, 'jira.listTransitions', {
       key: target.key,
       siteId: target.siteId,
       strict: true
@@ -177,7 +131,7 @@ export const JIRA_HANDLERS: Record<string, CommandHandler> = {
   'jira assignee list': async (context) => {
     const query = getOptionalStringFlag(context.flags, 'query')
     const target = await issueTarget(context)
-    const response = await context.client.call<JiraUser[]>('jira.listAssignableUsers', {
+    const response = await callJiraRead<JiraUser[]>(context, 'jira.listAssignableUsers', {
       key: target.key,
       query,
       siteId: target.siteId,
@@ -187,10 +141,12 @@ export const JIRA_HANDLERS: Record<string, CommandHandler> = {
   },
   'jira priority list': async (context) => {
     const target = await resolveJiraTarget(context)
-    const response = await context.client.call<JiraPriority[]>('jira.listPriorities', {
+    const response = await callJiraRead<JiraPriority[]>(context, 'jira.listPriorities', {
       siteId: target.siteId,
       strict: true
     })
     printResult(response, context.json, formatJiraPriorityList)
   }
 }
+
+JIRA_HANDLERS['jira site list'] = JIRA_HANDLERS['jira connection']

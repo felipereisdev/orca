@@ -22,6 +22,7 @@ import { COMPUTER_ERROR_CODES } from '../../../shared/computer-use-runtime-types
 import { TerminalSplitOutcomeError } from '../../../shared/workspace-layout/terminal-split-outcome'
 import { WslHostWindowsDriveRefusalError } from '../../../shared/wsl-host-windows-drive-refusal'
 import { wslDistroHoldRpcFailure } from '../../../shared/wsl-distro-stopped-hold'
+import { JIRA_AGENT_ERROR_CODES } from '../../../shared/jira/jira-agent-access'
 import { LINEAR_ERROR_CODES } from '../../../shared/linear/agent-access'
 import { AGENT_SESSION_RPC_ERROR_CODES } from '../../../shared/agent-session/agent-session-host-authority'
 import { ARTIFACT_SHARING_DISABLED_CODE } from '../../../shared/artifacts/artifact-sharing-gate'
@@ -118,6 +119,7 @@ const COMPUTER_PASSTHROUGH_CODES: ReadonlySet<string> = new Set(Object.values(CO
 const LINEAR_PASSTHROUGH_CODES: ReadonlySet<string> = new Set(LINEAR_ERROR_CODES)
 const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   ...RECIPE_VM_REFUSAL_CODES,
+  ...JIRA_AGENT_ERROR_CODES,
   WORKTREE_CREATE_COLLISION_CODE,
   WORKTREE_CREATE_EXACT_NAME_TAKEN_CODE,
   AGENT_LAUNCH_SURFACE_UNAVAILABLE_CODE,

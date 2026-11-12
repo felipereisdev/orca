@@ -4,6 +4,9 @@ export const JIRA_HANDLER_GROUP: HandlerGroup = {
   name: 'jira',
   keys: [
     'jira connection',
+    'jira site list',
+    'jira attachment download',
+    'jira link add',
     'jira issue',
     'jira list',
     'jira search',
@@ -23,6 +26,7 @@ export const JIRA_HANDLER_GROUP: HandlerGroup = {
     'jira priority clear',
     'jira label add',
     'jira label rm',
+    'jira label remove',
     'jira label set'
   ],
   load: async () => (await import('./handlers/jira.js')).JIRA_HANDLERS

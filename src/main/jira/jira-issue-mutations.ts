@@ -1,3 +1,4 @@
+import { markdownToAdf } from './markdown-adf'
 import { taskProviderFailure } from '../../shared/work-items/task-provider-failure'
 import type {
   JiraCreateIssueArgs,
@@ -168,18 +169,18 @@ export async function addIssueComment(
       `${apiBasePath(entry.site)}/issue/${encodeURIComponent(key)}/comment`,
       {
         method: 'POST',
-        body: JSON.stringify({ body: toBodyText(entry.site, body) })
+        body: JSON.stringify({
+          body: entry.site.authType === 'server' ? body : markdownToAdf(body)
+        })
       }
     )
     return { ok: true, id: comment.id }
   } catch (error) {
     if (isAuthError(error)) {
       clearToken(entry.site.id)
-      throw error
+      return { ok: false, error: 'Jira denied the comment. Check your connection in Orca Tasks.' }
     }
-    return error instanceof Error
-      ? { ok: false, error: error.message }
-      : taskProviderFailure('jira.commentFailed', 'Failed to add comment.')
+    return { ok: false, error: 'Jira did not confirm the comment. Verify in Jira before retrying.' }
   } finally {
     release()
   }

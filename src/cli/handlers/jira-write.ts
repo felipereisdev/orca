@@ -16,34 +16,10 @@ import {
 } from '../flags'
 import { printResult } from '../format'
 import { formatJiraCreate } from '../jira-format'
+import { callJiraRead } from '../jira-read-call'
 import { resolveJiraTarget } from '../jira-target'
-import { RuntimeClientError, type RuntimeRpcSuccess } from '../runtime-client'
-
-async function callJiraWrite<T>(
-  context: HandlerContext,
-  method: string,
-  params: unknown
-): Promise<RuntimeRpcSuccess<T>> {
-  try {
-    return await context.client.call<T>(method, params)
-  } catch (error) {
-    if (
-      error instanceof RuntimeClientError &&
-      [
-        'runtime_timeout',
-        'runtime_connection_failed',
-        'runtime_disconnected',
-        'runtime_unavailable'
-      ].includes(error.code)
-    ) {
-      throw new RuntimeClientError(
-        'jira_write_unverified',
-        `${error.message} The Jira change may have been applied. Verify in Jira before retrying.`
-      )
-    }
-    throw error
-  }
-}
+import { RuntimeClientError } from '../runtime-client'
+import { callJiraWrite, jiraWriteFailure } from '../jira-write-call'
 
 async function applyUpdate(context: HandlerContext, updates: JiraIssueUpdate): Promise<void> {
   if (updates.assigneeAccountId === '' || updates.priorityId === '') {
@@ -59,10 +35,7 @@ async function applyUpdate(context: HandlerContext, updates: JiraIssueUpdate): P
     updates
   })
   if (!response.result.ok) {
-    throw new RuntimeClientError(
-      'jira_write_failed',
-      `${response.result.error} Jira did not confirm the change. Verify in Jira before retrying.`
-    )
+    throw jiraWriteFailure(response.result)
   }
   printResult(
     { ...response, result: { ...response.result, key: target.key, siteId: target.siteId } },
@@ -94,7 +67,8 @@ async function transition(context: HandlerContext): Promise<void> {
     )
   }
   const target = await resolveJiraTarget(context, getRequiredStringFlag(context.flags, 'key'))
-  const { result: transitions } = await context.client.call<JiraTransition[]>(
+  const { result: transitions } = await callJiraRead<JiraTransition[]>(
+    context,
     'jira.listTransitions',
     { key: target.key, siteId: target.siteId, strict: true }
   )
@@ -116,10 +90,7 @@ async function transition(context: HandlerContext): Promise<void> {
     updates: { transitionId: matches[0].id }
   })
   if (!response.result.ok) {
-    throw new RuntimeClientError(
-      'jira_write_failed',
-      `${response.result.error} Jira did not confirm the change. Verify in Jira before retrying.`
-    )
+    throw jiraWriteFailure(response.result)
   }
   printResult(response, context.json, () => `Transitioned ${target.key} (${target.siteId})`)
 }
@@ -169,7 +140,7 @@ async function create(context: HandlerContext): Promise<void> {
   }
   const userFieldKeys = getRepeatedStringFlag(context.flags, 'user-field')
   const target = await resolveJiraTarget(context)
-  const { result: projects } = await context.client.call<JiraProject[]>('jira.listProjects', {
+  const { result: projects } = await callJiraRead<JiraProject[]>(context, 'jira.listProjects', {
     siteId: target.siteId,
     strict: true
   })
@@ -193,10 +164,7 @@ async function create(context: HandlerContext): Promise<void> {
     userFieldKeys
   })
   if (!response.result.ok) {
-    throw new RuntimeClientError(
-      'jira_write_failed',
-      `${response.result.error} Jira did not confirm the change. Verify in Jira before retrying.`
-    )
+    throw jiraWriteFailure(response.result)
   }
   printResult({ ...response, result: response.result }, context.json, formatJiraCreate)
 }
@@ -212,10 +180,7 @@ export const JIRA_WRITE_HANDLERS: Record<string, CommandHandler> = {
       { key: target.key, body, siteId: target.siteId }
     )
     if (!response.result.ok) {
-      throw new RuntimeClientError(
-        'jira_write_failed',
-        `${response.result.error} Jira did not confirm the change. Verify in Jira before retrying.`
-      )
+      throw jiraWriteFailure(response.result)
     }
     printResult(response, context.json, () => `Commented on ${target.key} (${target.siteId})`)
   },

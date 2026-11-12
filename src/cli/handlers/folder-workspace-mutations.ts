@@ -1,3 +1,5 @@
+import type { HandlerContext } from '../dispatch'
+import { resolveWorktreeJiraLink } from './worktree-jira-issue-link'
 import type {
   RuntimeStatus,
   RuntimeWorktreeRecord,
@@ -56,24 +58,23 @@ function folderGone(folderId: string): RuntimeClientError {
 
 /** `worktree set` on a folder workspace, through the folder workspace update RPC. False for any other selector. */
 export async function setIfFolderWorkspace(
-  client: RuntimeClient,
-  flags: Flags,
-  selector: string,
-  json: boolean
+  context: HandlerContext,
+  selector: string
 ): Promise<boolean> {
+  const { json } = context
   const folderId = folderIdOfSelector(selector)
   if (folderId === undefined) {
     return false
   }
-  printResult(await setFolderWorkspace(client, flags, folderId), json, formatWorktreeShow)
+  printResult(await setFolderWorkspace(context, folderId), json, formatWorktreeShow)
   return true
 }
 
 async function setFolderWorkspace(
-  client: RuntimeClient,
-  flags: Flags,
+  context: HandlerContext,
   folderId: string
 ): Promise<RuntimeRpcSuccess<RuntimeWorktreeSetResult>> {
+  const { client, flags } = context
   const key = folderWorkspaceKey(folderId)
   refuseFolderFlags(flags, [
     [
@@ -91,12 +92,14 @@ async function setFolderWorkspace(
   const workspaceStatus = getOptionalStringFlag(flags, 'workspace-status')
   const { isUnread } = getWorktreeReadFlags(flags)
   await assertUniqueIdMutationSupported(client)
+  const jiraLink = await resolveWorktreeJiraLink(context, { worktree: key })
   const updated = await client.call<{ folderWorkspace: FolderWorkspace | null }>(
     'folderWorkspace.update',
     {
       folderWorkspaceId: folderId,
       requireUniqueId: true,
       updates: {
+        ...jiraLink,
         ...(displayName !== undefined ? { name: displayName } : {}),
         ...(comment !== undefined ? { comment } : {}),
         ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),

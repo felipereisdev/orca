@@ -408,6 +408,12 @@ import {
   HostedReviewCreationEligibility,
   HostedReviewForBranch
 } from './hosted-review-params'
+import {
+  AgentAttachmentRead,
+  AgentCurrentIssue,
+  AgentIssueContext,
+  AgentSearchIssues
+} from './jira-agent-access-params'
 import { JiraFavouriteFilterParams } from './jira-favourite-filter-params'
 import {
   AssignableUsers,
@@ -429,10 +435,11 @@ import {
   UserSearch
 } from './jira-params'
 import { JiraQuickFilterStateParam } from './jira-quick-filter-params'
+import { AddRemoteLink } from './jira-remote-link-params'
 import { JiraSavedFilterMutationParam } from './jira-saved-filter-params'
 import {
-  AgentIssueContext,
-  AgentSearchIssues,
+  AgentIssueContext as AgentIssueContextOfLinearAgentAccessParams,
+  AgentSearchIssues as AgentSearchIssuesOfLinearAgentAccessParams,
   LinearCommentDelete,
   LinearCommentEdit,
   LinearCurrentContext,
@@ -1273,10 +1280,14 @@ export const RPC_PARAMS_BY_METHOD = {
   'hostedReview.forBranch': HostedReviewForBranch,
   'hostedReview.getCreationEligibility': HostedReviewCreationEligibility,
   'jira.addIssueComment': IssueCommentOfJiraParams,
+  'jira.addRemoteLink': AddRemoteLink,
+  'jira.agentSearchIssues': AgentSearchIssues,
   'jira.attachmentImage': AttachmentImage,
+  'jira.attachmentRead': AgentAttachmentRead,
   'jira.cancelGenerateIssueSummary': CancelGenerateIssueSummary,
   'jira.connect': Connect,
   'jira.createIssue': CreateIssueOfJiraParams,
+  'jira.currentIssue': AgentCurrentIssue,
   'jira.disconnect': SiteSelection,
   'jira.generateIssueSummary': GenerateIssueSummary,
   'jira.getIssue': IssueKey,
@@ -1284,6 +1295,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'jira.getProjectStatusOrder': ProjectStatusOrder,
   'jira.issueComments': IssueKey,
   'jira.issueCommentsStream': IssueKey,
+  'jira.issueContext': AgentIssueContext,
   'jira.listAssignableUsers': AssignableUsers,
   'jira.listCreateFields': ProjectIssueTypeFields,
   'jira.listFavouriteFilters': JiraFavouriteFilterParams,
@@ -1310,7 +1322,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'linear.addIssueComment': IssueCommentOfLinearParams,
   'linear.agentIssueList': LinearIssueList,
   'linear.agentProjectList': LinearProjectList,
-  'linear.agentSearchIssues': AgentSearchIssues,
+  'linear.agentSearchIssues': AgentSearchIssuesOfLinearAgentAccessParams,
   'linear.agentTeamLabels': LinearTeamLookup,
   'linear.agentTeamList': LinearWorkspaceRead,
   'linear.agentTeamMembers': LinearTeamLookup,
@@ -1327,7 +1339,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'linear.issueAddComment': LinearIssueAddComment,
   'linear.issueAttachLink': LinearIssueAttachLink,
   'linear.issueComments': LinearIssueCommentsParams,
-  'linear.issueContext': AgentIssueContext,
+  'linear.issueContext': AgentIssueContextOfLinearAgentAccessParams,
   'linear.issueCreate': LinearIssueCreate,
   'linear.issueRelationWrite': LinearIssueRelationWrite,
   'linear.issueSetState': LinearIssueSetState,

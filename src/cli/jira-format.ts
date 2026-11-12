@@ -30,6 +30,13 @@ export function formatJiraIssue(issue: JiraIssue): string {
   if (issue.siteName) {
     lines.push(`Site: ${issue.siteName}`)
   }
+  if (issue.parent) {
+    lines.push(`Parent: ${issue.parent.key} ${issue.parent.title}`)
+  }
+  if (issue.sprint) {
+    lines.push(`Sprint: ${issue.sprint}`)
+  }
+  lines.push(`Created: ${issue.createdAt}`)
   lines.push(`Updated: ${issue.updatedAt}`)
   if (issue.description) {
     lines.push('', issue.description)

@@ -4,6 +4,9 @@ import {
 } from '../../../../../../shared/jira/jira-payload-stream'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../../core'
 import { JIRA_ATTACHMENT_IMAGE_METHODS } from './jira-attachment-image'
+import { JIRA_AGENT_ACCESS_METHODS } from './jira-agent-access'
+import { JIRA_CURRENT_ISSUE_METHODS } from './jira-current-issue'
+import { JIRA_REMOTE_LINK_METHODS } from './jira-remote-link'
 import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira-favourite-filter-params'
 import {
   AssignableUsers,
@@ -53,6 +56,9 @@ function generationOwner(context: Pick<RpcContext, 'pairedDeviceId' | 'caller'>)
 
 export const JIRA_METHODS = [
   ...JIRA_ATTACHMENT_IMAGE_METHODS,
+  ...JIRA_AGENT_ACCESS_METHODS,
+  ...JIRA_CURRENT_ISSUE_METHODS,
+  ...JIRA_REMOTE_LINK_METHODS,
   defineMethod({
     name: 'jira.generateIssueSummary',
     permission: 'workspace',

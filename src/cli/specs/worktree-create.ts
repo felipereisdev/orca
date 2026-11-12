@@ -6,7 +6,7 @@ export const WORKTREE_CREATE_COMMAND_SPEC: CommandSpec = {
   repeatableFlags: ['reference'],
   summary: 'Create a new Orca-managed worktree',
   usage:
-    'orca worktree create --name <name> [--repo <selector>|--project <id-or-name> [--host <host>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--model <id>] [--effort <level>] [--surface chat|terminal] [--setup run|skip|inherit] [--base-branch <ref>] [--branch <name>] [--reference <url-or-jira-key>...] [--reference-site <id>] [--issue <number>] [--pr <number>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector> [--parent-environment <environment>]] [--no-parent] [--run-hooks] [--activate] [--retry-launch <operationId>] [--json]',
+    'orca worktree create --name <name> [--repo <selector>|--project <id-or-name> [--host <host>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--model <id>] [--effort <level>] [--surface chat|terminal] [--setup run|skip|inherit] [--base-branch <ref>] [--branch <name>] [--reference <url-or-jira-key>...] [--reference-site <id>] [--issue <number>] [--pr <number>] [--jira-issue <KEY|URL>] [--jira-site <id>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector> [--parent-environment <environment>]] [--no-parent] [--run-hooks] [--activate] [--retry-launch <operationId>] [--json]',
   allowedFlags: [
     ...GLOBAL_FLAGS,
     'repo',
@@ -27,6 +27,8 @@ export const WORKTREE_CREATE_COMMAND_SPEC: CommandSpec = {
     'issue',
     'pr',
     'linear-issue',
+    'jira-issue',
+    'jira-site',
     'gitlab-issue',
     'gitlab-mr',
     'comment',
@@ -38,6 +40,8 @@ export const WORKTREE_CREATE_COMMAND_SPEC: CommandSpec = {
     'activate'
   ],
   notes: [
+    'Do not combine --jira-issue with --reference, --issue, --pr, --linear-issue, --gitlab-issue or --gitlab-mr; use reference add for multiple references.',
+    '--jira-issue verifies a Jira key or browse URL and stores a native task attachment; use --jira-site to select one connected site.',
     'Repeat --reference to attach full issue or review URLs, or Jira issue keys, before setup or agent startup. Use --reference-site to choose the Jira site for keys. Other providers require full URLs. Cannot combine with legacy link flags.',
     'This creates a new checkout. For a fresh agent in an existing worktree, use `orca agent launch` instead.',
     'By default, Orca records the new worktree as a child of the caller context when it can infer one from the Orca terminal or current directory.',
