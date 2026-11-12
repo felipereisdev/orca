@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 export const databaseExplorerReferenceSchema = z.object({
   connectionId: z.string().uuid(),
   controllerRuntimeId: z.string().min(1).max(1024)

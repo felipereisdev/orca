@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import { databaseExplorerReferenceSchema } from './database-explorer-reference'
 import type { DatabaseConnectionSummary } from './database-contracts'
 export const databaseMentionReferenceSchema = databaseExplorerReferenceSchema.extend({
