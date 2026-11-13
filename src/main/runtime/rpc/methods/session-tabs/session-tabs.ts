@@ -1,3 +1,4 @@
+import { SESSION_TAB_DATABASE_OPEN_METHOD } from './session-tab-database-open'
 import { isDeepStrictEqual } from 'node:util'
 import { terminalCreateFeatureRequirement } from '../../startup/agent-launch-feature-requirement'
 import { terminalImageViewerSupported } from '../../../terminal/launch/terminal-image-viewer-env'
@@ -30,6 +31,7 @@ import {
 import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../shared/sidebar-inputs-switch'
 
 export const SESSION_TAB_METHODS = [
+  SESSION_TAB_DATABASE_OPEN_METHOD,
   defineMethod({
     name: 'session.tabs.list',
     permission: 'workspace',

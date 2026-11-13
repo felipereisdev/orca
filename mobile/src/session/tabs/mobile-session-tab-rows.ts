@@ -73,6 +73,7 @@ function tabContent(
     case 'markdown':
     case 'file':
       return tab.relativePath === title ? '' : tab.relativePath
+    case 'database':
     case 'agent-session':
       return ''
   }
@@ -80,6 +81,8 @@ function tabContent(
 
 function tabKindLabel(tab: MobileSessionTab): string {
   switch (tab.type) {
+    case 'database':
+      return translate('session.tabRows.database', 'Database')
     case 'browser':
       return translate('session.tabRows.browser', 'Browser')
     case 'markdown':

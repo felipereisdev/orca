@@ -61,6 +61,7 @@ export function useMobileSessionBulkClose(scope: MobileSessionCloseActionsModel)
   const visibleTabs: MobileSessionTab[] = sessionTabs
   const activeMarkdownTab = activeSessionTab?.type === 'markdown' ? activeSessionTab : null
   const activeFileTab = activeSessionTab?.type === 'file' ? activeSessionTab : null
+  const activeDatabaseTab = activeSessionTab?.type === 'database' ? activeSessionTab : null
   const activeBrowserTab = activeSessionTab?.type === 'browser' ? activeSessionTab : null
   const activePendingTerminalTab =
     activeSessionTab?.type === 'terminal' && typeof activeSessionTab.terminal !== 'string'
@@ -126,6 +127,7 @@ export function useMobileSessionBulkClose(scope: MobileSessionCloseActionsModel)
     activeMarkdownTab,
     activeFileTab,
     activeBrowserTab,
+    activeDatabaseTab,
     activePendingTerminalTab,
     isPendingTerminalRecoveryParked,
     retryPendingTerminalRecovery

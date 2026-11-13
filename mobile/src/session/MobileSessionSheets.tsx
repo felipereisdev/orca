@@ -1,3 +1,4 @@
+import { MobileDatabaseConnectionSheet } from '../database/MobileDatabaseConnectionSheet'
 import { Platform } from 'react-native'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
@@ -125,6 +126,8 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         // Why: browser/markdown creation resolve a real worktree on the host
         // (browser.tabCreate, files.createFile); the floating sentinel is
         // terminal-only over RPC, so those options hide there.
+        canCreateDatabase={!isFloatingWorkspaceRoute}
+        onCreateDatabase={() => controller.setShowDatabaseConnections(true)}
         canCreateBrowser={!isFloatingWorkspaceRoute}
         canCreateMarkdownNote={!isFloatingWorkspaceRoute && onPairedHost}
         onClose={() => setShowCreateTabDrawer(false)}
@@ -149,6 +152,23 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
           setShowCreateBrowserModal(true)
         }}
         onCreateMarkdownNote={() => void handleCreateMarkdownNote()}
+      />
+      <MobileDatabaseConnectionSheet
+        visible={controller.showDatabaseConnections}
+        opening={controller.creatingDatabase}
+        error={controller.databaseCreateError}
+        client={client}
+        worktreeId={worktreeId}
+        onClose={() => controller.setShowDatabaseConnections(false)}
+        onSelect={(connection) => void controller.handleCreateDatabase(connection)}
+      />
+      <ActionSheetModal
+        visible={controller.databaseActionTarget !== null}
+        title={controller.databaseActionTarget?.title || t('session.sheets.database', 'Database')}
+        actions={closeWithBulkActions(controller.databaseActionTarget, () =>
+          controller.setDatabaseActionTarget(null)
+        )}
+        onClose={() => controller.setDatabaseActionTarget(null)}
       />
       <ActionSheetModal
         visible={pendingDiffNotesDelivery !== null}

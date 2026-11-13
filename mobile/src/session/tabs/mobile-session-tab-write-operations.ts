@@ -2,7 +2,10 @@ import { bindDeferredRpcOperation, defineRpcOperation } from '../../transport/rp
 import { rpcResultVariant } from '../../transport/rpc/rpc-operation-result-reader'
 import '../../terminal/terminal-reply-schema'
 import { sessionCreatedTerminalTabSchema } from '../../terminal/session/mobile-session-terminal-reply-schema'
-import { sessionTabCloseReplySchema } from './mobile-session-tab-write-reply-schema'
+import {
+  sessionDatabaseTabOpenReplySchema,
+  sessionTabCloseReplySchema
+} from './mobile-session-tab-write-reply-schema'
 import { sessionWriteUnreadReplySchema } from '../../transport/rpc/rpc-uninterpreted-reply-schemas'
 import '../../terminal/quick-commands/mobile-quick-command-operations'
 
@@ -34,5 +37,15 @@ export const sessionTabActivate = bindDeferredRpcOperation(
     acceptance: 'success-result-or-skip',
     barrier: 'after-caller-barrier',
     read: rpcResultVariant('session-tab-activated', sessionWriteUnreadReplySchema)
+  })
+)
+
+export const sessionTabOpenDatabase = bindDeferredRpcOperation(
+  defineRpcOperation({
+    name: 'session.tabs-open-database',
+    method: 'session.tabs.openDatabase',
+    acceptance: 'require-result-or-throw-message',
+    barrier: 'after-caller-barrier',
+    read: rpcResultVariant('opened-database-tab', sessionDatabaseTabOpenReplySchema)
   })
 )

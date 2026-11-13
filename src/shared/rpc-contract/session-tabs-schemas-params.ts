@@ -1,3 +1,4 @@
+import { databaseExplorerReferenceSchema } from '../database/database-explorer-reference'
 import { z } from 'zod'
 import { RUNTIME_NAVIGATION_TARGETS } from '../runtime-navigation'
 import { TAB_ACTIVATION_INTENTS } from '../tab-activation-intent'
@@ -13,6 +14,10 @@ export const WorktreeTabSelector = z.object({
     .unknown()
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing worktree selector'))
+})
+
+export const OpenDatabaseTab = WorktreeTabSelector.extend({
+  connection: databaseExplorerReferenceSchema
 })
 
 export const SessionTabsUnsubscribe = WorktreeTabSelector.extend({

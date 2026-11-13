@@ -1,3 +1,4 @@
+import { buildHeadlessMobileDatabaseTabs } from './mobile-database-tab-rows'
 import {
   normalizeMobileSessionTabSelection,
   restoreLegacyMobileSessionNavigation
@@ -210,7 +211,11 @@ export abstract class OrcaRuntimeWithHydrateHeadlessMobileSessionTabsFromWorkspa
       const editorTabs = runtimeOwnedOnly
         ? []
         : buildHeadlessMobileSessionEditorTabs(entryWorktreeId, session)
+      const databaseTabs = runtimeOwnedOnly
+        ? []
+        : buildHeadlessMobileDatabaseTabs(entryWorktreeId, session)
       const tabs: RuntimeMobileSessionSnapshotTab[] = [
+        ...databaseTabs,
         ...terminalTabs,
         ...editorTabs,
         ...browserTabs
@@ -225,6 +230,7 @@ export abstract class OrcaRuntimeWithHydrateHeadlessMobileSessionTabsFromWorkspa
       const activeTab = pickHeadlessActiveTerminalTab(terminalTabs)
       const tabOrder = [
         ...collectHeadlessParentTabOrder(terminalTabs),
+        ...databaseTabs.map((tab) => tab.id),
         ...editorTabs.map((tab) => tab.id),
         ...browserTabs.map((tab) => tab.id)
       ]
@@ -239,9 +245,9 @@ export abstract class OrcaRuntimeWithHydrateHeadlessMobileSessionTabsFromWorkspa
         editorTabs.find((tab) => tab.isActive) ??
         mergedTabs[0] ??
         null
-      // Editors ride with browsers: both keep their persisted group, unlike terminal parents.
+      // Content tabs keep their persisted group, unlike terminal parents.
       const mergedBrowserOrder = mergedTabs
-        .filter((tab) => tab.type === 'browser' || tab.type === 'markdown' || tab.type === 'file')
+        .filter((tab) => tab.type !== 'terminal' && tab.type !== 'agent-session')
         .map((tab) => tab.id)
       // Restore persisted split groups or cold rebuilds coalesce them into one.
       const hasCurrentNavigation = currentNavigation?.tabGroups !== undefined

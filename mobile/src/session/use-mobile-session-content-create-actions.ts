@@ -1,3 +1,4 @@
+import { useMobileSessionDatabaseCreate } from './tabs/use-mobile-session-database-create'
 import { normalizeBrowserUrl } from '../browser/pane-view/browser-url'
 import { translate } from '../i18n/mobile-i18n'
 import { captureMobileFileMutationOwnership } from '../files/mobile-file-mutation-ownership'
@@ -24,6 +25,7 @@ const BROWSER_NAVIGATION_COMMANDS = {
 export function useMobileSessionContentCreateActions(
   scope: MobileSessionTerminalCreateActionsModel
 ) {
+  const database = useMobileSessionDatabaseCreate(scope)
   const {
     worktreeId,
     client,
@@ -204,6 +206,7 @@ export function useMobileSessionContentCreateActions(
     }
   }
   return {
+    ...database,
     handleCreateMarkdownNote,
     handleCreateBrowser,
     handleBrowserNavigationCommand

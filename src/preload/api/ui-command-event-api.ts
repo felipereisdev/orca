@@ -1,3 +1,4 @@
+import type { DatabaseTabUiApi } from '../../shared/database/database-tab-open'
 import type {
   RuntimeEditorTabReveal,
   RuntimeFileOpenPosition
@@ -77,7 +78,7 @@ import type {
 
 export type CloseActiveTabPayload = { sourceId: string }
 
-export type UiCommandEventApi = {
+export type UiCommandEventApi = DatabaseTabUiApi & {
   getJiraQuickFilters?: () => Promise<JiraQuickFilterState>
   setJiraQuickFilters?: (state: JiraQuickFilterState) => Promise<JiraQuickFilterState>
   getJiraSavedFilters?: () => Promise<JiraSavedFilterState>

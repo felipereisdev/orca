@@ -2179,7 +2179,8 @@
       "renameTerminalFailed": "Couldn't rename the terminal. {{reason}}",
       "terminalName": "Terminal name",
       "allowAutoClose": "Allow Auto-Close",
-      "agents": "Agents"
+      "agents": "Agents",
+      "database": "Database"
     },
     "tabStrip": {
       "newTab": "New tab",
@@ -2936,7 +2937,8 @@
       "markdown": "Markdown note",
       "file": "File",
       "chat": "Chat",
-      "terminal": "Terminal"
+      "terminal": "Terminal",
+      "database": "Database"
     },
     "tabBar": {
       "oneTab": "1 tab",
@@ -4992,6 +4994,57 @@
     "activity": {
       "needsWindow": "Couldn’t update. Open Orca on {{desktop}}.",
       "failed": "Couldn’t update the agent list."
+    }
+  },
+  "database": {
+    "mobile": {
+      "connections": "Databases",
+      "noConnections": "No database connections are linked to this project. Configure them in Orca on your computer.",
+      "invalidTab": "This database tab is invalid. Open the connection again from New Tab.",
+      "connectionUnavailable": "This connection is no longer available to this project. Configure project connections on your computer.",
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Query cancelled",
+      "readWrite": "Read / write",
+      "readOnly": "Read only",
+      "structure": "Structure",
+      "history": "History",
+      "deviceHistory": "Queries from this device",
+      "parameterValuesNotSaved": "Parameter values are not saved in history.",
+      "noHistory": "No queries from this device for this connection.",
+      "sqlQuery": "SQL query",
+      "starting": "Starting…",
+      "loadingResult": "Loading result…",
+      "expired": "Expired",
+      "cancelling": "Cancelling…",
+      "run": "Run",
+      "retryResult": "Reload result",
+      "checkHistoryBeforeRetry": "Check History before running again if the connection was interrupted.",
+      "queryHint": "Run a query or open a result from History.",
+      "resultExpired": "This result has expired on the host. The SQL is available above; run it again to obtain a new result.",
+      "waitingForResult": "Waiting for the host’s query result…",
+      "affectedRows": "{{count}} affected rows",
+      "rowCount": "{{count}} rows",
+      "resultTruncated": "Result limited by the host. Refine the query to retrieve other rows.",
+      "noRows": "The query returned no rows.",
+      "controllerChanged": "The database controller has changed. Open the connection again from New Tab.",
+      "schemas": "Schemas",
+      "filterStructure": "Filter structure",
+      "previewSql": "Prepare SELECT · 100 rows",
+      "emptyStructure": "No matching items.",
+      "structureTruncated": "The host limited this structure listing.",
+      "offline": "Connect to the host to use databases.",
+      "updateHost": "Update Orca on this workspace’s host to use databases.",
+      "requestFailed": "The database request failed",
+      "resultConnectionMismatch": "The database result belongs to another connection",
+      "queryConnectionMismatch": "The database query belongs to another connection",
+      "sql": "SQL",
+      "sqlPlaceholder": "SELECT …",
+      "editSql": "Edit SQL",
+      "openFailed": "Could not open database",
+      "opening": "Opening database…"
     }
   }
 }

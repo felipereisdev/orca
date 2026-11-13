@@ -32,6 +32,7 @@ export function useMobileSessionTerminalSendActions(scope: MobileSessionTerminal
     setActionTarget,
     setMarkdownActionTarget,
     setFileActionTarget,
+    setDatabaseActionTarget,
     setBrowserActionTarget,
     setAgentSessionActionTarget,
     deviceTokenRef,
@@ -198,6 +199,7 @@ export function useMobileSessionTerminalSendActions(scope: MobileSessionTerminal
     setActionTarget,
     setMarkdownActionTarget,
     setFileActionTarget,
+    setDatabaseActionTarget,
     setBrowserActionTarget,
     setAgentSessionActionTarget
   })

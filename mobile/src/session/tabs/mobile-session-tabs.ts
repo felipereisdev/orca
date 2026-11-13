@@ -3,6 +3,7 @@ import type {
   RuntimeMobileSessionAgentTabStatus,
   RuntimeMobileSessionBrowserTab,
   RuntimeMobileSessionFileTab,
+  RuntimeMobileSessionDatabaseTab,
   RuntimeMobileSessionMarkdownTab,
   RuntimeMobileSessionTerminalClientTab,
   RuntimeMobileSessionTerminalTab
@@ -89,6 +90,7 @@ export type MobileSessionTab =
       // The phone also opens branch and commit diffs, which the host never publishes.
       diffSource?: RuntimeMobileSessionFileTab['diffSource'] | 'branch' | 'commit'
     })
+  | Pick<RuntimeMobileSessionDatabaseTab, 'type' | 'id' | 'title' | 'entityId' | 'isActive'>
   | MobileBrowserTab
 
 export type SessionTabsResult = Pick<

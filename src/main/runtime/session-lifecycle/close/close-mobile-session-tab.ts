@@ -265,6 +265,8 @@ export abstract class OrcaRuntimeWithCloseMobileSessionTab extends OrcaRuntimeWi
       }
       await this.closeMobileSessionTerminalPane(worktreeId, tab)
       return finishCommittedClose()
+    } else if (tab.type === 'database' && this.shouldCloseDatabaseTabInMain()) {
+      await this.closeMobileDatabaseTab(worktreeId, tab.id, options.force)
     } else if (tab.type === 'browser') {
       // Client-hosted, offscreen and renderer browser pages each own their retirement path.
       const clientPage = tab.browserPageId

@@ -15,6 +15,7 @@ import {
 import { AGENT_SESSION_CURRENT_REQUESTS_CLIENT_CAPABILITY } from '../../../../src/shared/agent-session/requests/agent-session-current-requests-capability'
 import '../../../../src/shared/protocol-version'
 import {
+  SESSION_TABS_DATABASE_RUNTIME_CAPABILITY,
   AGENT_STATUS_RESTORED_UNCONFIRMED_RUNTIME_CAPABILITY,
   SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY
 } from '../../../../src/shared/session-tabs-runtime-capabilities'
@@ -29,6 +30,7 @@ import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../../src
 import { COMPRESSED_FRAMES_CLIENT_CAPABILITY } from '../../../../src/shared/remote-runtime/e2ee/paired-e2ee-compressed-frame'
 
 export const MOBILE_RUNTIME_CLIENT_CAPABILITIES = remoteRuntimeClientCapabilities([
+  SESSION_TABS_DATABASE_RUNTIME_CAPABILITY,
   AGENT_SESSION_COMMANDS_ON_REQUEST_CAPABILITY,
   AGENT_SESSION_COHERENT_MODEL_CATALOG_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
@@ -52,6 +54,7 @@ export const MOBILE_RUNTIME_CLIENT_CAPABILITIES = remoteRuntimeClientCapabilitie
   // Reads `agent_launch_tab_closed` (a user closed its tab, which stopped it) as a definite answer.
   AGENT_LAUNCH_TAB_CLOSED_CLIENT_CAPABILITY,
   // Native chat offers no Stop for a turn the host restored but could not confirm.
+  SESSION_TABS_DATABASE_RUNTIME_CAPABILITY,
   AGENT_STATUS_RESTORED_UNCONFIRMED_RUNTIME_CAPABILITY,
   AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUEUED_IMAGE_CARDS_CLIENT_CAPABILITY,

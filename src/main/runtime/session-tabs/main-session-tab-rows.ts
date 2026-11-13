@@ -21,6 +21,7 @@ export type MainSessionTabRows = Omit<
 function isMainRow(row: RuntimeMobileSessionSnapshotTab): boolean {
   return (
     row.type === 'terminal' ||
+    row.type === 'database' ||
     (row.type === 'file' && row.mode !== 'diff') ||
     (row.type === 'markdown' && row.mode === 'edit')
   )

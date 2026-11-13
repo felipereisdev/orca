@@ -6,6 +6,7 @@ export function sessionCommandDockShown(controller: MobileSessionController): bo
     !controller.activeMarkdownTab &&
     !controller.activeFileTab &&
     !controller.activeBrowserTab &&
+    !controller.activeDatabaseTab &&
     !controller.showNativeChat
   )
 }

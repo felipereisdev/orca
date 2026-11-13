@@ -158,8 +158,19 @@ function projectTab(tab: LayoutTab, scope: Scope): RuntimeMobileSessionSnapshotT
     case 'check-details':
       // Virtual views have no file to read and no compatible session.tabs kind.
       return []
-    // A simulator needs the desktop to draw it; the window lists none either.
     case 'database':
+      return [
+        {
+          type: 'database',
+          id: tab.id,
+          entityId: tab.entityId,
+          title:
+            tab.customTitle?.trim() || scope.facts.tabLabels[scope.key]?.[tab.id] || '@database',
+          ...tabProps(tab),
+          isActive: scope.activeTabId === tab.id
+        }
+      ]
+    // A simulator needs the desktop to draw it; the window lists none either.
     case 'simulator':
       return []
   }

@@ -137,11 +137,22 @@ export type RuntimeMobileSessionAgentTabStatus = Pick<
   | 'structuredHostOwned'
 >
 
+export type RuntimeMobileSessionDatabaseTab = {
+  type: 'database'
+  id: string
+  title: string
+  entityId: string
+  color?: string | null
+  isPinned?: boolean
+  isActive: boolean
+}
+
 export type RuntimeMobileSessionSnapshotTab =
   | RuntimeMobileSessionTerminalTab
   | RuntimeMobileSessionMarkdownTab
   | RuntimeMobileSessionFileTab
   | RuntimeMobileSessionBrowserTab
+  | RuntimeMobileSessionDatabaseTab
   | RuntimeMobileSessionAgentTab
 
 export type RuntimeMobileSessionTerminalClientTab =
@@ -153,4 +164,5 @@ export type RuntimeMobileSessionClientTab =
   | RuntimeMobileSessionMarkdownTab
   | RuntimeMobileSessionFileTab
   | RuntimeMobileSessionBrowserTab
+  | RuntimeMobileSessionDatabaseTab
   | RuntimeMobileSessionAgentTab

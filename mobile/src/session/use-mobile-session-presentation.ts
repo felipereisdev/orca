@@ -30,6 +30,7 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     terminalsLoaded,
     activeHandle,
     creating,
+    creatingDatabase,
     creatingBrowser,
     creatingMarkdown,
     toastOpacityRef,
@@ -52,7 +53,7 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     terminalsLoaded,
     visibleTabCount: visibleTabs.length,
     activeHandle,
-    createInFlight: creating || creatingBrowser || creatingMarkdown,
+    createInFlight: creating || creatingBrowser || creatingMarkdown || creatingDatabase,
     stateRef: initialSessionAutoCreateRef,
     worktreeId,
     consumeCreationRoute: () => router.setParams({ created: undefined }),
@@ -92,7 +93,8 @@ export function useMobileSessionPresentation(scope: MobileSessionBulkCloseModel)
     !scope.showNativeChat &&
     !scope.activeMarkdownTab &&
     !scope.activeFileTab &&
-    !scope.activeBrowserTab
+    !scope.activeBrowserTab &&
+    !scope.activeDatabaseTab
   const dockBottomInset = dockShown && (sideRail || padAvailable) ? 0 : insets.bottom
   const reducedMotion = useReducedMotionEnabled()
   const toastRise = useMemo<MobileAnimatedInterpolation | 0>(

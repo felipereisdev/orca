@@ -7,6 +7,7 @@ import {
 import { Animated, View, Text, Pressable, ActivityIndicator } from 'react-native'
 import { saveTerminalTextScale } from '../storage/preferences'
 import { MobileBrowserPane } from '../browser/MobileBrowserPane'
+import { MobileSessionDatabasePane } from '../database/MobileSessionDatabasePane'
 import { TerminalPaneView } from '../terminal/session/TerminalPaneView'
 import { MountedTerminalPanes } from '../terminal/session/mounted-terminal-lru'
 import { MobileNativeChatOverlay } from './native-chat/MobileNativeChatOverlay'
@@ -49,9 +50,6 @@ export function MobileSessionActiveContent({
     worktreeId,
     client,
     terminals,
-    terminalTextScale,
-    setTerminalTextScale,
-    terminalTextScaleRevisionRef,
     activeHandle,
     terminalSplitActive,
     visibleTerminalHandles,
@@ -168,6 +166,8 @@ export function MobileSessionActiveContent({
           setShowCreateTabDrawer(true)
         }}
       />
+    ) : controller.activeDatabaseTab ? (
+      <MobileSessionDatabasePane controller={controller} keyboardLift={keyboardLift} />
     ) : activeMarkdownTab ? (
       <View style={styles.markdownFrame}>
         <MarkdownReader
@@ -309,11 +309,11 @@ export function MobileSessionActiveContent({
                     : activeTerminalKeyboardLift
               }
               terminalTheme={terminal.terminalTheme}
-              textScale={terminalTextScale}
+              textScale={controller.terminalTextScale}
               onTextScaleChange={(scale) => {
                 // Why: pinch-to-zoom reports a new preset; persist it so the size sticks across panes and launches.
-                terminalTextScaleRevisionRef.current += 1
-                setTerminalTextScale(scale)
+                controller.terminalTextScaleRevisionRef.current += 1
+                controller.setTerminalTextScale(scale)
                 void saveTerminalTextScale(scale)
               }}
               onRef={setTerminalWebViewRef}

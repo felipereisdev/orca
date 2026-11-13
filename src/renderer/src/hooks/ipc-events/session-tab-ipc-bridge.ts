@@ -1,3 +1,4 @@
+import { syncRuntimeGraph } from '@/runtime/sync-runtime-graph/graph-publication'
 import { hasUnsentBrowserNotes } from '@/store/slices/browser/annotations/browser-page-annotation'
 import { isLocalSessionTabCloseOwned } from '@/runtime/web-session-tabs-sync/closing/local-session-tab-close-owner'
 import { closeMobileSessionTabInStore } from '@/runtime/web-session-tabs-sync/closing/mobile-session-tab-close'
@@ -24,6 +25,38 @@ import { resolveWindowTabIdForHostTab } from './host-session-tab-target'
 import { moveTerminalPaneToNewTabForClient } from '@/components/terminal-pane/layout/detach/terminal-pane-move-request-routing'
 
 export function registerSessionTabIpcBridge(unsubs: (() => void)[]): void {
+  if (window.api.ui.onDatabaseTabOpenRequest) {
+    unsubs.push(
+      window.api.ui.onDatabaseTabOpenRequest(
+        ({ requestId, worktreeId, entityId, tabId, title }) => {
+          void (async () => {
+            try {
+              const state = useAppStore.getState()
+              const existing = state.unifiedTabsByWorktree[worktreeId]?.find(
+                (tab) => tab.contentType === 'database' && tab.entityId === entityId
+              )
+              const id =
+                existing?.id ??
+                state.createUnifiedTab(worktreeId, 'database', {
+                  id: tabId,
+                  entityId,
+                  label: title,
+                  activate: false
+                }).id
+              await syncRuntimeGraph()
+              window.api.ui.respondDatabaseTabOpen({ requestId, tabId: id })
+            } catch (error) {
+              window.api.ui.respondDatabaseTabOpen({
+                requestId,
+                error: error instanceof Error ? error.message : 'database_tab_open_failed'
+              })
+            }
+          })()
+        }
+      )
+    )
+  }
+
   unsubs.push(
     window.api.ui.onCloseSessionTab(({ tabId, worktreeId }) => {
       if (isLocalSessionTabCloseOwned(worktreeId, tabId)) {

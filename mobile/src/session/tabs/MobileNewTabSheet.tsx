@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { FileText, Globe, SquareTerminal } from 'lucide-react-native'
+import { Database, FileText, Globe, SquareTerminal } from 'lucide-react-native'
 import { TUI_AGENT_DISPLAY_NAMES } from '../../../../src/shared/agent-launch/catalog/tui-agent-display-names'
 import { ActionSheetContent, type ActionSheetAction } from '../../components/ActionSheetModal'
 import { BottomDrawer } from '../../components/bottom-drawer/BottomDrawer'
@@ -26,6 +26,8 @@ type Props = {
   agentOptions: readonly MobileNewTabAgentOption[]
   /** Loading, none, other-server or error; shown instead of the agent grid. */
   agentStatusRow: ActionSheetAction | null
+  canCreateDatabase: boolean
+  onCreateDatabase: () => void
   canCreateBrowser: boolean
   canCreateMarkdownNote: boolean
   onClose: () => void
@@ -41,6 +43,8 @@ export function MobileNewTabSheet({
   workspaceName,
   agentOptions,
   agentStatusRow,
+  canCreateDatabase,
+  onCreateDatabase,
   canCreateBrowser,
   canCreateMarkdownNote,
   onClose,
@@ -139,6 +143,15 @@ export function MobileNewTabSheet({
           leading={<SquareTerminal size={16} color={iconColor} />}
           onPress={() => closeAndRun(onCreateTerminal)}
         />
+        {canCreateDatabase ? (
+          <ListRow
+            key="database"
+            title={t('session.sheets.database', 'Database')}
+            leading={<Database size={16} color={iconColor} />}
+            navigates
+            onPress={() => closeThen(onCreateDatabase)}
+          />
+        ) : null}
         {canCreateBrowser ? (
           <ListRow
             key="browser"

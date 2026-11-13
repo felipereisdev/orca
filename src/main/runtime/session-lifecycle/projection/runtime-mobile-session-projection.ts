@@ -112,7 +112,7 @@ export function projectRuntimeMobileSessionTabs(
       })
       continue
     }
-    if (tab.type === 'markdown' || tab.type === 'file') {
+    if (tab.type === 'markdown' || tab.type === 'file' || tab.type === 'database') {
       tabs.push(tab)
       continue
     }

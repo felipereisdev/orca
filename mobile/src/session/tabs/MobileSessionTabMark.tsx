@@ -1,4 +1,4 @@
-import { File, FileText, Globe, SquareTerminal } from 'lucide-react-native'
+import { Database, File, FileText, Globe, SquareTerminal } from 'lucide-react-native'
 import { MobileAgentIcon } from '../../components/MobileAgentIcon'
 import { colors } from '../../theme/mobile-theme'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
@@ -17,12 +17,14 @@ export function MobileSessionTabMark({
     return <MobileAgentIcon agentId={row.agentId} size={size} />
   }
   const Icon =
-    row.tab.type === 'browser'
-      ? Globe
-      : row.tab.type === 'markdown'
-        ? FileText
-        : row.tab.type === 'file'
-          ? File
-          : SquareTerminal
+    row.tab.type === 'database'
+      ? Database
+      : row.tab.type === 'browser'
+        ? Globe
+        : row.tab.type === 'markdown'
+          ? FileText
+          : row.tab.type === 'file'
+            ? File
+            : SquareTerminal
   return <Icon size={size} color={colors.textSecondary} strokeWidth={2.1} />
 }

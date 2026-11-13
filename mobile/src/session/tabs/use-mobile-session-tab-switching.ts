@@ -170,7 +170,7 @@ export function useMobileSessionTabSwitching(scope: MobileSessionKeyboardStateMo
           .then(reportActivation)
           .catch(() => {})
       }
-      if (tab.type === 'browser') {
+      if (tab.type === 'browser' || tab.type === 'database') {
         return
       }
       if (tab.type === 'file') {

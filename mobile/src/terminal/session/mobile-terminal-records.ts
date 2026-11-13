@@ -43,6 +43,7 @@ export type MobileTerminalSessionTab = Partial<
 }
 
 type MobileSessionTabLike =
+  | { type: 'database'; id: string; title?: string; entityId: string; isActive?: boolean }
   | MobileTerminalSessionTab
   | {
       type: 'markdown'
@@ -188,6 +189,8 @@ function mobileSessionTabEqual(
         a.language === b.language &&
         a.isDirty === b.isDirty
       )
+    case 'database':
+      return b.type === 'database' && a.entityId === b.entityId
     case 'browser':
       return (
         b.type === 'browser' &&

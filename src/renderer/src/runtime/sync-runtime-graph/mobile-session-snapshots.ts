@@ -139,6 +139,21 @@ export function buildMobileSessionTabSnapshots(
         )
         emittedEditorFileIds.add(file.id)
         emittedEditorTabIds.add(item.tabId ?? item.id)
+      } else if (item.type === 'database') {
+        const tab = unifiedTabById.get(item.tabId ?? item.id)
+        if (tab?.contentType === 'database') {
+          tabs.push({
+            type: 'database',
+            id: tab.id,
+            entityId: tab.entityId,
+            title: tab.customLabel?.trim() || tab.label || '@database',
+            color: tab.color,
+            isPinned: tab.isPinned,
+            isActive: inputs.groups.some(
+              (group) => group.id === inputs.activeGroupId && group.activeTabId === tab.id
+            )
+          })
+        }
       } else if (item.type === 'browser') {
         const workspace = browserWorkspaceById.get(item.id)
         if (!workspace || !isMobilePublishableBrowserWorkspace(workspace)) {

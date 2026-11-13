@@ -10,11 +10,13 @@ import type { Terminal } from '../../terminal/session/mobile-terminal-model'
 
 type MarkdownTab = Extract<MobileSessionTab, { type: 'markdown' }>
 type FileTab = Extract<MobileSessionTab, { type: 'file' }>
+type DatabaseTab = Extract<MobileSessionTab, { type: 'database' }>
 type BrowserTab = Extract<MobileSessionTab, { type: 'browser' }>
 type AgentSessionTab = Extract<MobileSessionTab, { type: 'agent-session' }>
 type SetActionTarget<T> = Dispatch<SetStateAction<T | null>>
 
 export function useMobileSessionTabActionTargets() {
+  const [databaseActionTarget, setDatabaseActionTarget] = useState<DatabaseTab | null>(null)
   const [actionTarget, setActionTarget] = useState<Terminal | null>(null)
   const [markdownActionTarget, setMarkdownActionTarget] = useState<MarkdownTab | null>(null)
   const [fileActionTarget, setFileActionTarget] = useState<FileTab | null>(null)
@@ -24,6 +26,8 @@ export function useMobileSessionTabActionTargets() {
   )
 
   return {
+    databaseActionTarget,
+    setDatabaseActionTarget,
     actionTarget,
     agentSessionActionTarget,
     browserActionTarget,
@@ -42,6 +46,7 @@ export function useMobileSessionTabActionSheetOpener(args: {
   setActionTarget: SetActionTarget<Terminal>
   setMarkdownActionTarget: SetActionTarget<MarkdownTab>
   setFileActionTarget: SetActionTarget<FileTab>
+  setDatabaseActionTarget: SetActionTarget<DatabaseTab>
   setBrowserActionTarget: SetActionTarget<BrowserTab>
   setAgentSessionActionTarget: SetActionTarget<AgentSessionTab>
 }): (tab: MobileSessionTab) => void {
@@ -49,6 +54,7 @@ export function useMobileSessionTabActionSheetOpener(args: {
     activeHandleRef,
     setActionTarget,
     setAgentSessionActionTarget,
+    setDatabaseActionTarget,
     setBrowserActionTarget,
     setFileActionTarget,
     setMarkdownActionTarget
@@ -64,6 +70,8 @@ export function useMobileSessionTabActionSheetOpener(args: {
           title: tab.title,
           isActive: tab.terminal === activeHandleRef.current
         })
+      } else if (tab.type === 'database') {
+        setDatabaseActionTarget(tab)
       } else if (tab.type === 'markdown') {
         setMarkdownActionTarget(tab)
       } else if (tab.type === 'file') {
@@ -78,6 +86,7 @@ export function useMobileSessionTabActionSheetOpener(args: {
       activeHandleRef,
       setActionTarget,
       setAgentSessionActionTarget,
+      setDatabaseActionTarget,
       setBrowserActionTarget,
       setFileActionTarget,
       setMarkdownActionTarget

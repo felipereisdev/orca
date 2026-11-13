@@ -252,7 +252,7 @@ export type RuntimeMobileSessionTabsSnapshot = {
   snapshotVersion: number
   activeGroupId: string | null
   activeTabId: string | null
-  activeTabType: 'terminal' | 'markdown' | 'file' | 'browser' | 'agent-session' | null
+  activeTabType: 'terminal' | 'markdown' | 'file' | 'browser' | 'agent-session' | 'database' | null
   tabGroups?: RuntimeMobileSessionTabGroup[]
   tabGroupLayout?: TabGroupLayoutNode | null
   retiredTerminalSurfaces?: RuntimeMobileSessionRetiredTerminalSurface[]
@@ -277,7 +277,7 @@ export type RuntimeMobileSessionTabsResult = {
   navigationIntent?: 'follow'
   activeGroupId: string | null
   activeTabId: string | null
-  activeTabType: 'terminal' | 'markdown' | 'file' | 'browser' | 'agent-session' | null
+  activeTabType: 'terminal' | 'markdown' | 'file' | 'browser' | 'agent-session' | 'database' | null
   tabGroups?: RuntimeMobileSessionTabGroup[]
   tabGroupLayout?: TabGroupLayoutNode | null
   retiredTerminalSurfaces?: RuntimeMobileSessionRetiredTerminalSurface[]

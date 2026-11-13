@@ -2871,7 +2871,8 @@
       "unsavedMarkdown": "Alterações em Markdown não salvas",
       "urlPrompt": "Digite uma URL ou deixe em branco para abrir uma nova aba.",
       "allowAutoClose": "Permitir fechamento automático",
-      "renameTerminalFailed": "Não foi possível renomear o terminal. {{reason}}"
+      "renameTerminalFailed": "Não foi possível renomear o terminal. {{reason}}",
+      "database": "Base de dados"
     },
     "sourceControlLaunchAgent": {
       "noEnabledAgent": "Nenhum agente de IA ativado foi detectado neste host do espaço de trabalho.",
@@ -3231,6 +3232,9 @@
     },
     "usePrTextAction": {
       "updateFailed": "Falha ao atualizar o pull request."
+    },
+    "tabRows": {
+      "database": "Base de dados"
     }
   },
   "settings": {
@@ -4917,6 +4921,57 @@
           }
         }
       }
+    }
+  },
+  "database": {
+    "mobile": {
+      "connections": "Bases de dados",
+      "offline": "Conecte-se ao host para usar as bases de dados.",
+      "updateHost": "Atualize o Orca no host deste workspace para usar as bases de dados.",
+      "controllerChanged": "O controlador da base de dados mudou. Abra a conexão novamente em Nova Aba.",
+      "noConnections": "Não há conexões de base de dados vinculadas a este projeto. Configure-as no Orca do computador.",
+      "schemas": "Schemas",
+      "filterStructure": "Filtrar estrutura",
+      "previewSql": "Preparar SELECT · 100 linhas",
+      "emptyStructure": "Nenhum item encontrado.",
+      "structureTruncated": "O host limitou esta listagem da estrutura.",
+      "queryHint": "Execute uma consulta ou abra um resultado no Histórico.",
+      "resultExpired": "Este resultado expirou no host. O SQL está disponível acima; execute-o novamente para obter um novo resultado.",
+      "cancelled": "Consulta cancelada",
+      "waitingForResult": "Aguardando o resultado da consulta no host…",
+      "affectedRows": "{{count}} linhas afetadas",
+      "rowCount": "{{count}} linhas",
+      "resultTruncated": "Resultado limitado pelo host. Refine a consulta para obter outras linhas.",
+      "noRows": "A consulta não retornou linhas.",
+      "invalidTab": "Esta aba de base de dados é inválida. Abra a conexão novamente em Nova Aba.",
+      "connectionUnavailable": "Esta conexão não está mais disponível para o projeto. Configure as conexões no computador.",
+      "queued": "Na fila",
+      "running": "Em execução",
+      "completed": "Concluída",
+      "failed": "Falhou",
+      "readWrite": "Leitura e escrita",
+      "readOnly": "Somente leitura",
+      "structure": "Estrutura",
+      "history": "Histórico",
+      "deviceHistory": "Consultas deste dispositivo",
+      "parameterValuesNotSaved": "Os valores dos parâmetros não são salvos no histórico.",
+      "noHistory": "Nenhuma consulta deste dispositivo para esta conexão.",
+      "sqlQuery": "Consulta SQL",
+      "starting": "Iniciando…",
+      "loadingResult": "Carregando resultado…",
+      "expired": "Expirado",
+      "cancelling": "Cancelando…",
+      "run": "Executar",
+      "retryResult": "Recarregar resultado",
+      "checkHistoryBeforeRetry": "Verifique o Histórico antes de executar novamente se a conexão foi interrompida.",
+      "sql": "SQL",
+      "sqlPlaceholder": "SELECT …",
+      "requestFailed": "A solicitação à base de dados falhou.",
+      "resultConnectionMismatch": "O resultado pertence a outra conexão.",
+      "queryConnectionMismatch": "A consulta pertence a outra conexão.",
+      "editSql": "Editar SQL",
+      "openFailed": "Não foi possível abrir a base de dados.",
+      "opening": "Abrindo base de dados…"
     }
   }
 }

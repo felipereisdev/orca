@@ -35,6 +35,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
     pendingDiffNotesDelivery,
     setPendingDiffNotesDelivery,
     creating,
+    creatingDatabase,
     creatingBrowser,
     creatingMarkdown,
     setShowCreateTabDrawer,
@@ -166,7 +167,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
     repoContextLoaded: prRepoContextLoaded,
     hostedChecksSupported: prIsGithubRepo
   })
-  const createTabBusy = creating || creatingBrowser || creatingMarkdown
+  const createTabBusy = creating || creatingBrowser || creatingMarkdown || creatingDatabase
   const handleOpenNewTab = () => {
     setCreateError('')
     setShowCreateTabDrawer(true)
