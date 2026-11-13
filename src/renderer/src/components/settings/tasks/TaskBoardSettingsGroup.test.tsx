@@ -16,7 +16,7 @@ function savedJiraRules(): unknown {
 }
 
 beforeEach(() => {
-  ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   updateSettings.mockClear()
   useAppStore.setState({
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the group only reads taskBoard.

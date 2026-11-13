@@ -31,7 +31,21 @@ function githubCard(category: 'todo' | 'done', labels: string[]): TaskBoardCard 
     category,
     labels,
     updatedAt: '2026-01-01T00:00:00Z',
-    source: {} as TaskBoardCard['source']
+    source: {
+      provider: 'github',
+      item: {
+        id: 'github:repo:1',
+        type: 'issue',
+        number: 1,
+        title: 't',
+        state: category === 'done' ? 'closed' : 'open',
+        url: 'u',
+        labels,
+        updatedAt: '2026-01-01T00:00:00Z',
+        author: null,
+        repoId: 'repo'
+      }
+    }
   }
 }
 

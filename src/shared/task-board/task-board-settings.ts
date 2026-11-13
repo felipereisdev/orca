@@ -1,4 +1,4 @@
-import { TASK_PROVIDERS, type TaskProvider } from '../work-items/task-providers'
+import type { TaskProvider } from '../work-items/task-providers'
 
 export type TaskBoardRule = { match: string; statusId: string }
 export type TaskBoardProviderSettings = {
@@ -64,9 +64,11 @@ function normalizeProvider(value: unknown): TaskBoardProviderSettings {
 export function normalizeTaskBoardSettings(value: unknown): TaskBoardSettings {
   const raw = isRecord(value) ? value : {}
   const rawProviders = isRecord(raw.providers) ? raw.providers : {}
-  const providers = {} as Record<TaskProvider, TaskBoardProviderSettings>
-  for (const provider of TASK_PROVIDERS) {
-    providers[provider] = normalizeProvider(rawProviders[provider])
+  const providers: Record<TaskProvider, TaskBoardProviderSettings> = {
+    github: normalizeProvider(rawProviders.github),
+    gitlab: normalizeProvider(rawProviders.gitlab),
+    linear: normalizeProvider(rawProviders.linear),
+    jira: normalizeProvider(rawProviders.jira)
   }
   return {
     doneStatusId: cleanString(raw.doneStatusId, MAX_ID_LENGTH) || DEFAULT_DONE_STATUS_ID,

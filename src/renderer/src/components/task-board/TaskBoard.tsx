@@ -125,7 +125,7 @@ export function TaskBoard({
             <Tooltip open={reason !== null}>
               <TooltipTrigger asChild>
                 <div className="flex h-9 items-center justify-between border-b border-border/50 px-3">
-                  <Badge variant="secondary" className="gap-1.5">
+                  <Badge variant="secondary">
                     <meta.icon className={cn('size-3.5 shrink-0', meta.tone)} />
                     <span className="truncate">{column.label || '—'}</span>
                   </Badge>
