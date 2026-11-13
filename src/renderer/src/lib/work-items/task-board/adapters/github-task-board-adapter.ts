@@ -9,7 +9,7 @@ import {
   isWithinDoneWindow,
   type TaskBoardProviderResult
 } from '../task-board-provider-results'
-import { getTaskBoardRepos, isTaskBoardProviderVisible } from './task-board-provider-scope'
+import { getTaskBoardRepos } from './task-board-provider-scope'
 
 const OPEN_PER_REPO_LIMIT = 50
 const CLOSED_PER_REPO_LIMIT = 20
@@ -34,7 +34,7 @@ export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): 
 }
 
 async function readGitHubCards(signal: AbortSignal): Promise<TaskBoardProviderResult> {
-  const repos = isTaskBoardProviderVisible('github') ? getTaskBoardRepos('github') : []
+  const repos = getTaskBoardRepos('github')
   if (repos.length === 0) {
     return disconnectedTaskBoardResult('github')
   }

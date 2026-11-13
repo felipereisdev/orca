@@ -4,6 +4,8 @@ import {
   getDefaultTaskRepoSelection,
   getTaskEligibleRepos
 } from '@/components/task-page/task-page-default-repo-selection'
+import type { PreflightStatus } from '../../../../../../preload/api/preflight-api'
+import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import type { Repo } from '../../../../../../shared/repo-types'
 import {
   normalizeVisibleTaskProviders,
@@ -11,15 +13,43 @@ import {
 } from '../../../../../../shared/work-items/task-providers'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
 
-export function isTaskBoardProviderVisible(provider: TaskProvider): boolean {
-  const settings = useAppStore.getState().settings
-  return normalizeVisibleTaskProviders(settings?.visibleTaskProviders).includes(provider)
+/** Store inputs that decide which providers and repos the board reads. */
+export type TaskBoardScopeInput = {
+  repos: readonly Repo[]
+  preflightStatus: PreflightStatus | null
+  preflightStatusChecked: boolean
+  visibleTaskProviders: unknown
 }
 
-/** One repo per project (host twins would duplicate cards), skipping hosts without the provider CLI signed in. */
-export function getTaskBoardRepos(provider: 'github' | 'gitlab'): Repo[] {
+function readTaskBoardScopeInput(): TaskBoardScopeInput {
   const state = useAppStore.getState()
-  const eligible = getTaskEligibleRepos(state.repos)
+  return {
+    repos: state.repos,
+    preflightStatus: state.preflightStatus,
+    preflightStatusChecked: state.preflightStatusChecked,
+    visibleTaskProviders: state.settings?.visibleTaskProviders
+  }
+}
+
+export function isTaskBoardProviderVisible(
+  provider: TaskProvider,
+  scope: TaskBoardScopeInput = readTaskBoardScopeInput()
+): boolean {
+  return normalizeVisibleTaskProviders(scope.visibleTaskProviders).includes(provider)
+}
+
+/**
+ * One repo per project (host twins would duplicate cards), skipping hosts without the provider
+ * CLI signed in. Empty when the provider is hidden.
+ */
+export function getTaskBoardRepos(
+  provider: 'github' | 'gitlab',
+  scope: TaskBoardScopeInput = readTaskBoardScopeInput()
+): Repo[] {
+  if (!isTaskBoardProviderVisible(provider, scope)) {
+    return []
+  }
+  const eligible = getTaskEligibleRepos(scope.repos)
   const selected = getDefaultTaskRepoSelection(eligible)
   return eligible.filter((repo) => {
     const source = selected.has(repo.id) ? getTaskPageRepoSourceContext(repo, provider) : null
@@ -28,9 +58,26 @@ export function getTaskBoardRepos(provider: 'github' | 'gitlab'): Repo[] {
       getRepoBackedProviderAvailability({
         provider,
         contexts: [source],
-        preflightStatus: state.preflightStatus,
-        preflightReady: source.hostId === 'local' && state.preflightStatusChecked
+        preflightStatus: scope.preflightStatus,
+        preflightReady: source.hostId === 'local' && scope.preflightStatusChecked
       }).length === 0
     )
   })
+}
+
+/** Changes exactly when the provider's read would cover a different scope. */
+export function getTaskBoardProviderScopeKey(
+  provider: TaskProvider,
+  scope: TaskBoardScopeInput
+): string {
+  if (provider === 'jira' || provider === 'linear') {
+    return isTaskBoardProviderVisible(provider, scope) ? 'visible' : 'hidden'
+  }
+  return JSON.stringify(
+    getTaskBoardRepos(provider, scope).map((repo) => [
+      repo.id,
+      getRepoExecutionHostId(repo),
+      repo.path
+    ])
+  )
 }

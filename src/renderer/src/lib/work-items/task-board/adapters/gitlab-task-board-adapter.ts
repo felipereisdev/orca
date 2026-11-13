@@ -11,7 +11,7 @@ import {
   isWithinDoneWindow,
   type TaskBoardProviderResult
 } from '../task-board-provider-results'
-import { getTaskBoardRepos, isTaskBoardProviderVisible } from './task-board-provider-scope'
+import { getTaskBoardRepos } from './task-board-provider-scope'
 
 // Leave headroom below the runtime RPC foreground concurrency of eight, as the GitLab task list does.
 const GITLAB_FETCH_CONCURRENCY = 6
@@ -67,7 +67,7 @@ async function listRepoIssues(repo: Repo, now: Date): Promise<RepoIssues> {
 }
 
 async function readGitLabCards(signal: AbortSignal): Promise<TaskBoardProviderResult> {
-  const repos = isTaskBoardProviderVisible('gitlab') ? getTaskBoardRepos('gitlab') : []
+  const repos = getTaskBoardRepos('gitlab')
   if (repos.length === 0) {
     return disconnectedTaskBoardResult('gitlab')
   }
