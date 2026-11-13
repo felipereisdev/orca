@@ -66,42 +66,46 @@ async function listRepoIssues(repo: Repo, now: Date): Promise<RepoIssues> {
   return { items }
 }
 
-export async function listGitLabTaskBoardCards(
-  signal: AbortSignal
-): Promise<TaskBoardProviderResult> {
+async function readGitLabCards(signal: AbortSignal): Promise<TaskBoardProviderResult> {
   const repos = isTaskBoardProviderVisible('gitlab') ? getTaskBoardRepos('gitlab') : []
   if (repos.length === 0) {
     return disconnectedTaskBoardResult('gitlab')
   }
-  try {
-    const now = new Date()
-    const results = await mapSettledWithConcurrency(repos, GITLAB_FETCH_CONCURRENCY, (repo) =>
-      signal.aborted ? Promise.resolve<RepoIssues>({ items: [] }) : listRepoIssues(repo, now)
-    )
-    const cards: TaskBoardCard[] = []
-    const errors: unknown[] = []
-    let loadedRepos = 0
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        errors.push(result.reason)
-        return
-      }
-      if (result.value.error !== undefined) {
-        errors.push(result.value.error)
-        return
-      }
-      if (result.value.notGitLab) {
-        return
-      }
-      loadedRepos += 1
-      const repoLabel = repos[index].displayName
-      cards.push(...result.value.items.map((item) => toGitLabTaskBoardCard(item, repoLabel)))
-    })
-    // A partial failure keeps the repos that loaded; only an all-failed provider shows an error.
-    if (errors.length > 0 && loadedRepos === 0) {
-      return failedTaskBoardResult('gitlab', errors[0])
+  const now = new Date()
+  const results = await mapSettledWithConcurrency(repos, GITLAB_FETCH_CONCURRENCY, (repo) =>
+    signal.aborted ? Promise.resolve<RepoIssues>({ items: [] }) : listRepoIssues(repo, now)
+  )
+  const cards: TaskBoardCard[] = []
+  const errors: unknown[] = []
+  let loadedRepos = 0
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      errors.push(result.reason)
+      return
     }
-    return { provider: 'gitlab', status: 'ready', cards }
+    if (result.value.error !== undefined) {
+      errors.push(result.value.error)
+      return
+    }
+    if (result.value.notGitLab) {
+      return
+    }
+    loadedRepos += 1
+    const repoLabel = repos[index].displayName
+    cards.push(...result.value.items.map((item) => toGitLabTaskBoardCard(item, repoLabel)))
+  })
+  // A partial failure keeps the repos that loaded; only an all-failed provider shows an error.
+  if (errors.length > 0 && loadedRepos === 0) {
+    return failedTaskBoardResult('gitlab', errors[0])
+  }
+  return { provider: 'gitlab', status: 'ready', cards }
+}
+
+export async function listGitLabTaskBoardCards(
+  signal: AbortSignal
+): Promise<TaskBoardProviderResult> {
+  try {
+    return await readGitLabCards(signal)
   } catch (error) {
     return failedTaskBoardResult('gitlab', error)
   }

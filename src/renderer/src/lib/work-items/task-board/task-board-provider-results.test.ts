@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { TaskBoardCard } from './task-board-card'
 import {
@@ -6,6 +7,20 @@ import {
   isWithinDoneWindow,
   mergeTaskBoardProviderResult
 } from './task-board-provider-results'
+
+// Merging never reads `source`, so every fixture card can share one item.
+const sourceItem: GitHubWorkItem = {
+  id: 'i',
+  type: 'issue',
+  number: 1,
+  title: 'Issue',
+  state: 'open',
+  url: 'https://example.test/i',
+  labels: [],
+  updatedAt: '2026-11-01T00:00:00Z',
+  author: null,
+  repoId: 'r'
+}
 
 function card(provider: TaskProvider, refKey: string, updatedAt: string): TaskBoardCard {
   return {
@@ -19,7 +34,7 @@ function card(provider: TaskProvider, refKey: string, updatedAt: string): TaskBo
     category: 'todo',
     labels: [],
     updatedAt,
-    source: {} as TaskBoardCard['source']
+    source: { provider: 'github', item: sourceItem }
   }
 }
 

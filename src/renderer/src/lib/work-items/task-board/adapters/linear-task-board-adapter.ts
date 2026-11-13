@@ -1,7 +1,7 @@
 import { getLinearPriorityLabel } from '@/components/task-page/task-page-localized-options'
 import { linearListIssues, linearStatusForTarget } from '@/runtime/linear/runtime-linear-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
-import { parseExecutionHostId } from '../../../../../../shared/execution-host'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { LinearIssue } from '../../../../../../shared/linear/issue-types'
 import { linearStatusCategory, type TaskBoardCard } from '../task-board-card'
 import {
@@ -10,7 +10,7 @@ import {
   isWithinDoneWindow,
   type TaskBoardProviderResult
 } from '../task-board-provider-results'
-import { getTaskBoardAccountHostId, isTaskBoardProviderVisible } from './task-board-provider-scope'
+import { isTaskBoardProviderVisible } from './task-board-provider-scope'
 
 const ASSIGNED_LIMIT = 100
 const COMPLETED_LIMIT = 100
@@ -32,10 +32,11 @@ export function toLinearTaskBoardCard(issue: LinearIssue): TaskBoardCard {
   }
 }
 
-export async function listLinearTaskBoardCards(
-  signal: AbortSignal
+async function readLinearCards(
+  signal: AbortSignal,
+  accountHostId: ExecutionHostId
 ): Promise<TaskBoardProviderResult> {
-  const parsed = parseExecutionHostId(getTaskBoardAccountHostId())
+  const parsed = parseExecutionHostId(accountHostId)
   // Linear has no SSH relay, matching Cmd-J.
   if (!isTaskBoardProviderVisible('linear') || !parsed || parsed.kind === 'ssh') {
     return disconnectedTaskBoardResult('linear')
@@ -44,28 +45,36 @@ export async function listLinearTaskBoardCards(
   if (!target) {
     return disconnectedTaskBoardResult('linear')
   }
+  const status = await linearStatusForTarget(target)
+  if (signal.aborted || !status.connected) {
+    return disconnectedTaskBoardResult('linear')
+  }
+  // 'completed' reads the viewer's assigned issues too, but includes canceled ones.
+  const [assigned, completed] = await Promise.all([
+    linearListIssues(target, 'assigned', ASSIGNED_LIMIT, 'all'),
+    linearListIssues(target, 'completed', COMPLETED_LIMIT, 'all')
+  ])
+  const now = new Date()
+  const cards = [
+    ...assigned.items.map(toLinearTaskBoardCard),
+    ...completed.items
+      .filter((issue) => isWithinDoneWindow(issue.updatedAt, now))
+      .map(toLinearTaskBoardCard)
+  ].filter((card) => card.category !== 'excluded')
+  const workspaceError = [...(assigned.errors ?? []), ...(completed.errors ?? [])][0]
+  if (workspaceError && assigned.items.length + completed.items.length === 0) {
+    return failedTaskBoardResult('linear', workspaceError.message)
+  }
+  return { provider: 'linear', status: 'ready', cards }
+}
+
+/** `accountHostId` is the Tasks page's account-backed source host (Cmd-J's `accountBackedTaskSourceHostId`). */
+export async function listLinearTaskBoardCards(
+  signal: AbortSignal,
+  accountHostId: ExecutionHostId
+): Promise<TaskBoardProviderResult> {
   try {
-    const status = await linearStatusForTarget(target)
-    if (signal.aborted || !status.connected) {
-      return disconnectedTaskBoardResult('linear')
-    }
-    // 'completed' reads the viewer's assigned issues too, but includes canceled ones.
-    const [assigned, completed] = await Promise.all([
-      linearListIssues(target, 'assigned', ASSIGNED_LIMIT, 'all'),
-      linearListIssues(target, 'completed', COMPLETED_LIMIT, 'all')
-    ])
-    const now = new Date()
-    const cards = [
-      ...assigned.items.map(toLinearTaskBoardCard),
-      ...completed.items
-        .filter((issue) => isWithinDoneWindow(issue.updatedAt, now))
-        .map(toLinearTaskBoardCard)
-    ].filter((card) => card.category !== 'excluded')
-    const workspaceError = [...(assigned.errors ?? []), ...(completed.errors ?? [])][0]
-    if (workspaceError && assigned.items.length + completed.items.length === 0) {
-      return failedTaskBoardResult('linear', workspaceError.message)
-    }
-    return { provider: 'linear', status: 'ready', cards }
+    return await readLinearCards(signal, accountHostId)
   } catch (error) {
     return failedTaskBoardResult('linear', error)
   }

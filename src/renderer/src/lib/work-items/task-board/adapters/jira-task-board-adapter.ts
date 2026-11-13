@@ -1,6 +1,7 @@
 import { jiraSearchIssuesForTarget } from '@/runtime/jira/runtime-jira-client'
 import { jiraStatusForTarget } from '@/runtime/jira/runtime-jira-project-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { buildJiraPresetJql } from '../../../../../../shared/jira/jira-preset-jql'
 import { resolveJiraSourceHostId } from '../../../../../../shared/jira/jira-source-host'
 import type { JiraIssue } from '../../../../../../shared/jira/jira-types'
@@ -10,7 +11,7 @@ import {
   failedTaskBoardResult,
   type TaskBoardProviderResult
 } from '../task-board-provider-results'
-import { getTaskBoardAccountHostId, isTaskBoardProviderVisible } from './task-board-provider-scope'
+import { isTaskBoardProviderVisible } from './task-board-provider-scope'
 
 // Jira search caps each request at 100 issues.
 const ASSIGNED_LIMIT = 100
@@ -38,40 +39,49 @@ export function toJiraTaskBoardCard(issue: JiraIssue, showSiteName = false): Tas
   }
 }
 
-export async function listJiraTaskBoardCards(
-  signal: AbortSignal
+async function readJiraCards(
+  signal: AbortSignal,
+  accountHostId: ExecutionHostId
 ): Promise<TaskBoardProviderResult> {
   if (!isTaskBoardProviderVisible('jira')) {
     return disconnectedTaskBoardResult('jira')
   }
   // Jira credentials stay on the desktop for SSH hosts; runtime hosts own theirs.
   const target = ipcOrRuntimeTargetForHostId(
-    resolveJiraSourceHostId({ workspaceHostId: getTaskBoardAccountHostId() })
+    resolveJiraSourceHostId({ workspaceHostId: accountHostId })
   )
   if (!target) {
     return disconnectedTaskBoardResult('jira')
   }
+  const status = await jiraStatusForTarget(target)
+  if (!status.connected) {
+    return disconnectedTaskBoardResult('jira')
+  }
+  const [assigned, done] = await Promise.all([
+    jiraSearchIssuesForTarget(
+      target,
+      buildJiraPresetJql('assigned'),
+      ASSIGNED_LIMIT,
+      'all',
+      signal
+    ),
+    jiraSearchIssuesForTarget(target, DONE_JQL, DONE_LIMIT, 'all', signal)
+  ])
+  const showSiteName = (status.sites?.length ?? 0) > 1
+  return {
+    provider: 'jira',
+    status: 'ready',
+    cards: [...assigned, ...done].map((issue) => toJiraTaskBoardCard(issue, showSiteName))
+  }
+}
+
+/** `accountHostId` is the Tasks page's account-backed source host (Cmd-J's `accountBackedTaskSourceHostId`). */
+export async function listJiraTaskBoardCards(
+  signal: AbortSignal,
+  accountHostId: ExecutionHostId
+): Promise<TaskBoardProviderResult> {
   try {
-    const status = await jiraStatusForTarget(target)
-    if (!status.connected) {
-      return disconnectedTaskBoardResult('jira')
-    }
-    const [assigned, done] = await Promise.all([
-      jiraSearchIssuesForTarget(
-        target,
-        buildJiraPresetJql('assigned'),
-        ASSIGNED_LIMIT,
-        'all',
-        signal
-      ),
-      jiraSearchIssuesForTarget(target, DONE_JQL, DONE_LIMIT, 'all', signal)
-    ])
-    const showSiteName = (status.sites?.length ?? 0) > 1
-    return {
-      provider: 'jira',
-      status: 'ready',
-      cards: [...assigned, ...done].map((issue) => toJiraTaskBoardCard(issue, showSiteName))
-    }
+    return await readJiraCards(signal, accountHostId)
   } catch (error) {
     return failedTaskBoardResult('jira', error)
   }

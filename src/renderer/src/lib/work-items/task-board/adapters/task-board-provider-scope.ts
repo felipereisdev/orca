@@ -4,8 +4,6 @@ import {
   getDefaultTaskRepoSelection,
   getTaskEligibleRepos
 } from '@/components/task-page/task-page-default-repo-selection'
-import { getSettingsFocusedExecutionHostId } from '../../../../../../shared/execution-host'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { Repo } from '../../../../../../shared/repo-types'
 import {
   normalizeVisibleTaskProviders,
@@ -16,11 +14,6 @@ import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
 export function isTaskBoardProviderVisible(provider: TaskProvider): boolean {
   const settings = useAppStore.getState().settings
   return normalizeVisibleTaskProviders(settings?.visibleTaskProviders).includes(provider)
-}
-
-/** Host that owns the Jira and Linear accounts, as Cmd-J resolves it. */
-export function getTaskBoardAccountHostId(): ExecutionHostId {
-  return getSettingsFocusedExecutionHostId(useAppStore.getState().settings)
 }
 
 /** One repo per project (host twins would duplicate cards), skipping hosts without the provider CLI signed in. */

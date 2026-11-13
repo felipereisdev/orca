@@ -1,7 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { readIpcErrorDetail } from '@/runtime/errors/ipc-error'
 import { TASK_BOARD_DONE_WINDOW_DAYS } from '../../../../../shared/task-board/task-board-settings'
-import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { TaskBoardCard } from './task-board-card'
 
 export type TaskBoardProviderResult = {
@@ -24,11 +24,15 @@ export type TaskBoardCardsState = {
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function emptyTaskBoardCardsState(): TaskBoardCardsState {
-  const providers = {} as Record<TaskProvider, TaskBoardProviderState>
-  for (const provider of TASK_PROVIDERS) {
-    providers[provider] = { status: 'loading' }
+  return {
+    cards: [],
+    providers: {
+      github: { status: 'loading' },
+      gitlab: { status: 'loading' },
+      linear: { status: 'loading' },
+      jira: { status: 'loading' }
+    }
   }
-  return { cards: [], providers }
 }
 
 function updatedAtMs(card: TaskBoardCard): number {
