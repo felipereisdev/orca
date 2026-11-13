@@ -1,6 +1,6 @@
 import type { TaskPageJiraListStateModel } from './jira/use-task-page-jira-list-state'
 import { useEffect } from 'react'
-import { resolveVisibleTaskProvider } from '../../../../shared/work-items/task-providers'
+import { resolveVisibleTaskSource } from '../../../../shared/work-items/task-source'
 import { normalizeGitHubTaskPreset } from '../../../../shared/work-items/task-github-search'
 import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
 import { loadLinearIssueView } from '../linear-issue-view-storage'
@@ -55,7 +55,7 @@ export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) 
       return
     }
     setTaskSource(
-      resolveVisibleTaskProvider(
+      resolveVisibleTaskSource(
         pageData.taskSource ?? settings.defaultTaskSource,
         visibleTaskProviders
       )

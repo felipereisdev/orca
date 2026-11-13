@@ -7,6 +7,8 @@ import { TaskPageGitHubList } from './github/List'
 import { TaskPageGitLabTodoList } from './gitlab/TodoList'
 import { TaskPageGitLabItemList } from './gitlab/ItemList'
 import { TaskPageJiraContent } from './jira/Content'
+import { TaskPageOrcaContent } from './orca/Content'
+import { isOrcaTaskSource } from '../../../../shared/work-items/task-source'
 export function TaskPageContent({
   model
 }: {
@@ -28,7 +30,9 @@ export function TaskPageContent({
     closeTaskDetailPage,
     handleUseWorkItem
   } = model
-  return taskSource === 'github' && dialogWorkItem ? (
+  return isOrcaTaskSource(taskSource) ? (
+    <TaskPageOrcaContent model={model} />
+  ) : taskSource === 'github' && dialogWorkItem ? (
     dialogWorkItem.type === 'pr' ? (
       <PullRequestPage
         workItem={dialogWorkItem}

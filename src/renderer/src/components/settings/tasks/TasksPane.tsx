@@ -5,9 +5,9 @@ import type { GlobalSettings } from '../../../../../shared/global-settings-types
 import {
   type TaskProvider,
   TASK_PROVIDERS,
-  normalizeVisibleTaskProviders,
-  resolveVisibleTaskProvider
+  normalizeVisibleTaskProviders
 } from '../../../../../shared/work-items/task-providers'
+import { resolveVisibleTaskSource } from '../../../../../shared/work-items/task-source'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { Button } from '@/components/ui/button'
@@ -130,7 +130,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
 
     updateSettings({
       visibleTaskProviders: nextProviders,
-      defaultTaskSource: resolveVisibleTaskProvider(settings.defaultTaskSource, nextProviders)
+      defaultTaskSource: resolveVisibleTaskSource(settings.defaultTaskSource, nextProviders)
     })
   }
 

@@ -4,6 +4,7 @@ import type { GitHubTaskKind } from '../../../../shared/work-items/task-github-s
 import { buildGitHubRepoUrl } from '../../../../shared/github/repositories/links'
 import { getTaskSourceContextSummary } from '../task-source-context-summary'
 import { getGitHubProjectSourceSummary } from './task-page-source-context'
+import { translate } from '@/i18n/i18n'
 
 type TaskPageSourceDisplayInput = TaskPageLinearCreationStateModel & {
   activeGithubTaskKind: GitHubTaskKind
@@ -41,6 +42,15 @@ export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInpu
   const jiraSiteName = selectedJiraSite?.displayName ?? selectedJiraSite?.siteUrl ?? null
   // Why the catalog dep: it changes with the language, and the summary's own copy is translated too.
   const taskSourceContextSummary = useMemo(() => {
+    if (taskSource === 'orca') {
+      return {
+        label: translate('taskBoard.contextSummary', 'Assigned to you'),
+        title: translate(
+          'taskBoard.contextSummaryTitle',
+          'Issues assigned to you in every connected provider'
+        )
+      }
+    }
     const providerLabel =
       sourceOptions.find((source) => source.id === taskSource)?.label ?? taskSource
     if (taskSource === 'github' && githubMode === 'project') {

@@ -110,11 +110,10 @@ function isTaskProviderAvailable(
 }
 
 export function resolveVisibleTaskProvider(
-  preferred: TaskSource | null | undefined,
+  preferred: TaskProvider | null | undefined,
   visibleProviders: readonly TaskProvider[]
 ): TaskProvider {
-  // Why: 'orca' is not a provider, so callers that need a real provider get the fallback.
-  if (isTaskProvider(preferred) && visibleProviders.includes(preferred)) {
+  if (preferred && visibleProviders.includes(preferred)) {
     return preferred
   }
   return visibleProviders[0] ?? 'github'

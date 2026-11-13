@@ -5,9 +5,9 @@ import { normalizeGitHubTaskPreset } from '../../../../shared/work-items/task-gi
 import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import {
-  type TaskProvider,
-  resolveVisibleTaskProvider
-} from '../../../../shared/work-items/task-providers'
+  type TaskSource,
+  resolveVisibleTaskSource
+} from '../../../../shared/work-items/task-source'
 import type { TaskSourceContext } from '../../../../shared/work-items/task-source-context'
 import type { RuntimeProviderPreflightStatus } from '@/components/task-source-provider-availability'
 import { buildExecutionHostRegistry } from '../../../../shared/execution-host/execution-host-registry'
@@ -35,8 +35,8 @@ export function useTaskPageRuntimeHosts(model: TaskPageRepoSelectionModel) {
   const defaultTaskViewPreset = normalizeGitHubTaskPreset(settings?.defaultTaskViewPreset ?? 'all')
   const initialTaskQuery = getTaskPresetQuery(defaultTaskViewPreset)
   const preferredTaskSource = pageData.taskSource ?? defaultTaskSource
-  const [taskSource, setTaskSource] = useState<TaskProvider>(
-    resolveVisibleTaskProvider(preferredTaskSource, visibleTaskProviders)
+  const [taskSource, setTaskSource] = useState<TaskSource>(
+    resolveVisibleTaskSource(preferredTaskSource, visibleTaskProviders)
   )
   const runtimePreflightMountedRef = useRef(true)
   const runtimePreflightRequestedHostIdsRef = useRef<Set<TaskSourceContext['hostId']>>(new Set())

@@ -1,9 +1,9 @@
 import type { TaskPageSourceAvailabilityModel } from './use-task-page-source-availability'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import {
-  isTaskProvider,
-  resolveVisibleTaskProvider
-} from '../../../../shared/work-items/task-providers'
+  isTaskSourceVisible,
+  resolveVisibleTaskSource
+} from '../../../../shared/work-items/task-source'
 import type {
   GitLabTaskFilter,
   GitLabIssueFilter
@@ -44,7 +44,7 @@ export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel)
       } else if (taskSourceManuallyChangedRef.current) {
         return
       }
-      setTaskSource(resolveVisibleTaskProvider(pageData.taskSource, visibleTaskProviders))
+      setTaskSource(resolveVisibleTaskSource(pageData.taskSource, visibleTaskProviders))
     }
   }, [pageData.taskSource, visibleTaskProviders, setTaskSource])
   useEffect(() => {
@@ -52,18 +52,16 @@ export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel)
       return
     }
     // Why: GitLab/Linear availability hydrates after mount; restore the saved default once its provider check proves it can be shown.
-    // TEMP(orca-board): orca is not a provider; Task 7 replaces this guard with real orca handling.
     if (
-      isTaskProvider(preferredTaskSource) &&
-      visibleTaskProviders.includes(preferredTaskSource) &&
+      isTaskSourceVisible(preferredTaskSource, visibleTaskProviders) &&
       taskSource !== preferredTaskSource
     ) {
       setTaskSource(preferredTaskSource)
     }
   }, [preferredTaskSource, taskSource, visibleTaskProviders, setTaskSource])
   useEffect(() => {
-    if (!visibleTaskProviders.includes(taskSource)) {
-      setTaskSource(resolveVisibleTaskProvider(settings?.defaultTaskSource, visibleTaskProviders))
+    if (!isTaskSourceVisible(taskSource, visibleTaskProviders)) {
+      setTaskSource(resolveVisibleTaskSource(settings?.defaultTaskSource, visibleTaskProviders))
     }
   }, [settings?.defaultTaskSource, taskSource, visibleTaskProviders, setTaskSource])
 

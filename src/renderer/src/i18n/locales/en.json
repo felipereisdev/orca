@@ -25613,6 +25613,9 @@
     "chooseStateTitle": "Move {{id}} to {{column}}",
     "chooseStateDescription": "Several Linear states match this column. Choose one:",
     "cancel": "Cancel",
-    "finishOpenMove": "Finish the open move first"
+    "finishOpenMove": "Finish the open move first",
+    "source": "My board",
+    "contextSummary": "Assigned to you",
+    "contextSummaryTitle": "Issues assigned to you in every connected provider"
   }
 }
