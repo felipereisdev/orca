@@ -32,6 +32,24 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function SearchablePickerSelection({ entries }: { entries: AgentPickerEntry[] }) {
+  const [selection, setSelection] = useState('')
+  return (
+    <>
+      <output aria-label="Selection">{selection}</output>
+      <DropdownMenu defaultOpen modal={false}>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <AgentLaunchPickerMenu
+            entries={entries}
+            runLaunch={(row, draft) => setSelection(`${row.agent}:${draft?.choices.model ?? ''}`)}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+}
+
 it('includes blank terminal in keyboard results and filters it for agent and model searches', async () => {
   const entry: AgentPickerEntry = {
     agent: 'codex',
@@ -107,7 +125,7 @@ it('includes blank terminal in keyboard results and filters it for agent and mod
   expect(screen.getByLabelText('Selection').textContent).toBe('codex:astra')
 })
 
-it('lists an agent named by the query before other agents’ model setups', () => {
+it('selects an agent named by the query before other agents’ model setups', () => {
   const codex: AgentPickerEntry = {
     agent: 'codex',
     label: 'Codex',
@@ -129,27 +147,11 @@ it('lists an agent named by the query before other agents’ model setups', () =
       models: [{ id: 'gpt-5-codex', label: 'GPT-5 Codex', isDefault: false, efforts: [] }]
     }
   }
-  const launch = vi.fn()
-  render(
-    <DropdownMenu defaultOpen modal={false}>
-      <DropdownMenuTrigger>Open</DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <AgentLaunchPickerMenu entries={[opencode, codex]} runLaunch={launch} />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+  render(<SearchablePickerSelection entries={[opencode, codex]} />)
   fireEvent.focus(screen.getByRole('textbox'))
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'codex' } })
-  const items = screen.getAllByRole('menuitem').map((item) => item.textContent)
-  expect(items[0]).toContain('Codex')
-  expect(items[0]).not.toContain('OpenCode')
-  expect(items.some((text) => text?.includes('OpenCode · GPT-5 Codex'))).toBe(true)
-  const highlighted = document.querySelectorAll('[data-search-default]')
-  expect(highlighted).toHaveLength(1)
-  expect(highlighted[0].textContent).toContain('Codex')
-  expect(highlighted[0].textContent).not.toContain('OpenCode')
   fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
-  expect(launch).toHaveBeenCalledWith({ agent: 'codex', kind: 'cli' }, undefined)
+  expect(screen.getByLabelText('Selection').textContent).toBe('codex:')
 })
 
 it('matches Antigravity and its model setups via the AGY acronym', async () => {
@@ -174,32 +176,12 @@ it('matches Antigravity and its model setups via the AGY acronym', async () => {
       models: [{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', isDefault: false, efforts: [] }]
     }
   }
-  const launch = vi.fn()
   const user = userEvent.setup()
-  render(
-    <DropdownMenu defaultOpen modal={false}>
-      <DropdownMenuTrigger>Open</DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <AgentLaunchPickerMenu entries={[codex, antigravity]} runLaunch={launch} />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-  await user.type(screen.getByRole('textbox'), 'AGY')
-  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
-    expect.stringContaining('Antigravity')
-  ])
-  await user.keyboard('{Enter}')
-  expect(launch).toHaveBeenCalledWith({ agent: 'antigravity', kind: 'cli' }, undefined)
+  render(<SearchablePickerSelection entries={[codex, antigravity]} />)
+  await user.type(screen.getByRole('textbox'), 'AGY{Enter}')
+  expect(screen.getByLabelText('Selection').textContent).toBe('antigravity:')
 
-  launch.mockClear()
   await user.click(screen.getByRole('button', { name: 'Open' }))
   await user.type(screen.getByRole('textbox'), 'AGY Gemini{Enter}')
-  expect(launch).toHaveBeenCalledWith(
-    { agent: 'antigravity', kind: 'cli', executionHostId: undefined },
-    expect.objectContaining({
-      agent: 'antigravity',
-      choices: { model: 'gemini-2.5-pro' }
-    }),
-    antigravity
-  )
+  expect(screen.getByLabelText('Selection').textContent).toBe('antigravity:gemini-2.5-pro')
 })

@@ -34,7 +34,7 @@ vi.mock('../../store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({ runtimeEnvironments: source.pairedId ? [{ id: source.pairedId }] : [] })
 }))
-vi.mock('@/lib/desktop-window-chrome', () => ({
+vi.mock('@/app-shell/chrome/desktop-window-chrome', () => ({
   isPairedWebClientWindow: () => source.pairedId !== null
 }))
 const { useOwnerUsageRateLimits } = await import('./use-owner-usage-rate-limits')
