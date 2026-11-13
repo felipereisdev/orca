@@ -1,3 +1,5 @@
+import type { TaskSource } from './task-source'
+
 export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira'
 
 export const TASK_PROVIDERS: readonly TaskProvider[] = ['github', 'gitlab', 'linear', 'jira']
@@ -11,8 +13,12 @@ export function isTaskProvider(value: unknown): value is TaskProvider {
 export function normalizeTaskProviderSettings(value: {
   visibleTaskProviders: unknown
   defaultTaskSource: unknown
-}): { visibleTaskProviders: TaskProvider[]; defaultTaskSource: TaskProvider } {
+}): { visibleTaskProviders: TaskProvider[]; defaultTaskSource: TaskSource } {
   const visibleTaskProviders = normalizeVisibleTaskProviders(value.visibleTaskProviders)
+  // Why: orca is always visible and not in the provider list, so there is nothing to repair.
+  if (value.defaultTaskSource === 'orca') {
+    return { visibleTaskProviders, defaultTaskSource: 'orca' }
+  }
   const defaultTaskSource = isTaskProvider(value.defaultTaskSource)
     ? value.defaultTaskSource
     : resolveVisibleTaskProvider('github', visibleTaskProviders)
@@ -104,10 +110,11 @@ function isTaskProviderAvailable(
 }
 
 export function resolveVisibleTaskProvider(
-  preferred: TaskProvider | null | undefined,
+  preferred: TaskSource | null | undefined,
   visibleProviders: readonly TaskProvider[]
 ): TaskProvider {
-  if (preferred && visibleProviders.includes(preferred)) {
+  // Why: 'orca' is not a provider, so callers that need a real provider get the fallback.
+  if (isTaskProvider(preferred) && visibleProviders.includes(preferred)) {
     return preferred
   }
   return visibleProviders[0] ?? 'github'

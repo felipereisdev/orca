@@ -1,6 +1,9 @@
 import type { TaskPageSourceAvailabilityModel } from './use-task-page-source-availability'
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { resolveVisibleTaskProvider } from '../../../../shared/work-items/task-providers'
+import {
+  isTaskProvider,
+  resolveVisibleTaskProvider
+} from '../../../../shared/work-items/task-providers'
 import type {
   GitLabTaskFilter,
   GitLabIssueFilter
@@ -49,7 +52,12 @@ export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel)
       return
     }
     // Why: GitLab/Linear availability hydrates after mount; restore the saved default once its provider check proves it can be shown.
-    if (visibleTaskProviders.includes(preferredTaskSource) && taskSource !== preferredTaskSource) {
+    // TEMP(orca-board): orca is not a provider; Task 7 replaces this guard with real orca handling.
+    if (
+      isTaskProvider(preferredTaskSource) &&
+      visibleTaskProviders.includes(preferredTaskSource) &&
+      taskSource !== preferredTaskSource
+    ) {
       setTaskSource(preferredTaskSource)
     }
   }, [preferredTaskSource, taskSource, visibleTaskProviders, setTaskSource])

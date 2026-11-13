@@ -6,6 +6,7 @@ import {
   restoreAvailableDefaultTaskProvider,
   resolveVisibleTaskProvider
 } from '../../../../../shared/work-items/task-providers'
+import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 import { PER_REPO_FETCH_LIMIT } from '../../../../../shared/work-items/work-item-pagination'
 import { isGitRepoKind } from '../../../../../shared/repo-kind'
 import { presetToQuery } from './ui-slice-hydration-sanitizers'
@@ -117,10 +118,11 @@ export function createUiTaskActions(set: UISliceSet, get: UISliceGet): Partial<U
         },
         state.settings?.defaultTaskSource
       )
-      const resolvedSource = resolveVisibleTaskProvider(
-        data.taskSource ?? state.settings?.defaultTaskSource,
-        visibleTaskProviders
-      )
+      const preferredSource = data.taskSource ?? state.settings?.defaultTaskSource
+      // Why: the orca board has no provider work-item cache to warm.
+      const resolvedSource = isOrcaTaskSource(preferredSource)
+        ? preferredSource
+        : resolveVisibleTaskProvider(preferredSource, visibleTaskProviders)
       const resolvedMode = state.taskResumeState?.githubMode ?? 'items'
       if (resolvedSource === 'github' && resolvedMode === 'items') {
         const eligibleRepos = state.repos.filter((repo) => isGitRepoKind(repo) && repo.path)

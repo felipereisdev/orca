@@ -8,7 +8,7 @@ import type { GitHubWorkItem } from '../../../../../shared/github/work-items/wor
 import type { GitLabWorkItem } from '../../../../../shared/gitlab-types'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type { LinearIssue } from '../../../../../shared/linear/issue-types'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { TaskSource } from '../../../../../shared/work-items/task-source'
 import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import type { LaunchSource } from '../../../../../shared/telemetry-events'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
@@ -62,7 +62,7 @@ export type OpenAgentSendPopoverTargetModeArgs = {
 export type TaskPageData = {
   preselectedRepoId?: string
   prefilledName?: string
-  taskSource?: TaskProvider
+  taskSource?: TaskSource
   openGitHubWorkItem?: GitHubWorkItem
   openGitHubSourceContext?: TaskSourceContext | null
   openGitHubInitialTab?: 'conversation' | 'checks' | 'files'
