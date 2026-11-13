@@ -12,6 +12,8 @@ export type TaskBoardMoveOverride = {
   card: TaskBoardCard
   columnId: string
   expiresAt?: number
+  /** Expired and waiting on a fresh provider read, whose result then replaces it. */
+  rereading?: true
 }
 
 export type PlacedTaskBoardCard = { card: TaskBoardCard; columnId: string }

@@ -59,7 +59,8 @@ function useTaskBoardScopeKeys(): Record<TaskProvider, string> {
 export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   state: TaskBoardCardsState
   refresh: () => void
-  refreshProvider: (provider: TaskProvider) => void
+  /** A fresh read; resolves once its result reached the board (or was superseded). */
+  refreshProvider: (provider: TaskProvider) => Promise<void>
 } {
   // The last cards for this host show at once; the mount load then updates the stale ones.
   const [stateHostId, setStateHostId] = useState(accountHostId)
@@ -70,6 +71,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   }
   useEffect(() => writeTaskBoardCards(stateHostId, state), [stateHostId, state])
   const controllersRef = useRef(new Map<TaskProvider, AbortController>())
+  const mountedRef = useRef(false)
   const scopeKeys = useTaskBoardScopeKeys()
   const scopeKeysRef = useRef(scopeKeys)
   const loadedScopeKeysRef = useRef<Record<TaskProvider, string> | null>(null)
@@ -89,12 +91,21 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         const next = previous.status === 'loading' ? previous : { ...previous, refreshing: true }
         return { ...current, providers: { ...current.providers, [provider]: next } }
       })
-      void PROVIDER_LOADERS[provider](controller.signal, accountHostId, options).then((result) => {
-        if (!controller.signal.aborted) {
+      return PROVIDER_LOADERS[provider](controller.signal, accountHostId, options).then(
+        (result) => {
+          if (controller.signal.aborted) {
+            return
+          }
           markTaskBoardProviderLoaded(accountHostId, provider, { at: Date.now(), scopeKey })
-          setState((current) => mergeTaskBoardProviderResult(current, result))
+          if (mountedRef.current) {
+            setState((current) => mergeTaskBoardProviderResult(current, result))
+            return
+          }
+          // Why: a move settling after the board unmounted still reloads; the next mount trusts this cache.
+          const cached = readTaskBoardCards(accountHostId)
+          writeTaskBoardCards(accountHostId, mergeTaskBoardProviderResult(cached, result))
         }
-      })
+      )
     },
     [accountHostId]
   )
@@ -106,12 +117,13 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   )
   const refresh = useCallback(() => {
     for (const provider of TASK_PROVIDERS) {
-      refreshProvider(provider)
+      void refreshProvider(provider)
     }
   }, [refreshProvider])
 
   useEffect(() => {
     const controllers = controllersRef.current
+    mountedRef.current = true
     // Why: opening a card's detail and coming back must not refetch all four providers every time.
     const now = Date.now()
     const cached = readTaskBoardCards(accountHostId).providers
@@ -124,7 +136,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         cached[provider].status !== 'loading' &&
         cached[provider].refreshing !== true
       if (!reusable) {
-        load(provider, {})
+        void load(provider, {})
       }
     }
     return () => {
@@ -132,6 +144,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         controller.abort()
       }
       controllers.clear()
+      mountedRef.current = false
     }
   }, [accountHostId, load])
 
@@ -144,7 +157,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     }
     for (const provider of TASK_PROVIDERS) {
       if (previous[provider] !== scopeKeys[provider]) {
-        load(provider, {})
+        void load(provider, {})
       }
     }
   }, [scopeKeys, load])

@@ -126,6 +126,27 @@ describe('useTaskBoardCards', () => {
     now.mockRestore()
   })
 
+  it('caches a reload that lands after the board unmounted for the next mount', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the hook only merges cards by refKey, provider and updatedAt.
+    const before = {
+      refKey: 'jira:site:APP-9',
+      provider: 'jira',
+      updatedAt: '2026-11-01T00:00:00Z'
+    } as TaskBoardCard
+    const after = { ...before, updatedAt: '2026-11-02T00:00:00Z' }
+    loaders.jira.mockResolvedValue({ provider: 'jira', status: 'ready', cards: [before] })
+    const first = renderHook(() => useTaskBoardCards('runtime:late-host'))
+    await act(async () => {})
+    first.unmount()
+
+    // A move that settles after unmount reloads its provider through the old instance.
+    loaders.jira.mockResolvedValue({ provider: 'jira', status: 'ready', cards: [after] })
+    await first.result.current.refreshProvider('jira')
+
+    const second = renderHook(() => useTaskBoardCards('runtime:late-host'))
+    expect(second.result.current.state.cards).toEqual([after])
+  })
+
   it('bypasses provider caches on Refresh but not on mount', () => {
     const { result } = renderHook(() => useTaskBoardCards('runtime:refresh-host'))
     expect(loaders.github).toHaveBeenLastCalledWith(expect.any(AbortSignal), {})

@@ -51,7 +51,7 @@ export function TaskPageOrcaContent({
     columns: statuses,
     settings,
     accountHostId: accountBackedTaskSourceHostId,
-    onMoved: refreshProvider
+    reread: refreshProvider
   })
 
   const openCard = (card: TaskBoardCard): void => {
@@ -126,18 +126,20 @@ export function TaskPageOrcaBoard({
         { id: status.id, label: status.label, status, cards: [] }
       ])
     )
+    // A held move outlives its provider's reads, so a provider hidden in Settings must drop it too.
+    const visible = new Set<string>(sourceOptions.map((option) => option.id))
     for (const { card, columnId } of placeTaskBoardCards(
       state.cards,
       move.overrides,
       statuses,
       settings
     )) {
-      if (!hiddenProviders.has(card.provider)) {
+      if (visible.has(card.provider) && !hiddenProviders.has(card.provider)) {
         byId.get(columnId)?.cards.push(card)
       }
     }
     return [...byId.values()]
-  }, [hiddenProviders, move.overrides, settings, state.cards, statuses])
+  }, [hiddenProviders, move.overrides, settings, sourceOptions, state.cards, statuses])
 
   const toolbarProviders = sourceOptions.flatMap((option): TaskBoardToolbarProvider[] =>
     isTaskProvider(option.id)

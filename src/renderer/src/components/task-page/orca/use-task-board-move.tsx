@@ -37,7 +37,12 @@ import {
 } from './task-board-provider-moves'
 
 /** A Jira/Linear drop; while its dialog is open it is the board's only one. */
-type MoveSession = { card: TaskBoardCard; target: RuntimeClientTarget; columnId: string }
+type MoveSession = {
+  host: ExecutionHostId
+  card: TaskBoardCard
+  target: RuntimeClientTarget
+  columnId: string
+}
 /** The confirmed card, no change, or `dialog`: a dialog now owns the move and its session. */
 type MoveOutcome = TaskBoardCard | 'unchanged' | 'dialog'
 
@@ -59,10 +64,11 @@ export function useTaskBoardMove(args: {
   columns: readonly WorkspaceStatusDefinition[]
   settings: TaskBoardSettings
   accountHostId: ExecutionHostId
-  onMoved: (provider: TaskProvider) => void
+  /** A fresh read of the provider; resolves once its result reached the board. */
+  reread: (provider: TaskProvider) => Promise<void>
 }): TaskBoardMove {
   const t = useTranslate()
-  const { overrides, updatingRefKeys } = useTaskBoardMoveOverrides()
+  const { overrides, updatingRefKeys } = useTaskBoardMoveOverrides(args.accountHostId, args.reread)
   const [error, setError] = useState<string | null>(null)
   const [jiraPrompt, setJiraPrompt] = useState<JiraBoardMovePrompt | null>(null)
   const [linearChoice, setLinearChoice] = useState<TaskBoardLinearChoice | null>(null)
@@ -72,7 +78,7 @@ export function useTaskBoardMove(args: {
   useEffect(
     () => () => {
       if (dialogRef.current) {
-        releaseTaskBoardMove(dialogRef.current.card.refKey)
+        releaseTaskBoardMove(dialogRef.current.host, dialogRef.current.card.refKey)
       }
     },
     []
@@ -85,14 +91,18 @@ export function useTaskBoardMove(args: {
     settings: args.settings
   })
 
-  function settle(card: TaskBoardCard, columnId: string, outcome: TaskBoardCard | 'unchanged') {
+  /** `host` is the board host at drop time; the hold lives in that host's board. */
+  function settle(
+    { host, card, columnId }: Omit<MoveSession, 'target'>,
+    outcome: TaskBoardCard | 'unchanged'
+  ) {
     if (outcome === 'unchanged') {
-      releaseTaskBoardMove(card.refKey)
+      releaseTaskBoardMove(host, card.refKey)
       return
     }
     const confirmedColumnId = resolveTaskBoardColumnId(outcome, args.columns, args.settings)
-    confirmTaskBoardMove(outcome, confirmedColumnId ?? columnId)
-    args.onMoved(card.provider)
+    confirmTaskBoardMove(host, outcome, confirmedColumnId ?? columnId)
+    void args.reread(card.provider)
   }
 
   /** Ends `session` only while it still owns the dialog; a settled session is never touched again. */
@@ -103,7 +113,7 @@ export function useTaskBoardMove(args: {
     dialogRef.current = null
     setJiraPrompt(null)
     setLinearChoice(null)
-    settle(session.card, session.columnId, outcome)
+    settle(session, outcome)
   }
 
   /** A drop whose choices loaded after another dialog opened gives way to that dialog. */
@@ -168,7 +178,8 @@ export function useTaskBoardMove(args: {
 
   async function move(card: TaskBoardCard, columnId: string): Promise<void> {
     const { source } = card
-    if (isTaskBoardMoveInFlight(card.refKey)) {
+    const drop = { host: args.accountHostId, card, columnId }
+    if (isTaskBoardMoveInFlight(drop.host, card.refKey)) {
       return
     }
     // One open dialog at a time, as the Jira tab locks its board: a second must not take it over.
@@ -178,12 +189,11 @@ export function useTaskBoardMove(args: {
     }
     setError(null)
     // The card shows in its target column at once; a failure puts it back.
-    holdTaskBoardMove(card, columnId)
+    holdTaskBoardMove(drop.host, card, columnId)
     let outcome: MoveOutcome = 'unchanged'
     try {
       const session = (provider: 'jira' | 'linear'): MoveSession => ({
-        card,
-        columnId,
+        ...drop,
         target: requireTaskBoardTarget(provider, args.accountHostId)
       })
       outcome =
@@ -199,7 +209,7 @@ export function useTaskBoardMove(args: {
       setError(taskBoardMoveErrorMessage(cause))
     }
     if (outcome !== 'dialog') {
-      settle(card, columnId, outcome)
+      settle(drop, outcome)
     }
   }
 

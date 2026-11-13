@@ -3,7 +3,10 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
-import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
+import {
+  placeTaskBoardCards,
+  TASK_BOARD_MOVE_OVERRIDE_TTL_MS
+} from '@/lib/work-items/task-board/task-board-move-overrides'
 import type { JiraIssue, JiraStatus, JiraTransition } from '../../../../../shared/jira/jira-types'
 import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
@@ -74,19 +77,20 @@ function jiraCard(key: string, status = todo, updatedAt = ''): TaskBoardCard {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('useTaskBoardMove', () => {
   it('keeps an open Jira dialog when a second Jira card is dropped', async () => {
     moves.loadJira.mockResolvedValue(transitions)
-    const onMoved = vi.fn()
+    const reread = vi.fn(async () => {})
     const { result } = renderHook(() =>
       useTaskBoardMove({
         cards: [],
         columns,
         settings: getDefaultTaskBoardSettings(),
         accountHostId: 'local',
-        onMoved
+        reread
       })
     )
     const first = jiraCard('APP-1')
@@ -98,7 +102,7 @@ describe('useTaskBoardMove', () => {
     expect(moves.loadJira).toHaveBeenCalledTimes(1)
     expect([...result.current.updatingRefKeys]).toEqual(['jira::APP-1'])
     expect(result.current.error).toBe('Finish the open move first')
-    expect(onMoved).not.toHaveBeenCalled()
+    expect(reread).not.toHaveBeenCalled()
   })
 
   it('keeps a confirmed move in its target column when the next read is still stale', async () => {
@@ -107,17 +111,59 @@ describe('useTaskBoardMove', () => {
     moves.loadJira.mockResolvedValue([transitions[0]])
     moves.applyJira.mockResolvedValue(confirmed)
     const settings = getDefaultTaskBoardSettings()
-    const onMoved = vi.fn()
+    const reread = vi.fn(async () => {})
     const { result } = renderHook(() =>
-      useTaskBoardMove({ cards: [], columns, settings, accountHostId: 'local', onMoved })
+      useTaskBoardMove({ cards: [], columns, settings, accountHostId: 'local', reread })
     )
 
     await act(() => result.current.move(stale, 'in-progress'))
 
-    expect(onMoved).toHaveBeenCalledExactlyOnceWith('jira')
+    expect(reread).toHaveBeenCalledExactlyOnceWith('jira')
     // The provider re-read after the move still returns the card in To Do.
     expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
       { card: confirmed, columnId: 'in-progress' }
+    ])
+  })
+
+  it('re-reads the provider when a held move expires and then shows what that read says', async () => {
+    vi.useFakeTimers()
+    const stale = jiraCard('APP-4')
+    const confirmed = jiraCard('APP-4', review, '2026-11-13T10:00:00Z')
+    moves.loadJira.mockResolvedValue([transitions[0]])
+    moves.applyJira.mockResolvedValue(confirmed)
+    const settings = getDefaultTaskBoardSettings()
+    const reread = vi.fn(async () => {})
+    const { result } = renderHook(() =>
+      useTaskBoardMove({
+        cards: [],
+        columns,
+        settings,
+        accountHostId: 'runtime:expiry-host',
+        reread
+      })
+    )
+    await act(() => result.current.move(stale, 'in-progress'))
+    let finishReread: () => void = () => {}
+    reread.mockClear().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishReread = resolve
+        })
+    )
+
+    await act(() => vi.advanceTimersByTimeAsync(TASK_BOARD_MOVE_OVERRIDE_TTL_MS))
+
+    expect(reread).toHaveBeenCalledExactlyOnceWith('jira')
+    // Still held while the fresh read is in flight, so the card does not snap back early.
+    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
+      { card: confirmed, columnId: 'in-progress' }
+    ])
+
+    await act(async () => finishReread())
+
+    // The fresh read still says To Do: the provider is now authoritative.
+    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
+      { card: stale, columnId: 'todo' }
     ])
   })
 })
