@@ -6,13 +6,13 @@ import { listJiraTaskBoardCards } from '@/lib/work-items/task-board/adapters/jir
 import { listLinearTaskBoardCards } from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
 import { getTaskBoardProviderScopeKey } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
 import {
-  emptyTaskBoardCardsState,
   mergeTaskBoardProviderResult,
   type TaskBoardCardsState,
   type TaskBoardProviderResult
 } from '@/lib/work-items/task-board/task-board-provider-results'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
+import { readTaskBoardCards, writeTaskBoardCards } from './task-board-session-cache'
 
 const PROVIDER_LOADERS: Record<
   TaskProvider,
@@ -48,7 +48,14 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   refresh: () => void
   refreshProvider: (provider: TaskProvider) => void
 } {
-  const [state, setState] = useState(emptyTaskBoardCardsState)
+  // The last cards for this host show at once; the mount refresh then updates them.
+  const [stateHostId, setStateHostId] = useState(accountHostId)
+  const [state, setState] = useState(() => readTaskBoardCards(accountHostId))
+  if (stateHostId !== accountHostId) {
+    setStateHostId(accountHostId)
+    setState(readTaskBoardCards(accountHostId))
+  }
+  useEffect(() => writeTaskBoardCards(stateHostId, state), [stateHostId, state])
   const controllersRef = useRef(new Map<TaskProvider, AbortController>())
   const scopeKeys = useTaskBoardScopeKeys()
   const loadedScopeKeysRef = useRef<Record<TaskProvider, string> | null>(null)
@@ -58,11 +65,12 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
       controllersRef.current.get(provider)?.abort()
       const controller = new AbortController()
       controllersRef.current.set(provider, controller)
-      // Previous cards stay visible while the provider reloads.
-      setState((current) => ({
-        ...current,
-        providers: { ...current.providers, [provider]: { status: 'loading' } }
-      }))
+      // Previous cards and a settled status stay visible while the provider reloads.
+      setState((current) => {
+        const previous = current.providers[provider]
+        const next = previous.status === 'loading' ? previous : { ...previous, refreshing: true }
+        return { ...current, providers: { ...current.providers, [provider]: next } }
+      })
       void PROVIDER_LOADERS[provider](controller.signal, accountHostId).then((result) => {
         if (!controller.signal.aborted) {
           setState((current) => mergeTaskBoardProviderResult(current, result))

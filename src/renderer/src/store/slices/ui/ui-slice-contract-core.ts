@@ -72,6 +72,8 @@ export type TaskPageData = {
   openLinearSourceContext?: TaskSourceContext | null
   openJiraIssue?: JiraIssue
   openJiraSourceContext?: TaskSourceContext | null
+  /** Set when a detail was opened from My board, so closing it returns there. */
+  detailReturnTaskSource?: TaskSource
 }
 
 export type NewWorkspaceDraft = {

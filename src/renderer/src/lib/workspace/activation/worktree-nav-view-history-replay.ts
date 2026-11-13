@@ -1,5 +1,6 @@
 import { useAppStore } from '@/store/index'
 import type { WorktreeNavHistoryViewEntry } from '@/store/slices/ui/workspace-navigation-history'
+import { closeTaskPageDetail } from '@/lib/work-items/task-page-detail-return'
 
 // Replay via setActiveView: open*Page would mutate previousViewBefore* or duplicate history (navigateToIndex).
 export function applyWorktreeNavViewEntry(entry: WorktreeNavHistoryViewEntry): void {
@@ -11,18 +12,7 @@ export function applyWorktreeNavViewEntry(entry: WorktreeNavHistoryViewEntry): v
     useAppStore.setState((state) => ({
       activeView: 'tasks',
       githubTaskDrawerWorkItem: null,
-      taskPageData: {
-        ...state.taskPageData,
-        openGitHubWorkItem: undefined,
-        openGitHubSourceContext: undefined,
-        openGitHubInitialTab: undefined,
-        openGitLabWorkItem: undefined,
-        openGitLabSourceContext: undefined,
-        openLinearIssue: undefined,
-        openLinearSourceContext: undefined,
-        openJiraIssue: undefined,
-        openJiraSourceContext: undefined
-      }
+      taskPageData: closeTaskPageDetail(state.taskPageData)
     }))
     return
   }

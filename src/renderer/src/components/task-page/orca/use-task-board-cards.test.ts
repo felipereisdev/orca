@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../shared/constants'
+import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 
@@ -91,5 +92,26 @@ describe('useTaskBoardCards', () => {
       })
     )
     expect(callCounts()).toEqual({ github: 1, gitlab: 1, linear: 2, jira: 1 })
+  })
+
+  it('shows the last cards at once on remount and refreshes them in the background', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the hook only merges cards by refKey, provider and updatedAt.
+    const card = {
+      refKey: 'jira:site:APP-1',
+      provider: 'jira',
+      updatedAt: '2026-11-01T00:00:00Z'
+    } as TaskBoardCard
+    loaders.jira.mockResolvedValue({ provider: 'jira', status: 'ready', cards: [card] })
+    const first = renderHook(() => useTaskBoardCards('runtime:cache-host'))
+    await act(async () => {})
+    first.unmount()
+
+    loaders.jira.mockReturnValue(new Promise(() => {}))
+    const second = renderHook(() => useTaskBoardCards('runtime:cache-host'))
+    expect(second.result.current.state.cards).toEqual([card])
+    expect(second.result.current.state.providers.jira).toEqual({
+      status: 'ready',
+      refreshing: true
+    })
   })
 })

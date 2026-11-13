@@ -19,6 +19,10 @@ import { formatRelativeTime } from '../task-page-source-context'
 import { TaskBoardToolbar, type TaskBoardToolbarProvider } from './TaskBoardToolbar'
 import { useTaskBoardCards } from './use-task-board-cards'
 import { useTaskBoardMove, type TaskBoardMove } from './use-task-board-move'
+import {
+  readHiddenTaskBoardProviders,
+  writeHiddenTaskBoardProviders
+} from './task-board-session-cache'
 
 export function TaskPageOrcaContent({
   model
@@ -111,7 +115,7 @@ export function TaskPageOrcaBoard({
   onStartWorkspace: (card: TaskBoardCard) => void
 }): React.JSX.Element {
   const t = useTranslate()
-  const [hiddenProviders, setHiddenProviders] = useState<ReadonlySet<TaskProvider>>(new Set())
+  const [hiddenProviders, setHiddenProviders] = useState(readHiddenTaskBoardProviders)
 
   const columns = useMemo<TaskBoardColumn[]>(() => {
     const byId = new Map<string, TaskBoardColumn>(
@@ -146,16 +150,16 @@ export function TaskPageOrcaBoard({
       : []
   )
   const providerStates = Object.values(state.providers)
-  const loading = providerStates.some((provider) => provider.status === 'loading')
+  const firstLoad = state.cards.length === 0 && providerStates.some((p) => p.status === 'loading')
+  const refreshing = providerStates.some((p) => p.status === 'loading' || p.refreshing === true)
   const allDisconnected = providerStates.every((provider) => provider.status === 'disconnected')
   const toggleProvider = (provider: TaskProvider): void => {
-    setHiddenProviders((current) => {
-      const next = new Set(current)
-      if (!next.delete(provider)) {
-        next.add(provider)
-      }
-      return next
-    })
+    const next = new Set(hiddenProviders)
+    if (!next.delete(provider)) {
+      next.add(provider)
+    }
+    setHiddenProviders(next)
+    writeHiddenTaskBoardProviders(next)
   }
 
   if (allDisconnected) {
@@ -174,7 +178,7 @@ export function TaskPageOrcaBoard({
       <TaskBoardToolbar
         providers={toolbarProviders}
         shownCount={columns.reduce((count, column) => count + column.cards.length, 0)}
-        refreshing={loading}
+        refreshing={refreshing}
         onToggleProvider={toggleProvider}
         onRefresh={onRefresh}
       />
@@ -197,7 +201,7 @@ export function TaskPageOrcaBoard({
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
-        {loading && state.cards.length === 0 ? (
+        {firstLoad ? (
           <TaskBoardSkeleton columnCount={statuses.length} />
         ) : (
           <TaskBoard

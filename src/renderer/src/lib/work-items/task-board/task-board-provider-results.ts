@@ -12,8 +12,10 @@ export type TaskBoardProviderResult = {
 }
 
 export type TaskBoardProviderState = {
+  /** `loading` only until the provider's first result; later reloads set `refreshing`. */
   status: 'loading' | 'ready' | 'error' | 'disconnected'
   error?: string
+  refreshing?: boolean
 }
 
 export type TaskBoardCardsState = {

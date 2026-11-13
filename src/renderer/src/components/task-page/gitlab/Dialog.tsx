@@ -10,8 +10,18 @@ export function TaskPageGitLabDialog({
     setGitlabDialogItem,
     gitlabDialogRepo,
     gitlabDialogSourceContext,
-    handleUseGitLabItem
+    handleUseGitLabItem,
+    pageData,
+    closeTaskDetailPage
   } = model
+  // Why: a dialog opened from My board closes back to the board.
+  const closeDialog = (): void => {
+    if (pageData.detailReturnTaskSource) {
+      closeTaskDetailPage()
+    } else {
+      setGitlabDialogItem(null)
+    }
+  }
   return (
     <GitLabItemDialog
       item={gitlabDialogItem}
@@ -20,10 +30,10 @@ export function TaskPageGitLabDialog({
       repoId={gitlabDialogItem?.repoId ?? null}
       sourceContext={gitlabDialogSourceContext}
       onCreateWorkspace={(item) => {
-        setGitlabDialogItem(null)
+        closeDialog()
         handleUseGitLabItem(item)
       }}
-      onClose={() => setGitlabDialogItem(null)}
+      onClose={closeDialog}
     />
   )
 }
