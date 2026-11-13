@@ -25597,5 +25597,13 @@
       "readOnly": "Read only",
       "readWrite": "Read and write"
     }
+  },
+  "taskBoard": {
+    "emptyColumn": "No issues",
+    "moveCard": "Move {{id}}",
+    "startWorkspace": "Start workspace from {{id}}",
+    "startWorkspaceTooltip": "Start workspace",
+    "openExternal": "Open {{id}} in browser",
+    "openExternalTooltip": "Open in browser"
   }
 }
