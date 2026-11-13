@@ -202,6 +202,7 @@ export type RuntimeStore = {
     terminalModelQueryAuthority?: GlobalSettings['terminalModelQueryAuthority']
     worktreeVisibilityDefaults?: GlobalSettings['worktreeVisibilityDefaults']
     workspaceCleanupPolicy?: GlobalSettings['workspaceCleanupPolicy']
+    taskBoard?: GlobalSettings['taskBoard']
     hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
     activeRuntimeEnvironmentId?: GlobalSettings['activeRuntimeEnvironmentId']
     showPinnedWorktreesInGroups?: GlobalSettings['showPinnedWorktreesInGroups']
