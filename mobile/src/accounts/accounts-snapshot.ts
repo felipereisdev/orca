@@ -106,6 +106,7 @@ const ClaudeAccountSummarySchema = z
   .object({
     id: AccountIdSchema,
     email: z.string().min(1),
+    label: z.string().optional(),
     managedAuthRuntime: z.enum(['host', 'wsl']).optional(),
     wslDistro: z.string().nullable().optional(),
     authMethod: z.enum(['subscription-oauth', 'unknown']).optional(),
@@ -155,6 +156,13 @@ const CodexAccountSummarySchema = z
 
 export const AccountsSnapshotSchema = z
   .object({
+    claudeLaunchTarget: z
+      .discriminatedUnion('runtime', [
+        z.object({ runtime: z.literal('host'), wslDistro: z.null() }),
+        z.object({ runtime: z.literal('wsl'), wslDistro: z.string().min(1) })
+      ])
+      .nullable()
+      .optional(),
     claude: z
       .object({
         accounts: z.array(ClaudeAccountSummarySchema),

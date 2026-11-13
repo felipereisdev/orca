@@ -21,6 +21,7 @@ export function supportsMobileQuickCommands(capabilities: readonly string[] | un
 export type MobileQuickCommandLaunch = {
   agent?: TuiAgent
   options: {
+    claudeAccountId?: string
     agentPrompt?: string
     startupCommand?: string
     startupCommandDelivery?: 'shell-ready'

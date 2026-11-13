@@ -16,6 +16,7 @@ import { TerminalTabIdParam } from './agent-session-params'
 import { SessionId } from './structured-agent-session-params'
 import { isStructuredAgentSessionIdFor } from '../agent-session/structured-agent-session-create'
 import { AgentLaunchAccountEnv } from '../agent-launch/startup/agent-launch-account-env'
+import { ClaudeAccountIdParam } from './structured-agent-session-account-params'
 
 const LaunchAgent = z.custom<TuiAgent>(isTuiAgent, { message: 'Unknown TUI agent' })
 
@@ -27,6 +28,7 @@ const tolerantTabLayoutId = z
 
 export const AgentLaunchFields = z.object({
   agent: LaunchAgent,
+  claudeAccountId: ClaudeAccountIdParam.optional(),
   /** Caller-minted retry identity; optional forever for shipped clients. Never mint after an ambiguous launch:
    * a fresh ID on retry would create another operation instead of replaying. */
   operationId: z
@@ -111,11 +113,28 @@ export const AgentLaunchFields = z.object({
   surface: z.enum(AGENT_LAUNCH_SURFACES).optional()
 })
 
-/** Caller IDs must retain the agent lane encoded by host-minted IDs. */
-function refuseSessionIdForAnotherAgent(
-  launch: { agent: string; sessionId?: string | undefined },
+/** Caller identities must belong to the agent and launch route that can honor them. */
+function refuseInvalidAgentLaunchIdentity(
+  launch: {
+    agent: string
+    sessionId?: string | undefined
+    claudeAccountId?: string | undefined
+    target: { kind: string }
+    reuseTerminal?: { handle: string } | undefined
+  },
   ctx: z.RefinementCtx
 ): void {
+  if (launch.claudeAccountId) {
+    const message =
+      launch.agent !== 'claude'
+        ? 'An explicit Claude account requires Claude.'
+        : launch.target.kind !== 'existing' || launch.reuseTerminal
+          ? 'An explicit Claude account requires a new agent tab in an existing workspace.'
+          : undefined
+    if (message) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['claudeAccountId'], message })
+    }
+  }
   if (launch.sessionId && !isStructuredAgentSessionIdFor(launch.agent, launch.sessionId)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -125,11 +144,11 @@ function refuseSessionIdForAnotherAgent(
   }
 }
 
-export const AgentLaunch = AgentLaunchFields.superRefine(refuseSessionIdForAnotherAgent)
+export const AgentLaunch = AgentLaunchFields.superRefine(refuseInvalidAgentLaunchIdentity)
 
 export type AgentLaunchParams = z.infer<typeof AgentLaunch>
 
 // A distinct method prevents an older receiver from silently dropping the replay requirement.
 export const AgentLaunchReplay = AgentLaunchFields.required({ operationId: true }).superRefine(
-  refuseSessionIdForAnotherAgent
+  refuseInvalidAgentLaunchIdentity
 )

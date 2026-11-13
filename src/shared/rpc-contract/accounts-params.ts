@@ -98,6 +98,7 @@ export const AddCodexFromHomeParams = z.object({
 
 // Account list opts out: forced usage refresh bypasses throttle/Retry-After and costs a serial round trip per account.
 export const ListAccountsParams = z.object({
+  worktreeId: z.string().min(1).optional(),
   refreshUsage: z.boolean().default(true),
   // Older hosts strip this and skip the refresh, which matches their prior behavior.
   refreshStaleUsage: z.boolean().optional()

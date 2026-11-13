@@ -5,6 +5,7 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import type { RpcResponse } from '../../transport/rpc/rpc-wire-types'
 import type { SendRequestOptions } from '../../transport/rpc/unvalidated-rpc-request-port'
 import '../../../../src/shared/protocol-version'
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/agent-session-create-capabilities'
 import { PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY } from '../../../../src/shared/preflight-runtime-capabilities'
 import type { ExecutionHostId } from '../../../../src/shared/execution-host'
 import { WorkspaceExecutionHostContext } from '../../navigation/workspace-execution-host'
@@ -14,6 +15,8 @@ import type { MobileNewTabAgentOption } from './mobile-new-tab-agent-options'
 import type { MobileNewTabAgentLoadState } from './mobile-agent-load-state'
 import { useMobileNewTabAgentOptions } from './use-mobile-new-tab-agent-options'
 
+const defaultHostCapabilities = [PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY]
+
 const claude: RpcResponse = { id: '1', ok: true, result: ['claude'] }
 
 type FakeHost = {
@@ -21,6 +24,7 @@ type FakeHost = {
   repos?: () => RpcResponse
   settings?: unknown
   connectedAt?: number
+  accounts?: (params: unknown) => RpcResponse
 }
 
 type FakeClient = RpcClient & { sendRequest: ReturnType<typeof vi.fn> }
@@ -34,6 +38,9 @@ function createClient(host: FakeHost): FakeClient {
       }
       if (method === 'repo.list' && host.repos) {
         return host.repos()
+      }
+      if (method === 'accounts.list' && host.accounts) {
+        return host.accounts(_params)
       }
       if (method === 'preflight.detectAgents') {
         return host.agents()
@@ -61,18 +68,25 @@ type DrawerProps = {
   prefetch?: boolean
   executionHost?: ExecutionHostId
   worktreeId?: string
+  hostCapabilities?: readonly string[]
 }
 
 // One page document: every mount shares its query client, as screens in one document do.
 function mountDrawer(queryClient: QueryClient) {
   const states: MobileNewTabAgentLoadState[] = []
   let options: MobileNewTabAgentOption[] = []
-  function Probe({ client, open, prefetch = false, worktreeId = 'folder:fw-1' }: DrawerProps) {
+  function Probe({
+    client,
+    open,
+    prefetch = false,
+    worktreeId = 'folder:fw-1',
+    hostCapabilities = defaultHostCapabilities
+  }: DrawerProps) {
     const sheet = useMobileNewTabAgentOptions({
       client,
       connState: 'connected',
       hostId: 'host-1',
-      hostCapabilities: [PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY],
+      hostCapabilities,
       worktreeId,
       open,
       prefetch
@@ -139,4 +153,89 @@ describe('useMobileNewTabAgentOptions', () => {
     expect(drawer.options()).toEqual([])
     drawer.unmount()
   })
+})
+
+it('offers only named Claude accounts owned by the current execution host and workspace runtime', async () => {
+  const drawer = mountDrawer(queryClient)
+  const hostCapabilities = [
+    PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY,
+    CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY
+  ]
+  const accounts = [
+    { id: 'claude-host', email: 'host@example.com', label: 'Host account' },
+    {
+      id: 'claude-ubuntu-a',
+      email: 'a@example.com',
+      managedAuthRuntime: 'wsl',
+      wslDistro: 'Ubuntu'
+    },
+    {
+      id: 'claude-ubuntu-b',
+      email: 'b@example.com',
+      managedAuthRuntime: 'wsl',
+      wslDistro: 'ubuntu'
+    },
+    {
+      id: 'claude-debian',
+      email: 'debian@example.com',
+      managedAuthRuntime: 'wsl',
+      wslDistro: 'Debian'
+    }
+  ]
+  const client = createClient({
+    agents: () => ({ id: '1', ok: true, result: ['claude', 'codex'] }),
+    accounts: (params) => ({
+      id: 'accounts',
+      ok: true,
+      result: {
+        claude: { accounts, activeAccountId: null },
+        codex: { accounts: [], activeAccountId: null },
+        rateLimits: {
+          claude: null,
+          codex: null,
+          inactiveClaudeAccounts: [],
+          inactiveCodexAccounts: []
+        },
+        claudeLaunchTarget:
+          typeof params === 'object' &&
+          params !== null &&
+          'worktreeId' in params &&
+          params.worktreeId === 'folder:fw-ubuntu'
+            ? { runtime: 'wsl', wslDistro: 'Ubuntu' }
+            : { runtime: 'host', wslDistro: null }
+      }
+    })
+  })
+  await drawer.render({
+    client,
+    open: false,
+    prefetch: true,
+    worktreeId: 'folder:fw-ubuntu',
+    hostCapabilities
+  })
+  expect(
+    drawer.options().map(({ agent, claudeAccountId }) => ({ agent, claudeAccountId }))
+  ).toEqual([
+    { agent: 'claude', claudeAccountId: 'claude-ubuntu-a' },
+    { agent: 'claude', claudeAccountId: 'claude-ubuntu-b' },
+    { agent: 'codex', claudeAccountId: undefined }
+  ])
+  await drawer.render({ client, open: true, worktreeId: 'folder:fw-host', hostCapabilities })
+  expect(
+    drawer
+      .options()
+      .filter(({ agent }) => agent === 'claude')
+      .map(({ claudeAccountId }) => claudeAccountId)
+  ).toEqual(['claude-host'])
+  await drawer.render({
+    client: createClient({ agents: () => claude }),
+    open: true,
+    worktreeId: 'folder:fw-host',
+    executionHost: 'runtime:vm-b',
+    hostCapabilities
+  })
+  expect(
+    drawer.options().map(({ agent, claudeAccountId }) => ({ agent, claudeAccountId }))
+  ).toEqual([{ agent: 'claude', claudeAccountId: undefined }])
+  drawer.unmount()
 })

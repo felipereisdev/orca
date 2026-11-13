@@ -106,7 +106,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
       : sendDiffNotesStatusRow
         ? [sendDiffNotesStatusRow]
         : createTabAgentOptions.map((option) => ({
-            id: `agent:${option.agent}`,
+            id: `agent:${option.agent}:${option.claudeAccountId ?? ''}`,
             label: option.label,
             hint: t('session.usePanelRouteActions.newSessionHint', 'New agent session'),
             icon: Bot,
@@ -118,6 +118,7 @@ export function useMobileSessionPanelRouteActions(scope: MobileSessionPresentati
               }
               void sendDiffNotesToNewAgent(delivery, async () => {
                 await handleCreateTerminal(option.agent, {
+                  ...(option.claudeAccountId ? { claudeAccountId: option.claudeAccountId } : {}),
                   initialPrompt: delivery.prompt,
                   onPromptSent: () => void clearDeliveredDiffComments(delivery.comments)
                 })

@@ -152,6 +152,7 @@ export function useMobileSessionTerminalCreateActions(scope: MobileSessionAttach
         hostCapabilities?.includes(SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY) === true
       const response = await requestMobileSessionTerminalCreate({
         client,
+        hostCapabilities,
         worktreeId,
         afterTabId,
         clientMutationId,

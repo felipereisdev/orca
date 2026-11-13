@@ -36,6 +36,8 @@ export type AgentLaunchReusedTerminal = { handle: string }
 
 export type AgentLaunchIntent = {
   agent: TuiAgent
+  /** Pin a fresh Claude launch to a named account owned by its execution runtime. */
+  claudeAccountId?: string
   target: AgentLaunchTarget
   prompt?: AgentLaunchPrompt
   /** Structured create options also supply terminal model/effort/mode preferences. */

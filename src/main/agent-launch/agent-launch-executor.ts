@@ -276,6 +276,7 @@ async function createSurface(
     const session = await surfaces.createStructuredSession({
       worktreeId: workspace.worktreeId,
       agent: intent.agent,
+      ...(intent.claudeAccountId ? { claudeAccountId: intent.claudeAccountId } : {}),
       ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
       ...(intent.chatOptions ? { chatOptions: intent.chatOptions } : {}),
       ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),

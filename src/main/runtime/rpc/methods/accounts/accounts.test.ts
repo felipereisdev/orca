@@ -80,3 +80,30 @@ describe('account RPC methods', () => {
     }
   )
 })
+
+it('lists the requested workspace account target instead of its global usage target', async () => {
+  const listed = method('accounts.list')
+  if (isStreamingMethod(listed)) {
+    throw new Error('Expected request method')
+  }
+  const snapshot = { rateLimits: { claudeTarget: { runtime: 'host', wslDistro: null } } }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Account listing reads only the snapshot and workspace detection owner.
+  const runtime = {
+    getAccountsSnapshot: () => snapshot,
+    resolveAgentDetectionHost: async (worktreeId: string) =>
+      worktreeId === 'folder:ubuntu'
+        ? {
+            kind: 'local',
+            context: {
+              projectRuntime: { status: 'resolved', runtime: { kind: 'wsl', distro: 'Ubuntu' } }
+            }
+          }
+        : { kind: 'ssh', connectionId: 'remote-server' }
+  } as unknown as OrcaRuntimeService
+  const call = (worktreeId: string) =>
+    listed.handler(listed.params?.parse({ worktreeId, refreshUsage: false }), { runtime })
+  await expect(call('folder:ubuntu')).resolves.toMatchObject({
+    claudeLaunchTarget: { runtime: 'wsl', wslDistro: 'Ubuntu' }
+  })
+  await expect(call('folder:ssh')).resolves.toMatchObject({ claudeLaunchTarget: null })
+})

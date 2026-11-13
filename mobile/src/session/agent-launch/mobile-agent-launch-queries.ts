@@ -1,3 +1,6 @@
+import { AccountsSnapshotSchema } from '../../accounts/accounts-snapshot'
+import { defineRpcOperation, runRpcOperation } from '../../transport/rpc/rpc-operation'
+import { rpcResultVariant } from '../../transport/rpc/rpc-operation-result-reader'
 import { useMemo } from 'react'
 import { useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useOptionalHostProtocolGates } from '../../components/host-protocol-gates-context'
@@ -156,3 +159,30 @@ export function agentLaunchContextOf({
       }
     : null
 }
+
+const newTabAccountsRead = defineRpcOperation({
+  name: 'accounts.new-tab-workspace',
+  method: 'accounts.list',
+  acceptance: 'require-result-or-throw',
+  barrier: 'on-settle',
+  read: rpcResultVariant('accounts-snapshot', AccountsSnapshotSchema)
+})
+
+export const newTabAccountsQuery = defineHostQuery({
+  family: 'accounts.newTab',
+  staleTime: 60_000,
+  gcTime: 30 * 60_000,
+  retry: false,
+  signal: { events: ['settingsChanged'] },
+  fetch: async (client, target, _input: typeof NO_INPUT) => {
+    try {
+      return await runRpcOperation(client, newTabAccountsRead, {
+        worktreeId: target.worktree,
+        refreshUsage: false
+      })
+    } catch {
+      // Advisory inventory: unsupported account APIs retain the host's default launch entry.
+      return null
+    }
+  }
+})

@@ -22,6 +22,7 @@ export type AgentLaunchSurfaceFactory = {
   createStructuredSession(args: {
     worktreeId: string
     agent: StructuredAgentId
+    claudeAccountId?: string
     chatOptions?: Readonly<Record<string, string>>
     options?: Readonly<Record<string, unknown>>
     /** Caller-minted ID; reject with AgentLaunchSessionAlreadyExistsError if taken. */
@@ -36,6 +37,7 @@ export type AgentLaunchSurfaceFactory = {
   createTerminalAgent(args: {
     worktreeId: string
     agent: TuiAgent
+    claudeAccountId?: string
     options?: Readonly<Record<string, unknown>>
     /** Offer on argv; promptRodeLaunchCommand confirms whether the typed line carried it. */
     startupPrompt?: string
@@ -158,6 +160,7 @@ export function terminalLaunchInputs(intent: AgentLaunchIntent) {
     ...(intent.cwd ? { cwd: intent.cwd } : {}),
     ...(intent.launchSource ? { launchSource: intent.launchSource } : {}),
     ...(intent.paneKey ? { paneKey: intent.paneKey } : {}),
+    ...(intent.claudeAccountId ? { claudeAccountId: intent.claudeAccountId } : {}),
     ...(intent.accountEnv ? { accountEnv: intent.accountEnv } : {})
   }
 }

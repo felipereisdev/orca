@@ -1,3 +1,6 @@
+import type { ClaudeAccountLaunchTarget } from '../../../../src/shared/claude-account-launch-target'
+import { filterClaudeAccountsForLaunchTarget } from '../../../../src/shared/claude-account-launch-target'
+import type { ClaudeAccountSummary } from '../../accounts/accounts-snapshot'
 import type { TuiAgent } from '../../../../src/shared/agent-launch/catalog/tui-agent'
 import { filterEnabledMobileTuiAgents } from '../../agents/mobile-tui-agents'
 import { isTuiAgent as isMobileTuiAgent } from '../../../../src/shared/agent-launch/catalog/tui-agent-config'
@@ -12,6 +15,7 @@ export type MobileNewTabAgentSettings = {
 export type MobileNewTabAgentOption = {
   agent: TuiAgent
   label: string
+  claudeAccountId?: string
 }
 
 export function orderMobileNewTabAgents(
@@ -46,4 +50,24 @@ export function buildMobileNewTabAgentOptions(
     agent,
     label: MOBILE_TUI_AGENT_LABELS[agent]
   }))
+}
+
+export function expandMobileClaudeAccountOptions(
+  options: MobileNewTabAgentOption[],
+  accounts: readonly ClaudeAccountSummary[],
+  target: ClaudeAccountLaunchTarget | null | undefined
+): MobileNewTabAgentOption[] {
+  const applicable = target ? filterClaudeAccountsForLaunchTarget(accounts, target) : []
+  if (!applicable.length) {
+    return options
+  }
+  return options.flatMap((option) =>
+    option.agent === 'claude'
+      ? applicable.map((account) => ({
+          agent: option.agent,
+          label: account.label || account.email,
+          claudeAccountId: account.id
+        }))
+      : [option]
+  )
 }

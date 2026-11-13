@@ -1,3 +1,6 @@
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/agent-session-create-capabilities'
+import { useHostQuery } from '../../query/host-query'
+import { expandMobileClaudeAccountOptions } from './mobile-new-tab-agent-options'
 import { useEffect, useMemo, useState } from 'react'
 import { hashKey, useQueryClient } from '@tanstack/react-query'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
@@ -6,6 +9,7 @@ import type { ConnectionState } from '../../transport/connection/connection-stat
 import { hostQueryKey } from '../../query/host-query-key'
 import {
   detectedAgentsQuery,
+  newTabAccountsQuery,
   refreshDetectedAgents,
   reloadNewTabSettings,
   useMobileAgentLaunchQueries,
@@ -29,6 +33,7 @@ function refreshedThisConnection(client: RpcClient): Set<string> {
 }
 
 const NO_OPTIONS: MobileNewTabAgentOption[] = []
+const NO_INPUT = {}
 
 // Loads with the session (`prefetch`) so the first "+" tap lists agents at once.
 export function useMobileNewTabAgentOptions(args: {
@@ -51,6 +56,27 @@ export function useMobileNewTabAgentOptions(args: {
     enabled: connected && (open || args.prefetch),
     observeLoaded: open
   })
+  const accountsSupported =
+    args.hostCapabilities?.includes(CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY) === true
+  const accounts = useHostQuery(newTabAccountsQuery, { hostId, client }, target, NO_INPUT, {
+    enabled: connected && accountsSupported && args.worktreeId !== '' && (open || args.prefetch),
+    subscribed:
+      open ||
+      queryClient.getQueryData(
+        hostQueryKey(hostId, newTabAccountsQuery.family, target, NO_INPUT)
+      ) === undefined
+  })
+  useEffect(() => {
+    if (open && connected && accountsSupported) {
+      void queryClient.invalidateQueries(
+        {
+          queryKey: hostQueryKey(hostId, newTabAccountsQuery.family, target, NO_INPUT),
+          exact: true
+        },
+        { cancelRefetch: false }
+      )
+    }
+  }, [open, connected, accountsSupported, hostId, queryClient, target])
   // A list this mount did not load may predate an install into a new PATH directory.
   const [mountedAt] = useState(Date.now)
 
@@ -101,7 +127,7 @@ export function useMobileNewTabAgentOptions(args: {
     ? 'idle'
     : detected?.kind === 'other-runtime'
       ? 'other-runtime'
-      : detected && settings.data
+      : detected && settings.data && (!accountsSupported || accounts.data !== undefined)
         ? 'loaded'
         : detection.isError || settings.isError
           ? 'error'
@@ -109,9 +135,13 @@ export function useMobileNewTabAgentOptions(args: {
   const options = useMemo(
     () =>
       loadState === 'loaded' && detected?.kind === 'detected'
-        ? newTabAgentOptionsFrom(settings.data?.settings, detected.detectedAgents)
+        ? expandMobileClaudeAccountOptions(
+            newTabAgentOptionsFrom(settings.data?.settings, detected.detectedAgents),
+            accountsSupported ? (accounts.data?.claude.accounts ?? []) : [],
+            accounts.data?.claudeLaunchTarget
+          )
         : NO_OPTIONS,
-    [detected, loadState, settings.data]
+    [detected, loadState, settings.data, accounts.data, accountsSupported]
   )
   return { loadState, options }
 }

@@ -1,3 +1,4 @@
+import { getWorkspaceAccountsSnapshot } from './workspace-accounts-snapshot'
 import { CLAUDE_ACCOUNT_NAME_METHODS } from './claude-account-name-method'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
 import type { OrcadFeature } from '../../startup/orcad-readiness'
@@ -149,7 +150,7 @@ const ACCOUNT_METHOD_DEFINITIONS = [
           undefined
         )
       }
-      return runtime.getAccountsSnapshot()
+      return getWorkspaceAccountsSnapshot(runtime, params.worktreeId)
     }
   }),
   defineMethod({

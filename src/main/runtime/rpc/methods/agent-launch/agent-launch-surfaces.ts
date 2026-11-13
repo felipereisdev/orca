@@ -52,6 +52,7 @@ export function agentLaunchSurfaceFactory(
     createStructuredSession: async ({
       worktreeId,
       agent,
+      claudeAccountId,
       options,
       chatOptions,
       sessionId: requested,
@@ -93,6 +94,7 @@ export function agentLaunchSurfaceFactory(
         },
         worktree: `id:${worktreeId}`,
         agent,
+        ...(claudeAccountId ? { claudeAccountId } : {}),
         ...(chatOptions?.model ? { optionsMode: 'replace-model-selection' as const } : {}),
         ...(seeded ? { options: seeded } : {}),
         ...(tabId ? { tabId } : {}),
@@ -124,6 +126,7 @@ export function agentLaunchSurfaceFactory(
     createTerminalAgent: async ({
       worktreeId,
       agent,
+      claudeAccountId,
       startupPrompt,
       agentArgs,
       cwd,
@@ -146,6 +149,7 @@ export function agentLaunchSurfaceFactory(
         wslUserAct: true,
         // Let the runtime build the configured launcher: agent ids are not commands (cursor uses cursor-agent).
         startupAgent: agent,
+        ...(claudeAccountId ? { claudeAccountId } : {}),
         terminalImageViewerSupported: terminalImageViewerSupported(context),
         // The runtime reports typed-line prompt carry; paste only when the command did not carry it.
         ...(startupPrompt

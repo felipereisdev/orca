@@ -180,6 +180,20 @@ describe('a fresh launch writes the ledger once before its effect', () => {
 })
 
 describe('stable replay identity', () => {
+  it('refuses a retry that changes the explicitly selected Claude account', async () => {
+    const params = createLaunch({
+      operationId: OPERATION_ID,
+      target: { kind: 'existing', worktree: 'id:wt-7' },
+      surface: 'terminal',
+      claudeAccountId: 'work'
+    })
+    await launch(params, runtimeStub())
+
+    await expect(launch({ ...params, claudeAccountId: 'personal' }, runtimeStub())).rejects.toThrow(
+      'agent_session_operation_conflict'
+    )
+  })
+
   it('replays across a bearer-credential change under the paired device subject', async () => {
     const params = createLaunch({ operationId: OPERATION_ID })
     const firstRuntime = runtimeStub()

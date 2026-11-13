@@ -2,6 +2,7 @@ import type { MobileQuickCommandLaunch } from '../quick-commands'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import type { MobileNewTabAgentOption } from '../../session/agent-launch/mobile-new-tab-agent-options'
 import { sessionTabCreateTerminal } from '../../session/tabs/mobile-session-tab-write-operations'
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/agent-session-create-capabilities'
 
 export type MobileSessionTerminalCreateOptions = MobileQuickCommandLaunch['options'] & {
   onPromptSent?: () => void
@@ -13,6 +14,7 @@ export type MobileSessionTerminalCreateOptions = MobileQuickCommandLaunch['optio
 
 export function requestMobileSessionTerminalCreate(args: {
   client: RpcClient
+  hostCapabilities?: readonly string[] | null
   worktreeId: string
   afterTabId?: string
   clientMutationId: string
@@ -21,6 +23,12 @@ export function requestMobileSessionTerminalCreate(args: {
   sourceChatFork?: { sessionId: string }
 }) {
   const { client, worktreeId, afterTabId, clientMutationId, agent, options, sourceChatFork } = args
+  if (
+    options?.claudeAccountId !== undefined &&
+    !args.hostCapabilities?.includes(CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY)
+  ) {
+    throw new Error('Update Orca on this host to choose a Claude account for this session.')
+  }
   const params = {
     worktree: `id:${worktreeId}`,
     afterTabId,
@@ -31,6 +39,7 @@ export function requestMobileSessionTerminalCreate(args: {
       : {}),
     ...(options?.agentPrompt ? { agentPrompt: options.agentPrompt } : {}),
     ...(agent ? { agent } : {}),
+    ...(options?.claudeAccountId !== undefined ? { claudeAccountId: options.claudeAccountId } : {}),
     ...(sourceChatFork ? { sourceChatFork } : {}),
     activate: false,
     select: true,

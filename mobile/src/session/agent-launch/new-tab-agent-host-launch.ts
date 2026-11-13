@@ -74,6 +74,7 @@ export async function launchNewTabAgentThroughHost(args: {
     hostCapabilities: args.hostCapabilities,
     worktreeId: args.worktreeId,
     agent: args.agent,
+    claudeAccountId: options?.claudeAccountId,
     reservation,
     ...(afterTabId ? { placement: { afterTabId } } : {}),
     ...(prompt?.trim() ? { prompt: { text: prompt, delivery: 'submit' as const } } : {}),

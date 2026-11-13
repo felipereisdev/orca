@@ -2,6 +2,7 @@
 
 import {
   AGENT_LAUNCH_CHAT_OPTIONS_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY
 } from '../../../../src/shared/agent-launch/contracts/agent-launch-runtime-capability'
 import type {
@@ -79,6 +80,7 @@ export async function launchAgentInExistingWorkspace(args: {
   hostCapabilities: readonly string[] | null | undefined
   worktreeId: string
   agent: TuiAgent
+  claudeAccountId?: string
   agentArgs?: string
   surface?: 'chat' | 'terminal'
   prompt?: AgentLaunchPrompt
@@ -90,11 +92,18 @@ export async function launchAgentInExistingWorkspace(args: {
   placement?: AgentLaunchPlacement
   mintOperationId?: () => string
 }): Promise<MobileExistingAgentLaunch> {
+  if (
+    args.claudeAccountId !== undefined &&
+    !args.hostCapabilities?.includes(AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY)
+  ) {
+    return { kind: 'failed', message: AGENT_LAUNCH_UPDATE_REQUIRED_MESSAGE }
+  }
   if (!supportsMobileExistingAgentLaunch(args.hostCapabilities)) {
     return { kind: 'unsupported' }
   }
   const params = agentLaunchExistingParams({
     agent: args.agent,
+    claudeAccountId: args.claudeAccountId,
     agentArgs: args.agentArgs,
     ...(args.surface && args.hostCapabilities?.includes(AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY)
       ? { surface: args.surface }

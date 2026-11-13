@@ -6,6 +6,7 @@ import { parseAgentSessionOperationTimestamp } from '../../agent-session/agent-s
 /** Digest launch behavior, excluding its operation ID and mutable host settings; changed defaults must not conflict with an honest retry. */
 export type AgentLaunchFingerprintInput = {
   agent: string
+  claudeAccountId?: string
   target:
     | { kind: 'existing'; worktree: string }
     | { kind: 'create-worktree'; create: Readonly<Record<string, unknown>> }
@@ -37,6 +38,7 @@ export function computeAgentLaunchFingerprint(input: AgentLaunchFingerprintInput
   return canonicalAgentSessionDigest({
     method: 'agent.launch',
     agent: input.agent,
+    claudeAccountId: input.claudeAccountId,
     target,
     prompt: input.prompt,
     sessionOptions: input.sessionOptions,

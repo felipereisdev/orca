@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { FileText, Globe, SquareTerminal } from 'lucide-react-native'
-import type { TuiAgent } from '../../../../src/shared/agent-launch/catalog/tui-agent'
+import { TUI_AGENT_DISPLAY_NAMES } from '../../../../src/shared/agent-launch/catalog/tui-agent-display-names'
 import { ActionSheetContent, type ActionSheetAction } from '../../components/ActionSheetModal'
 import { BottomDrawer } from '../../components/bottom-drawer/BottomDrawer'
 import {
@@ -29,7 +29,7 @@ type Props = {
   canCreateBrowser: boolean
   canCreateMarkdownNote: boolean
   onClose: () => void
-  onCreateAgent: (agent: TuiAgent) => void
+  onCreateAgent: (option: MobileNewTabAgentOption) => void
   onCreateTerminal: () => void
   /** Runs after the sheet has gone, so it may open another modal. */
   onCreateBrowser: () => void
@@ -96,20 +96,29 @@ export function MobileNewTabSheet({
       {showAgentGrid ? (
         <View style={styles.grid}>
           {agentRows.map((row) => (
-            <View key={row.options.map((option) => option.agent).join(':')} style={styles.gridRow}>
+            <View
+              key={row.options
+                .map((option) => `${option.agent}:${option.claudeAccountId ?? ''}`)
+                .join(':')}
+              style={styles.gridRow}
+            >
               {row.options.map((option) => (
                 <Pressable
-                  key={option.agent}
-                  onPress={() => closeAndRun(() => onCreateAgent(option.agent))}
+                  key={`${option.agent}:${option.claudeAccountId ?? ''}`}
+                  onPress={() => closeAndRun(() => onCreateAgent(option))}
                   accessibilityRole="button"
-                  accessibilityLabel={option.label}
+                  accessibilityLabel={
+                    option.claudeAccountId
+                      ? `${TUI_AGENT_DISPLAY_NAMES[option.agent]}, ${option.label}`
+                      : option.label
+                  }
                   style={styles.tile}
                 >
                   {({ pressed }) => (
                     <>
                       {pressed ? <View style={styles.tilePressed} /> : null}
                       <MobileAgentIcon agentId={option.agent} size={22} />
-                      <Text style={styles.tileLabel} numberOfLines={1}>
+                      <Text style={styles.tileLabel} numberOfLines={option.claudeAccountId ? 2 : 1}>
                         {option.label}
                       </Text>
                     </>
@@ -176,7 +185,13 @@ const styles = themedStyleSheet(() => ({
     left: 0,
     backgroundColor: colors.translucentFill
   },
-  tileLabel: { fontSize: 13.5, fontWeight: '600', color: colors.textPrimary, maxWidth: '100%' },
+  tileLabel: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    maxWidth: '100%',
+    textAlign: 'center'
+  },
   // Padded like a tile: flex shares space after padding, so a bare spacer would widen its row's tiles.
   tileSpacer: { flex: 1, paddingHorizontal: spacing.sm },
   actions: { marginTop: spacing.lg }

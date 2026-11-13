@@ -60,7 +60,12 @@ export const AGENT_LAUNCH_PERMISSION_CHOICE_CAPABILITY = 'settings.agent-permiss
 // explicit chat it cannot open before creating anything. Older hosts strip the field.
 export const AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY = 'agent.launch.surface.v1' as const
 
+// Host resolves a fresh existing-workspace Claude launch's named account on its execution runtime.
+export const AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY =
+  'agent-launch.claude-account.v1' as const
+
 export const AGENT_LAUNCH_RUNTIME_CAPABILITIES = [
+  AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_CHAT_OPTIONS_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_SETTINGS_CAPABILITY,
   AGENT_LAUNCH_CHOICES_CAPABILITY,

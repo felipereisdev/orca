@@ -56,6 +56,7 @@ export function agentLaunchCreateParams(
 // Use the separate replay method: older hosts would strip operationId from agent.launch and run an unprotected duplicate.
 export function agentLaunchExistingParams(args: {
   agent: TuiAgent
+  claudeAccountId?: string
   worktreeId: string
   operationId: string
   prompt?: AgentLaunchPrompt
@@ -70,6 +71,7 @@ export function agentLaunchExistingParams(args: {
 }): RpcSendParams<'agent.launchReplay'> {
   return {
     agent: args.agent,
+    ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.agentArgs !== undefined ? { agentArgs: args.agentArgs } : {}),
     ...(args.surface ? { surface: args.surface } : {}),
     operationId: args.operationId,
