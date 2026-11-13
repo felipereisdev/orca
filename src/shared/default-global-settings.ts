@@ -18,6 +18,7 @@ import { DEFAULT_SOURCE_CONTROL_GROUP_ORDER } from './source-control/listing/sou
 import { DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT } from './terminal/replay/terminal-scrollback-policy'
 import { NESTED_WORKER_MAX_DEPTH_DEFAULT } from './orchestration/workers/nested-worker-depth'
 import { getDefaultWorkspaceCleanupRules } from './workspace-cleanup/workspace-cleanup-policy'
+import { getDefaultTaskBoardSettings } from './task-board/task-board-settings'
 
 export function buildDefaultSettings(args: {
   workspaceDir: string
@@ -37,6 +38,7 @@ export function buildDefaultSettings(args: {
     workspaceDir: args.workspaceDir,
     worktreeVisibilityDefaults: { external: 'hide' },
     workspaceCleanupPolicy: getDefaultWorkspaceCleanupRules(),
+    taskBoard: getDefaultTaskBoardSettings(),
     nestWorkspaces: true,
     workspaceDirHistory: [],
     refreshLocalBaseRefOnWorktreeCreate: false,
@@ -299,12 +301,7 @@ export function buildDefaultSettings(args: {
     // Why: local desktop stays the default until the user picks a saved runtime environment.
     activeRuntimeEnvironmentId: null,
     // Why: hydrate a stable empty shape so renderer optional-chained reads never hit undefined.
-    githubProjects: {
-      pinned: [],
-      recent: [],
-      lastViewByProject: {},
-      activeProject: null
-    },
+    githubProjects: { pinned: [], recent: [], lastViewByProject: {}, activeProject: null },
     // Why: keep agent/model maps empty so first use follows the default agent's model, not a frozen stale choice.
     commitMessageAi: {
       enabled: true,
