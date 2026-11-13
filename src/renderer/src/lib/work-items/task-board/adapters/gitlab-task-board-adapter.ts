@@ -1,4 +1,5 @@
 import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
+import type { ForgeRepoSelector } from '@/runtime/source-control/forge/forge-credential-target'
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import type { GitLabWorkItem } from '../../../../../../shared/gitlab-types'
 import { mapSettledWithConcurrency } from '../../../../../../shared/map-with-concurrency'
@@ -36,13 +37,18 @@ export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): 
 
 type RepoIssues = { items: GitLabWorkItem[]; error?: string; notGitLab?: true }
 
-async function listRepoIssues(repo: Repo, now: Date): Promise<RepoIssues> {
-  const selector = {
+/** The GitLab selector the board reads and writes a repo's issues with. */
+export function gitLabTaskBoardRepoSelector(repo: Repo): ForgeRepoSelector {
+  return {
     repoPath: repo.path,
     repoId: repo.id,
     sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
     repoOwnerExecutionHostId: getRepoExecutionHostId(repo)
   }
+}
+
+async function listRepoIssues(repo: Repo, now: Date): Promise<RepoIssues> {
+  const selector = gitLabTaskBoardRepoSelector(repo)
   const api = gitLabApiFor(selector)
   const [opened, closed] = await Promise.all([
     api.listIssues({ ...selector, state: 'opened', assignee: '@me', limit: OPEN_LIMIT }),

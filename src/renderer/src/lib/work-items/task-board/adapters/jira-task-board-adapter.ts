@@ -2,6 +2,7 @@ import { jiraSearchIssuesForTarget } from '@/runtime/jira/runtime-jira-client'
 import { jiraStatusForTarget } from '@/runtime/jira/runtime-jira-project-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { buildJiraPresetJql } from '../../../../../../shared/jira/jira-preset-jql'
 import { resolveJiraSourceHostId } from '../../../../../../shared/jira/jira-source-host'
 import type { JiraIssue } from '../../../../../../shared/jira/jira-types'
@@ -39,6 +40,14 @@ export function toJiraTaskBoardCard(issue: JiraIssue, showSiteName = false): Tas
   }
 }
 
+/** Where the board reads and writes Jira for the Tasks page's account-backed host. */
+export function resolveJiraTaskBoardTarget(
+  accountHostId: ExecutionHostId
+): RuntimeClientTarget | null {
+  // Jira credentials stay on the desktop for SSH hosts; runtime hosts own theirs.
+  return ipcOrRuntimeTargetForHostId(resolveJiraSourceHostId({ workspaceHostId: accountHostId }))
+}
+
 async function readJiraCards(
   signal: AbortSignal,
   accountHostId: ExecutionHostId
@@ -46,10 +55,7 @@ async function readJiraCards(
   if (!isTaskBoardProviderVisible('jira')) {
     return disconnectedTaskBoardResult('jira')
   }
-  // Jira credentials stay on the desktop for SSH hosts; runtime hosts own theirs.
-  const target = ipcOrRuntimeTargetForHostId(
-    resolveJiraSourceHostId({ workspaceHostId: accountHostId })
-  )
+  const target = resolveJiraTaskBoardTarget(accountHostId)
   if (!target) {
     return disconnectedTaskBoardResult('jira')
   }

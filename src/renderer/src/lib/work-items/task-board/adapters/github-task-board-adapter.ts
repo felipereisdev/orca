@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { GitHubWorkItem } from '../../../../../../shared/github/work-items/work-item-types'
+import type { Repo } from '../../../../../../shared/repo-types'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
 import { openClosedStatusCategory, type TaskBoardCard } from '../task-board-card'
 import {
@@ -33,18 +34,23 @@ export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): 
   }
 }
 
+/** The repo arguments the board reads and writes a repo's GitHub issues with. */
+export function gitHubTaskBoardRepoArgs(repo: Repo) {
+  return {
+    repoId: repo.id,
+    path: repo.path,
+    executionHostId: repo.executionHostId,
+    sourceContext: getTaskPageRepoSourceContext(repo, 'github')
+  }
+}
+
 async function readGitHubCards(signal: AbortSignal): Promise<TaskBoardProviderResult> {
   const repos = getTaskBoardRepos('github')
   if (repos.length === 0) {
     return disconnectedTaskBoardResult('github')
   }
   const state = useAppStore.getState()
-  const repoArgs = repos.map((repo) => ({
-    repoId: repo.id,
-    path: repo.path,
-    executionHostId: repo.executionHostId,
-    sourceContext: getTaskPageRepoSourceContext(repo, 'github')
-  }))
+  const repoArgs = repos.map(gitHubTaskBoardRepoArgs)
   // Why: a read held by a pending source save is obsolete, not empty; re-read once it settles.
   const read = (perRepoLimit: number, query: string) =>
     state.githubSourceCollections.readCurrent(

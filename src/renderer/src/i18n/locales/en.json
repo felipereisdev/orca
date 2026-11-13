@@ -25606,6 +25606,12 @@
     "openExternal": "Open {{id}} in browser",
     "openExternalTooltip": "Open in browser",
     "loadFailed": "Could not load issues. Refresh to try again.",
-    "githubDidNotSettle": "GitHub issues did not finish loading."
+    "githubDidNotSettle": "GitHub issues did not finish loading.",
+    "noLabelMapping": "Map a label to this column in Settings → Tasks",
+    "providerUnavailable": "{{provider}} is not connected.",
+    "repoUnavailable": "The repository for {{id}} is no longer in Orca.",
+    "chooseStateTitle": "Move {{id}} to {{column}}",
+    "chooseStateDescription": "Several Linear states match this column. Choose one:",
+    "cancel": "Cancel"
   }
 }

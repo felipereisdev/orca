@@ -3,6 +3,7 @@ import { linearListIssues, linearStatusForTarget } from '@/runtime/linear/runtim
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { LinearIssue } from '../../../../../../shared/linear/issue-types'
+import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { linearStatusCategory, type TaskBoardCard } from '../task-board-card'
 import {
   disconnectedTaskBoardResult,
@@ -32,16 +33,22 @@ export function toLinearTaskBoardCard(issue: LinearIssue): TaskBoardCard {
   }
 }
 
+/** Where the board reads and writes Linear for the Tasks page's account-backed host. */
+export function resolveLinearTaskBoardTarget(
+  accountHostId: ExecutionHostId
+): RuntimeClientTarget | null {
+  const parsed = parseExecutionHostId(accountHostId)
+  // Linear has no SSH relay, matching Cmd-J.
+  return parsed && parsed.kind !== 'ssh' ? ipcOrRuntimeTargetForHostId(parsed.id) : null
+}
+
 async function readLinearCards(
   signal: AbortSignal,
   accountHostId: ExecutionHostId
 ): Promise<TaskBoardProviderResult> {
-  const parsed = parseExecutionHostId(accountHostId)
-  // Linear has no SSH relay, matching Cmd-J.
-  if (!isTaskBoardProviderVisible('linear') || !parsed || parsed.kind === 'ssh') {
-    return disconnectedTaskBoardResult('linear')
-  }
-  const target = ipcOrRuntimeTargetForHostId(parsed.id)
+  const target = isTaskBoardProviderVisible('linear')
+    ? resolveLinearTaskBoardTarget(accountHostId)
+    : null
   if (!target) {
     return disconnectedTaskBoardResult('linear')
   }

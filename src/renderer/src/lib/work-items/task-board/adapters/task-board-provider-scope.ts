@@ -81,3 +81,17 @@ export function getTaskBoardProviderScopeKey(
     ])
   )
 }
+
+/** The board repo a card was read from; ids repeat across hosts, so a stamped host must match too. */
+export function findTaskBoardRepo(
+  provider: 'github' | 'gitlab',
+  item: { repoId: string; repoHostId?: string }
+): Repo | null {
+  return (
+    getTaskBoardRepos(provider).find(
+      (repo) =>
+        repo.id === item.repoId &&
+        (item.repoHostId === undefined || getRepoExecutionHostId(repo) === item.repoHostId)
+    ) ?? null
+  )
+}
