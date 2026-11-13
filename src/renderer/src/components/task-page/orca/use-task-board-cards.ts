@@ -8,17 +8,30 @@ import { getTaskBoardProviderScopeKey } from '@/lib/work-items/task-board/adapte
 import {
   mergeTaskBoardProviderResult,
   type TaskBoardCardsState,
+  type TaskBoardLoadOptions,
   type TaskBoardProviderResult
 } from '@/lib/work-items/task-board/task-board-provider-results'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
-import { readTaskBoardCards, writeTaskBoardCards } from './task-board-session-cache'
+import {
+  markTaskBoardProviderLoaded,
+  readTaskBoardCards,
+  readTaskBoardProviderLoaded,
+  writeTaskBoardCards
+} from './task-board-session-cache'
+
+/** A provider read this recently is shown from the session cache when the board mounts again. */
+const MOUNT_REUSE_MS = 45_000
 
 const PROVIDER_LOADERS: Record<
   TaskProvider,
-  (signal: AbortSignal, accountHostId: ExecutionHostId) => Promise<TaskBoardProviderResult>
+  (
+    signal: AbortSignal,
+    accountHostId: ExecutionHostId,
+    options: TaskBoardLoadOptions
+  ) => Promise<TaskBoardProviderResult>
 > = {
-  github: listGitHubTaskBoardCards,
+  github: (signal, _accountHostId, options) => listGitHubTaskBoardCards(signal, options),
   gitlab: listGitLabTaskBoardCards,
   linear: listLinearTaskBoardCards,
   jira: listJiraTaskBoardCards
@@ -48,7 +61,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   refresh: () => void
   refreshProvider: (provider: TaskProvider) => void
 } {
-  // The last cards for this host show at once; the mount refresh then updates them.
+  // The last cards for this host show at once; the mount load then updates the stale ones.
   const [stateHostId, setStateHostId] = useState(accountHostId)
   const [state, setState] = useState(() => readTaskBoardCards(accountHostId))
   if (stateHostId !== accountHostId) {
@@ -58,21 +71,27 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   useEffect(() => writeTaskBoardCards(stateHostId, state), [stateHostId, state])
   const controllersRef = useRef(new Map<TaskProvider, AbortController>())
   const scopeKeys = useTaskBoardScopeKeys()
+  const scopeKeysRef = useRef(scopeKeys)
   const loadedScopeKeysRef = useRef<Record<TaskProvider, string> | null>(null)
+  useEffect(() => {
+    scopeKeysRef.current = scopeKeys
+  }, [scopeKeys])
 
-  const refreshProvider = useCallback(
-    (provider: TaskProvider) => {
+  const load = useCallback(
+    (provider: TaskProvider, options: TaskBoardLoadOptions) => {
       controllersRef.current.get(provider)?.abort()
       const controller = new AbortController()
       controllersRef.current.set(provider, controller)
+      const scopeKey = scopeKeysRef.current[provider]
       // Previous cards and a settled status stay visible while the provider reloads.
       setState((current) => {
         const previous = current.providers[provider]
         const next = previous.status === 'loading' ? previous : { ...previous, refreshing: true }
         return { ...current, providers: { ...current.providers, [provider]: next } }
       })
-      void PROVIDER_LOADERS[provider](controller.signal, accountHostId).then((result) => {
+      void PROVIDER_LOADERS[provider](controller.signal, accountHostId, options).then((result) => {
         if (!controller.signal.aborted) {
+          markTaskBoardProviderLoaded(accountHostId, provider, { at: Date.now(), scopeKey })
           setState((current) => mergeTaskBoardProviderResult(current, result))
         }
       })
@@ -80,6 +99,11 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     [accountHostId]
   )
 
+  // Refresh and post-move reloads are explicit, so they bypass provider response caches.
+  const refreshProvider = useCallback(
+    (provider: TaskProvider) => load(provider, { fresh: true }),
+    [load]
+  )
   const refresh = useCallback(() => {
     for (const provider of TASK_PROVIDERS) {
       refreshProvider(provider)
@@ -88,14 +112,28 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
 
   useEffect(() => {
     const controllers = controllersRef.current
-    refresh()
+    // Why: opening a card's detail and coming back must not refetch all four providers every time.
+    const now = Date.now()
+    const cached = readTaskBoardCards(accountHostId).providers
+    for (const provider of TASK_PROVIDERS) {
+      const loaded = readTaskBoardProviderLoaded(accountHostId, provider)
+      const reusable =
+        loaded !== undefined &&
+        now - loaded.at < MOUNT_REUSE_MS &&
+        loaded.scopeKey === scopeKeysRef.current[provider] &&
+        cached[provider].status !== 'loading' &&
+        cached[provider].refreshing !== true
+      if (!reusable) {
+        load(provider, {})
+      }
+    }
     return () => {
       for (const controller of controllers.values()) {
         controller.abort()
       }
       controllers.clear()
     }
-  }, [refresh])
+  }, [accountHostId, load])
 
   // The mount load covers the first keys; afterwards only providers whose scope changed reload.
   useEffect(() => {
@@ -106,10 +144,10 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     }
     for (const provider of TASK_PROVIDERS) {
       if (previous[provider] !== scopeKeys[provider]) {
-        refreshProvider(provider)
+        load(provider, {})
       }
     }
-  }, [scopeKeys, refreshProvider])
+  }, [scopeKeys, load])
 
   return { state, refresh, refreshProvider }
 }

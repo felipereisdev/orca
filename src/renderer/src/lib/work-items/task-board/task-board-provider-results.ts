@@ -11,6 +11,9 @@ export type TaskBoardProviderResult = {
   error?: string
 }
 
+/** `fresh`: a Refresh or post-move read, which must bypass provider response caches. */
+export type TaskBoardLoadOptions = { fresh?: boolean }
+
 export type TaskBoardProviderState = {
   /** `loading` only until the provider's first result; later reloads set `refreshing`. */
   status: 'loading' | 'ready' | 'error' | 'disconnected'

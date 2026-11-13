@@ -2,12 +2,14 @@ import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { GitHubWorkItem } from '../../../../../../shared/github/work-items/work-item-types'
 import type { Repo } from '../../../../../../shared/repo-types'
+import { TASK_BOARD_DONE_WINDOW_DAYS } from '../../../../../../shared/task-board/task-board-settings'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
 import { openClosedStatusCategory, type TaskBoardCard } from '../task-board-card'
 import {
   disconnectedTaskBoardResult,
   failedTaskBoardResult,
   isWithinDoneWindow,
+  type TaskBoardLoadOptions,
   type TaskBoardProviderResult
 } from '../task-board-provider-results'
 import { getTaskBoardRepos } from './task-board-provider-scope'
@@ -17,6 +19,13 @@ const CLOSED_PER_REPO_LIMIT = 20
 const DISPLAY_LIMIT = 200
 const OPEN_QUERY = 'assignee:@me is:issue is:open'
 const CLOSED_QUERY = 'assignee:@me is:issue is:closed'
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Search sorts by creation; bounding by update keeps an old issue closed today inside the per-repo limit. */
+function closedQuery(now: Date): string {
+  const since = new Date(now.getTime() - TASK_BOARD_DONE_WINDOW_DAYS * DAY_MS)
+  return `${CLOSED_QUERY} updated:>=${since.toISOString().slice(0, 10)}`
+}
 
 export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): TaskBoardCard {
   return {
@@ -44,23 +53,30 @@ export function gitHubTaskBoardRepoArgs(repo: Repo) {
   }
 }
 
-async function readGitHubCards(signal: AbortSignal): Promise<TaskBoardProviderResult> {
+async function readGitHubCards(
+  signal: AbortSignal,
+  { fresh }: TaskBoardLoadOptions
+): Promise<TaskBoardProviderResult> {
   const repos = getTaskBoardRepos('github')
   if (repos.length === 0) {
     return disconnectedTaskBoardResult('github')
   }
   const state = useAppStore.getState()
   const repoArgs = repos.map(gitHubTaskBoardRepoArgs)
+  // Why: Refresh and post-move reads must skip the renderer cache and gh's 120s response cache.
+  const fetchOptions = fresh ? { force: true, noCache: true } : undefined
+  const now = new Date()
   // Why: a read held by a pending source save is obsolete, not empty; re-read once it settles.
   const read = (perRepoLimit: number, query: string) =>
     state.githubSourceCollections.readCurrent(
       repos,
-      () => state.fetchWorkItemsAcrossRepos(repoArgs, perRepoLimit, DISPLAY_LIMIT, query),
+      () =>
+        state.fetchWorkItemsAcrossRepos(repoArgs, perRepoLimit, DISPLAY_LIMIT, query, fetchOptions),
       signal
     )
   const [open, closed] = await Promise.all([
     read(OPEN_PER_REPO_LIMIT, OPEN_QUERY),
-    read(CLOSED_PER_REPO_LIMIT, CLOSED_QUERY)
+    read(CLOSED_PER_REPO_LIMIT, closedQuery(now))
   ])
   if (!open || !closed) {
     return failedTaskBoardResult(
@@ -71,7 +87,6 @@ async function readGitHubCards(signal: AbortSignal): Promise<TaskBoardProviderRe
   if (open.githubUnavailable || (open.failedCount === repos.length && open.items.length === 0)) {
     return failedTaskBoardResult('github', undefined)
   }
-  const now = new Date()
   const labels = new Map(repos.map((repo) => [repo.id, repo.displayName]))
   const cards = [
     ...open.items,
@@ -83,10 +98,11 @@ async function readGitHubCards(signal: AbortSignal): Promise<TaskBoardProviderRe
 }
 
 export async function listGitHubTaskBoardCards(
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: TaskBoardLoadOptions = {}
 ): Promise<TaskBoardProviderResult> {
   try {
-    return await readGitHubCards(signal)
+    return await readGitHubCards(signal, options)
   } catch (error) {
     return failedTaskBoardResult('github', error)
   }

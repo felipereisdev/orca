@@ -82,7 +82,7 @@ describe('useTaskBoardCards', () => {
   })
 
   it('reloads a provider when its visibility changes', async () => {
-    renderHook(() => useTaskBoardCards('local'))
+    renderHook(() => useTaskBoardCards('runtime:visibility-host'))
     await act(async () =>
       useAppStore.setState({
         settings: {
@@ -94,7 +94,8 @@ describe('useTaskBoardCards', () => {
     expect(callCounts()).toEqual({ github: 1, gitlab: 1, linear: 2, jira: 1 })
   })
 
-  it('shows the last cards at once on remount and refreshes them in the background', async () => {
+  it('shows the last cards on remount and reloads only providers read over 45s ago', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the hook only merges cards by refKey, provider and updatedAt.
     const card = {
       refKey: 'jira:site:APP-1',
@@ -106,12 +107,31 @@ describe('useTaskBoardCards', () => {
     await act(async () => {})
     first.unmount()
 
-    loaders.jira.mockReturnValue(new Promise(() => {}))
+    now.mockReturnValue(1_044_000)
     const second = renderHook(() => useTaskBoardCards('runtime:cache-host'))
     expect(second.result.current.state.cards).toEqual([card])
-    expect(second.result.current.state.providers.jira).toEqual({
+    expect(second.result.current.state.providers.jira).toEqual({ status: 'ready' })
+    expect(callCounts()).toEqual({ github: 1, gitlab: 1, linear: 1, jira: 1 })
+    second.unmount()
+
+    now.mockReturnValue(1_045_000)
+    loaders.jira.mockReturnValue(new Promise(() => {}))
+    const third = renderHook(() => useTaskBoardCards('runtime:cache-host'))
+    expect(third.result.current.state.cards).toEqual([card])
+    expect(third.result.current.state.providers.jira).toEqual({
       status: 'ready',
       refreshing: true
     })
+    expect(callCounts()).toEqual({ github: 2, gitlab: 2, linear: 2, jira: 2 })
+    now.mockRestore()
+  })
+
+  it('bypasses provider caches on Refresh but not on mount', () => {
+    const { result } = renderHook(() => useTaskBoardCards('runtime:refresh-host'))
+    expect(loaders.github).toHaveBeenLastCalledWith(expect.any(AbortSignal), {})
+
+    act(() => result.current.refresh())
+
+    expect(loaders.github).toHaveBeenLastCalledWith(expect.any(AbortSignal), { fresh: true })
   })
 })

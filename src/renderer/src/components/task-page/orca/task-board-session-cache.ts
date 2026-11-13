@@ -7,6 +7,12 @@ import type { TaskProvider } from '../../../../../shared/work-items/task-provide
 
 // Why: opening a card's detail unmounts the board; returning should show the last cards and chips at once.
 const cardsByAccountHost = new Map<ExecutionHostId, TaskBoardCardsState>()
+/** When a provider's last result arrived, and for which provider scope. */
+type TaskBoardProviderLoad = { at: number; scopeKey: string }
+const loadsByAccountHost = new Map<
+  ExecutionHostId,
+  Partial<Record<TaskProvider, TaskBoardProviderLoad>>
+>()
 let hiddenProviders: ReadonlySet<TaskProvider> = new Set()
 
 export function readTaskBoardCards(accountHostId: ExecutionHostId): TaskBoardCardsState {
@@ -18,6 +24,24 @@ export function writeTaskBoardCards(
   state: TaskBoardCardsState
 ): void {
   cardsByAccountHost.set(accountHostId, state)
+}
+
+export function readTaskBoardProviderLoaded(
+  accountHostId: ExecutionHostId,
+  provider: TaskProvider
+): TaskBoardProviderLoad | undefined {
+  return loadsByAccountHost.get(accountHostId)?.[provider]
+}
+
+export function markTaskBoardProviderLoaded(
+  accountHostId: ExecutionHostId,
+  provider: TaskProvider,
+  load: TaskBoardProviderLoad
+): void {
+  loadsByAccountHost.set(accountHostId, {
+    ...loadsByAccountHost.get(accountHostId),
+    [provider]: load
+  })
 }
 
 export function readHiddenTaskBoardProviders(): ReadonlySet<TaskProvider> {
