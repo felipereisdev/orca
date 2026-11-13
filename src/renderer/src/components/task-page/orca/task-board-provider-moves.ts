@@ -2,32 +2,31 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
-import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
 import { getLinearTargetScope } from '@/store/slices/linear/linear-slice-scope'
 import '@/store/slices/linear/linear-issue-read'
 import { confirmLinearIssueWrite } from '@/store/slices/linear/linear-issue-write-publication'
 import { linearUpdateIssueForTarget } from '@/runtime/linear/runtime-linear-issue-client'
 import { linearTeamStatesForTarget } from '@/runtime/linear/runtime-linear-project-client'
-import { runIssueUpdate } from '@/components/github/github-work-item-edit-mutations'
 import {
   enqueueJiraIssueMutation,
   jiraIssueRequestScope
 } from '@/components/jira-issue-mutation-queue'
 import { loadTaskPageJiraIssueTransitions } from '@/components/task-page/jira/task-page-jira-board-transitions'
 import { applyJiraBoardMove } from '@/components/task-page/jira/task-page-jira-board-move'
-import { gitHubTaskBoardRepoArgs } from '@/lib/work-items/task-board/adapters/github-task-board-adapter'
-import { gitLabTaskBoardRepoSelector } from '@/lib/work-items/task-board/adapters/gitlab-task-board-adapter'
-import { resolveJiraTaskBoardTarget } from '@/lib/work-items/task-board/adapters/jira-task-board-adapter'
-import { resolveLinearTaskBoardTarget } from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
-import { findTaskBoardRepo } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
+import {
+  resolveJiraTaskBoardTarget,
+  toJiraTaskBoardCard
+} from '@/lib/work-items/task-board/adapters/jira-task-board-adapter'
+import {
+  resolveLinearTaskBoardTarget,
+  toLinearTaskBoardCard
+} from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
 import {
   selectJiraMoveTransitions,
-  selectLinearMoveStates,
-  type LabelProviderMove
+  selectLinearMoveStates
 } from '@/lib/work-items/task-board/task-board-move-targets'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import { parseGitHubItemRepository } from '../../../../../shared/github/work-items/work-item-target'
 import type {
   JiraIssue,
   JiraIssueUpdate,
@@ -71,6 +70,14 @@ export function requireTaskBoardTarget(
   return target
 }
 
+/** The card a confirmed move shows: the provider's new facts under the board's own identity. */
+export function confirmedTaskBoardCard(
+  card: TaskBoardCard,
+  confirmed: TaskBoardCard
+): TaskBoardCard {
+  return { ...confirmed, refKey: card.refKey, projectLabel: card.projectLabel }
+}
+
 function noStatusChangeError(column: string, key: string): Error {
   return new Error(
     translate(
@@ -103,12 +110,14 @@ export async function loadJiraTaskBoardMoveTransitions(
   return candidates
 }
 
+/** Resolves to the card as Jira reads it after the transition. */
 export async function applyJiraTaskBoardMove(
   target: RuntimeClientTarget,
+  card: TaskBoardCard,
   issue: JiraIssue,
   transition: JiraTransition,
   updates: JiraIssueUpdate
-): Promise<void> {
+): Promise<TaskBoardCard> {
   const scope = jiraIssueRequestScope(issue, null, {
     activeRuntimeEnvironmentId: runtimeTargetEnvironmentId(target)
   })
@@ -120,20 +129,26 @@ export async function applyJiraTaskBoardMove(
     siteId: issue.siteId,
     contextKey: runtimeContextKey(target)
   }
-  let latest: JiraIssue | null = null
+  const saved: { latest: JiraIssue | null } = { latest: null }
   await enqueueJiraIssueMutation({
     scope,
     previous: issue,
     optimistic: { status: transition.to },
     commentsChanged: Boolean(updates.transitionComment?.trim()),
     update: async () => {
-      const saved = await applyJiraBoardMove(target, issue, updates)
-      latest = saved.latest
-      return saved.result
+      const result = await applyJiraBoardMove(target, issue, updates)
+      saved.latest = result.latest
+      return result.result
     },
-    refresh: async () => latest,
+    refresh: async () => saved.latest,
     patchIssue: (patch) => useAppStore.getState().patchJiraIssue(issue.key, patch, patchOptions)
   })
+  const confirmed = saved.latest ?? {
+    ...issue,
+    status: transition.to,
+    updatedAt: new Date().toISOString()
+  }
+  return confirmedTaskBoardCard(card, toJiraTaskBoardCard(confirmed))
 }
 
 /** Never empty. */
@@ -150,11 +165,13 @@ export async function loadLinearTaskBoardMoveStates(
   return candidates
 }
 
+/** Resolves to the card in `state`; Linear's update returns no issue to read it from. */
 export async function applyLinearTaskBoardMove(
   target: RuntimeClientTarget,
+  card: TaskBoardCard,
   issue: LinearIssue,
   state: LinearWorkflowState
-): Promise<void> {
+): Promise<TaskBoardCard> {
   const result = await linearUpdateIssueForTarget(
     target,
     issue.id,
@@ -165,60 +182,10 @@ export async function applyLinearTaskBoardMove(
     throw new Error(result.error)
   }
   confirmLinearIssueWrite({ scope: getLinearTargetScope(target), id: issue.id })
-}
-
-function missingRepoError(card: TaskBoardCard): Error {
-  return new Error(
-    translate('taskBoard.repoUnavailable', 'The repository for {{id}} is no longer in Orca.', {
-      id: card.displayId
-    })
-  )
-}
-
-/** Applies a GitLab/GitHub open/closed + label move in the repo the card was read from. */
-export async function applyTaskBoardLabelMove(
-  card: TaskBoardCard,
-  move: Extract<LabelProviderMove, { ok: true }>
-): Promise<void> {
-  const { source } = card
-  if (source.provider === 'gitlab') {
-    const repo = findTaskBoardRepo('gitlab', source.item)
-    if (!repo) {
-      throw missingRepoError(card)
-    }
-    const selector = gitLabTaskBoardRepoSelector(repo)
-    const result = await gitLabApiFor(selector).updateIssue({
-      ...selector,
-      number: source.item.number,
-      updates: {
-        ...(move.state ? { state: move.state === 'open' ? 'opened' : 'closed' } : {}),
-        addLabels: move.addLabels,
-        removeLabels: move.removeLabels
-      }
-    })
-    if (!result.ok) {
-      throw new Error(result.error)
-    }
-    return
+  const confirmed: LinearIssue = {
+    ...issue,
+    state: { name: state.name, type: state.type, color: state.color },
+    updatedAt: new Date().toISOString()
   }
-  if (source.provider === 'github') {
-    const repo = findTaskBoardRepo('github', source.item)
-    if (!repo) {
-      throw missingRepoError(card)
-    }
-    const { repoId, path, sourceContext } = gitHubTaskBoardRepoArgs(repo)
-    await runIssueUpdate({
-      repoPath: path,
-      repoId,
-      sourceContext,
-      projectOrigin: undefined,
-      issueRepo: parseGitHubItemRepository(source.item.url),
-      number: source.item.number,
-      updates: {
-        ...(move.state ? { state: move.state } : {}),
-        addLabels: move.addLabels,
-        removeLabels: move.removeLabels
-      }
-    })
-  }
+  return confirmedTaskBoardCard(card, toLinearTaskBoardCard(confirmed))
 }

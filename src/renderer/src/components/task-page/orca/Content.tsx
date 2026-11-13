@@ -4,7 +4,7 @@ import { TaskBoard, type TaskBoardColumn } from '@/components/task-board/TaskBoa
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
-import { resolveTaskBoardColumnId } from '@/lib/work-items/task-board/task-board-columns'
+import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
 import type { TaskBoardCardsState } from '@/lib/work-items/task-board/task-board-provider-results'
 import { useAppStore } from '@/store'
 import {
@@ -124,17 +124,18 @@ export function TaskPageOrcaBoard({
         { id: status.id, label: status.label, status, cards: [] }
       ])
     )
-    for (const card of state.cards) {
-      if (hiddenProviders.has(card.provider)) {
-        continue
-      }
-      const columnId = resolveTaskBoardColumnId(card, statuses, settings)
-      if (columnId !== null) {
+    for (const { card, columnId } of placeTaskBoardCards(
+      state.cards,
+      move.overrides,
+      statuses,
+      settings
+    )) {
+      if (!hiddenProviders.has(card.provider)) {
         byId.get(columnId)?.cards.push(card)
       }
     }
     return [...byId.values()]
-  }, [hiddenProviders, settings, state.cards, statuses])
+  }, [hiddenProviders, move.overrides, settings, state.cards, statuses])
 
   const toolbarProviders = sourceOptions.flatMap((option): TaskBoardToolbarProvider[] =>
     isTaskProvider(option.id)

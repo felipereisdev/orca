@@ -58,6 +58,7 @@ function move(error: string | null): TaskBoardMove {
   return {
     canDrop: () => ({ ok: true }),
     move: async () => {},
+    overrides: new Map(),
     updatingRefKeys: new Set(['gitlab:fixture:#45']),
     dialogs: <span hidden />,
     error,

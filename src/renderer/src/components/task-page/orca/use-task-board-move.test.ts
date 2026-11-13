@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
 import type { JiraIssue, JiraStatus, JiraTransition } from '../../../../../shared/jira/jira-types'
 import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
@@ -19,9 +20,9 @@ vi.mock('./task-board-provider-moves', () => ({
   loadJiraTaskBoardMoveTransitions: moves.loadJira,
   applyJiraTaskBoardMove: moves.applyJira,
   loadLinearTaskBoardMoveStates: vi.fn(),
-  applyLinearTaskBoardMove: vi.fn(),
-  applyTaskBoardLabelMove: vi.fn()
+  applyLinearTaskBoardMove: vi.fn()
 }))
+vi.mock('./task-board-label-moves', () => ({ applyTaskBoardLabelMove: vi.fn() }))
 vi.mock('@/components/task-page/jira/task-page-jira-board-move-dialog', () => ({
   JiraBoardMoveDialog: () => null
 }))
@@ -42,7 +43,7 @@ const columns: WorkspaceStatusDefinition[] = [
   { id: 'completed', label: 'Done' }
 ]
 
-function jiraCard(key: string): TaskBoardCard {
+function jiraCard(key: string, status = todo, updatedAt = ''): TaskBoardCard {
   const issue: JiraIssue = {
     id: key,
     key,
@@ -50,10 +51,10 @@ function jiraCard(key: string): TaskBoardCard {
     url: `https://jira.example.com/browse/${key}`,
     project: { id: '1', key: 'APP', name: 'App' },
     issueType: { id: '1', name: 'Task' },
-    status: todo,
+    status,
     labels: [],
     createdAt: '',
-    updatedAt: ''
+    updatedAt
   }
   return {
     refKey: `jira::${key}`,
@@ -62,10 +63,10 @@ function jiraCard(key: string): TaskBoardCard {
     title: key,
     url: issue.url,
     projectLabel: 'APP',
-    statusName: todo.name,
-    category: 'todo',
+    statusName: status.name,
+    category: status.categoryKey === 'indeterminate' ? 'in-progress' : 'todo',
     labels: [],
-    updatedAt: '',
+    updatedAt,
     source: { provider: 'jira', item: issue }
   }
 }
@@ -97,5 +98,25 @@ describe('useTaskBoardMove', () => {
     expect([...result.current.updatingRefKeys]).toEqual(['jira::APP-1'])
     expect(result.current.error).toBe('Finish the open move first')
     expect(onMoved).not.toHaveBeenCalled()
+  })
+
+  it('keeps a confirmed move in its target column when the next read is still stale', async () => {
+    const stale = jiraCard('APP-3')
+    const confirmed = jiraCard('APP-3', review, '2026-11-13T10:00:00Z')
+    moves.loadJira.mockResolvedValue([transitions[0]])
+    moves.applyJira.mockResolvedValue(confirmed)
+    const settings = getDefaultTaskBoardSettings()
+    const onMoved = vi.fn()
+    const { result } = renderHook(() =>
+      useTaskBoardMove({ columns, settings, accountHostId: 'local', onMoved })
+    )
+
+    await act(() => result.current.move(stale, 'in-progress'))
+
+    expect(onMoved).toHaveBeenCalledExactlyOnceWith('jira')
+    // The provider re-read after the move still returns the card in To Do.
+    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
+      { card: confirmed, columnId: 'in-progress' }
+    ])
   })
 })

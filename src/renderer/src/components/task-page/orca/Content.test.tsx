@@ -28,6 +28,7 @@ vi.mock('./use-task-board-move', () => ({
   useTaskBoardMove: () => ({
     canDrop: () => ({ ok: true }),
     move: vi.fn(),
+    overrides: new Map(),
     updatingRefKeys: new Set(),
     dialogs: null,
     error: board.error,

@@ -37,7 +37,7 @@ export function emptyTaskBoardCardsState(): TaskBoardCardsState {
   }
 }
 
-function updatedAtMs(card: TaskBoardCard): number {
+export function taskBoardCardUpdatedAtMs(card: TaskBoardCard): number {
   const ms = Date.parse(card.updatedAt)
   return Number.isNaN(ms) ? 0 : ms
 }
@@ -53,11 +53,13 @@ export function mergeTaskBoardProviderResult(
   ]
   for (const card of candidates) {
     const current = byRefKey.get(card.refKey)
-    if (!current || updatedAtMs(card) > updatedAtMs(current)) {
+    if (!current || taskBoardCardUpdatedAtMs(card) > taskBoardCardUpdatedAtMs(current)) {
       byRefKey.set(card.refKey, card)
     }
   }
-  const cards = [...byRefKey.values()].sort((a, b) => updatedAtMs(b) - updatedAtMs(a))
+  const cards = [...byRefKey.values()].sort(
+    (a, b) => taskBoardCardUpdatedAtMs(b) - taskBoardCardUpdatedAtMs(a)
+  )
   const providerState: TaskBoardProviderState =
     result.error === undefined
       ? { status: result.status }
