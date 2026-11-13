@@ -25619,6 +25619,31 @@
     "contextSummaryTitle": "Issues assigned to you in every connected provider",
     "noProviders": "Connect a task provider in Settings → Tasks",
     "refresh": "Refresh",
-    "dismissError": "Dismiss"
+    "dismissError": "Dismiss",
+    "settings": {
+      "statusNamePlaceholder": "Status name",
+      "labelPlaceholder": "Label",
+      "dropTargetTitle": "Status to apply on drop",
+      "columnLabel": "Column",
+      "removeRule": "Remove rule",
+      "addRule": "Add rule",
+      "dropTargetPlaceholder": "Automatic",
+      "providerJira": "Jira",
+      "providerLinear": "Linear",
+      "providerGitLab": "GitLab",
+      "providerGitHub": "GitHub",
+      "doneColumn": "Done column",
+      "title": "Task board",
+      "description": "Choose which board column each issue status or label lands in.",
+      "searchDescription": "Board columns and status mapping for issues across providers.",
+      "help": "Columns are your workspace statuses; edit them from the workspace board.",
+      "search": {
+        "board": "task board",
+        "columns": "board columns",
+        "mapping": "status mapping",
+        "kanban": "kanban",
+        "done": "done column"
+      }
+    }
   }
 }

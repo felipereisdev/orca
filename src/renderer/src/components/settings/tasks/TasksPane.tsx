@@ -31,6 +31,7 @@ import { useTaskSourceProviderReadiness } from './use-task-source-provider-readi
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
+import { TaskBoardSettingsGroup } from './TaskBoardSettingsGroup'
 
 type TasksPaneProps = {
   settings: GlobalSettings
@@ -144,121 +145,124 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
   }
 
   return (
-    <SettingsGroup
-      title={t('auto.components.settings.TasksPane.setupTitle', 'Task management setup')}
-      description={t(
-        'auto.components.settings.TasksPane.setupDescription',
-        'Finish connect + visibility for each provider in one place. Linear also needs the agent skill so coding agents can read and update tickets. At least one provider must stay visible.'
-      )}
-    >
-      {stalledVisible.length > 0 ? (
-        <div className="my-4 rounded-xl border border-status-warning-border bg-status-warning-background px-3.5 py-3 text-xs text-muted-foreground">
-          <p className="font-medium text-amber-800 dark:text-amber-200">
-            {t(
-              'auto.components.settings.TasksPane.incompleteBannerTitle',
-              'Some visible providers still need setup'
-            )}
-          </p>
-          <p className="mt-1">
-            {stalledVisible.includes('linear')
-              ? t(
-                  'auto.components.settings.TasksPane.incompleteBannerBodyWithLinear',
-                  'Hide providers you do not use, or expand a card and finish its steps. For Linear: API access, the agent skill, and Show in Tasks.'
-                )
-              : t(
-                  'auto.components.settings.TasksPane.incompleteBannerBody',
-                  'Hide providers you do not use, or expand a card and finish its steps.'
-                )}
-          </p>
-        </div>
-      ) : null}
-
-      <SearchableSetting
-        title={t('auto.components.settings.TasksPane.30255b39dc', 'Task providers')}
+    <>
+      <SettingsGroup
+        title={t('auto.components.settings.TasksPane.setupTitle', 'Task management setup')}
         description={t(
-          'auto.components.settings.TasksPane.providersDescription',
-          'Each card walks through connection (and skill, for Linear) plus whether it appears in Tasks.'
+          'auto.components.settings.TasksPane.setupDescription',
+          'Finish connect + visibility for each provider in one place. Linear also needs the agent skill so coding agents can read and update tickets. At least one provider must stay visible.'
         )}
-        keywords={getTasksPaneSearchKeywords()}
-        className="divide-y divide-border"
       >
-        {TASK_PROVIDERS.map((provider) => {
-          const meta = PROVIDER_META[provider]
-          const readiness = readinessByProvider[provider]
-          const Icon = meta.Icon
-          const visible = readiness.visible
-          const canHide = visibleProviders.length > 1
-
-          return (
-            <TaskSourceProviderCard
-              key={provider}
-              icon={<Icon className="size-4" />}
-              name={meta.label}
-              description={meta.description}
-              readiness={readiness}
-              visible={visible}
-              canHide={canHide}
-              defaultExpanded={autoExpandedProvider === provider}
-              onToggleVisible={() => toggleProvider(provider)}
-            >
-              {provider === 'linear' ? (
-                <TaskSourceLinearSetup
-                  connected={readiness.connected}
-                  checking={readiness.checking}
-                  visible={visible}
-                  canHide={canHide}
-                  onToggleVisible={() => toggleProvider('linear')}
-                  onOpenIntegrations={() => openIntegrations(LINEAR_INTEGRATION_SECTION_ID)}
-                />
-              ) : provider === 'jira' ? (
-                <JiraSetupSteps
-                  connected={readiness.connected}
-                  checking={readiness.checking}
-                  visible={visible}
-                  canHide={canHide}
-                  onToggleVisible={() => toggleProvider('jira')}
-                  onConnected={() => void checkJiraConnection()}
-                  onOpenIntegrations={() => openIntegrations(JIRA_INTEGRATION_SECTION_ID)}
-                />
-              ) : (
-                <CodeHostSetupSteps
-                  providerLabel={meta.label}
-                  connected={readiness.connected}
-                  checking={readiness.checking}
-                  unavailable={readiness.unavailable}
-                  visible={visible}
-                  canHide={canHide}
-                  onToggleVisible={() => toggleProvider(provider)}
-                  onOpenIntegrations={() => openIntegrations()}
-                  onRetryConnection={() =>
-                    void refreshPreflightStatus({ force: true, wakeWslDistro: true })
-                  }
-                />
+        {stalledVisible.length > 0 ? (
+          <div className="my-4 rounded-xl border border-status-warning-border bg-status-warning-background px-3.5 py-3 text-xs text-muted-foreground">
+            <p className="font-medium text-amber-800 dark:text-amber-200">
+              {t(
+                'auto.components.settings.TasksPane.incompleteBannerTitle',
+                'Some visible providers still need setup'
               )}
-            </TaskSourceProviderCard>
-          )
-        })}
-      </SearchableSetting>
+            </p>
+            <p className="mt-1">
+              {stalledVisible.includes('linear')
+                ? t(
+                    'auto.components.settings.TasksPane.incompleteBannerBodyWithLinear',
+                    'Hide providers you do not use, or expand a card and finish its steps. For Linear: API access, the agent skill, and Show in Tasks.'
+                  )
+                : t(
+                    'auto.components.settings.TasksPane.incompleteBannerBody',
+                    'Hide providers you do not use, or expand a card and finish its steps.'
+                  )}
+            </p>
+          </div>
+        ) : null}
 
-      <p data-settings-row="" className="py-3 text-xs text-muted-foreground">
-        {t(
-          'auto.components.settings.TasksPane.integrationsHint',
-          'Credentials for all providers also live under'
-        )}{' '}
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto p-0 text-xs align-baseline"
-          onClick={() => openIntegrations()}
+        <SearchableSetting
+          title={t('auto.components.settings.TasksPane.30255b39dc', 'Task providers')}
+          description={t(
+            'auto.components.settings.TasksPane.providersDescription',
+            'Each card walks through connection (and skill, for Linear) plus whether it appears in Tasks.'
+          )}
+          keywords={getTasksPaneSearchKeywords()}
+          className="divide-y divide-border"
         >
-          {t('auto.components.settings.TasksPane.integrationsLink', 'Integrations')}
-        </Button>
-        {t(
-          'auto.components.settings.TasksPane.skillHint',
-          '. After Linear is connected, usage examples stay under Settings → Linear.'
-        )}
-      </p>
-    </SettingsGroup>
+          {TASK_PROVIDERS.map((provider) => {
+            const meta = PROVIDER_META[provider]
+            const readiness = readinessByProvider[provider]
+            const Icon = meta.Icon
+            const visible = readiness.visible
+            const canHide = visibleProviders.length > 1
+
+            return (
+              <TaskSourceProviderCard
+                key={provider}
+                icon={<Icon className="size-4" />}
+                name={meta.label}
+                description={meta.description}
+                readiness={readiness}
+                visible={visible}
+                canHide={canHide}
+                defaultExpanded={autoExpandedProvider === provider}
+                onToggleVisible={() => toggleProvider(provider)}
+              >
+                {provider === 'linear' ? (
+                  <TaskSourceLinearSetup
+                    connected={readiness.connected}
+                    checking={readiness.checking}
+                    visible={visible}
+                    canHide={canHide}
+                    onToggleVisible={() => toggleProvider('linear')}
+                    onOpenIntegrations={() => openIntegrations(LINEAR_INTEGRATION_SECTION_ID)}
+                  />
+                ) : provider === 'jira' ? (
+                  <JiraSetupSteps
+                    connected={readiness.connected}
+                    checking={readiness.checking}
+                    visible={visible}
+                    canHide={canHide}
+                    onToggleVisible={() => toggleProvider('jira')}
+                    onConnected={() => void checkJiraConnection()}
+                    onOpenIntegrations={() => openIntegrations(JIRA_INTEGRATION_SECTION_ID)}
+                  />
+                ) : (
+                  <CodeHostSetupSteps
+                    providerLabel={meta.label}
+                    connected={readiness.connected}
+                    checking={readiness.checking}
+                    unavailable={readiness.unavailable}
+                    visible={visible}
+                    canHide={canHide}
+                    onToggleVisible={() => toggleProvider(provider)}
+                    onOpenIntegrations={() => openIntegrations()}
+                    onRetryConnection={() =>
+                      void refreshPreflightStatus({ force: true, wakeWslDistro: true })
+                    }
+                  />
+                )}
+              </TaskSourceProviderCard>
+            )
+          })}
+        </SearchableSetting>
+
+        <p data-settings-row="" className="py-3 text-xs text-muted-foreground">
+          {t(
+            'auto.components.settings.TasksPane.integrationsHint',
+            'Credentials for all providers also live under'
+          )}{' '}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs align-baseline"
+            onClick={() => openIntegrations()}
+          >
+            {t('auto.components.settings.TasksPane.integrationsLink', 'Integrations')}
+          </Button>
+          {t(
+            'auto.components.settings.TasksPane.skillHint',
+            '. After Linear is connected, usage examples stay under Settings → Linear.'
+          )}
+        </p>
+      </SettingsGroup>
+      <TaskBoardSettingsGroup />
+    </>
   )
 }
