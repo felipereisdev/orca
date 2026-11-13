@@ -5,21 +5,26 @@ import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
 import { resolveTaskBoardColumnId } from '@/lib/work-items/task-board/task-board-columns'
+import type { TaskBoardCardsState } from '@/lib/work-items/task-board/task-board-provider-results'
 import { useAppStore } from '@/store'
-import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
+import {
+  getDefaultTaskBoardSettings,
+  type TaskBoardSettings
+} from '../../../../../shared/task-board/task-board-settings'
 import { isTaskProvider, type TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
+import type { SourceOption } from '../task-page-localized-options'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import { formatRelativeTime } from '../task-page-source-context'
 import { TaskBoardToolbar, type TaskBoardToolbarProvider } from './TaskBoardToolbar'
 import { useTaskBoardCards } from './use-task-board-cards'
-import { useTaskBoardMove } from './use-task-board-move'
+import { useTaskBoardMove, type TaskBoardMove } from './use-task-board-move'
 
 export function TaskPageOrcaContent({
   model
 }: {
   model: TaskPageComposerActionsModel
 }): React.JSX.Element {
-  const t = useTranslate()
   const {
     accountBackedTaskSourceHostId,
     sourceOptions,
@@ -43,6 +48,69 @@ export function TaskPageOrcaContent({
     accountHostId: accountBackedTaskSourceHostId,
     onMoved: refreshProvider
   })
+
+  const openCard = (card: TaskBoardCard): void => {
+    const { source } = card
+    switch (source.provider) {
+      case 'jira':
+        return openJiraDetailPage(source.item)
+      case 'linear':
+        return openLinearDetailPage(source.item)
+      case 'gitlab':
+        return openGitLabDetailPage(source.item)
+      case 'github':
+        return openGitHubDetailPage(source.item)
+    }
+  }
+  const startWorkspace = (card: TaskBoardCard): void => {
+    const { source } = card
+    switch (source.provider) {
+      case 'jira':
+        return handleUseJiraItem(source.item)
+      case 'linear':
+        return handleOpenOrUseLinearItem(source.item)
+      case 'gitlab':
+        return handleUseGitLabItem(source.item)
+      case 'github':
+        return handleOpenOrUseGitHubWorkItem(source.item)
+    }
+  }
+
+  return (
+    <TaskPageOrcaBoard
+      state={state}
+      statuses={statuses}
+      settings={settings}
+      move={move}
+      sourceOptions={sourceOptions}
+      onRefresh={refresh}
+      onOpen={openCard}
+      onStartWorkspace={startWorkspace}
+    />
+  )
+}
+
+/** The board without its data hooks, so fixtures can render every state. */
+export function TaskPageOrcaBoard({
+  state,
+  statuses,
+  settings,
+  move,
+  sourceOptions,
+  onRefresh,
+  onOpen,
+  onStartWorkspace
+}: {
+  state: TaskBoardCardsState
+  statuses: readonly WorkspaceStatusDefinition[]
+  settings: TaskBoardSettings
+  move: TaskBoardMove
+  sourceOptions: readonly SourceOption[]
+  onRefresh: () => void
+  onOpen: (card: TaskBoardCard) => void
+  onStartWorkspace: (card: TaskBoardCard) => void
+}): React.JSX.Element {
+  const t = useTranslate()
   const [hiddenProviders, setHiddenProviders] = useState<ReadonlySet<TaskProvider>>(new Set())
 
   const columns = useMemo<TaskBoardColumn[]>(() => {
@@ -80,33 +148,6 @@ export function TaskPageOrcaContent({
   const providerStates = Object.values(state.providers)
   const loading = providerStates.some((provider) => provider.status === 'loading')
   const allDisconnected = providerStates.every((provider) => provider.status === 'disconnected')
-
-  const openCard = (card: TaskBoardCard): void => {
-    const { source } = card
-    switch (source.provider) {
-      case 'jira':
-        return openJiraDetailPage(source.item)
-      case 'linear':
-        return openLinearDetailPage(source.item)
-      case 'gitlab':
-        return openGitLabDetailPage(source.item)
-      case 'github':
-        return openGitHubDetailPage(source.item)
-    }
-  }
-  const startWorkspace = (card: TaskBoardCard): void => {
-    const { source } = card
-    switch (source.provider) {
-      case 'jira':
-        return handleUseJiraItem(source.item)
-      case 'linear':
-        return handleOpenOrUseLinearItem(source.item)
-      case 'gitlab':
-        return handleUseGitLabItem(source.item)
-      case 'github':
-        return handleOpenOrUseGitHubWorkItem(source.item)
-    }
-  }
   const toggleProvider = (provider: TaskProvider): void => {
     setHiddenProviders((current) => {
       const next = new Set(current)
@@ -135,7 +176,7 @@ export function TaskPageOrcaContent({
         shownCount={columns.reduce((count, column) => count + column.cards.length, 0)}
         refreshing={loading}
         onToggleProvider={toggleProvider}
-        onRefresh={refresh}
+        onRefresh={onRefresh}
       />
       {move.error ? (
         <div
@@ -163,8 +204,8 @@ export function TaskPageOrcaContent({
             columns={columns}
             canDrop={move.canDrop}
             onMove={move.move}
-            onOpen={openCard}
-            onStartWorkspace={startWorkspace}
+            onOpen={onOpen}
+            onStartWorkspace={onStartWorkspace}
             updatingRefKeys={move.updatingRefKeys}
             selectedRefKey={null}
             formatUpdatedAt={formatRelativeTime}
