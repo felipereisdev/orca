@@ -9,6 +9,7 @@ import { Label } from '../../../ui/label'
 import { ClaudeAccountCard } from './claude-account-card'
 import { ClaudeIcon } from '../../../status-bar/icons'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
+import { ClaudeOAuthUsageSetting } from './claude-oauth-usage-setting'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import type { AccountsPaneSectionModel } from '../accounts-pane-types'
 import {
@@ -37,6 +38,7 @@ export function renderClaudeAccountsSection(
     claudeAccounts,
     claudeAction,
     isRemoteAccountScope,
+    recordFeatureInteraction,
     remoteAccountScopeNotice,
     runClaudeAccountAction,
     settings,
@@ -251,6 +253,13 @@ export function renderClaudeAccountsSection(
             )}
           </div>
         </SearchableSetting>
+        {isRemoteAccountScope ? null : (
+          <ClaudeOAuthUsageSetting
+            settings={settings}
+            updateSettings={updateSettings}
+            recordFeatureInteraction={recordFeatureInteraction}
+          />
+        )}
         {isRemoteAccountScope ? null : (
           <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
         )}

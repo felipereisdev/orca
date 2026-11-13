@@ -2,7 +2,7 @@ import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-f
 import { prepareHostClaudeAccountLaunch } from './host-claude-account-launch'
 import { retireAtRestCommandContext } from '../../../native-chat/agent-session-wire/options/at-rest-command-context'
 import { agentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
-import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/commit-message-agent-environment'
+import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/execution/commit-message-agent-environment'
 import {
   hostAccountLaunchEnvFor,
   type HostAccountLaunchEnv

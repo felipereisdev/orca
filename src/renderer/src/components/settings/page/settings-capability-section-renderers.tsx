@@ -23,7 +23,6 @@ export function renderAgentsSettingsSection(
   return (
     <SettingsSection
       id="agents"
-      grouped
       title={t('auto.components.settings.Settings.8afa676615', 'Agents')}
       description={t(
         'auto.components.settings.Settings.ec1ba547f7',
@@ -63,7 +62,6 @@ export function renderAccountsSettingsSection(
   return (
     <SettingsSection
       id="accounts"
-      grouped
       title={t('auto.components.settings.Settings.4198aae333', 'AI provider accounts')}
       description={t(
         'auto.components.settings.Settings.21f09426ea',
@@ -117,7 +115,6 @@ export function renderOrchestrationSettingsSection(
   return (
     <SettingsSection
       id="orchestration"
-      grouped
       title={t('auto.components.settings.Settings.00c3a7950d', 'Orchestration')}
       description={t(
         'auto.components.settings.Settings.475980f53d',
@@ -140,7 +137,6 @@ export function renderLinearSettingsSection(
   return model.linearConnected ? (
     <SettingsSection
       id="linear"
-      grouped
       title={t('auto.components.settings.Settings.linearTitle', 'Linear')}
       description={t(
         'auto.components.settings.Settings.linearDescription',
@@ -162,7 +158,6 @@ export function renderDesktopCapabilitySettingsSections(
     <>
       <SettingsSection
         id="computer-use"
-        grouped
         title={t('auto.components.settings.Settings.3f3e11cb5d', 'Computer use')}
         description={t(
           'auto.components.settings.Settings.7118953f14',
@@ -175,7 +170,6 @@ export function renderDesktopCapabilitySettingsSections(
 
       <SettingsSection
         id="voice"
-        grouped
         title={t('auto.components.settings.Settings.5063bb47a5', 'Voice')}
         description={t(
           'components.settings.voice.pageDescription',
@@ -184,7 +178,11 @@ export function renderDesktopCapabilitySettingsSections(
         searchEntries={navigation.getSectionSearchEntries('voice')}
       >
         {view.isSectionMounted('voice') ? (
-          <VoicePane settings={model.settings} updateSettings={model.updateSettings} />
+          <VoicePane
+            settings={model.settings}
+            updateSettings={model.updateSettings}
+            writeSourceControlAiSettings={context.interactions.writeSourceControlAiSettingsOrThrow}
+          />
         ) : null}
       </SettingsSection>
     </>
@@ -199,7 +197,6 @@ export function renderDatabaseSettingsSection(
   return (
     <SettingsSection
       id="database"
-      grouped
       hideHeader
       title={t('database.settings.title', 'Database connections')}
       description={t(

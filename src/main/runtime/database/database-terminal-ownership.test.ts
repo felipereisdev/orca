@@ -7,7 +7,7 @@ import { RpcDispatcher } from '../rpc/dispatcher'
 import { defineMethod } from '../rpc/core'
 import { DatabaseScope } from '../../../shared/rpc-contract/database-params'
 import { databaseActor } from './database-project-context'
-import { OrchestrationRequestEvidence } from '../../../cli/runtime/orchestration-compatibility-envelope'
+import { OrchestrationRequestEvidence } from '../../../cli/orchestration/identity/orchestration-compatibility-envelope'
 
 it('binds attested terminal CLI calls to their live terminal and refuses another workspace or stale evidence', async () => {
   const profile = createDatabaseTestProfile()

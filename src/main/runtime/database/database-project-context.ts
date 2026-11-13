@@ -6,7 +6,7 @@ import type { DatabaseProjectKey } from '../../../shared/database/database-contr
 import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { RpcContext } from '../rpc/core'
-import { rpcCallerOperationKey } from '../rpc/rpc-caller-identity'
+import { rpcCallerOperationKey } from '../rpc/callers/rpc-caller-identity'
 import type { DatabaseActor } from '../../database/execution/database-query-actor'
 import { sameDatabaseProject } from '../../database/catalog/database-project-scope'
 

@@ -26,7 +26,7 @@ import type {
   HostAccountSignInStatus
 } from '../../../../shared/host-account-sign-in-types'
 import type { CodexResetCreditExpectedScope } from '../../../../shared/codex-reset-credit-scope'
-import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/commit-message-agent-environment'
+import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/execution/commit-message-agent-environment'
 import {
   getClaudeSelectionTargetForAccount,
   type ClaudeAccountSelectionTarget

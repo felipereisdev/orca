@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
-import { asLoaded, build, testContext, WS } from './workspace-layout-command.test-fixture'
-import { saveWorkspaceLayout } from './workspace-layout-save'
-import { loadWorkspaceLayout } from './workspace-layout-load'
+import { asLoaded, build, testContext, WS } from './commands/workspace-layout-command.test-fixture'
+import { saveWorkspaceLayout } from './persistence/workspace-layout-save'
+import { loadWorkspaceLayout } from './persistence/workspace-layout-load'
 import { parseWorkspaceSession } from '../workspace-session/workspace-session-schema'
 it('restores a database reference in its split and closes it without creating an editor file', () => {
   const context = testContext()

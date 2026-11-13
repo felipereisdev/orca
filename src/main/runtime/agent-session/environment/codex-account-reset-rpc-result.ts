@@ -1,4 +1,4 @@
-import type { CodexResetCreditRejectedBeforeProviderReason } from '../../../codex-accounts/codex-account-service-types'
+import type { CodexResetCreditRejectedBeforeProviderReason } from '../../../codex-accounts/account-management/codex-account-service-types'
 import type { CodexResetCreditExpectedScope } from '../../../../shared/codex-reset-credit-scope'
 import type { CodexRateLimitResetOutcome } from '../../../../shared/rate-limit-types'
 import type { AccountsSnapshot } from './runtime-account-controller'

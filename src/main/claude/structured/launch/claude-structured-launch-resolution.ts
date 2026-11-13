@@ -1,8 +1,8 @@
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
 import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../../claude-accounts/runtime-auth/environment'
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/agent-session-acquired-account'
-import { prepareClaudeLaunchAccount } from '../../claude-launch-account'
-import { assertStructuredAgentResolutionCurrent } from '../../../native-chat/structured-agent-command-resolution'
+import { prepareClaudeLaunchAccount } from './claude-launch-account'
+import { assertStructuredAgentResolutionCurrent } from '../../../native-chat/agent-launch/structured-agent-command-resolution'
 import { activeProviderContext } from '../../../../shared/agent-session/agent-session-provider-context'
 import { getClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { requireLegacyAgentSessionAccountHome } from '../../../../shared/agent-session/lifecycle/agent-session-account-home'
@@ -28,9 +28,12 @@ import {
   type ClaudeEnvDeps
 } from './claude-structured-child-env'
 import { claudeStructuredLaunchArgs } from './claude-structured-launch-args'
-import type { ClaudeCliFlagCheck, ClaudeCliFlagSupport } from '../../claude-cli-flag-support'
+import type {
+  ClaudeCliFlagCheck,
+  ClaudeCliFlagSupport
+} from '../../cli-capabilities/claude-cli-flag-support'
 import { resolveClaudeLaunchFlags } from './claude-structured-launch-flags'
-import { withNativeChatVisualsEnv } from '../../../native-chat/native-chat-visuals-delivery'
+import { withNativeChatVisualsEnv } from '../../../native-chat/conversation-files/native-chat-visuals-delivery'
 import { claudeLaunchResumesTranscript } from './claude-structured-launch-home'
 import type { StructuredAgentLaunchPartResolver } from '../../../runtime/agent-session/launch/structured-agent-launch-composition'
 import { claudeSessionIdForOrcaSession } from '../claude-structured-session-id'

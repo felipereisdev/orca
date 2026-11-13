@@ -7,7 +7,7 @@ import {
   DatabaseBindingQuery,
   DatabaseBindingStart
 } from '../../../../../shared/rpc-contract/database-params'
-import { rpcCallerOperationKey } from '../../rpc-caller-identity'
+import { rpcCallerOperationKey } from '../../callers/rpc-caller-identity'
 
 function principal(context: RpcContext): string {
   if (!context.caller) {

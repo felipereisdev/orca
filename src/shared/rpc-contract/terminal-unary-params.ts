@@ -118,6 +118,11 @@ export const TerminalResolvePane = z.object({
   worktreeId: OptionalString
 })
 
+export const TerminalAgentId = z.object({
+  paneKey: requiredString('Missing pane key'),
+  worktreeId: requiredString('Missing worktree ID')
+})
+
 export const TerminalRecoverPane = z.object({
   paneKey: requiredString('Missing pane key'),
   worktreeId: requiredString('Missing worktree ID'),
@@ -165,6 +170,11 @@ export const TerminalSetPaneTitle = TerminalHandle.extend({
   title: z.string()
 })
 
+export const TerminalViewport = z.object({
+  cols: z.number().int().min(1).max(1000),
+  rows: z.number().int().min(1).max(500)
+})
+
 export const TerminalSend = TerminalHandle.extend({
   inputSequence: z
     .object({
@@ -203,22 +213,12 @@ export const TerminalSend = TerminalHandle.extend({
       type: z.enum(['mobile', 'desktop']).default('desktop').optional()
     })
     .optional(),
-  viewport: z
-    .object({
-      cols: z.number().int().min(1).max(1000),
-      rows: z.number().int().min(1).max(500)
-    })
-    .optional(),
+  viewport: TerminalViewport.optional(),
   claimViewport: z.literal(true).optional()
 })
 
 export const TerminalOpenInputSession = TerminalHandle.extend({
   client: z.object({ id: requiredString('Missing client ID'), type: z.literal('mobile') })
-})
-
-export const TerminalViewport = z.object({
-  cols: z.number().int().min(1).max(1000),
-  rows: z.number().int().min(1).max(500)
 })
 
 export const TerminalWait = TerminalHandle.extend({
@@ -317,12 +317,7 @@ export const TerminalSplit = z
       .optional(),
     newLeafId: OptionalString,
     cwd: OptionalString,
-    initialSize: z
-      .object({
-        cols: z.number().int().min(1).max(1000),
-        rows: z.number().int().min(1).max(500)
-      })
-      .optional()
+    initialSize: TerminalViewport.optional()
   })
   .superRefine((params, ctx) => {
     if (!params.terminal && !params.pane) {

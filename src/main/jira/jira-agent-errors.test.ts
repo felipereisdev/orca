@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { mapRuntimeError } from '../runtime/rpc/errors'
+import { mapRuntimeError } from '../runtime/rpc/responses/rpc-response'
 import { jiraAgentError, sanitizeJiraAgentError } from './jira-agent-request'
 
 it('preserves sanitized Jira domain codes through the real RPC error mapper', () => {

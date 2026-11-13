@@ -1,3 +1,5 @@
+import type { AgentSessionForkedFrom } from './agent-session-fork-origin'
+export type { AgentSessionForkedFrom } from './agent-session-fork-origin'
 import { isExplicitClaudeAccountRecord } from '../../claude-profile-routing'
 import { isOptionalUsageLimitContinueCancel } from './agent-session-usage-limit-continue'
 import type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
@@ -31,8 +33,10 @@ import { isStructuredAgentId } from './agent-session-provider-handle-encoding'
 import { isNonNegativeSafeInteger } from '../../ssh-retained-payload-limits'
 import {
   isAgentSessionAccountHome,
+  isOptionalAgentSessionLaunchedAccount,
   MAX_PATH_LENGTH,
-  type AgentSessionAccountHome
+  type AgentSessionAccountHome,
+  type AgentSessionLaunchedAccount
 } from './agent-session-account-home'
 
 export const AGENT_SESSION_RECORD_SCHEMA_VERSION = 2 as const
@@ -103,14 +107,6 @@ export type AgentSessionLease = {
   deathEvidence: AgentSessionDeathEvidence | null
 }
 
-export type AgentSessionForkedFrom = {
-  sessionId: string
-  /** The source response whose turn the fork copied through. */
-  itemId: string
-  /** Where the inherited history ends in this chat's own journal. */
-  childBoundary: { kind: 'item'; itemId: string } | { kind: 'start' }
-}
-
 export type AgentSessionRecord = {
   schemaVersion: typeof AGENT_SESSION_RECORD_SCHEMA_VERSION
   sessionId: string
@@ -121,6 +117,8 @@ export type AgentSessionRecord = {
   providerContextBoundary?: AgentSessionProviderContextBoundary
   claudeAccountId?: string
   accountHome: AgentSessionAccountHome
+  /** Where the latest proven runtime actually launched; absent before any or from older hosts. */
+  launchedAccount?: AgentSessionLaunchedAccount
   /** Optional host-written construction observation; checked independently of record readability. */
   acquiredAccount?: unknown
   /** Initial launch directory in host path syntax. Floating sessions resume here; worktree/folder IDs resolve their durable location. */
@@ -316,6 +314,7 @@ export function isPersistedAgentSessionObservationRecord(
       isStructuredAgentId(record.provider) &&
       isExplicitClaudeAccountRecord(record) &&
       isAgentSessionAccountHome(record.accountHome) &&
+      isOptionalAgentSessionLaunchedAccount(record.launchedAccount) &&
       (record.launchDirectory === undefined ||
         isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&
       (record.options === undefined || isAgentSessionOptions(record.options)) &&

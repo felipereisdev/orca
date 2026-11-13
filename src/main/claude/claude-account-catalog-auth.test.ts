@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { createClaudeModelCatalogProbe } from './claude-model-catalog-probe'
+import { createClaudeModelCatalogProbe } from './model-catalog/claude-model-catalog-probe'
 import { harness } from '../native-chat/agent-model-catalog/agent-model-catalog-account-list-test-support'
 
 it('discovers an explicit account through a child with that profile and no inherited credentials', async () => {
