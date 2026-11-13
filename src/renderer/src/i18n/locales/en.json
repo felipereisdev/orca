@@ -25612,6 +25612,7 @@
     "repoUnavailable": "The repository for {{id}} is no longer in Orca.",
     "chooseStateTitle": "Move {{id}} to {{column}}",
     "chooseStateDescription": "Several Linear states match this column. Choose one:",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "finishOpenMove": "Finish the open move first"
   }
 }

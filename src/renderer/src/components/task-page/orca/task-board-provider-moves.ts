@@ -113,7 +113,7 @@ export async function applyJiraTaskBoardMove(
     activeRuntimeEnvironmentId: runtimeTargetEnvironmentId(target)
   })
   if (!scope) {
-    return
+    throw new Error(taskBoardMoveErrorMessage(null))
   }
   const patchOptions = {
     sourceContext: null,

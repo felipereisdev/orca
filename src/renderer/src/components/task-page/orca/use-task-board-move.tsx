@@ -31,8 +31,10 @@ import {
   taskBoardMoveErrorMessage
 } from './task-board-provider-moves'
 
-/** A drop waiting on the user's choice in a dialog; its card stays updating until it settles. */
+/** The one Jira/Linear drop in flight, loading or in a dialog; its card stays updating until it settles. */
 type MoveSession = { card: TaskBoardCard; target: RuntimeClientTarget }
+/** `dialog`: a dialog now owns the move and its session. */
+type MoveOutcome = 'moved' | 'unchanged' | 'dialog'
 type LinearChoice = {
   issue: LinearIssue
   destination: string
@@ -81,32 +83,23 @@ export function useTaskBoardMove(args: {
     settings: args.settings
   })
 
-  function openSession(session: MoveSession): void {
-    const previous = sessionRef.current
-    if (previous && previous.card.refKey !== session.card.refKey) {
-      setUpdating(previous.card.refKey, false)
+  /** Ends `session` only while it is still the current one; a settled session is never touched again. */
+  function endSession(session: MoveSession | null, moved: boolean): void {
+    if (!session || sessionRef.current !== session) {
+      return
     }
-    setJiraPrompt(null)
-    setLinearChoice(null)
-    sessionRef.current = session
-  }
-
-  function endSession(moved: boolean): void {
-    const session = sessionRef.current
     sessionRef.current = null
     setJiraPrompt(null)
     setLinearChoice(null)
-    if (session) {
-      setUpdating(session.card.refKey, false)
-      if (moved) {
-        args.onMoved(session.card.provider)
-      }
+    setUpdating(session.card.refKey, false)
+    if (moved) {
+      args.onMoved(session.card.provider)
     }
   }
 
   function closeDialogs(): void {
     if (!pending) {
-      endSession(false)
+      endSession(sessionRef.current, false)
     }
   }
 
@@ -124,21 +117,14 @@ export function useTaskBoardMove(args: {
         }
   }
 
-  /** Resolves true once the provider changed, false when a dialog now owns the move. */
-  async function moveJira(
-    card: TaskBoardCard,
-    issue: JiraIssue,
-    columnId: string
-  ): Promise<boolean> {
-    const target = requireTaskBoardTarget('jira', args.accountHostId)
+  async function moveJira(session: MoveSession, issue: JiraIssue, columnId: string) {
     const moveArgs = targetArgs(columnId)
-    const transitions = await loadJiraTaskBoardMoveTransitions(target, issue, moveArgs)
+    const transitions = await loadJiraTaskBoardMoveTransitions(session.target, issue, moveArgs)
     const [only] = transitions
     if (transitions.length === 1 && classifyTransitionRequirements(only).kind === 'none') {
-      await applyJiraTaskBoardMove(target, issue, only, { transitionId: only.id })
-      return true
+      await applyJiraTaskBoardMove(session.target, issue, only, { transitionId: only.id })
+      return 'moved'
     }
-    openSession({ card, target })
     setJiraPrompt({
       issue,
       destination: moveArgs.columnLabel,
@@ -147,82 +133,91 @@ export function useTaskBoardMove(args: {
       error: null,
       loading: false
     })
-    return false
+    return 'dialog'
   }
 
-  async function moveLinear(
-    card: TaskBoardCard,
-    issue: LinearIssue,
-    columnId: string
-  ): Promise<boolean> {
-    const target = requireTaskBoardTarget('linear', args.accountHostId)
+  async function moveLinear(session: MoveSession, issue: LinearIssue, columnId: string) {
     const moveArgs = targetArgs(columnId)
-    const states = await loadLinearTaskBoardMoveStates(target, issue, moveArgs)
+    const states = await loadLinearTaskBoardMoveStates(session.target, issue, moveArgs)
     if (states.length === 1) {
-      await applyLinearTaskBoardMove(target, issue, states[0])
-      return true
+      await applyLinearTaskBoardMove(session.target, issue, states[0])
+      return 'moved'
     }
-    openSession({ card, target })
     setLinearChoice({ issue, destination: moveArgs.columnLabel, states, error: null })
-    return false
+    return 'dialog'
   }
 
-  async function moveWithLabels(card: TaskBoardCard, columnId: string): Promise<boolean> {
+  async function moveWithLabels(card: TaskBoardCard, columnId: string): Promise<MoveOutcome> {
     const labelMove = resolveLabelProviderMove(card, columnId, args.columns, args.settings)
     if (!labelMove.ok) {
       if (labelMove.reason === 'same-column') {
-        return false
+        return 'unchanged'
       }
       throw new Error(
         t('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Tasks')
       )
     }
     await applyTaskBoardLabelMove(card, labelMove)
-    return true
+    return 'moved'
   }
 
   async function move(card: TaskBoardCard, columnId: string): Promise<void> {
+    const { source } = card
+    const sessioned = source.provider === 'jira' || source.provider === 'linear'
     if (busyRef.current.has(card.refKey)) {
       return
     }
+    // One Jira/Linear move at a time, as the Jira tab locks its board: a second must not take over its dialog.
+    if (sessioned && sessionRef.current) {
+      setError(t('taskBoard.finishOpenMove', 'Finish the open move first'))
+      return
+    }
     setUpdating(card.refKey, true)
-    setError(null)
-    let moved = false
+    let session: MoveSession | null = null
+    let outcome: MoveOutcome = 'unchanged'
     try {
-      const { source } = card
-      moved =
-        source.provider === 'jira'
-          ? await moveJira(card, source.item, columnId)
-          : source.provider === 'linear'
-            ? await moveLinear(card, source.item, columnId)
+      if (sessioned) {
+        session = { card, target: requireTaskBoardTarget(source.provider, args.accountHostId) }
+        sessionRef.current = session
+      }
+      outcome =
+        session && source.provider === 'jira'
+          ? await moveJira(session, source.item, columnId)
+          : session && source.provider === 'linear'
+            ? await moveLinear(session, source.item, columnId)
             : await moveWithLabels(card, columnId)
     } catch (cause) {
       setError(taskBoardMoveErrorMessage(cause))
     }
-    // An open dialog keeps the card updating until the user settles it.
-    if (sessionRef.current?.card.refKey !== card.refKey) {
-      setUpdating(card.refKey, false)
+    if (outcome === 'dialog') {
+      return
     }
-    if (moved) {
+    if (session && sessionRef.current === session) {
+      sessionRef.current = null
+    }
+    setUpdating(card.refKey, false)
+    if (outcome === 'moved') {
       args.onMoved(card.provider)
     }
   }
 
   async function applyJira(transition: JiraTransition, updates: JiraIssueUpdate): Promise<void> {
     const session = sessionRef.current
-    if (!session || !jiraPrompt) {
+    if (session?.card.source.provider !== 'jira') {
       return
     }
     setPending(true)
     try {
-      await applyJiraTaskBoardMove(session.target, jiraPrompt.issue, transition, updates)
-      endSession(true)
+      await applyJiraTaskBoardMove(session.target, session.card.source.item, transition, updates)
+      endSession(session, true)
     } catch (cause) {
-      setJiraPrompt((current) =>
-        current
-          ? { ...current, selected: transition, error: taskBoardMoveErrorMessage(cause) }
-          : null
-      )
+      if (sessionRef.current === session) {
+        setJiraPrompt((current) =>
+          current
+            ? { ...current, selected: transition, error: taskBoardMoveErrorMessage(cause) }
+            : null
+        )
+      }
     }
     setPending(false)
   }
@@ -237,17 +232,19 @@ export function useTaskBoardMove(args: {
   async function chooseLinear(stateId: string): Promise<void> {
     const session = sessionRef.current
     const state = linearChoice?.states.find((item) => item.id === stateId)
-    if (!session || !linearChoice || !state) {
+    if (session?.card.source.provider !== 'linear' || !state) {
       return
     }
     setPending(true)
     try {
-      await applyLinearTaskBoardMove(session.target, linearChoice.issue, state)
-      endSession(true)
+      await applyLinearTaskBoardMove(session.target, session.card.source.item, state)
+      endSession(session, true)
     } catch (cause) {
-      setLinearChoice((current) =>
-        current ? { ...current, error: taskBoardMoveErrorMessage(cause) } : null
-      )
+      if (sessionRef.current === session) {
+        setLinearChoice((current) =>
+          current ? { ...current, error: taskBoardMoveErrorMessage(cause) } : null
+        )
+      }
     }
     setPending(false)
   }
