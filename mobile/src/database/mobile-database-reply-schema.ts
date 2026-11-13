@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import { databaseConnectionSchema } from '../../../src/shared/database/database-configuration-schema'
 import { databaseQueryRecordSchema } from '../../../src/shared/database/database-query-result-schema'
 

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as z from 'zod'
 import { databaseProjectSchema, databaseLimitsSchema } from './database-configuration-schema'
 
 const source = z.object({
