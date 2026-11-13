@@ -147,10 +147,10 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
     }
     return getTaskPageRepoSourceContext(dialogRepo, 'github')
   }, [dialogRepo, dialogWorkItem, pageData.openGitHubSourceContext, pageData.openGitHubWorkItem])
+  // Why: board cards come from every Orca repo, not only the GitLab tab's selection.
   const gitlabDialogRepo = useMemo(
-    () =>
-      gitlabDialogItem ? (getWorkItemRepo(selectedRepos, gitlabDialogItem) ?? primaryRepo) : null,
-    [gitlabDialogItem, primaryRepo, selectedRepos]
+    () => (gitlabDialogItem ? (getWorkItemRepo(repos, gitlabDialogItem) ?? primaryRepo) : null),
+    [gitlabDialogItem, primaryRepo, repos]
   )
   const gitlabDialogSourceContext = useMemo(() => {
     if (!gitlabDialogItem) {

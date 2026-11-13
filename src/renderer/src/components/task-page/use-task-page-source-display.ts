@@ -4,7 +4,7 @@ import type { GitHubTaskKind } from '../../../../shared/work-items/task-github-s
 import { buildGitHubRepoUrl } from '../../../../shared/github/repositories/links'
 import { getTaskSourceContextSummary } from '../task-source-context-summary'
 import { getGitHubProjectSourceSummary } from './task-page-source-context'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 
 type TaskPageSourceDisplayInput = TaskPageLinearCreationStateModel & {
   activeGithubTaskKind: GitHubTaskKind
@@ -12,6 +12,7 @@ type TaskPageSourceDisplayInput = TaskPageLinearCreationStateModel & {
 
 /** The Tasks source claims (summary, repo link) come from the list's resolved sources once mode and kind are known. */
 export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInput>(model: Model) {
+  const t = useTranslate()
   const {
     taskSource,
     githubMode,
@@ -44,8 +45,8 @@ export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInpu
   const taskSourceContextSummary = useMemo(() => {
     if (taskSource === 'orca') {
       return {
-        label: translate('taskBoard.contextSummary', 'Assigned to you'),
-        title: translate(
+        label: t('taskBoard.contextSummary', 'Assigned to you'),
+        title: t(
           'taskBoard.contextSummaryTitle',
           'Issues assigned to you in every connected provider'
         )
@@ -98,6 +99,7 @@ export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInpu
     linearWorkspaceName,
     selectedRepos.length,
     sourceOptions,
+    t,
     taskSource,
     taskSourceHostAvailability,
     taskSourceRepoContexts

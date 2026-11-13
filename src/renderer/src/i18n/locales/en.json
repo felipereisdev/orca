@@ -25616,6 +25616,9 @@
     "finishOpenMove": "Finish the open move first",
     "source": "My board",
     "contextSummary": "Assigned to you",
-    "contextSummaryTitle": "Issues assigned to you in every connected provider"
+    "contextSummaryTitle": "Issues assigned to you in every connected provider",
+    "noProviders": "Connect a task provider in Settings → Tasks",
+    "refresh": "Refresh",
+    "dismissError": "Dismiss"
   }
 }
