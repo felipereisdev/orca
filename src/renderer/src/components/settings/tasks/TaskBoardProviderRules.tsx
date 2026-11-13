@@ -63,10 +63,10 @@ export function TaskBoardProviderRules({
   onChange
 }: TaskBoardProviderRulesProps): React.JSX.Element {
   const t = useTranslate()
-  const nextKey = useRef(0)
+  const nextKey = useRef(value.rules.length)
   // Why: normalization drops rules with an empty match, so rows being typed live here until they are valid.
   const [rows, setRows] = useState<RuleRow[]>(() =>
-    value.rules.map((rule) => ({ ...rule, key: nextKey.current++ }))
+    value.rules.map((rule, index) => ({ ...rule, key: index }))
   )
   const supportsDropTargets = provider === 'jira' || provider === 'linear'
   const matchPlaceholder = supportsDropTargets
@@ -130,9 +130,11 @@ export function TaskBoardProviderRules({
           variant="outline"
           size="sm"
           disabled={statuses.length === 0}
-          onClick={() =>
-            commitRows([...rows, { key: nextKey.current++, match: '', statusId: statuses[0].id }])
-          }
+          onClick={() => {
+            const key = nextKey.current
+            nextKey.current += 1
+            commitRows([...rows, { key, match: '', statusId: statuses[0].id }])
+          }}
         >
           <Plus className="size-3.5" />
           {t('taskBoard.settings.addRule', 'Add rule')}
