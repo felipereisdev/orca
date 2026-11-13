@@ -14,11 +14,29 @@ export type LabelProviderMove =
   | { ok: true; state?: 'open' | 'closed'; addLabels: string[]; removeLabels: string[] }
   | { ok: false; reason: 'no-mapping' | 'same-column' }
 
+function labelRepoId(card: TaskBoardCard): string | null {
+  const { source } = card
+  return source.provider === 'gitlab' || source.provider === 'github' ? source.item.repoId : null
+}
+
+/** Labels other board cards of the card's repo carry: the casing the repo already uses. */
+export function taskBoardRepoLabels(
+  card: TaskBoardCard,
+  cards: readonly TaskBoardCard[]
+): string[] {
+  const repoId = labelRepoId(card)
+  return cards
+    .filter((other) => other.provider === card.provider && labelRepoId(other) === repoId)
+    .flatMap((other) => other.labels)
+}
+
+/** `knownLabels` (see `taskBoardRepoLabels`) keeps an added label from becoming a case variant. */
 export function resolveLabelProviderMove(
   card: TaskBoardCard,
   targetColumnId: string,
   columns: readonly WorkspaceStatusDefinition[],
-  settings: TaskBoardSettings
+  settings: TaskBoardSettings,
+  knownLabels: readonly string[] = []
 ): LabelProviderMove {
   if (resolveTaskBoardColumnId(card, columns, settings) === targetColumnId) {
     return { ok: false, reason: 'same-column' }
@@ -28,14 +46,17 @@ export function resolveLabelProviderMove(
   }
   const reopen = card.category === 'done' ? { state: 'open' as const } : {}
   const rules = getActiveTaskBoardRules(card.provider, columns, settings)
+  const matches = (label: string, match: string): boolean =>
+    normalizeTaskBoardMatch(label) === normalizeTaskBoardMatch(match)
   const cardLabelsFor = (match: string): string[] =>
-    card.labels.filter((label) => normalizeTaskBoardMatch(label) === normalizeTaskBoardMatch(match))
+    card.labels.filter((label) => matches(label, match))
   const targetRule = rules.find((rule) => rule.statusId === targetColumnId)
   if (targetRule) {
+    const existing = knownLabels.find((label) => matches(label, targetRule.match))
     return {
       ok: true,
       ...reopen,
-      addLabels: cardLabelsFor(targetRule.match).length > 0 ? [] : [targetRule.match],
+      addLabels: cardLabelsFor(targetRule.match).length > 0 ? [] : [existing ?? targetRule.match],
       removeLabels: [
         ...new Set(
           rules

@@ -12,6 +12,7 @@ import type { JiraIssue } from '../../../../shared/jira/jira-types'
 import { useAppStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import { findTaskPageJiraIssue } from '@/components/task-page/jira/task-page-jira-cache-selectors'
+import { linearIssueTaskSourceContext } from '@/lib/work-items/linear/linear-linked-work-item'
 import {
   closeTaskPageDetail,
   taskDetailReturnFields
@@ -148,7 +149,11 @@ export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
         {
           taskSource: 'linear',
           openLinearIssue: issue,
-          openLinearSourceContext: linearTaskSourceContext,
+          // Why: the Orca board lists every workspace's issues; bind the detail to the issue's own, as start-workspace does.
+          openLinearSourceContext:
+            taskSource === 'orca'
+              ? linearIssueTaskSourceContext(issue, linearTaskSourceContext)
+              : linearTaskSourceContext,
           ...taskDetailReturnFields(taskSource)
         },
         {

@@ -27,8 +27,12 @@ export function getLinearLinkedWorkItemBranchName(
     : undefined
 }
 
-export function buildLinearIssueComposerData(issue: LinearIssue, source: TaskSourceContext | null) {
-  const sourceContext = source
+/** `source` rebound to the issue's own workspace and team, for issues listed outside the selected one. */
+export function linearIssueTaskSourceContext(
+  issue: LinearIssue,
+  source: TaskSourceContext | null
+): TaskSourceContext | null {
+  return source
     ? normalizeTaskSourceContext({
         ...source,
         providerIdentity: {
@@ -41,6 +45,10 @@ export function buildLinearIssueComposerData(issue: LinearIssue, source: TaskSou
         accountLabel: issue.workspaceName ?? null
       })
     : null
+}
+
+export function buildLinearIssueComposerData(issue: LinearIssue, source: TaskSourceContext | null) {
+  const sourceContext = linearIssueTaskSourceContext(issue, source)
   return {
     prefilledName: getLinearIssueWorkspaceName(issue),
     linkedWorkItem: buildLinearWorkspaceSource(issue),

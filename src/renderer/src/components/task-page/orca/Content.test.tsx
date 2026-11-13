@@ -90,7 +90,7 @@ function renderContent() {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture supplies every model field this content reads.
   const model = {
     accountBackedTaskSourceHostId: 'local',
-    sourceOptions: getSourceOptions(),
+    visibleSourceOptions: getSourceOptions(),
     ...handlers
   } as unknown as TaskPageComposerActionsModel
   render(

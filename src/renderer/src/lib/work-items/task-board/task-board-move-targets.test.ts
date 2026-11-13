@@ -9,7 +9,8 @@ import type { TaskBoardCard } from './task-board-card'
 import {
   resolveLabelProviderMove,
   selectJiraMoveTransitions,
-  selectLinearMoveStates
+  selectLinearMoveStates,
+  taskBoardRepoLabels
 } from './task-board-move-targets'
 
 const columns = [
@@ -106,6 +107,20 @@ describe('resolveLabelProviderMove', () => {
         withRules()
       )
     ).toEqual({ ok: false, reason: 'same-column' })
+  })
+
+  it('adds the target label in the casing its repo already uses', () => {
+    const card = githubCard('todo', [])
+    const sibling = { ...githubCard('todo', ['Workflow::Review']), refKey: 'github:repo:2' }
+    expect(
+      resolveLabelProviderMove(
+        card,
+        'in-review',
+        columns,
+        withRules(),
+        taskBoardRepoLabels(card, [card, sibling])
+      )
+    ).toEqual({ ok: true, addLabels: ['Workflow::Review'], removeLabels: [] })
   })
 })
 

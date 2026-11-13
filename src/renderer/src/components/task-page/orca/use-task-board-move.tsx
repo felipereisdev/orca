@@ -19,7 +19,7 @@ import type { TaskBoardSettings } from '../../../../../shared/task-board/task-bo
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 import { TaskBoardMoveDialogs, type TaskBoardLinearChoice } from './TaskBoardMoveDialogs'
-import { applyTaskBoardLabelMove } from './task-board-label-moves'
+import { moveTaskBoardCardWithLabels } from './task-board-label-moves'
 import {
   confirmTaskBoardMove,
   holdTaskBoardMove,
@@ -54,6 +54,8 @@ export type TaskBoardMove = {
 
 /** `accountHostId` routes Jira and Linear writes: pass the Tasks page's `accountBackedTaskSourceHostId`. */
 export function useTaskBoardMove(args: {
+  /** The board's read cards; a GitLab/GitHub move reuses their label casing. */
+  cards: readonly TaskBoardCard[]
   columns: readonly WorkspaceStatusDefinition[]
   settings: TaskBoardSettings
   accountHostId: ExecutionHostId
@@ -164,19 +166,6 @@ export function useTaskBoardMove(args: {
     return 'dialog'
   }
 
-  async function moveWithLabels(card: TaskBoardCard, columnId: string): Promise<MoveOutcome> {
-    const labelMove = resolveLabelProviderMove(card, columnId, args.columns, args.settings)
-    if (!labelMove.ok) {
-      if (labelMove.reason === 'same-column') {
-        return 'unchanged'
-      }
-      throw new Error(
-        t('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Tasks')
-      )
-    }
-    return applyTaskBoardLabelMove(card, labelMove)
-  }
-
   async function move(card: TaskBoardCard, columnId: string): Promise<void> {
     const { source } = card
     if (isTaskBoardMoveInFlight(card.refKey)) {
@@ -202,7 +191,10 @@ export function useTaskBoardMove(args: {
           ? await moveJira(session('jira'), source.item)
           : source.provider === 'linear'
             ? await moveLinear(session('linear'), source.item)
-            : await moveWithLabels(card, columnId)
+            : await moveTaskBoardCardWithLabels(card, {
+                ...targetArgs(columnId),
+                cards: args.cards
+              })
     } catch (cause) {
       setError(taskBoardMoveErrorMessage(cause))
     }

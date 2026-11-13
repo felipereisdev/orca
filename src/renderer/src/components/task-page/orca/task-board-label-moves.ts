@@ -17,11 +17,15 @@ import {
 import { findTaskBoardRepo } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
 import { normalizeTaskBoardMatch } from '@/lib/work-items/task-board/task-board-columns'
-import type { LabelProviderMove } from '@/lib/work-items/task-board/task-board-move-targets'
+import {
+  resolveLabelProviderMove,
+  taskBoardRepoLabels,
+  type LabelProviderMove
+} from '@/lib/work-items/task-board/task-board-move-targets'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import { parseGitHubItemRepository } from '../../../../../shared/github/work-items/work-item-target'
 import type { TaskChange } from '@/store/github/task-records/task-change'
-import { confirmedTaskBoardCard } from './task-board-provider-moves'
+import { confirmedTaskBoardCard, type TaskBoardMoveTargetArgs } from './task-board-provider-moves'
 
 type LabelMove = Extract<LabelProviderMove, { ok: true }>
 
@@ -97,10 +101,7 @@ async function applyGitHubLabelMove(
 }
 
 /** Applies a GitLab/GitHub open/closed + label move in the repo the card was read from. */
-export async function applyTaskBoardLabelMove(
-  card: TaskBoardCard,
-  move: LabelMove
-): Promise<TaskBoardCard> {
+async function applyLabelMove(card: TaskBoardCard, move: LabelMove): Promise<TaskBoardCard> {
   const { source } = card
   if (source.provider === 'github') {
     return applyGitHubLabelMove(card, source.item, move)
@@ -132,4 +133,27 @@ export async function applyTaskBoardLabelMove(
     updatedAt: new Date().toISOString()
   }
   return confirmedTaskBoardCard(card, toGitLabTaskBoardCard(confirmed, card.projectLabel))
+}
+
+/** Resolves to the confirmed card, or `unchanged` for a drop on the card's own column. */
+export async function moveTaskBoardCardWithLabels(
+  card: TaskBoardCard,
+  {
+    columnId,
+    columns,
+    settings,
+    cards
+  }: TaskBoardMoveTargetArgs & { cards: readonly TaskBoardCard[] }
+): Promise<TaskBoardCard | 'unchanged'> {
+  const repoLabels = taskBoardRepoLabels(card, cards)
+  const move = resolveLabelProviderMove(card, columnId, columns, settings, repoLabels)
+  if (!move.ok) {
+    if (move.reason === 'same-column') {
+      return 'unchanged'
+    }
+    throw new Error(
+      translate('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Tasks')
+    )
+  }
+  return applyLabelMove(card, move)
 }

@@ -31,7 +31,7 @@ export function TaskPageOrcaContent({
 }): React.JSX.Element {
   const {
     accountBackedTaskSourceHostId,
-    sourceOptions,
+    visibleSourceOptions,
     openJiraDetailPage,
     handleUseJiraItem,
     openLinearDetailPage,
@@ -47,6 +47,7 @@ export function TaskPageOrcaContent({
   const settings = useMemo(() => savedSettings ?? getDefaultTaskBoardSettings(), [savedSettings])
   const { state, refresh, refreshProvider } = useTaskBoardCards(accountBackedTaskSourceHostId)
   const move = useTaskBoardMove({
+    cards: state.cards,
     columns: statuses,
     settings,
     accountHostId: accountBackedTaskSourceHostId,
@@ -86,7 +87,8 @@ export function TaskPageOrcaContent({
       statuses={statuses}
       settings={settings}
       move={move}
-      sourceOptions={sourceOptions}
+      // A provider hidden in Settings → Tasks gets no chip.
+      sourceOptions={visibleSourceOptions}
       onRefresh={refresh}
       onOpen={openCard}
       onStartWorkspace={startWorkspace}

@@ -22,7 +22,7 @@ vi.mock('./task-board-provider-moves', () => ({
   loadLinearTaskBoardMoveStates: vi.fn(),
   applyLinearTaskBoardMove: vi.fn()
 }))
-vi.mock('./task-board-label-moves', () => ({ applyTaskBoardLabelMove: vi.fn() }))
+vi.mock('./task-board-label-moves', () => ({ moveTaskBoardCardWithLabels: vi.fn() }))
 vi.mock('@/components/task-page/jira/task-page-jira-board-move-dialog', () => ({
   JiraBoardMoveDialog: () => null
 }))
@@ -82,6 +82,7 @@ describe('useTaskBoardMove', () => {
     const onMoved = vi.fn()
     const { result } = renderHook(() =>
       useTaskBoardMove({
+        cards: [],
         columns,
         settings: getDefaultTaskBoardSettings(),
         accountHostId: 'local',
@@ -108,7 +109,7 @@ describe('useTaskBoardMove', () => {
     const settings = getDefaultTaskBoardSettings()
     const onMoved = vi.fn()
     const { result } = renderHook(() =>
-      useTaskBoardMove({ columns, settings, accountHostId: 'local', onMoved })
+      useTaskBoardMove({ cards: [], columns, settings, accountHostId: 'local', onMoved })
     )
 
     await act(() => result.current.move(stale, 'in-progress'))
