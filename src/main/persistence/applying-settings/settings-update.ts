@@ -29,6 +29,7 @@ import { normalizeWorktreeVisibilityDefaults } from '../../../shared/external-wo
 import { normalizePRBotAuthorOverrides } from '../../../shared/source-control/review-comments/pr-bot-author-overrides'
 import { normalizeMachineName } from '../../../shared/machine-name'
 import { normalizeWorkspaceCleanupRules } from '../../../shared/workspace-cleanup/workspace-cleanup-policy'
+import { normalizeTaskBoardSettings } from '../../../shared/task-board/task-board-settings'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import {
   addMobilePairingCustomAddress,
@@ -117,6 +118,9 @@ export function updateSettings(
     sanitizedUpdates.workspaceCleanupPolicy = normalizeWorkspaceCleanupRules(
       updates.workspaceCleanupPolicy
     )
+  }
+  if ('taskBoard' in updates) {
+    sanitizedUpdates.taskBoard = normalizeTaskBoardSettings(updates.taskBoard)
   }
   sanitizeAgentLaunchProfileUpdates(sanitizedUpdates, updates)
   if ('nativeChatPermissionMode' in updates || 'agentPermissionDefault' in updates) {

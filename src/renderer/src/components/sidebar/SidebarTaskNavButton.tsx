@@ -18,9 +18,9 @@ import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
 import {
   normalizeVisibleTaskProviders,
-  restoreAvailableDefaultTaskProvider,
-  resolveVisibleTaskProvider
+  restoreAvailableDefaultTaskProvider
 } from '../../../../shared/work-items/task-providers'
+import { resolveVisibleTaskSource } from '../../../../shared/work-items/task-source'
 import { localPreflightContextKey } from '../../runtime/hosts/preflight/local-preflight-context-key'
 
 function HideTaskSidebarMenu({ onHide }: { onHide: () => void }): React.JSX.Element {
@@ -103,7 +103,7 @@ export function SidebarTaskNavButton(): React.JSX.Element | null {
     ]
   )
   const resolvedDefaultTaskSource = React.useMemo(
-    () => resolveVisibleTaskProvider(defaultTaskSource, visibleTaskProviders),
+    () => resolveVisibleTaskSource(defaultTaskSource, visibleTaskProviders),
     [defaultTaskSource, visibleTaskProviders]
   )
 

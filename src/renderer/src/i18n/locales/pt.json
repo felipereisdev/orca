@@ -24811,5 +24811,53 @@
       "notGitRepository": "Não é um repositório Git válido",
       "importFailed": "Não foi possível importar o repositório"
     }
+  },
+  "taskBoard": {
+    "emptyColumn": "Nenhuma issue",
+    "moveCard": "Mover {{id}}",
+    "startWorkspace": "Iniciar workspace a partir de {{id}}",
+    "startWorkspaceTooltip": "Iniciar workspace",
+    "openExternal": "Abrir {{id}} no navegador",
+    "openExternalTooltip": "Abrir no navegador",
+    "loadFailed": "Não foi possível carregar as issues. Atualize para tentar novamente.",
+    "githubDidNotSettle": "As issues do GitHub não terminaram de carregar.",
+    "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Tarefas",
+    "providerUnavailable": "{{provider}} não está conectado.",
+    "repoUnavailable": "O repositório de {{id}} não está mais no Orca.",
+    "chooseStateTitle": "Mover {{id}} para {{column}}",
+    "chooseStateDescription": "Vários estados do Linear correspondem a esta coluna. Escolha um:",
+    "cancel": "Cancelar",
+    "finishOpenMove": "Conclua primeiro a movimentação em aberto",
+    "source": "Meu quadro",
+    "contextSummary": "Atribuídas a você",
+    "contextSummaryTitle": "Issues atribuídas a você em todos os provedores conectados",
+    "noProviders": "Conecte um provedor de tarefas em Configurações → Tarefas",
+    "refresh": "Atualizar",
+    "dismissError": "Dispensar",
+    "settings": {
+      "statusNamePlaceholder": "Nome do status",
+      "labelPlaceholder": "Label",
+      "dropTargetTitle": "Status a aplicar ao soltar",
+      "columnLabel": "Coluna",
+      "removeRule": "Remover regra",
+      "addRule": "Adicionar regra",
+      "dropTargetPlaceholder": "Automático",
+      "providerJira": "Jira",
+      "providerLinear": "Linear",
+      "providerGitLab": "GitLab",
+      "providerGitHub": "GitHub",
+      "doneColumn": "Coluna concluída",
+      "title": "Quadro de tarefas",
+      "description": "Escolha em qual coluna do quadro cada status ou label de issue deve aparecer.",
+      "searchDescription": "Colunas do quadro e mapeamento de status para issues de todos os provedores.",
+      "help": "As colunas são os status do seu workspace; edite-as no quadro do workspace.",
+      "search": {
+        "board": "quadro de tarefas",
+        "columns": "colunas do quadro",
+        "mapping": "mapeamento de status",
+        "kanban": "kanban",
+        "done": "coluna concluída"
+      }
+    }
   }
 }

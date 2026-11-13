@@ -4,6 +4,7 @@ import type { GitHubTaskKind } from '../../../../shared/work-items/task-github-s
 import { buildGitHubRepoUrl } from '../../../../shared/github/repositories/links'
 import { getTaskSourceContextSummary } from '../task-source-context-summary'
 import { getGitHubProjectSourceSummary } from './task-page-source-context'
+import { useTranslate } from '@/i18n/use-translate'
 
 type TaskPageSourceDisplayInput = TaskPageLinearCreationStateModel & {
   activeGithubTaskKind: GitHubTaskKind
@@ -11,6 +12,7 @@ type TaskPageSourceDisplayInput = TaskPageLinearCreationStateModel & {
 
 /** The Tasks source claims (summary, repo link) come from the list's resolved sources once mode and kind are known. */
 export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInput>(model: Model) {
+  const t = useTranslate()
   const {
     taskSource,
     githubMode,
@@ -41,6 +43,15 @@ export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInpu
   const jiraSiteName = selectedJiraSite?.displayName ?? selectedJiraSite?.siteUrl ?? null
   // Why the catalog dep: it changes with the language, and the summary's own copy is translated too.
   const taskSourceContextSummary = useMemo(() => {
+    if (taskSource === 'orca') {
+      return {
+        label: t('taskBoard.contextSummary', 'Assigned to you'),
+        title: t(
+          'taskBoard.contextSummaryTitle',
+          'Issues assigned to you in every connected provider'
+        )
+      }
+    }
     const providerLabel =
       sourceOptions.find((source) => source.id === taskSource)?.label ?? taskSource
     if (taskSource === 'github' && githubMode === 'project') {
@@ -88,6 +99,7 @@ export function useTaskPageSourceDisplay<Model extends TaskPageSourceDisplayInpu
     linearWorkspaceName,
     selectedRepos.length,
     sourceOptions,
+    t,
     taskSource,
     taskSourceHostAvailability,
     taskSourceRepoContexts

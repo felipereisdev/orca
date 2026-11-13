@@ -12,12 +12,18 @@ import type { JiraIssue } from '../../../../shared/jira/jira-types'
 import { useAppStore } from '@/store'
 import { useShallow } from 'zustand/react/shallow'
 import { findTaskPageJiraIssue } from '@/components/task-page/jira/task-page-jira-cache-selectors'
+import { linearIssueTaskSourceContext } from '@/lib/work-items/linear/linear-linked-work-item'
+import {
+  closeTaskPageDetail,
+  taskDetailReturnFields
+} from '@/lib/work-items/task-page-detail-return'
 export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
   const {
     pageData,
     openTaskPage,
     linearTaskSourceContext,
     jiraTaskSourceContext,
+    taskSource,
     setDialogWorkItem
   } = model
   const linearDetailSourceContext =
@@ -143,14 +149,19 @@ export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
         {
           taskSource: 'linear',
           openLinearIssue: issue,
-          openLinearSourceContext: linearTaskSourceContext
+          // Why: the Orca board lists every workspace's issues; bind the detail to the issue's own, as start-workspace does.
+          openLinearSourceContext:
+            taskSource === 'orca'
+              ? linearIssueTaskSourceContext(issue, linearTaskSourceContext)
+              : linearTaskSourceContext,
+          ...taskDetailReturnFields(taskSource)
         },
         {
           recordTasksInteraction: false
         }
       )
     },
-    [linearTaskSourceContext, openTaskPage]
+    [linearTaskSourceContext, openTaskPage, taskSource]
   )
   const openRelatedLinearIssue = useCallback(
     (issue: LinearIssue) => {
@@ -171,20 +182,7 @@ export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
     }
     setDialogWorkItem(null)
     clearSelectedLinearIssue()
-    useAppStore.setState((s) => ({
-      taskPageData: {
-        ...s.taskPageData,
-        openGitHubWorkItem: undefined,
-        openGitHubSourceContext: undefined,
-        openGitHubInitialTab: undefined,
-        openGitLabWorkItem: undefined,
-        openGitLabSourceContext: undefined,
-        openLinearIssue: undefined,
-        openLinearSourceContext: undefined,
-        openJiraIssue: undefined,
-        openJiraSourceContext: undefined
-      }
-    }))
+    useAppStore.setState((s) => ({ taskPageData: closeTaskPageDetail(s.taskPageData) }))
   }, [clearSelectedLinearIssue, setDialogWorkItem])
   const [selectedJiraIssueKeyState, setSelectedJiraIssueKey] = useState<string | null>(null)
   const [selectedJiraIssueFallbackState, setSelectedJiraIssueFallback] = useState<JiraIssue | null>(
@@ -236,14 +234,15 @@ export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
         {
           taskSource: 'jira',
           openJiraIssue: issue,
-          openJiraSourceContext: jiraTaskSourceContext
+          openJiraSourceContext: jiraTaskSourceContext,
+          ...taskDetailReturnFields(taskSource)
         },
         {
           recordTasksInteraction: false
         }
       )
     },
-    [jiraTaskSourceContext, openTaskPage]
+    [jiraTaskSourceContext, openTaskPage, taskSource]
   )
 
   const nextModel = Object.assign(model, {

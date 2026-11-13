@@ -4,8 +4,7 @@ import type { LinearIssue } from '../../../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../../../shared/linear/workspace-types'
 import type { JiraIssue } from '../../../../shared/jira/jira-types'
 
-import { buildLinearWorkspaceSource } from '../../../../shared/new-workspace/workspace-source'
-import { getLinearIssueWorkspaceName } from '../../../../shared/workspace-name'
+import { buildLinearIssueComposerData } from '@/lib/work-items/linear/linear-linked-work-item'
 import { useAppStore } from '@/store'
 import { openLinearIssueWorkspaceOrStart } from '@/lib/work-items/linear/linear-issue-workspace-open'
 import { toast } from 'sonner'
@@ -60,14 +59,11 @@ export function useTaskPageComposerActions(model: TaskPageJiraListEffectsModel) 
     setLinearTeamRefreshNonce,
     setLinearTeamSelection
   } = model
-  // Linear string IDs need the provider-generic numeric placeholder 0.
+  // Why: bind the source to the issue's workspace; the board shows issues outside the selected one.
   const openComposerForLinearItem = useCallback(
     (issue: LinearIssue): void => {
-      const linkedWorkItem = buildLinearWorkspaceSource(issue)
       openModal('new-workspace-composer', {
-        linkedWorkItem,
-        taskSourceContext: linearTaskSourceContext,
-        prefilledName: getLinearIssueWorkspaceName(issue),
+        ...buildLinearIssueComposerData(issue, linearTaskSourceContext),
         telemetrySource: 'sidebar'
       })
     },

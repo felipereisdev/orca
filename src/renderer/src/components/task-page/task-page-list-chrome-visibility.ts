@@ -1,7 +1,7 @@
-import type { TaskProvider } from '../../../../shared/work-items/task-providers'
+import type { TaskSource } from '../../../../shared/work-items/task-source'
 
 export type TaskPageListChromeVisibilityState = {
-  taskSource: TaskProvider
+  taskSource: TaskSource
   hasGitHubDetail: boolean
   hasGitLabDetail: boolean
   hasJiraDetail: boolean
@@ -21,6 +21,8 @@ export function shouldHideTaskPageListChrome({
 }: TaskPageListChromeVisibilityState): boolean {
   // Selections survive provider switches; another provider’s retained detail must not hide the active list chrome.
   switch (taskSource) {
+    case 'orca':
+      return false
     case 'github':
       return hasGitHubDetail
     case 'gitlab':

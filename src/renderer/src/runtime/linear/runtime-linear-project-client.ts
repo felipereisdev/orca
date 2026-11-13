@@ -22,6 +22,7 @@ import {
   type LinearReadOptions
 } from './runtime-linear-client'
 import type { RowLessSource as RuntimeLinearSettings } from '../hosts/selection/default-creation-host'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 export async function linearListTeams(
   settings: RuntimeLinearSettings,
@@ -222,7 +223,14 @@ export async function linearTeamStates(
   teamId: string,
   workspaceId?: string | null
 ): Promise<LinearWorkflowState[]> {
-  const target = getLinearRuntimeTarget(settings)
+  return linearTeamStatesForTarget(getLinearRuntimeTarget(settings), teamId, workspaceId)
+}
+
+export async function linearTeamStatesForTarget(
+  target: RuntimeClientTarget,
+  teamId: string,
+  workspaceId?: string | null
+): Promise<LinearWorkflowState[]> {
   return target.kind === 'environment'
     ? callRuntimeRpc<LinearWorkflowState[]>(
         target,

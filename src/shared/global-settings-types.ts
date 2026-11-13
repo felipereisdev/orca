@@ -8,7 +8,7 @@ import type { GitHubProjectSettings } from './github/projects/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault/search/ai-vault-search-settings'
 import type { GitLabProjectSettings } from './gitlab-types'
-import type { TaskProvider } from './work-items/task-providers'
+import type { TaskProvider, TaskSource } from './work-items/task-source'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control/ai/settings/source-control-ai-settings-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
@@ -352,7 +352,7 @@ export type GlobalSettings = GlobalSettingsBase & {
   /** Default preset in the new-workspace GitHub task view. */
   defaultTaskViewPreset: TaskViewPresetId
   /** Persisted last-used task source so Tasks reopens to the same provider instead of defaulting to GitHub. */
-  defaultTaskSource: TaskProvider
+  defaultTaskSource: TaskSource
   /** Persisted visible task providers; hides unused providers from Tasks chrome and sidebar shortcuts. */
   visibleTaskProviders: TaskProvider[]
   /** Why: one-shot guard to make Jira visible for existing profiles once, without re-adding after a later opt-out. */

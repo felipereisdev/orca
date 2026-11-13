@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isTaskProvider } from '../work-items/task-providers'
+import { isTaskSource, type TaskSource } from '../work-items/task-source'
 import type { TaskProvider } from '../work-items/task-providers'
 import { isTuiAgent } from '../agent-launch/catalog/tui-agent-config'
 import { normalizeDisabledTuiAgents } from '../agent-launch/catalog/tui-agent-selection'
@@ -11,7 +12,12 @@ import { MACHINE_NAME_MAX_LENGTH } from '../machine-name'
 import { normalizePRBotAuthorOverrides } from '../source-control/review-comments/pr-bot-author-overrides'
 import { WorktreeVisibilityDefaultsUpdate } from './worktree-visibility-defaults-params'
 import { WorkspaceCleanupRulesParam } from './workspace-cleanup-policy-params'
+import { normalizeTaskBoardSettings } from '../task-board/task-board-settings'
 import { AGENT_CHAT_PERMISSION_MODES } from '../agent-launch/permissions/agent-chat-permission-mode'
+
+export const TaskSourceParam = z.custom<TaskSource>(isTaskSource, {
+  message: 'Unknown task source'
+})
 
 export const TaskProviderParam = z.custom<TaskProvider>(isTaskProvider, {
   message: 'Unknown task provider'
@@ -107,7 +113,7 @@ export const SettingsUpdate = z
       .unknown()
       .transform((value) => normalizeTuiAgentEnvRecord(value))
       .optional(),
-    defaultTaskSource: TaskProviderParam.optional(),
+    defaultTaskSource: TaskSourceParam.optional(),
     visibleTaskProviders: z.array(TaskProviderParam).optional(),
     defaultTaskViewPreset: z
       .enum(['issues', 'my-issues', 'prs', 'my-prs', 'review', 'all'])
@@ -132,7 +138,11 @@ export const SettingsUpdate = z
       .optional(),
     nativeChatAutoContinueAfterUsageLimit: z.boolean().optional(),
     nativeChatPermissionMode: z.enum(AGENT_CHAT_PERMISSION_MODES).optional(),
-    workspaceCleanupPolicy: WorkspaceCleanupRulesParam.optional()
+    workspaceCleanupPolicy: WorkspaceCleanupRulesParam.optional(),
+    taskBoard: z
+      .unknown()
+      .transform((value) => normalizeTaskBoardSettings(value))
+      .optional()
   })
   .strict()
   .default({})

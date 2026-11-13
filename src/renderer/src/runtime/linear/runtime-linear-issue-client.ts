@@ -8,6 +8,7 @@ import {
   type LinearMutationResult
 } from './runtime-linear-client'
 import type { RowLessSource as RuntimeLinearSettings } from '../hosts/selection/default-creation-host'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 
 export async function linearCreateIssue(
   settings: RuntimeLinearSettings,
@@ -68,7 +69,15 @@ export async function linearUpdateIssue(
   updates: LinearIssueUpdate,
   workspaceId?: string | null
 ): Promise<LinearMutationResult> {
-  const target = getLinearRuntimeTarget(settings)
+  return linearUpdateIssueForTarget(getLinearRuntimeTarget(settings), id, updates, workspaceId)
+}
+
+export async function linearUpdateIssueForTarget(
+  target: RuntimeClientTarget,
+  id: string,
+  updates: LinearIssueUpdate,
+  workspaceId?: string | null
+): Promise<LinearMutationResult> {
   return target.kind === 'environment'
     ? callRuntimeRpc<LinearMutationResult>(
         target,

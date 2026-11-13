@@ -11,9 +11,12 @@ import { buildSelectedReposKey } from '@/components/task-page/task-page-work-ite
 import {
   normalizeVisibleTaskProviders,
   restoreAvailableDefaultTaskProvider,
-  resolveVisibleTaskProvider,
   type TaskProvider
 } from '../../../../shared/work-items/task-providers'
+import {
+  isTaskSourceVisible,
+  resolveVisibleTaskSource
+} from '../../../../shared/work-items/task-source'
 import {
   getSourceOptions,
   getGitHubModeButtons,
@@ -156,7 +159,7 @@ export function useTaskPageRepoSelection(model: TaskPageStoreBindingsModel) {
   const linearOrderOptions = getLinearOrderOptions()
   const linearDisplayPropertyOptions = getLinearDisplayProperties()
   const visibleSourceOptions = useMemo(
-    () => sourceOptions.filter((source) => visibleTaskProviders.includes(source.id)),
+    () => sourceOptions.filter((source) => isTaskSourceVisible(source.id, visibleTaskProviders)),
     [sourceOptions, visibleTaskProviders]
   )
   const hideTaskSource = useCallback(
@@ -167,7 +170,7 @@ export function useTaskPageRepoSelection(model: TaskPageStoreBindingsModel) {
       // Empty provider lists mean all, so hiding one source must leave another selected.
       const nextVisibleTaskProviders: TaskProvider[] =
         visibleWithoutProvider.length > 0 ? visibleWithoutProvider : ['github']
-      const nextDefaultTaskSource = resolveVisibleTaskProvider(
+      const nextDefaultTaskSource = resolveVisibleTaskSource(
         defaultTaskSource,
         nextVisibleTaskProviders
       )

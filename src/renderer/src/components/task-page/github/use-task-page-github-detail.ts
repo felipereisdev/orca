@@ -1,4 +1,5 @@
 import type { TaskPageGitHubListStateModel } from './use-task-page-github-list-state'
+import { taskDetailReturnFields } from '@/lib/work-items/task-page-detail-return'
 import { useAppStore } from '@/store/index'
 import { getWorkItemRepo } from '@/lib/work-items/work-item-repo-row'
 import { githubTaskBinding } from '@/lib/work-items/github/github-task-observation'
@@ -23,6 +24,7 @@ type TaskPageGitHubDetailInput = Pick<
   TaskPageGitHubListStateModel,
   | 'pageData'
   | 'openTaskPage'
+  | 'taskSource'
   | 'repos'
   | 'selectedRepos'
   | 'primaryRepo'
@@ -46,6 +48,7 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
   const {
     pageData,
     openTaskPage,
+    taskSource,
     repos,
     selectedRepos,
     primaryRepo,
@@ -147,10 +150,10 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
     }
     return getTaskPageRepoSourceContext(dialogRepo, 'github')
   }, [dialogRepo, dialogWorkItem, pageData.openGitHubSourceContext, pageData.openGitHubWorkItem])
+  // Why: board cards come from every Orca repo, not only the GitLab tab's selection.
   const gitlabDialogRepo = useMemo(
-    () =>
-      gitlabDialogItem ? (getWorkItemRepo(selectedRepos, gitlabDialogItem) ?? primaryRepo) : null,
-    [gitlabDialogItem, primaryRepo, selectedRepos]
+    () => (gitlabDialogItem ? (getWorkItemRepo(repos, gitlabDialogItem) ?? primaryRepo) : null),
+    [gitlabDialogItem, primaryRepo, repos]
   )
   const gitlabDialogSourceContext = useMemo(() => {
     if (!gitlabDialogItem) {
@@ -209,7 +212,8 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
             getWorkItemRepo(repos, item),
             'github'
           ),
-          openGitHubInitialTab: initialTab
+          openGitHubInitialTab: initialTab,
+          ...taskDetailReturnFields(taskSource)
         },
         {
           recordTasksInteraction: false
@@ -224,7 +228,8 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
       openTaskPage,
       pendingGithubScrollRestoreRef,
       repos,
-      taskListPositionRef
+      taskListPositionRef,
+      taskSource
     ]
   )
   const openGitLabDetailPage = useCallback(
@@ -238,14 +243,15 @@ export function useTaskPageGitHubDetail<Model extends TaskPageGitHubDetailInput>
             getWorkItemRepo(repos, item),
             'gitlab',
             item.projectRef
-          )
+          ),
+          ...taskDetailReturnFields(taskSource)
         },
         {
           recordTasksInteraction: false
         }
       )
     },
-    [openTaskPage, repos]
+    [openTaskPage, repos, taskSource]
   )
   return Object.assign(model, {
     githubTaskDrawerWorkItem,

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Github, Gitlab, LayoutGrid, List } from 'lucide-react'
+import { Github, Gitlab, KanbanSquare, LayoutGrid, List } from 'lucide-react'
 
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
@@ -17,7 +17,7 @@ import {
 import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
 import type { GitLabMRInvolvement } from '../../../../shared/gitlab-types'
 import type { GitHubPRStateChip, GitHubPRWhoChip } from './github/task-page-pr-chips'
-import type { TaskProvider } from '../../../../shared/work-items/task-providers'
+import type { TaskSource } from '../../../../shared/work-items/task-source'
 import type { TaskViewPresetId } from '../../../../shared/ui-chrome-types'
 
 export type GitLabTaskFilter = 'opened' | 'merged' | 'closed' | 'all'
@@ -32,7 +32,7 @@ export type TaskQueryPreset = {
 export type GitHubTaskKind = 'issues' | 'prs'
 
 export type SourceOption = {
-  id: TaskProvider
+  id: TaskSource
   label: string
   Icon: (props: { className?: string }) => React.JSX.Element
   disabled?: boolean
@@ -125,6 +125,11 @@ export const getGitHubPRWhoChips = createLocalizedCatalog(
 )
 
 export const getSourceOptions = createLocalizedCatalog((): SourceOption[] => [
+  {
+    id: 'orca',
+    label: translate('taskBoard.source', 'My board'),
+    Icon: ({ className }) => <KanbanSquare className={className} />
+  },
   {
     id: 'github',
     label: translate('auto.components.TaskPage.acef77f7ca', 'GitHub'),

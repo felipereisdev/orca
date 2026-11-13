@@ -19,6 +19,14 @@ export const getTasksPaneSearchKeywords = createLocalizedCatalog(() => [
   ...translateSearchKeyword('auto.components.settings.tasks.search.connect', 'connect')
 ])
 
+export const getTaskBoardSettingsSearchKeywords = createLocalizedCatalog(() => [
+  ...translateSearchKeyword('taskBoard.settings.search.board', 'task board'),
+  ...translateSearchKeyword('taskBoard.settings.search.columns', 'board columns'),
+  ...translateSearchKeyword('taskBoard.settings.search.mapping', 'status mapping'),
+  ...translateSearchKeyword('taskBoard.settings.search.kanban', 'kanban'),
+  ...translateSearchKeyword('taskBoard.settings.search.done', 'done column')
+])
+
 export const getTasksPaneSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.tasks.search.12d2fdff3c', 'Task providers'),
@@ -27,5 +35,13 @@ export const getTasksPaneSearchEntries = createLocalizedCatalog(() => [
       'Connect task providers, install the Linear agent skill, and choose what appears in Tasks.'
     ),
     keywords: getTasksPaneSearchKeywords()
+  },
+  {
+    title: translate('taskBoard.settings.title', 'Task board'),
+    description: translate(
+      'taskBoard.settings.searchDescription',
+      'Board columns and status mapping for issues across providers.'
+    ),
+    keywords: getTaskBoardSettingsSearchKeywords()
   }
 ])

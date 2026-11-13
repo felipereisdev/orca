@@ -69,6 +69,11 @@ export function getLinearSourceScope(source: RowLessSource): LinearReadScope {
   return buildLinearReadScope(source, rowLessSourceTarget(source))
 }
 
+/** For a caller that already resolved its Linear host, without a task source. */
+export function getLinearTargetScope(target: RuntimeClientTarget): LinearReadScope {
+  return buildLinearReadScope(target, target)
+}
+
 export function getLinearTaskSourceScope(source: TaskSourceContext): LinearReadScope {
   return buildLinearReadScope(source, taskSourceRuntimeTarget(source))
 }
