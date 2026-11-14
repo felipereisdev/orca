@@ -1,10 +1,7 @@
 import { memo } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { GitBranch } from 'lucide-react-native'
-import type {
-  TaskBoardProgress,
-  TaskBoardWireCard
-} from '../../../../src/shared/task-board/task-board-wire-types'
+import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
 import { TaskProviderLogo } from '../../components/TaskProviderLogo'
 import type { Translate } from '../../i18n/mobile-i18n'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
@@ -13,8 +10,12 @@ import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
 import { getLinearPriorityLabel } from '../hosted-review/mobile-tasks-hosted-review'
 import { formatUpdatedAt } from '../item-detail/mobile-tasks-item-mapping'
 import { cardStyles as styles } from './mobile-task-board-card-styles'
-
-type StepState = 'done' | 'failed' | 'pending'
+import {
+  taskBoardChecksLabel,
+  taskBoardProgressSteps,
+  taskBoardReviewLabel,
+  taskBoardUnreadLabel
+} from './task-board-progress'
 
 // The host labels Linear priority in English; relabel from the number, as the Linear list does.
 function cardPriorityLabel(card: TaskBoardWireCard): string | undefined {
@@ -25,23 +26,13 @@ function cardPriorityLabel(card: TaskBoardWireCard): string | undefined {
   return typeof priority === 'number' && priority > 0 ? getLinearPriorityLabel(priority) : undefined
 }
 
-function progressSteps(progress: TaskBoardProgress | null | undefined): StepState[] {
-  if (!progress) {
-    return ['pending', 'pending', 'pending', 'pending']
-  }
-  return [
-    'done',
-    (progress.commitsAhead ?? 0) > 0 ? 'done' : 'pending',
-    progress.review ? 'done' : 'pending',
-    progress.checks === 'success' ? 'done' : progress.checks === 'failure' ? 'failed' : 'pending'
-  ]
-}
-
-// Jira and Linear work can land on either forge, so the review's own URL decides PR or MR.
-function reviewLabel(card: TaskBoardWireCard, t: Translate): string {
-  const url = card.progress?.review?.url
-  const pullRequest = url ? url.includes('/pull/') : card.provider === 'github'
-  return pullRequest ? t('tasks.board.card.stepPr', 'PR') : t('tasks.board.card.stepMr', 'MR')
+// Read at render: the palette changes with the color scheme.
+function checksColor(checks: 'success' | 'failure' | 'pending'): string {
+  return checks === 'success'
+    ? colors.statusGreen
+    : checks === 'failure'
+      ? colors.statusRed
+      : colors.statusAmber
 }
 
 function ChecksText({ card, review }: { card: TaskBoardWireCard; review: string }) {
@@ -50,56 +41,34 @@ function ChecksText({ card, review }: { card: TaskBoardWireCard; review: string 
   if (!progress) {
     return null
   }
-  switch (progress.checks) {
-    case 'success':
-      return (
-        <Text style={[styles.checks, { color: colors.statusGreen }]}>
-          {t('tasks.board.card.checksPassed', 'Checks passed')}
-        </Text>
-      )
-    case 'failure':
-      return (
-        <Text style={[styles.checks, { color: colors.statusRed }]}>
-          {t('tasks.board.card.checksFailed', 'Checks failed')}
-        </Text>
-      )
-    case 'pending':
-      return (
-        <Text style={[styles.checks, { color: colors.statusAmber }]}>
-          {t('tasks.board.card.checksRunning', 'Checks running')}
-        </Text>
-      )
-    case 'none':
-      return progress.review ? null : (
-        <Text style={[styles.checks, { color: colors.textMuted }]}>
-          {t('tasks.board.card.noReview', 'No {{review}} yet', { review })}
-        </Text>
-      )
+  if (progress.checks === 'none') {
+    return progress.review ? null : (
+      <Text style={[styles.checks, { color: colors.textMuted }]}>
+        {t('tasks.board.card.noReview', 'No {{review}} yet', { review })}
+      </Text>
+    )
   }
+  return (
+    <Text style={[styles.checks, { color: checksColor(progress.checks) }]}>
+      {taskBoardChecksLabel(progress.checks, t)}
+    </Text>
+  )
 }
 
 /** Workspace → commits → review → checks, then the branch and how its checks went. */
 function CardProgress({ card }: { card: TaskBoardWireCard }) {
   const t = useMobileTranslation()
-  const review = reviewLabel(card, t)
-  const steps = progressSteps(card.progress)
+  const review = taskBoardReviewLabel(card.provider, card.progress, t)
+  const steps = taskBoardProgressSteps(card.progress)
   const labels = [
     t('tasks.board.card.stepWorkspace', 'Workspace'),
     t('tasks.board.card.stepCommits', 'Commits'),
     review,
     t('tasks.board.card.stepChecks', 'Checks')
   ]
-  const done = steps.filter((step) => step === 'done').length
   return (
     <>
-      <View
-        style={styles.steps}
-        accessible
-        accessibilityLabel={t('tasks.board.card.stepsDone', '{{done}} of {{total}} steps done', {
-          done,
-          total: steps.length
-        })}
-      >
+      <View style={styles.steps}>
         {steps.map((step, index) => (
           <View key={labels[index]} style={styles.step}>
             <View
@@ -133,12 +102,6 @@ function CardProgress({ card }: { card: TaskBoardWireCard }) {
   )
 }
 
-function unreadLabel(count: number, t: Translate): string {
-  return count === 1
-    ? t('tasks.board.card.unread_one', '{{count}} new', { count })
-    : t('tasks.board.card.unread_other', '{{count}} new', { count })
-}
-
 /** The newest comment, with how many the user has not seen yet. */
 function CardComment({ card }: { card: TaskBoardWireCard }) {
   const t = useMobileTranslation()
@@ -167,9 +130,31 @@ function CardComment({ card }: { card: TaskBoardWireCard }) {
       ) : (
         <View style={styles.commentBody} />
       )}
-      {unread > 0 ? <Text style={styles.unread}>{unreadLabel(unread, t)}</Text> : null}
+      {unread > 0 ? <Text style={styles.unread}>{taskBoardUnreadLabel(unread, t)}</Text> : null}
     </View>
   )
+}
+
+// The card is one button to a screen reader, so its label carries what the drawn progress shows.
+function cardAccessibilityLabel(card: TaskBoardWireCard, started: boolean, t: Translate): string {
+  const parts = [card.displayId, card.title]
+  if (started) {
+    const steps = taskBoardProgressSteps(card.progress)
+    parts.push(
+      t('tasks.board.card.stepsDone', '{{done}} of {{total}} steps done', {
+        done: steps.filter((step) => step === 'done').length,
+        total: steps.length
+      })
+    )
+    const checks = card.progress ? taskBoardChecksLabel(card.progress.checks, t) : null
+    if (checks) {
+      parts.push(checks)
+    }
+    if ((card.unreadComments ?? 0) > 0) {
+      parts.push(taskBoardUnreadLabel(card.unreadComments ?? 0, t))
+    }
+  }
+  return parts.join(', ')
 }
 
 type Props = {
@@ -188,6 +173,7 @@ export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
   onMove
 }: Props) {
   useMobileColorScheme()
+  const t = useMobileTranslation()
   const priority = cardPriorityLabel(card)
   const updated = formatUpdatedAt(card.updatedAt)
   return (
@@ -195,7 +181,14 @@ export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
       onPress={() => onOpen(card)}
       onLongPress={() => onMove(card)}
       accessibilityRole="button"
-      accessibilityLabel={`${card.displayId}, ${card.title}`}
+      accessibilityLabel={cardAccessibilityLabel(card, started, t)}
+      // A long press is out of reach for a screen reader; the move is its own action.
+      accessibilityActions={[{ name: 'move', label: t('tasks.board.card.move', 'Move') }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'move') {
+          onMove(card)
+        }
+      }}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.header}>

@@ -3,7 +3,6 @@ import { Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams } from 'expo-router'
 import { ChevronLeft, List, RefreshCw, SlidersHorizontal } from 'lucide-react-native'
-import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
 import { HostOfflineBanner, useHostOfflineBanner } from '../../components/HostOfflineBanner'
 import { MobileSegmentedControl } from '../../components/MobileSegmentedControl'
 import { FilterChip } from '../../components/nav-bar/FilterChip'
@@ -28,6 +27,7 @@ import { useForceReconnect, useHostClient } from '../../transport/connection/hos
 import { mobileTaskListsHref } from '../mobile-task-navigation'
 import { MobileTasksHostSubtitle } from '../screen/mobile-tasks-host-subtitle'
 import { MobileTaskBoardBody } from './MobileTaskBoardBody'
+import { MobileTaskBoardCardSheets, type TaskBoardSheet } from './MobileTaskBoardCardSheets'
 import { MobileTaskBoardFilterSheet } from './MobileTaskBoardFilterSheet'
 import {
   NO_TASK_BOARD_FILTER,
@@ -36,9 +36,6 @@ import {
   type TaskBoardFilter
 } from './task-board-stages'
 import { useTaskBoard } from './use-task-board'
-
-// The detail drawer and move sheet (Task 11) take these presses over.
-function ignoreCardPress(_card: TaskBoardWireCard): void {}
 
 /** My board: the host's Kanban of issues assigned to the user, one stage at a time. */
 export function MobileTaskBoardScreen() {
@@ -56,6 +53,7 @@ export function MobileTaskBoardScreen() {
   const [filter, setFilter] = useState<TaskBoardFilter>(NO_TASK_BOARD_FILTER)
   const [stageId, setStageId] = useState<string | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [sheet, setSheet] = useState<TaskBoardSheet | null>(null)
 
   const verdict = classifyConnection({ state: connState, ...connectionInputs })
   const reconnect = hostId && forceReconnect ? () => void forceReconnect(hostId) : null
@@ -180,17 +178,28 @@ export function MobileTaskBoardScreen() {
           ) : null
         }
         bottomInset={insets.bottom}
-        onOpenCard={ignoreCardPress}
-        onMoveCard={ignoreCardPress}
+        onOpenCard={(card) => setSheet({ kind: 'detail', card })}
+        onMoveCard={(card) => setSheet({ kind: 'move', card })}
       />
       {board ? (
-        <MobileTaskBoardFilterSheet
-          visible={filterOpen}
-          onClose={() => setFilterOpen(false)}
-          board={board}
-          filter={filter}
-          onChange={setFilter}
-        />
+        <>
+          <MobileTaskBoardFilterSheet
+            visible={filterOpen}
+            onClose={() => setFilterOpen(false)}
+            board={board}
+            filter={filter}
+            onChange={setFilter}
+          />
+          <MobileTaskBoardCardSheets
+            hostId={hostId}
+            client={client}
+            view={view}
+            board={board}
+            stages={stages}
+            sheet={sheet}
+            onSheet={setSheet}
+          />
+        </>
       ) : null}
     </SafeAreaView>
   )

@@ -111,18 +111,21 @@ export async function addTaskBoardComment(
   return taskBoardCommentAdd.interpret(reply)
 }
 
-/** `newest`: the newest comment the drawer rendered for the card, never one it only fetched. */
+/**
+ * `newest`: the newest comment the drawer rendered for the card, never one it only fetched.
+ * False when the host refused the marker, so the card keeps its unread count.
+ */
 export async function markTaskBoardSeen(
   client: RpcClient,
   ref: TaskBoardCardRef,
   newest: { at: string; id: string }
-): Promise<void> {
+): Promise<boolean> {
   const reply = await taskBoardSeenMark.request(
     client,
     { ref, at: newest.at, id: newest.id },
     { timeoutMs: READ_TIMEOUT_MS }
   )
-  taskBoardSeenMark.interpret(reply)
+  return taskBoardSeenMark.interpret(reply).accepted
 }
 
 export async function moveTaskBoardCard(
