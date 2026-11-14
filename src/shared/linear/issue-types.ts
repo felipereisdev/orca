@@ -48,6 +48,8 @@ export type LinearComment = {
   body: string
   createdAt: string
   user?: {
+    /** Absent from older hosts; compared with the viewer id to find the user's own comments. */
+    id?: string
     displayName: string
     avatarUrl?: string
   }

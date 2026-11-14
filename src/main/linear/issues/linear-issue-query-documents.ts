@@ -240,6 +240,7 @@ export const ISSUE_COMMENTS_QUERY = `
           body
           createdAt
           user {
+            id
             displayName
             avatarUrl
           }
@@ -284,7 +285,11 @@ export type LinearIssueCommentsResponse = {
             id: string
             body?: string | null
             createdAt?: string | null
-            user?: { displayName?: string | null; avatarUrl?: string | null } | null
+            user?: {
+              id?: string | null
+              displayName?: string | null
+              avatarUrl?: string | null
+            } | null
           }[]
         | null
     } | null

@@ -251,12 +251,17 @@ async function readAttachmentWriteRecord(
   return attachment ? mapRawAttachmentWriteRecord(attachment) : null
 }
 
+/** `strict` rethrows read failures so callers can tell a failed read from an issue without comments. */
 export async function getIssueComments(
   issueId: string,
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  strict = false
 ): Promise<LinearComment[]> {
   const entry = getClients(workspaceId)[0]
   if (!entry) {
+    if (strict) {
+      throw new Error('Not connected to Linear')
+    }
     return []
   }
 
@@ -273,6 +278,7 @@ export async function getIssueComments(
       createdAt: node.createdAt ?? '',
       user: node.user
         ? {
+            ...(node.user.id ? { id: node.user.id } : {}),
             displayName: node.user.displayName ?? '',
             avatarUrl: node.user.avatarUrl ?? undefined
           }
@@ -283,6 +289,9 @@ export async function getIssueComments(
   } catch (error) {
     if (isAuthError(error)) {
       clearToken(entry.workspace.id)
+      throw error
+    }
+    if (strict) {
       throw error
     }
     console.warn('[linear] getIssueComments failed:', error)
