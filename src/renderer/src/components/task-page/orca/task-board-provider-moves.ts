@@ -13,15 +13,14 @@ import {
 } from '@/components/jira-issue-mutation-queue'
 import { loadTaskPageJiraIssueTransitions } from '@/components/task-page/jira/task-page-jira-board-transitions'
 import { applyJiraBoardMove } from '@/components/task-page/jira/task-page-jira-board-move'
-import {
-  resolveJiraTaskBoardTarget,
-  toJiraTaskBoardCard
-} from '@/lib/work-items/task-board/adapters/jira-task-board-adapter'
-import {
-  resolveLinearTaskBoardTarget,
-  toLinearTaskBoardCard
-} from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
+import { resolveJiraTaskBoardTarget } from '@/lib/work-items/task-board/adapters/jira-task-board-adapter'
+import { resolveLinearTaskBoardTarget } from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
+import { getLinearPriorityLabel } from '@/components/task-page/task-page-localized-options'
 import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import {
+  toJiraTaskBoardCard,
+  toLinearTaskBoardCard
+} from '../../../../../shared/task-board/task-board-provider-cards'
 import {
   selectJiraMoveTransitions,
   selectLinearMoveStates
@@ -187,5 +186,5 @@ export async function applyLinearTaskBoardMove(
     state: { name: state.name, type: state.type, color: state.color },
     updatedAt: new Date().toISOString()
   }
-  return confirmedTaskBoardCard(card, toLinearTaskBoardCard(confirmed))
+  return confirmedTaskBoardCard(card, toLinearTaskBoardCard(confirmed, getLinearPriorityLabel))
 }

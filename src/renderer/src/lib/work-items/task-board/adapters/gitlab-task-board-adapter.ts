@@ -6,10 +6,8 @@ import type { GitLabWorkItem } from '../../../../../../shared/gitlab-types'
 import { mapSettledWithConcurrency } from '../../../../../../shared/map-with-concurrency'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
-import {
-  openClosedStatusCategory,
-  type TaskBoardCard
-} from '../../../../../../shared/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../../shared/task-board/task-board-card'
+import { toGitLabTaskBoardCard } from '../../../../../../shared/task-board/task-board-provider-cards'
 import {
   disconnectedTaskBoardResult,
   isWithinDoneWindow,
@@ -21,22 +19,6 @@ import { getTaskBoardRepos } from './task-board-provider-scope'
 const GITLAB_FETCH_CONCURRENCY = 6
 const OPEN_LIMIT = 50
 const CLOSED_LIMIT = 20
-
-export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): TaskBoardCard {
-  return {
-    refKey: `gitlab:${item.repoHostId ?? ''}:${item.projectRef?.path ?? item.repoId}:${item.number}`,
-    provider: 'gitlab',
-    displayId: `#${item.number}`,
-    title: item.title,
-    url: item.url,
-    projectLabel: repoLabel,
-    statusName: item.state,
-    category: openClosedStatusCategory(item.state),
-    labels: item.labels,
-    updatedAt: item.updatedAt,
-    source: { provider: 'gitlab', item }
-  }
-}
 
 type RepoIssues = { items: GitLabWorkItem[]; error?: string; notGitLab?: true }
 

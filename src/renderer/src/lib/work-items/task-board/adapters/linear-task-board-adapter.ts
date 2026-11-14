@@ -5,10 +5,7 @@ import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-clien
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { LinearIssue } from '../../../../../../shared/linear/issue-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import {
-  linearStatusCategory,
-  type TaskBoardCard
-} from '../../../../../../shared/task-board/task-board-card'
+import { toLinearTaskBoardCard } from '../../../../../../shared/task-board/task-board-provider-cards'
 import {
   disconnectedTaskBoardResult,
   isWithinDoneWindow,
@@ -18,23 +15,6 @@ import { isTaskBoardProviderVisible } from './task-board-provider-scope'
 
 const ASSIGNED_LIMIT = 100
 const COMPLETED_LIMIT = 100
-
-export function toLinearTaskBoardCard(issue: LinearIssue): TaskBoardCard {
-  return {
-    refKey: `linear:${issue.workspaceId ?? ''}:${issue.id}`,
-    provider: 'linear',
-    displayId: issue.identifier,
-    title: issue.title,
-    url: issue.url,
-    projectLabel: issue.project?.name ?? issue.team.key,
-    statusName: issue.state.name,
-    category: linearStatusCategory(issue.state.type),
-    labels: issue.labels,
-    ...(issue.priority > 0 ? { priorityLabel: getLinearPriorityLabel(issue.priority) } : {}),
-    updatedAt: issue.updatedAt,
-    source: { provider: 'linear', item: issue }
-  }
-}
 
 /** Where the board reads and writes Linear for the Tasks page's account-backed host. */
 export function resolveLinearTaskBoardTarget(
@@ -65,11 +45,10 @@ async function readLinearCards(
     linearListIssues(target, 'completed', COMPLETED_LIMIT, 'all')
   ])
   const now = new Date()
+  const toCard = (issue: LinearIssue) => toLinearTaskBoardCard(issue, getLinearPriorityLabel)
   const cards = [
-    ...assigned.items.map(toLinearTaskBoardCard),
-    ...completed.items
-      .filter((issue) => isWithinDoneWindow(issue.updatedAt, now))
-      .map(toLinearTaskBoardCard)
+    ...assigned.items.map(toCard),
+    ...completed.items.filter((issue) => isWithinDoneWindow(issue.updatedAt, now)).map(toCard)
   ].filter((card) => card.category !== 'excluded')
   const workspaceError = [...(assigned.errors ?? []), ...(completed.errors ?? [])][0]
   if (workspaceError && assigned.items.length + completed.items.length === 0) {

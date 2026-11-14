@@ -6,11 +6,7 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
 import { buildJiraPresetJql } from '../../../../../../shared/jira/jira-preset-jql'
 import { resolveJiraSourceHostId } from '../../../../../../shared/jira/jira-source-host'
-import type { JiraIssue } from '../../../../../../shared/jira/jira-types'
-import {
-  jiraStatusCategory,
-  type TaskBoardCard
-} from '../../../../../../shared/task-board/task-board-card'
+import { toJiraTaskBoardCard } from '../../../../../../shared/task-board/task-board-provider-cards'
 import {
   disconnectedTaskBoardResult,
   type TaskBoardProviderResult
@@ -22,26 +18,6 @@ const ASSIGNED_LIMIT = 100
 const DONE_LIMIT = 50
 const DONE_JQL =
   'assignee = currentUser() AND statusCategory = Done AND updated >= -14d ORDER BY updated DESC'
-
-export function toJiraTaskBoardCard(issue: JiraIssue, showSiteName = false): TaskBoardCard {
-  return {
-    refKey: `jira:${issue.siteId ?? ''}:${issue.key}`,
-    provider: 'jira',
-    displayId: issue.key,
-    title: issue.title,
-    url: issue.url,
-    projectLabel:
-      showSiteName && issue.siteName
-        ? `${issue.project.key} · ${issue.siteName}`
-        : issue.project.key,
-    statusName: issue.status.name,
-    category: jiraStatusCategory(issue.status.categoryKey),
-    labels: issue.labels,
-    ...(issue.priority?.name ? { priorityLabel: issue.priority.name } : {}),
-    updatedAt: issue.updatedAt,
-    source: { provider: 'jira', item: issue }
-  }
-}
 
 /** Where the board reads and writes Jira for the Tasks page's account-backed host. */
 export function resolveJiraTaskBoardTarget(

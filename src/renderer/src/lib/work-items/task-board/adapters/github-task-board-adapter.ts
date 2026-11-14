@@ -1,14 +1,10 @@
 import { failedTaskBoardResult } from './task-board-failed-result'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import type { GitHubWorkItem } from '../../../../../../shared/github/work-items/work-item-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { TASK_BOARD_DONE_WINDOW_DAYS } from '../../../../../../shared/task-board/task-board-settings'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
-import {
-  openClosedStatusCategory,
-  type TaskBoardCard
-} from '../../../../../../shared/task-board/task-board-card'
+import { toGitHubTaskBoardCard } from '../../../../../../shared/task-board/task-board-provider-cards'
 import {
   disconnectedTaskBoardResult,
   isWithinDoneWindow,
@@ -28,22 +24,6 @@ const DAY_MS = 24 * 60 * 60 * 1000
 function closedQuery(now: Date): string {
   const since = new Date(now.getTime() - TASK_BOARD_DONE_WINDOW_DAYS * DAY_MS)
   return `${CLOSED_QUERY} updated:>=${since.toISOString().slice(0, 10)}`
-}
-
-export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): TaskBoardCard {
-  return {
-    refKey: `github:${item.repoHostId ?? ''}:${item.repoId}:${item.number}`,
-    provider: 'github',
-    displayId: `#${item.number}`,
-    title: item.title,
-    url: item.url,
-    projectLabel: repoLabel,
-    statusName: item.state,
-    category: openClosedStatusCategory(item.state),
-    labels: item.labels,
-    updatedAt: item.updatedAt,
-    source: { provider: 'github', item }
-  }
 }
 
 /** The repo arguments the board reads and writes a repo's GitHub issues with. */

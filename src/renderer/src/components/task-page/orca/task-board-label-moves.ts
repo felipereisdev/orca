@@ -6,16 +6,14 @@ import {
   isTrackedEdit
 } from '@/components/github-item-dialog/edit-item-fields/gh-edit-task-record'
 import { assertTaskPageGitHubDialogStateAuthority } from '@/components/task-page/github/task-page-github-dialog-state-authority'
-import {
-  gitHubTaskBoardRepoArgs,
-  toGitHubTaskBoardCard
-} from '@/lib/work-items/task-board/adapters/github-task-board-adapter'
-import {
-  gitLabTaskBoardRepoSelector,
-  toGitLabTaskBoardCard
-} from '@/lib/work-items/task-board/adapters/gitlab-task-board-adapter'
+import { gitHubTaskBoardRepoArgs } from '@/lib/work-items/task-board/adapters/github-task-board-adapter'
+import { gitLabTaskBoardRepoSelector } from '@/lib/work-items/task-board/adapters/gitlab-task-board-adapter'
 import { findTaskBoardRepo } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
 import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import {
+  toGitHubTaskBoardCard,
+  toGitLabTaskBoardCard
+} from '../../../../../shared/task-board/task-board-provider-cards'
 import { normalizeTaskBoardMatch } from '../../../../../shared/task-board/task-board-columns'
 import {
   resolveLabelProviderMove,
