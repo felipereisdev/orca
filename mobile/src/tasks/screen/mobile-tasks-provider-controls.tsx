@@ -1,15 +1,14 @@
 import type { ConnectionPresentationModel } from '../screen-state/use-mobile-tasks-connection-presentation'
 import { translate } from '../../i18n/mobile-i18n'
 import { ScrollView } from 'react-native'
-import { SlidersHorizontal, SquareKanban } from 'lucide-react-native'
+import { SlidersHorizontal } from 'lucide-react-native'
 import { styles } from '../mobile-tasks-legacy-styles'
 import { FilterChip } from '../../components/nav-bar/FilterChip'
 import { renderMobileTasksGitHubViewControls } from './mobile-tasks-github-view-controls'
 import { renderMobileTasksLinearViewControls } from '../providers/linear/mobile-tasks-linear-view-controls'
 import { renderMobileTasksJiraViewControls } from '../providers/jira/mobile-tasks-jira-view-controls'
 import { mobileTasksFilterCount } from './mobile-tasks-filter-sheet'
-import { saveTasksSurface } from '../../storage/preferences'
-import { mobileTaskBoardHref } from '../mobile-task-navigation'
+import { MobileTasksBoardChip } from './mobile-tasks-board-chip'
 
 /** My board, the scope dropdowns, then the one Filter chip that opens Filter & display. */
 export function renderMobileTasksProviderControls(model: ConnectionPresentationModel) {
@@ -48,13 +47,7 @@ export function renderMobileTasksProviderControls(model: ConnectionPresentationM
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.toolbar}
     >
-      <FilterChip
-        label={translate('tasks.providerControls.myBoard', 'My board')}
-        icon={SquareKanban}
-        onPress={() => {
-          void saveTasksSurface('board').then(() => router.replace(mobileTaskBoardHref(hostId)))
-        }}
-      />
+      <MobileTasksBoardChip hostId={hostId} router={router} />
 
       {scoped ? (
         <>

@@ -227,22 +227,3 @@ export function saveTerminalSplitLayout(layout: TerminalSplitLayout): Promise<vo
   })
   return write
 }
-
-/** Which Tasks view opens: My board or the per-provider lists. */
-export type TasksSurface = 'board' | 'lists'
-const TASKS_SURFACE_KEY = 'orca:tasksSurface'
-
-export async function loadTasksSurface(): Promise<TasksSurface> {
-  try {
-    return (await AsyncStorage.getItem(TASKS_SURFACE_KEY)) === 'board' ? 'board' : 'lists'
-  } catch {
-    return 'lists'
-  }
-}
-
-// A refused write (an older app shell) only means Tasks opens on the lists next time.
-export function saveTasksSurface(surface: TasksSurface): Promise<void> {
-  return persistMirrored(TASKS_SURFACE_KEY, surface).catch((error: unknown) => {
-    console.warn('Tasks view could not be saved', error)
-  })
-}

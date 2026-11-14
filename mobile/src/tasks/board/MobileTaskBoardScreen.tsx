@@ -15,7 +15,7 @@ import { useHostDisplay } from '../../host-descriptors/use-host-display'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import { useRouteHandoff } from '../../navigation/route-handoff'
 import { useRefreshHint } from '../../query/refresh-hint'
-import { saveTasksSurface } from '../../storage/preferences'
+import { saveTasksSurface } from '../../storage/tasks-surface-preference'
 import { colors, radii, spacing } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
@@ -81,7 +81,7 @@ export function MobileTaskBoardScreen() {
   )
 
   const openLists = () => {
-    void saveTasksSurface('lists').then(() => router.replace(mobileTaskListsHref(hostId)))
+    void saveTasksSurface(hostId, 'lists').then(() => router.replace(mobileTaskListsHref(hostId)))
   }
 
   return (

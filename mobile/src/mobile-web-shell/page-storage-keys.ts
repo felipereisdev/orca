@@ -43,7 +43,7 @@ export const PAGE_STORAGE_EXACT_KEYS = [
   'orca:terminalLinkOpenMode',
   /** The split terminal's chosen direction. */
   'orca:terminalSplitLayout',
-  /** Whether Tasks opens on My board or the provider lists. */
+  /** The hosts whose Tasks opens on My board instead of the provider lists. */
   'orca:tasksSurface'
 ] as const
 

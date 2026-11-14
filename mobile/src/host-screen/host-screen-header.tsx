@@ -110,7 +110,9 @@ export function HostScreenHeader({
       disabled: disconnected,
       closeBeforePress: true,
       onPress: () =>
-        void mobileTasksEntryHref(hostId).then((target) => actions.navigateFromHostList(target))
+        void mobileTasksEntryHref(hostId, controller.hostCapabilities).then((target) =>
+          actions.navigateFromHostList(target)
+        )
     },
     {
       id: 'automations',
