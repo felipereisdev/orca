@@ -48,7 +48,6 @@ describe('readTaskBoardComments', () => {
 
     const comments = await readTaskBoardComments(
       { ref: { provider: 'jira', siteId: 'site-b', key: 'OPS-7' } },
-      { fresh: false },
       deps
     )
 
@@ -107,7 +106,6 @@ describe('readTaskBoardComments', () => {
           issueRepo: { owner: 'upstream', repo: 'app' }
         }
       },
-      { fresh: false },
       deps
     )
 

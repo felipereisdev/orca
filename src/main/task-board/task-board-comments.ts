@@ -52,6 +52,7 @@ async function readJira(
 ): Promise<TaskBoardComment[]> {
   const comments = await deps.jiraComments(ref.key, ref.siteId)
   // Each site has its own login, so only the issue's site's account is the user.
+  // Without a site id the issue's site is unknown, so any of the user's site accounts counts.
   const accountIds = new Set(
     deps
       .jiraSites()
@@ -108,7 +109,6 @@ async function readGitLab(
 
 async function readGitHub(
   ref: Extract<TaskBoardCardRef, { provider: 'github' }>,
-  fresh: boolean,
   deps: TaskBoardCommentDeps
 ): Promise<TaskBoardComment[]> {
   const repo = requireRepo(ref, deps)
@@ -120,8 +120,8 @@ async function readGitHub(
     deps.getLocalGitArgs(repo)[0] ?? {},
     repo.issueSourcePreference,
     ref.issueRepo ?? undefined,
-    // Canonical reads skip gh's cache and fail instead of collapsing to empty.
-    fresh
+    // Only canonical reads fail instead of collapsing to []; they also skip gh's cache, which the board's TTL bounds.
+    true
   )
   if (!details) {
     throw new Error(`GitHub issue #${ref.number} could not be read`)
@@ -132,7 +132,6 @@ async function readGitHub(
 /** The card's comments, oldest first, with `own` set for the user's account on the issue's source. */
 export async function readTaskBoardComments(
   card: Pick<TaskBoardWireCard, 'ref'>,
-  options: { fresh: boolean },
   deps: TaskBoardCommentDeps
 ): Promise<TaskBoardComment[]> {
   const { ref } = card
@@ -143,7 +142,7 @@ export async function readTaskBoardComments(
         ? await readLinear(ref, deps)
         : ref.provider === 'gitlab'
           ? await readGitLab(ref, deps)
-          : await readGitHub(ref, options.fresh, deps)
+          : await readGitHub(ref, deps)
   // An unparseable timestamp sorts first instead of poisoning the comparator with NaN.
   return comments.toSorted((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0))
 }

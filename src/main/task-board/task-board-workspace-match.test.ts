@@ -37,13 +37,41 @@ function workspace(id: string, at: string, siteId: string): TaskBoardWorkspaceCa
 }
 
 const siteAIssue: TaskBoardCardRef = { provider: 'jira', siteId: 'site-a', key: 'SGP2-1226' }
+const siteACard = {
+  ref: siteAIssue,
+  displayId: 'SGP2-1226',
+  url: 'https://a.atlassian.net/browse/SGP2-1226'
+}
 
 describe('findTaskBoardWorkspace', () => {
   it('picks the most recently active workspace among those linked on the card’s own site', () => {
-    const found = findTaskBoardWorkspace({ ref: siteAIssue, displayId: 'SGP2-1226' }, [
+    const found = findTaskBoardWorkspace(siteACard, [
       workspace('a-morning', '2026-11-14T10:00:00Z', 'site-a'),
       workspace('a-noon', '2026-11-14T12:00:00Z', 'site-a'),
       workspace('b-latest', '2026-11-14T13:00:00Z', 'site-b')
+    ])
+
+    expect(found?.worktreeId).toBe('a-noon')
+  })
+
+  it('does not let a newer link to the same key on another site’s URL win', () => {
+    // The Jira link builder stores only the issue URL, with no site id.
+    const urlOnly: TaskBoardWorkspaceCandidate = {
+      ...workspace('b-by-url', '2026-11-14T13:00:00Z', 'unused'),
+      attachments: [
+        {
+          provider: 'jira',
+          type: 'issue',
+          number: 0,
+          identifier: 'SGP2-1226',
+          url: 'https://b.atlassian.net/browse/SGP2-1226'
+        }
+      ]
+    }
+
+    const found = findTaskBoardWorkspace(siteACard, [
+      workspace('a-noon', '2026-11-14T12:00:00Z', 'site-a'),
+      urlOnly
     ])
 
     expect(found?.worktreeId).toBe('a-noon')
@@ -67,10 +95,7 @@ describe('findTaskBoardWorkspace', () => {
       updatedAt: 1
     }
 
-    const found = findTaskBoardWorkspace(
-      { ref: siteAIssue, displayId: 'SGP2-1226' },
-      taskBoardWorkspaceCandidates([], [folder])
-    )
+    const found = findTaskBoardWorkspace(siteACard, taskBoardWorkspaceCandidates([], [folder]))
 
     expect(found).toMatchObject({
       worktreeId: 'folder:notes',

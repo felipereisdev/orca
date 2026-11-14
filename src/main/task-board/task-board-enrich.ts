@@ -92,7 +92,7 @@ async function cachedComments(
   if (cached) {
     return cached
   }
-  const comments = await readTaskBoardComments(card, { fresh: ctx.fresh }, deps)
+  const comments = await readTaskBoardComments(card, deps)
   deps.caches.comments.set(card.refKey, comments)
   return comments
 }

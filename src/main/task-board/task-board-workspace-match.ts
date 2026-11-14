@@ -10,6 +10,10 @@ import type {
   TaskBoardWireCard
 } from '../../shared/task-board/task-board-wire-types'
 import { getWorkspaceAttachments } from '../../shared/workspace-attachments/workspace-attachments'
+import {
+  getProvenWorkspaceReferenceIdentity,
+  getWorkspaceReferenceIdentifier
+} from '../../shared/workspace-attachments/workspace-reference-identity'
 import type { WorkspaceAttachment, Worktree } from '../../shared/worktree/types'
 
 export type TaskBoardWorkspaceCandidate = {
@@ -55,7 +59,7 @@ function sameText(a: string, b: string): boolean {
 }
 
 function attachmentKey(item: WorkspaceAttachment): string | undefined {
-  return (item.identifier ?? item.linearIdentifier ?? item.jiraIdentifier)?.toUpperCase()
+  return getWorkspaceReferenceIdentifier(item)?.toUpperCase()
 }
 
 // A link that declares no account cannot prove a different one, so only a declared mismatch excludes it.
@@ -121,9 +125,22 @@ function matchesRepoIssue(
   return attachmentRepoId(item, workspace) === ref.repoId
 }
 
-function matchesCard(
+type BoardCard = Pick<TaskBoardWireCard, 'ref' | 'displayId' | 'url'>
+
+function cardReferenceIdentity(card: BoardCard): string | undefined {
+  const { ref } = card
+  return getProvenWorkspaceReferenceIdentity({
+    provider: ref.provider,
+    type: 'issue',
+    number: 'number' in ref ? ref.number : 0,
+    ...('number' in ref ? {} : { identifier: card.displayId }),
+    url: card.url
+  })
+}
+
+function matchesIssueAndScope(
   item: WorkspaceAttachment,
-  card: Pick<TaskBoardWireCard, 'ref' | 'displayId'>,
+  card: BoardCard,
   workspace: TaskBoardWorkspaceCandidate
 ): boolean {
   const { ref } = card
@@ -152,14 +169,31 @@ function matchesCard(
   }
 }
 
+function matchesCard(
+  item: WorkspaceAttachment,
+  card: BoardCard,
+  cardIdentity: string | undefined,
+  workspace: TaskBoardWorkspaceCandidate
+): boolean {
+  if (!matchesIssueAndScope(item, card, workspace)) {
+    return false
+  }
+  // Links usually store only the issue URL; one naming another site/repo is another issue.
+  const linkIdentity = getProvenWorkspaceReferenceIdentity(item)
+  return !linkIdentity || !cardIdentity || linkIdentity === cardIdentity
+}
+
 /** The most recently active workspace linked to the card's issue within the card's account scope. */
 export function findTaskBoardWorkspace(
-  card: Pick<TaskBoardWireCard, 'ref' | 'displayId'>,
+  card: BoardCard,
   workspaces: readonly TaskBoardWorkspaceCandidate[]
 ): TaskBoardWorkspaceCandidate | null {
+  const cardIdentity = cardReferenceIdentity(card)
   let best: TaskBoardWorkspaceCandidate | null = null
   for (const workspace of workspaces) {
-    const linked = workspace.attachments.some((item) => matchesCard(item, card, workspace))
+    const linked = workspace.attachments.some((item) =>
+      matchesCard(item, card, cardIdentity, workspace)
+    )
     if (linked && (!best || workspace.lastActivityAt > best.lastActivityAt)) {
       best = workspace
     }
