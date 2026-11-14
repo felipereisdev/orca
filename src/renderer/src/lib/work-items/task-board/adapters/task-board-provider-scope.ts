@@ -40,7 +40,7 @@ export function isTaskBoardProviderVisible(
 
 /**
  * One repo per project (host twins would duplicate cards), skipping hosts without the provider
- * CLI signed in. Empty when the provider is hidden.
+ * CLI installed. Empty when the provider is hidden.
  */
 export function getTaskBoardRepos(
   provider: 'github' | 'gitlab',
@@ -55,12 +55,13 @@ export function getTaskBoardRepos(
     const source = selected.has(repo.id) ? getTaskPageRepoSourceContext(repo, provider) : null
     return (
       source !== null &&
+      // Why: the auth probe misses working self-hosted logins; the provider tabs still read there.
       getRepoBackedProviderAvailability({
         provider,
         contexts: [source],
         preflightStatus: scope.preflightStatus,
         preflightReady: source.hostId === 'local' && scope.preflightStatusChecked
-      }).length === 0
+      }).every((availability) => availability.reason === 'missing-provider-auth')
     )
   })
 }
