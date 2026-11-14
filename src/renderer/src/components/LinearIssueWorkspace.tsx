@@ -19,6 +19,10 @@ import { LinearIssueWorkspaceHeader } from './linear-issue-workspace-header'
 import { LinearIssueWorkspaceSidebar } from './linear-issue-workspace-sidebar'
 import { defaultScopeSource } from '@/runtime/hosts/selection/default-creation-host'
 import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
+import {
+  useReportRenderedComments,
+  type OnTaskCommentsRendered
+} from '@/lib/work-items/task-board/task-board-rendered-comments'
 
 type LinearIssueWorkspaceProps = {
   issue: LinearIssue | null
@@ -28,6 +32,7 @@ type LinearIssueWorkspaceProps = {
   variant?: 'sheet' | 'page'
   backLabel?: string
   sourceContext?: TaskSourceContext | null
+  onCommentsRendered?: OnTaskCommentsRendered
 }
 
 type LinearIssueWorkspaceIssueProps = Omit<
@@ -48,7 +53,8 @@ function LinearIssueWorkspaceIssue({
   variant,
   backLabel,
   sourceContext,
-  requestKey
+  requestKey,
+  onCommentsRendered
 }: LinearIssueWorkspaceIssueProps): React.JSX.Element {
   const t = useTranslate()
   const settings = useAppStore((state) => state.settings)
@@ -60,6 +66,12 @@ function LinearIssueWorkspaceIssue({
     [allWorktrees, folderWorkspaces]
   )
   const detail = useLinearIssueWorkspaceDetail({ issue, providerSettings, requestKey })
+  useReportRenderedComments(
+    onCommentsRendered,
+    'linear',
+    detail.commentsLoading ? null : detail.displayed.url,
+    detail.commentsLoading ? null : detail.comments
+  )
   const attachedWorkspace = useMemo(
     () => findLinearIssueWorkspaceAttachment(attachmentWorkspaces, detail.displayed),
     [attachmentWorkspaces, detail.displayed]
@@ -163,7 +175,8 @@ export default function LinearIssueWorkspace({
   onClose,
   variant = 'sheet',
   backLabel = 'Back',
-  sourceContext
+  sourceContext,
+  onCommentsRendered
 }: LinearIssueWorkspaceProps): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
   if (!issue) {
@@ -186,6 +199,7 @@ export default function LinearIssueWorkspace({
       backLabel={backLabel}
       sourceContext={sourceContext}
       requestKey={requestKey}
+      onCommentsRendered={onCommentsRendered}
     />
   )
 }

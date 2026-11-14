@@ -18,6 +18,7 @@ import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
 import type { TaskBoardColumn, TaskBoardDropCheck } from './TaskBoard'
+import { TaskBoardCardActivity } from './TaskBoardCardActivity'
 
 const PROVIDER_ICONS: Record<TaskProvider, (props: { className?: string }) => React.JSX.Element> = {
   github: ({ className }) => <GitHubIcon className={className} />,
@@ -204,6 +205,7 @@ export function TaskBoardCardView({
           ) : null}
         </div>
       ) : null}
+      <TaskBoardCardActivity card={card} />
       <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-2xs text-muted-foreground">
         <span className="truncate text-3xs">{card.projectLabel}</span>
         <span className="shrink-0">{formatUpdatedAt(card.updatedAt)}</span>

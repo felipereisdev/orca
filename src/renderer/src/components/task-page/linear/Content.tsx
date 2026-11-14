@@ -1,5 +1,7 @@
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import LinearIssueWorkspace from '@/components/LinearIssueWorkspace'
+import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
+import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 import { LoaderCircle } from 'lucide-react'
 import { LinearIcon } from '@/components/task-page/task-page-localized-options'
 import { useTranslate } from '@/i18n/use-translate'
@@ -15,6 +17,10 @@ export function TaskPageLinearContent({
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
   const t = useTranslate()
+  // Only a detail opened from My board marks its comments seen on the board host.
+  const onCommentsRendered = useTaskBoardSeenMarker(
+    isOrcaTaskSource(model.pageData.detailReturnTaskSource)
+  )
   const {
     linearStatusReady,
     linearConnected,
@@ -42,6 +48,7 @@ export function TaskPageLinearContent({
       onOpenIssue={openRelatedLinearIssue}
       onClose={closeTaskDetailPage}
       sourceContext={linearDetailSourceContext}
+      onCommentsRendered={onCommentsRendered}
     />
   ) : !linearStatusReady ? (
     <div className="mt-4 flex items-center justify-center py-14">

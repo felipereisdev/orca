@@ -16,6 +16,8 @@ import { TaskPageJiraViewControls } from '@/components/task-page/jira/task-page-
 import { formatRelativeTime } from '../task-page-source-context'
 import { getJiraStatusTone } from '@/components/task-page/jira/task-page-jira-status-tone'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
+import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
+import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 import { TaskPageLinearContent } from '../linear/Content'
 import {
   ipcOrRuntimeTargetForHostId,
@@ -28,6 +30,10 @@ export function TaskPageJiraContent({
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
   const t = useTranslate()
+  // Only a detail opened from My board marks its comments seen on the board host.
+  const onCommentsRendered = useTaskBoardSeenMarker(
+    isOrcaTaskSource(model.pageData.detailReturnTaskSource)
+  )
   const {
     jiraStatus,
     jiraHasWorkspace,
@@ -247,6 +253,7 @@ export function TaskPageJiraContent({
           onUse={handleUseJiraItem}
           onClose={closeTaskDetailPage}
           sourceContext={jiraDetailSourceContext}
+          onCommentsRendered={onCommentsRendered}
         />
       </div>
     )

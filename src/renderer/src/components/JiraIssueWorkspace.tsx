@@ -28,18 +28,24 @@ import { enqueueJiraIssueMutation, jiraIssueRequestScope } from './jira-issue-mu
 import { useJiraIssueMutationState } from './use-jira-issue-mutation-state'
 import { useJiraIssueWorkspaceData } from './use-jira-issue-workspace-data'
 import { useJiraIssueCommentSubmission } from './use-jira-issue-comment-submission'
+import {
+  useReportRenderedComments,
+  type OnTaskCommentsRendered
+} from '@/lib/work-items/task-board/task-board-rendered-comments'
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   onUse: (issue: JiraIssue) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
+  onCommentsRendered?: OnTaskCommentsRendered
 }
 
 export default function JiraIssueWorkspace({
   issue,
   onUse,
   onClose,
-  sourceContext
+  sourceContext,
+  onCommentsRendered
 }: JiraIssueWorkspaceProps): React.JSX.Element {
   const t = useTranslate()
   const settings = useAppStore((s) => s.settings)
@@ -80,6 +86,14 @@ export default function JiraIssueWorkspace({
     titleDraft
   } = useJiraIssueWorkspaceData({ issue, owner, requestKey })
   const displayed = fullIssue ?? issue
+  // Until the hydration effect runs, `displayed` and `comments` can still be the previous issue's.
+  const commentsShown = !commentsLoading && displayed && displayed.key === issue?.key
+  useReportRenderedComments(
+    onCommentsRendered,
+    'jira',
+    commentsShown ? displayed.url : null,
+    commentsShown ? comments : null
+  )
   const siteId = displayed?.siteId ?? undefined
   const metadataKey = JSON.stringify([
     sourceContext ? getTaskSourceCacheScope(sourceContext) : owner,

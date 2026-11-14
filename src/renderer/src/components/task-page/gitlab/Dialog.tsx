@@ -1,5 +1,7 @@
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import GitLabItemDialog from '@/components/GitLabItemDialog'
+import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
+import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 export function TaskPageGitLabDialog({
   model
 }: {
@@ -14,6 +16,9 @@ export function TaskPageGitLabDialog({
     pageData,
     closeTaskDetailPage
   } = model
+  const onCommentsRendered = useTaskBoardSeenMarker(
+    isOrcaTaskSource(model.pageData.detailReturnTaskSource)
+  )
   // Why: a dialog opened from My board closes back to the board.
   const closeDialog = (): void => {
     if (pageData.detailReturnTaskSource) {
@@ -34,6 +39,7 @@ export function TaskPageGitLabDialog({
         handleUseGitLabItem(item)
       }}
       onClose={closeDialog}
+      onCommentsRendered={onCommentsRendered}
     />
   )
 }

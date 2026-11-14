@@ -118,7 +118,20 @@ export const cardsWithMoveError = defineFixture({
           makeCard('jira', 'APP-12', 'Migrate the settings schema', {
             category: 'in-progress',
             columnId: 'in-progress',
-            statusName: 'In Progress'
+            statusName: 'In Progress',
+            progress: {
+              worktreeId: 'wt-app-12',
+              branch: 'app-12-settings-schema',
+              commitsAhead: 3,
+              review: { number: 482, url: 'https://example.com/pr/482', state: 'open' },
+              checks: 'failure'
+            },
+            latestComment: {
+              author: 'Dana Lee',
+              at: new Date().toISOString(),
+              excerpt: 'Can we keep the old key readable for one release?'
+            },
+            unreadComments: 2
           }),
           makeCard('gitlab', '#46', 'Remove the legacy flag', {
             category: 'done',

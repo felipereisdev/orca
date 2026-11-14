@@ -1,3 +1,4 @@
+import type { OnTaskCommentsRendered } from '@/lib/work-items/task-board/task-board-rendered-comments'
 import type { GitHubAssignableUser } from '../../../../../shared/github/pull-requests/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/work-items/task-source-context'
@@ -35,6 +36,7 @@ export type GitHubItemDialogProps = {
     reviewRequests: GitHubAssignableUser[]
   ) => void
   onClose: () => void
+  onCommentsRendered?: OnTaskCommentsRendered
   /** Optional Project-origin context; when set, edits route via slug-addressed IPCs against the row's repo (slug routing wins for writes). */
   projectOrigin?: GitHubItemDialogProjectOrigin
 }

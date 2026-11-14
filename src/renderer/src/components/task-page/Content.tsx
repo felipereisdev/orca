@@ -8,6 +8,7 @@ import { TaskPageGitLabTodoList } from './gitlab/TodoList'
 import { TaskPageGitLabItemList } from './gitlab/ItemList'
 import { TaskPageJiraContent } from './jira/Content'
 import { TaskPageOrcaContent } from './orca/Content'
+import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
 import { isOrcaTaskSource } from '../../../../shared/work-items/task-source'
 export function TaskPageContent({
   model
@@ -15,6 +16,10 @@ export function TaskPageContent({
   model: TaskPageComposerActionsModel
 }): React.JSX.Element | null {
   const t = useTranslate()
+  // Only a detail opened from My board marks its comments seen on the board host.
+  const onCommentsRendered = useTaskBoardSeenMarker(
+    isOrcaTaskSource(model.pageData.detailReturnTaskSource)
+  )
   const {
     repoSelection,
     taskSource,
@@ -62,6 +67,7 @@ export function TaskPageContent({
         }}
         onReviewRequestsChange={handleDialogReviewRequestsChange}
         onClose={closeTaskDetailPage}
+        onCommentsRendered={onCommentsRendered}
       />
     )
   ) : taskSource === 'github' && githubMode === 'project' ? (

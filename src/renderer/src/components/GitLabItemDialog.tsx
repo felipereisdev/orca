@@ -14,6 +14,7 @@ import { useGitLabItemDialogState } from './gitlab-item-dialog/use-gitlab-item-d
 import { useGitLabPipelineActions } from './gitlab-item-dialog/use-gitlab-pipeline-actions'
 import { useGitLabPrimaryActions } from './gitlab-item-dialog/use-gitlab-primary-actions'
 import { useGitLabReviewActions } from './gitlab-item-dialog/use-gitlab-review-actions'
+import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
 
 export default function GitLabItemDialog({
   item,
@@ -21,7 +22,8 @@ export default function GitLabItemDialog({
   repoId,
   sourceContext,
   onClose,
-  onCreateWorkspace
+  onCreateWorkspace,
+  onCommentsRendered
 }: GitLabItemDialogProps) {
   const itemId = item?.id ?? null
   // Why: one owner for provider-scoped state — the target the selector routes to (task source, GitLab
@@ -53,6 +55,14 @@ export default function GitLabItemDialog({
   const updateCommentDraft = state.updateCommentDraft
 
   useGitLabItemDetailsEffect(item, repoSelector, state)
+  // `details` is dropped before paint when the item changes, so it is always the shown item's.
+  const shownDetails = item && !state.loading ? state.details : null
+  useReportRenderedComments(
+    onCommentsRendered,
+    'gitlab',
+    shownDetails && item ? item.url : null,
+    shownDetails?.comments ?? null
+  )
   useGitLabItemScopeResetEffect(detailsOwner, state)
 
   const handleRefresh = useCallback(() => {

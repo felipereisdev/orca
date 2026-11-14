@@ -17,6 +17,7 @@ import { GitHubItemDialogPRTabs } from './github-item-dialog-pr-tabs'
 import { GHEditSection } from '../edit-item-fields/gh-edit-section'
 import { useGitHubWorkItemDetails } from '../load-item-details/use-github-work-item-details'
 import { useGitHubItemDialogLinkCopy } from './use-github-item-dialog-link-copy'
+import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
 
 export default function GitHubItemDialog(props: GitHubItemDialogProps): React.JSX.Element {
   const { workItem, sourceContext } = props
@@ -41,7 +42,8 @@ function GitHubItemDialogItem({
   projectOrigin,
   onUse,
   onReviewRequestsChange,
-  onClose
+  onClose,
+  onCommentsRendered
 }: GitHubItemDialogProps): React.JSX.Element {
   const [localState, setLocalState] = useState<GitHubWorkItem['state']>(workItem?.state ?? 'open')
   const [localLabels, setLocalLabels] = useState<string[]>(workItem?.labels ?? [])
@@ -127,6 +129,13 @@ function GitHubItemDialogItem({
     onRefreshAccepted: (item: GitHubWorkItem) => setLocalLabels(item.labels),
     onReviewRequestsChange
   })
+  // The dialog is keyed by item, so `details` is always the shown item's.
+  useReportRenderedComments(
+    onCommentsRendered,
+    'github',
+    details && workItem ? workItem.url : null,
+    details?.comments ?? null
+  )
   const { linkCopied, setLinkCopyButtonRef, handleCopyWorkItemLink } =
     useGitHubItemDialogLinkCopy(workItem)
 

@@ -22,6 +22,17 @@ export function writeTaskBoardCards(
   boardsByAccountHost.set(accountHostId, state)
 }
 
+/** The board shows a card the user just read as read until its next list. */
+export function clearTaskBoardUnread(accountHostId: ExecutionHostId, refKey: string): void {
+  const board = boardsByAccountHost.get(accountHostId)
+  if (board) {
+    const cards = board.cards.map((card) =>
+      card.refKey === refKey && card.unreadComments ? { ...card, unreadComments: 0 } : card
+    )
+    boardsByAccountHost.set(accountHostId, { ...board, cards })
+  }
+}
+
 export function readTaskBoardLoaded(accountHostId: ExecutionHostId): TaskBoardLoad | undefined {
   return loadsByAccountHost.get(accountHostId)
 }

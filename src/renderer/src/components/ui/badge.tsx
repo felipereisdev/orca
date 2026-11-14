@@ -28,7 +28,9 @@ const badgeVariants = cva(
           'h-4 border-current/30 px-1.5 py-0 align-[1px] text-3xs font-semibold tracking-wider uppercase',
         /** A skill or file sitting inline in the chat message box, ringed while selected. */
         promptPill:
-          'max-w-full border-border bg-secondary px-1.5 py-0 align-baseline text-muted-foreground data-[selected=true]:ring-1 data-[selected=true]:ring-ring'
+          'max-w-full border-border bg-secondary px-1.5 py-0 align-baseline text-muted-foreground data-[selected=true]:ring-1 data-[selected=true]:ring-ring',
+        /** A count of unseen items at the end of a dense card line. */
+        count: 'h-4 min-w-4 bg-primary px-1.5 py-0 text-3xs text-primary-foreground'
       }
     },
     defaultVariants: {

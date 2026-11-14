@@ -22,6 +22,7 @@ import {
   readHiddenTaskBoardProviders,
   writeHiddenTaskBoardProviders
 } from './task-board-session-cache'
+import { rememberTaskBoardDetailCard } from './task-board-seen-marker'
 
 export function TaskPageOrcaContent({
   model
@@ -51,6 +52,7 @@ export function TaskPageOrcaContent({
   })
 
   const openCard = (card: TaskBoardWireCard): void => {
+    rememberTaskBoardDetailCard(accountBackedTaskSourceHostId, card)
     const { source } = card
     switch (source.provider) {
       case 'jira':
