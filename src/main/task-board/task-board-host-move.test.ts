@@ -49,6 +49,7 @@ describe('decideJiraMove', () => {
           name: 'Resolve',
           fields: {
             resolution: {
+              name: 'Resolution',
               required: true,
               options: [
                 { id: '10', name: 'Fixed' },
@@ -58,7 +59,12 @@ describe('decideJiraMove', () => {
             commentRequired: false
           }
         },
-        { id: '41', name: 'Close', fields: 'unsupported' }
+        {
+          id: '41',
+          name: 'Close',
+          fields: 'unsupported',
+          unsupportedFieldNames: ['Root cause']
+        }
       ]
     })
   })
@@ -93,7 +99,12 @@ describe('decideJiraMove', () => {
     ])
     expect(decideJiraMove([close], { fields: { comment: 'Done' } })).toEqual({
       status: 'unsupported-fields',
-      choice: { id: '41', name: 'Close', fields: 'unsupported' }
+      choice: {
+        id: '41',
+        name: 'Close',
+        fields: 'unsupported',
+        unsupportedFieldNames: ['Root cause']
+      }
     })
   })
 })

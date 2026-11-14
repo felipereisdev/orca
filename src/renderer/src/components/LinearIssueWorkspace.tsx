@@ -70,7 +70,8 @@ function LinearIssueWorkspaceIssue({
     onCommentsRendered,
     'linear',
     detail.commentsLoading ? null : detail.displayed.url,
-    detail.commentsLoading ? null : detail.comments
+    detail.commentsLoading ? null : detail.comments,
+    detail.isLocalComment
   )
   const attachedWorkspace = useMemo(
     () => findLinearIssueWorkspaceAttachment(attachmentWorkspaces, detail.displayed),

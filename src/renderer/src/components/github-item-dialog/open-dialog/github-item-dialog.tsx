@@ -19,6 +19,9 @@ import { useGitHubWorkItemDetails } from '../load-item-details/use-github-work-i
 import { useGitHubItemDialogLinkCopy } from './use-github-item-dialog-link-copy'
 import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
 
+const isViewerComment = (comment: { viewerDidAuthor?: boolean }): boolean =>
+  comment.viewerDidAuthor === true
+
 export default function GitHubItemDialog(props: GitHubItemDialogProps): React.JSX.Element {
   const { workItem, sourceContext } = props
   const key = [
@@ -134,7 +137,8 @@ function GitHubItemDialogItem({
     onCommentsRendered,
     'github',
     details && workItem ? workItem.url : null,
-    details?.comments ?? null
+    details?.comments ?? null,
+    isViewerComment
   )
   const { linkCopied, setLinkCopyButtonRef, handleCopyWorkItemLink } =
     useGitHubItemDialogLinkCopy(workItem)

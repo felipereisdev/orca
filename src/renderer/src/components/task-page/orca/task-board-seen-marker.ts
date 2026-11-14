@@ -51,13 +51,15 @@ export function useTaskBoardSeenMarker(fromBoard: boolean): OnTaskCommentsRender
       return
     }
     markedRef.current = key
-    clearTaskBoardUnread(opened.accountHostId, opened.card.refKey)
-    // Best effort: a failed mark leaves the comments unread, and the next render tries again.
-    void markTaskBoardSeen(target, opened.card.ref, newest).catch(() => {
-      if (markedRef.current === key) {
-        markedRef.current = null
+    // Best effort: a failed mark leaves the card unread on the board, and the next render tries again.
+    void markTaskBoardSeen(target, opened.card.ref, newest).then(
+      () => clearTaskBoardUnread(opened.accountHostId, opened.card.refKey),
+      () => {
+        if (markedRef.current === key) {
+          markedRef.current = null
+        }
       }
-    })
+    )
   }, [])
   return fromBoard ? mark : undefined
 }

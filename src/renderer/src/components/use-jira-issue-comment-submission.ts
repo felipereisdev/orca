@@ -8,6 +8,13 @@ import { getCommentBodySubmitState } from '@/lib/source-control/review/comments/
 import { translate } from '@/i18n/i18n'
 import { jiraAddIssueCommentForTarget } from '@/runtime/jira/runtime-jira-detail-client'
 
+// A just-posted comment shows before Jira's read returns it, stamped with the local clock.
+const LOCAL_COMMENT_ACCOUNT_ID = 'local'
+
+export function isLocalJiraComment(comment: JiraComment): boolean {
+  return comment.user?.accountId === LOCAL_COMMENT_ACCOUNT_ID
+}
+
 type JiraIssueCommentSubmissionArgs = {
   commentDraft: string
   commentSubmitting: boolean
@@ -68,7 +75,7 @@ export function useJiraIssueCommentSubmission({
         body: bodyState.body,
         createdAt: new Date().toISOString(),
         user: {
-          accountId: 'local',
+          accountId: LOCAL_COMMENT_ACCOUNT_ID,
           displayName: translate('auto.components.issueComments.you', 'You')
         }
       }

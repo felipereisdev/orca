@@ -16,6 +16,9 @@ import { useGitLabPrimaryActions } from './gitlab-item-dialog/use-gitlab-primary
 import { useGitLabReviewActions } from './gitlab-item-dialog/use-gitlab-review-actions'
 import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
 
+const isViewerComment = (comment: { viewerDidAuthor?: boolean }): boolean =>
+  comment.viewerDidAuthor === true
+
 export default function GitLabItemDialog({
   item,
   repoPath,
@@ -61,7 +64,8 @@ export default function GitLabItemDialog({
     onCommentsRendered,
     'gitlab',
     shownDetails && item ? item.url : null,
-    shownDetails?.comments ?? null
+    shownDetails?.comments ?? null,
+    isViewerComment
   )
   useGitLabItemScopeResetEffect(detailsOwner, state)
 

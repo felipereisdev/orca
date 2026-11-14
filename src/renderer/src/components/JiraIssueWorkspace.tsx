@@ -27,7 +27,10 @@ import { editedJiraIssueFields } from './jira-issue-workspace-hydration'
 import { enqueueJiraIssueMutation, jiraIssueRequestScope } from './jira-issue-mutation-queue'
 import { useJiraIssueMutationState } from './use-jira-issue-mutation-state'
 import { useJiraIssueWorkspaceData } from './use-jira-issue-workspace-data'
-import { useJiraIssueCommentSubmission } from './use-jira-issue-comment-submission'
+import {
+  isLocalJiraComment,
+  useJiraIssueCommentSubmission
+} from './use-jira-issue-comment-submission'
 import {
   useReportRenderedComments,
   type OnTaskCommentsRendered
@@ -92,7 +95,8 @@ export default function JiraIssueWorkspace({
     onCommentsRendered,
     'jira',
     commentsShown ? displayed.url : null,
-    commentsShown ? comments : null
+    commentsShown ? comments : null,
+    isLocalJiraComment
   )
   const siteId = displayed?.siteId ?? undefined
   const metadataKey = JSON.stringify([

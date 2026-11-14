@@ -97,8 +97,9 @@ export function JiraBoardMoveDialog({
         {fields === 'unsupported' ? (
           <p className="text-sm text-muted-foreground">
             {t(
-              'jira.board.unsupportedFields',
-              'Jira requires fields Orca cannot collect yet. Finish this status change in Jira.'
+              'jira.transitions.unsupported',
+              'Jira requires fields Orca cannot collect yet: {{fields}}.',
+              { fields: prompt?.selected?.unsupportedFieldNames?.join(', ') ?? '' }
             )}
           </p>
         ) : null}

@@ -64,9 +64,7 @@ export function JiraTransitionFieldsForm({
       <p className="text-sm font-medium">{choice.name}</p>
       {resolution ? (
         <div className="space-y-2">
-          <Label htmlFor="jira-transition-resolution">
-            {t('jira.transitions.resolution', 'Resolution')}
-          </Label>
+          <Label htmlFor="jira-transition-resolution">{resolution.name}</Label>
           <Select value={resolutionId} onValueChange={setResolutionId} disabled={pending}>
             <SelectTrigger id="jira-transition-resolution" className="w-full" autoFocus>
               <SelectValue

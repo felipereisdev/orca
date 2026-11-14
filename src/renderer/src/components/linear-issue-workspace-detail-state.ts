@@ -37,6 +37,8 @@ export type LinearIssueWorkspaceDetailState = {
   commentsError: string | null
   editState: LinearEditState
   handleCommentAdded: (comment: LinearLocalComment) => void
+  /** The user's just-posted comments, stamped with the local clock. */
+  isLocalComment: (comment: LinearComment) => boolean
   retryComments: () => Promise<void>
 }
 
@@ -72,6 +74,12 @@ export function useLinearIssueWorkspaceDetail({
     optimisticCommentsRef.current.push(added)
     setComments((current) => [...current, added])
   }, [])
+
+  const isLocalComment = useCallback(
+    (comment: LinearComment) =>
+      optimisticCommentsRef.current.some((local) => local.id === comment.id),
+    []
+  )
 
   const loadComments = useCallback(
     (targetIssue: LinearIssue, targetProviderSettings: RuntimeLinearSettings): Promise<void> => {
@@ -159,6 +167,7 @@ export function useLinearIssueWorkspaceDetail({
     commentsError,
     editState,
     handleCommentAdded,
+    isLocalComment,
     retryComments
   }
 }

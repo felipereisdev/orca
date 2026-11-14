@@ -80,11 +80,18 @@ export type TaskBoardChoice = {
   name: string
   fields:
     | {
-        resolution: { required: boolean; options: { id: string; name: string }[] } | null
+        /** `name`: the field as Jira names it on the issue's site. */
+        resolution: {
+          name: string
+          required: boolean
+          options: { id: string; name: string }[]
+        } | null
         commentRequired: boolean
       }
     | 'unsupported'
     | null
+  /** With `fields: 'unsupported'`: the required fields only Jira can collect, as Jira names them. */
+  unsupportedFieldNames?: string[]
 }
 
 export type TaskBoardMoveResult =

@@ -106,7 +106,11 @@ export function jiraTransitionChoice(transition: JiraTransition): TaskBoardChoic
     return { ...choice, fields: null }
   }
   if (requirement.kind === 'unsupported') {
-    return { ...choice, fields: 'unsupported' }
+    return {
+      ...choice,
+      fields: 'unsupported',
+      unsupportedFieldNames: requirement.fields.map((field) => field.name)
+    }
   }
   const { resolution, commentRequired } = requirement
   return {
@@ -114,6 +118,7 @@ export function jiraTransitionChoice(transition: JiraTransition): TaskBoardChoic
     fields: {
       resolution: resolution
         ? {
+            name: resolution.name,
             required: true,
             options: (resolution.allowedValues ?? []).flatMap((value) => {
               const id = transitionAllowedValueKey(value)
