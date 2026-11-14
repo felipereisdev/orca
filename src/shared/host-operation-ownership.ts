@@ -70,6 +70,7 @@ export const HOST_OPERATION_OWNERSHIP = {
   ssh: 'host',
   stats: 'host',
   status: 'host',
+  taskBoard: 'host',
   terminal: 'host',
   terminalDaemon: 'host',
   ui: 'host',
