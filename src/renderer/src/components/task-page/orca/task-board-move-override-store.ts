@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import {
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS,
   type TaskBoardMoveOverride
 } from '@/lib/work-items/task-board/task-board-move-overrides'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 
 type Overrides = ReadonlyMap<string, TaskBoardMoveOverride>
 
@@ -39,7 +38,7 @@ export function isTaskBoardMoveInFlight(host: ExecutionHostId, refKey: string): 
 
 export function holdTaskBoardMove(
   host: ExecutionHostId,
-  card: TaskBoardCard,
+  card: TaskBoardWireCard,
   columnId: string
 ): void {
   change(host, (next) => next.set(card.refKey, { card, columnId }))
@@ -47,47 +46,47 @@ export function holdTaskBoardMove(
 
 export function confirmTaskBoardMove(
   host: ExecutionHostId,
-  card: TaskBoardCard,
+  card: TaskBoardWireCard,
   columnId: string
 ): void {
   const expiresAt = Date.now() + TASK_BOARD_MOVE_OVERRIDE_TTL_MS
   change(host, (next) => next.set(card.refKey, { card, columnId, expiresAt }))
 }
 
-/** Rolls the card back to wherever its provider reads place it. */
+/** Rolls the card back to wherever the host's list places it. */
 export function releaseTaskBoardMove(host: ExecutionHostId, refKey: string): void {
   change(host, (next) => next.delete(refKey))
 }
 
-/** Marks expired holds as re-reading and returns the providers to read again. */
-function startExpiredRereads(host: ExecutionHostId, now: number): Set<TaskProvider> {
-  const providers = new Set<TaskProvider>()
+/** Marks expired holds as re-reading; true when any did expire. */
+function startExpiredRereads(host: ExecutionHostId, now: number): boolean {
+  let expired = false
   change(host, (next) => {
     for (const [refKey, override] of next) {
       if (override.expiresAt !== undefined && !override.rereading && override.expiresAt <= now) {
         next.set(refKey, { ...override, rereading: true })
-        providers.add(override.card.provider)
+        expired = true
       }
     }
   })
-  return providers
+  return expired
 }
 
-/** The fresh read is now authoritative; a hold re-made meanwhile (no `rereading`) stays. */
-function finishRereads(host: ExecutionHostId, provider: TaskProvider): void {
+/** The fresh list is now authoritative; a hold re-made meanwhile (no `rereading`) stays. */
+function finishRereads(host: ExecutionHostId): void {
   change(host, (next) => {
     for (const [refKey, override] of next) {
-      if (override.rereading && override.card.provider === provider) {
+      if (override.rereading) {
         next.delete(refKey)
       }
     }
   })
 }
 
-/** `reread` must resolve once a fresh read of the provider has reached the board (or was dropped). */
+/** `reread` must resolve once a fresh list has reached the board (or was dropped). */
 export function useTaskBoardMoveOverrides(
   host: ExecutionHostId,
-  reread: (provider: TaskProvider) => Promise<void>
+  reread: () => Promise<void>
 ): {
   overrides: Overrides
   updatingRefKeys: ReadonlySet<string>
@@ -110,12 +109,12 @@ export function useTaskBoardMoveOverrides(
     if (expiries.length === 0) {
       return
     }
-    // Why: a read that lagged the move left the old card in the board's state; dropping the hold
-    // alone would snap it back, so the hold stays until a fresh read replaces it.
+    // Why: a list that lagged the move left the old card in the board's state; dropping the hold
+    // alone would snap it back, so the hold stays until a fresh list replaces it.
     const timer = setTimeout(
       () => {
-        for (const provider of startExpiredRereads(host, Date.now())) {
-          void reread(provider).finally(() => finishRereads(host, provider))
+        if (startExpiredRereads(host, Date.now())) {
+          void reread().finally(() => finishRereads(host))
         }
       },
       Math.max(0, Math.min(...expiries) - Date.now())

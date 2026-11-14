@@ -7,7 +7,11 @@ import { ChevronDown, CircleAlert, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useTranslate } from '@/i18n/use-translate'
-import { classifyTransitionRequirements } from '../../../shared/jira/jira-transition-fields'
+import {
+  classifyTransitionRequirements,
+  jiraTransitionChoice,
+  jiraTransitionUpdate
+} from '../../../shared/jira/jira-transition-fields'
 import { JiraTransitionFieldsForm } from './jira-transition-fields-form'
 import type {
   JiraIssue,
@@ -130,10 +134,15 @@ export function JiraIssueTransitionControl({
           ) : null}
           {requirement?.kind === 'form' && selected ? (
             <JiraTransitionFieldsForm
-              transition={selected}
+              choice={jiraTransitionChoice(selected)}
               pending={busy || Boolean(error)}
               onBack={reset}
-              onSubmit={(updates) => apply(selected, updates)}
+              onSubmit={async ({ fields }) => {
+                const updates = jiraTransitionUpdate(selected, fields)
+                if (updates) {
+                  await apply(selected, updates)
+                }
+              }}
             />
           ) : error || loading ? null : requirement?.kind === 'unsupported' ? (
             <>

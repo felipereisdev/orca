@@ -1,5 +1,10 @@
-import type { TaskBoardChoice } from '../task-board/task-board-wire-types'
-import type { JiraCreateField, JiraCreateFieldAllowedValue, JiraTransition } from './jira-types'
+import type { TaskBoardChoice, TaskBoardMoveFields } from '../task-board/task-board-wire-types'
+import type {
+  JiraCreateField,
+  JiraCreateFieldAllowedValue,
+  JiraIssueUpdate,
+  JiraTransition
+} from './jira-types'
 
 export type JiraTransitionRequirement =
   | { kind: 'none' }
@@ -118,5 +123,35 @@ export function jiraTransitionChoice(transition: JiraTransition): TaskBoardChoic
         : null,
       commentRequired
     }
+  }
+}
+
+/** The update a filled choice applies; null while a required field is missing or unsupported. */
+export function jiraTransitionUpdate(
+  transition: JiraTransition,
+  fields: TaskBoardMoveFields = {}
+): JiraIssueUpdate | null {
+  const requirement = classifyTransitionRequirements(transition)
+  if (requirement.kind === 'unsupported') {
+    return null
+  }
+  if (requirement.kind === 'none') {
+    return { transitionId: transition.id }
+  }
+  const { resolution: resolutionField, commentRequired } = requirement
+  const resolution = resolutionField
+    ? buildResolutionFieldValue(resolutionField, fields.resolutionId ?? '')
+    : null
+  const comment = fields.comment?.trim() ?? ''
+  if ((resolutionField && !resolution) || (commentRequired && !comment)) {
+    return null
+  }
+  return {
+    transitionId: transition.id,
+    ...(resolutionField && resolution
+      ? { transitionFields: { [resolutionField.key]: resolution } }
+      : {}),
+    // A comment goes only where the transition asks for one.
+    ...(commentRequired ? { transitionComment: comment } : {})
   }
 }

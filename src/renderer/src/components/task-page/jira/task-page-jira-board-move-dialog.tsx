@@ -8,20 +8,20 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { useTranslate } from '@/i18n/use-translate'
-import { JiraTransitionFieldsForm } from '../../jira-transition-fields-form'
-import { classifyTransitionRequirements } from '../../../../../shared/jira/jira-transition-fields'
-import type {
-  JiraIssue,
-  JiraIssueUpdate,
-  JiraTransition
-} from '../../../../../shared/jira/jira-types'
+import {
+  JiraTransitionFieldsForm,
+  type JiraTransitionFieldsSubmit
+} from '../../jira-transition-fields-form'
+import type { TaskBoardChoice } from '../../../../../shared/task-board/task-board-wire-types'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 
+/** A board drop's status change, in the host's choice terms so My board and the Jira tab share it. */
 export type JiraBoardMovePrompt = {
-  issue: JiraIssue
+  issueKey: string
+  issueUrl: string
   destination: string
-  transitions: JiraTransition[]
-  selected: JiraTransition | null
+  choices: TaskBoardChoice[]
+  selected: TaskBoardChoice | null
   error: string | null
   loading: boolean
 }
@@ -30,8 +30,8 @@ type Props = {
   prompt: JiraBoardMovePrompt | null
   pending: boolean
   onClose: () => void
-  onChoose: (transition: JiraTransition) => void
-  onSubmit: (updates: JiraIssueUpdate) => Promise<void>
+  onChoose: (choice: TaskBoardChoice) => void
+  onSubmit: (submit: JiraTransitionFieldsSubmit) => Promise<void>
   onRetry: () => void
 }
 
@@ -44,7 +44,7 @@ export function JiraBoardMoveDialog({
   onRetry
 }: Props): React.JSX.Element {
   const t = useTranslate()
-  const requirement = prompt?.selected ? classifyTransitionRequirements(prompt.selected) : null
+  const fields = prompt?.selected?.fields
   return (
     <Dialog
       open={prompt !== null}
@@ -58,7 +58,7 @@ export function JiraBoardMoveDialog({
         <DialogHeader>
           <DialogTitle>
             {t('jira.board.moveTitle', 'Move {{key}} to {{column}}', {
-              key: prompt?.issue.key,
+              key: prompt?.issueKey,
               column: prompt?.destination
             })}
           </DialogTitle>
@@ -79,45 +79,44 @@ export function JiraBoardMoveDialog({
             {prompt.error}
           </p>
         ) : null}
-        {!prompt?.selected && !prompt?.loading && prompt?.transitions.length ? (
+        {!prompt?.selected && !prompt?.loading && prompt?.choices.length ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm">{t('jira.board.chooseTransition', 'Choose a status change:')}</p>
-            {prompt.transitions.map((transition) => (
+            {prompt.choices.map((choice) => (
               <Button
-                key={transition.id}
+                key={choice.id}
                 variant="secondary"
                 disabled={pending}
-                onClick={() => onChoose(transition)}
+                onClick={() => onChoose(choice)}
               >
-                {transition.name}
+                {choice.name}
               </Button>
             ))}
           </div>
         ) : null}
-        {requirement?.kind === 'unsupported' ? (
+        {fields === 'unsupported' ? (
           <p className="text-sm text-muted-foreground">
             {t(
-              'jira.transitions.unsupported',
-              'Jira requires fields Orca cannot collect yet: {{fields}}.',
-              { fields: requirement.fields.map((field) => field.name).join(', ') }
+              'jira.board.unsupportedFields',
+              'Jira requires fields Orca cannot collect yet. Finish this status change in Jira.'
             )}
           </p>
         ) : null}
-        {requirement?.kind === 'form' && prompt?.selected ? (
+        {fields && fields !== 'unsupported' && prompt?.selected ? (
           <JiraTransitionFieldsForm
             key={prompt.selected.id}
-            transition={prompt.selected}
+            choice={prompt.selected}
             pending={pending}
             onBack={onClose}
             onSubmit={onSubmit}
           />
         ) : null}
-        {prompt && (prompt.error || requirement?.kind === 'unsupported') ? (
+        {prompt && (prompt.error || fields === 'unsupported') ? (
           <div className="flex justify-end gap-2">
             <Button variant="ghost" disabled={pending} onClick={onClose}>
               {t('jira.board.cancel', 'Cancel')}
             </Button>
-            {requirement?.kind === 'none' ? (
+            {prompt.selected && fields === null ? (
               <Button
                 variant="secondary"
                 disabled={pending}
@@ -129,7 +128,7 @@ export function JiraBoardMoveDialog({
               >
                 {t('jira.transitions.retry', 'Retry')}
               </Button>
-            ) : !prompt.selected && prompt.transitions.length === 0 ? (
+            ) : !prompt.selected && prompt.choices.length === 0 ? (
               <Button variant="secondary" disabled={pending || prompt.loading} onClick={onRetry}>
                 {t('jira.transitions.retry', 'Retry')}
               </Button>
@@ -138,7 +137,7 @@ export function JiraBoardMoveDialog({
               variant="secondary"
               onClick={(event) => {
                 if (prompt) {
-                  openAppHttpLink(prompt.issue.url, { event })
+                  openAppHttpLink(prompt.issueUrl, { event })
                 }
               }}
             >

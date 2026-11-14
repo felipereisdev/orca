@@ -8,7 +8,7 @@ import {
   readTaskBoardCardDragData,
   writeTaskBoardCardDragData
 } from '@/lib/work-items/task-board/task-board-drag-payload'
-import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { WorkspaceStatusDefinition } from '../../../../shared/worktree/types'
 import { getWorkspaceStatusVisualMeta } from '../sidebar/workspace-status/presentation/workspace-status'
 import { TaskBoardCardView } from './TaskBoardCardView'
@@ -17,15 +17,15 @@ export type TaskBoardColumn = {
   id: string
   label: string
   status: WorkspaceStatusDefinition
-  cards: TaskBoardCard[]
+  cards: TaskBoardWireCard[]
 }
 export type TaskBoardDropCheck = { ok: true } | { ok: false; reason: string }
 export type TaskBoardProps = {
   columns: TaskBoardColumn[]
-  canDrop: (card: TaskBoardCard, columnId: string) => TaskBoardDropCheck
-  onMove: (card: TaskBoardCard, columnId: string) => Promise<void>
-  onOpen: (card: TaskBoardCard) => void
-  onStartWorkspace: (card: TaskBoardCard) => void
+  canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
+  onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
+  onOpen: (card: TaskBoardWireCard) => void
+  onStartWorkspace: (card: TaskBoardWireCard) => void
   updatingRefKeys: ReadonlySet<string>
   selectedRefKey: string | null
   formatUpdatedAt: (updatedAt: string) => string
@@ -45,14 +45,14 @@ export function TaskBoard({
   const [draggingRefKey, setDraggingRefKey] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
 
-  const findCard = (refKey: string | null): TaskBoardCard | undefined =>
+  const findCard = (refKey: string | null): TaskBoardWireCard | undefined =>
     refKey
       ? columns.flatMap((column) => column.cards).find((card) => card.refKey === refKey)
       : undefined
   const draggingCard = findCard(draggingRefKey)
 
   const handleCardDragStart = (
-    card: TaskBoardCard,
+    card: TaskBoardWireCard,
     event: React.DragEvent<HTMLDivElement>
   ): void => {
     if (

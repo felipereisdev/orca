@@ -2,24 +2,19 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardDropCheck } from '@/components/task-board/TaskBoard'
 import type { JiraBoardMovePrompt } from '@/components/task-page/jira/task-page-jira-board-move-dialog'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
-import { resolveTaskBoardColumnId } from '../../../../../shared/task-board/task-board-columns'
 import type { TaskBoardMoveOverride } from '@/lib/work-items/task-board/task-board-move-overrides'
-import { resolveLabelProviderMove } from '../../../../../shared/task-board/task-board-move-targets'
+import { moveTaskBoardCard } from '@/runtime/task-board/runtime-task-board-client'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import { classifyTransitionRequirements } from '../../../../../shared/jira/jira-transition-fields'
-import type {
-  JiraIssue,
-  JiraIssueUpdate,
-  JiraTransition
-} from '../../../../../shared/jira/jira-types'
-import type { LinearIssue } from '../../../../../shared/linear/issue-types'
 import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
-import type { TaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type {
+  TaskBoardChoice,
+  TaskBoardMoveFields,
+  TaskBoardMoveResult,
+  TaskBoardWireCard
+} from '../../../../../shared/task-board/task-board-wire-types'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
-import { TaskBoardMoveDialogs, type TaskBoardLinearChoice } from './TaskBoardMoveDialogs'
-import { moveTaskBoardCardWithLabels } from './task-board-label-moves'
+import { TaskBoardMoveDialogs, type TaskBoardStateChoice } from './TaskBoardMoveDialogs'
 import {
   confirmTaskBoardMove,
   holdTaskBoardMove,
@@ -27,29 +22,24 @@ import {
   releaseTaskBoardMove,
   useTaskBoardMoveOverrides
 } from './task-board-move-override-store'
-import {
-  applyJiraTaskBoardMove,
-  applyLinearTaskBoardMove,
-  loadJiraTaskBoardMoveTransitions,
-  loadLinearTaskBoardMoveStates,
-  requireTaskBoardTarget,
-  taskBoardMoveErrorMessage
-} from './task-board-provider-moves'
+import { taskBoardBlockedMessage, taskBoardMoveErrorMessage } from './task-board-move-messages'
+import { withPreviousEnrichment } from './task-board-view-state'
 
-/** A Jira/Linear drop; while its dialog is open it is the board's only one. */
+/** One drop; while its dialog is open it is the board's only one. */
 type MoveSession = {
+  /** The board host at drop time; the hold lives in that host's board. */
   host: ExecutionHostId
-  card: TaskBoardCard
   target: RuntimeClientTarget
+  card: TaskBoardWireCard
   columnId: string
+  columnLabel: string
 }
-/** The confirmed card, no change, or `dialog`: a dialog now owns the move and its session. */
-type MoveOutcome = TaskBoardCard | 'unchanged' | 'dialog'
+type MoveRequest = { choiceId?: string; fields?: TaskBoardMoveFields }
 
 export type TaskBoardMove = {
-  canDrop: (card: TaskBoardCard, columnId: string) => TaskBoardDropCheck
-  move: (card: TaskBoardCard, columnId: string) => Promise<void>
-  /** Dropped cards held in their target column until a provider read agrees. */
+  canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
+  move: (card: TaskBoardWireCard, columnId: string) => Promise<void>
+  /** Dropped cards held in their target column until a list agrees. */
   overrides: ReadonlyMap<string, TaskBoardMoveOverride>
   updatingRefKeys: ReadonlySet<string>
   dialogs: React.JSX.Element
@@ -57,21 +47,18 @@ export type TaskBoardMove = {
   clearError: () => void
 }
 
-/** `accountHostId` routes Jira and Linear writes: pass the Tasks page's `accountBackedTaskSourceHostId`. */
+/** Moves cards through the board host (`accountHostId`, the Tasks page's account-backed host). */
 export function useTaskBoardMove(args: {
-  /** The board's read cards; a GitLab/GitHub move reuses their label casing. */
-  cards: readonly TaskBoardCard[]
   columns: readonly WorkspaceStatusDefinition[]
-  settings: TaskBoardSettings
   accountHostId: ExecutionHostId
-  /** A fresh read of the provider; resolves once its result reached the board. */
-  reread: (provider: TaskProvider) => Promise<void>
+  /** A fresh list; resolves once its result reached the board. */
+  reread: () => Promise<void>
 }): TaskBoardMove {
   const t = useTranslate()
   const { overrides, updatingRefKeys } = useTaskBoardMoveOverrides(args.accountHostId, args.reread)
   const [error, setError] = useState<string | null>(null)
   const [jiraPrompt, setJiraPrompt] = useState<JiraBoardMovePrompt | null>(null)
-  const [linearChoice, setLinearChoice] = useState<TaskBoardLinearChoice | null>(null)
+  const [stateChoice, setStateChoice] = useState<TaskBoardStateChoice | null>(null)
   const [pending, setPending] = useState(false)
   const dialogRef = useRef<MoveSession | null>(null)
   // A dialog dies with the board; its card must not stay held in the target column.
@@ -84,203 +71,173 @@ export function useTaskBoardMove(args: {
     []
   )
 
-  const targetArgs = (columnId: string) => ({
-    columnId,
-    columnLabel: args.columns.find((column) => column.id === columnId)?.label ?? columnId,
-    columns: args.columns,
-    settings: args.settings
-  })
-
-  /** `host` is the board host at drop time; the hold lives in that host's board. */
-  function settle(
-    { host, card, columnId }: Omit<MoveSession, 'target'>,
-    outcome: TaskBoardCard | 'unchanged'
-  ) {
-    if (outcome === 'unchanged') {
-      releaseTaskBoardMove(host, card.refKey)
-      return
-    }
-    const confirmedColumnId = resolveTaskBoardColumnId(outcome, args.columns, args.settings)
-    confirmTaskBoardMove(host, outcome, confirmedColumnId ?? columnId)
-    void args.reread(card.provider)
-  }
-
-  /** Ends `session` only while it still owns the dialog; a settled session is never touched again. */
-  function endDialog(session: MoveSession, outcome: TaskBoardCard | 'unchanged'): void {
+  function closeDialog(session: MoveSession): void {
     if (dialogRef.current !== session) {
       return
     }
     dialogRef.current = null
     setJiraPrompt(null)
-    setLinearChoice(null)
-    settle(session, outcome)
+    setStateChoice(null)
   }
 
-  /** A drop whose choices loaded after another dialog opened gives way to that dialog. */
-  function claimDialog(session: MoveSession): void {
-    if (dialogRef.current) {
-      throw new Error(t('taskBoard.finishOpenMove', 'Finish the open move first'))
+  function settleMoved(session: MoveSession, moved: TaskBoardWireCard | null): void {
+    closeDialog(session)
+    if (moved) {
+      const confirmed = withPreviousEnrichment(moved, session.card)
+      confirmTaskBoardMove(session.host, confirmed, moved.columnId)
+      return
+    }
+    // Why: the write landed but its re-read failed; hold the card where it was dropped and list again.
+    const held = { ...session.card, columnId: session.columnId }
+    confirmTaskBoardMove(session.host, held, session.columnId)
+    void args.reread()
+  }
+
+  /** An open dialog keeps its card held and shows the error; otherwise the card rolls back. */
+  function fail(session: MoveSession, message: string): void {
+    if (dialogRef.current === session) {
+      setJiraPrompt((current) => (current ? { ...current, error: message } : null))
+      setStateChoice((current) => (current ? { ...current, error: message } : null))
+      return
+    }
+    releaseTaskBoardMove(session.host, session.card.refKey)
+    setError(message)
+  }
+
+  function openDialog(
+    session: MoveSession,
+    choices: TaskBoardChoice[] | null,
+    selected: TaskBoardChoice | null
+  ): void {
+    // One open dialog at a time, as the Jira tab locks its board: a second must not take it over.
+    if (dialogRef.current && dialogRef.current !== session) {
+      fail(session, t('taskBoard.finishOpenMove', 'Finish the open move first'))
+      return
     }
     dialogRef.current = session
+    if (session.card.provider !== 'jira') {
+      setStateChoice({
+        displayId: session.card.displayId,
+        destination: session.columnLabel,
+        choices: choices ?? [],
+        error: null
+      })
+      return
+    }
+    setJiraPrompt((current) => ({
+      issueKey: session.card.displayId,
+      issueUrl: session.card.url,
+      destination: session.columnLabel,
+      choices: choices ?? current?.choices ?? (selected ? [selected] : []),
+      selected,
+      error: null,
+      loading: false
+    }))
+  }
+
+  function handle(session: MoveSession, result: TaskBoardMoveResult): void {
+    switch (result.status) {
+      case 'moved':
+        return settleMoved(session, result.card)
+      case 'needs-choice':
+        return openDialog(session, result.choices, null)
+      case 'needs-fields':
+      case 'unsupported-fields':
+        return openDialog(session, null, result.choice)
+      case 'failed':
+        return fail(session, result.error || taskBoardMoveErrorMessage(null))
+      case 'blocked':
+        if (result.reason !== 'same-column') {
+          return fail(
+            session,
+            taskBoardBlockedMessage(result.reason, session.card, session.columnLabel)
+          )
+        }
+        // The card already moved elsewhere (another client); the list shows where.
+        closeDialog(session)
+        releaseTaskBoardMove(session.host, session.card.refKey)
+        void args.reread()
+    }
+  }
+
+  async function send(session: MoveSession, request: MoveRequest): Promise<void> {
+    try {
+      const result = await moveTaskBoardCard(session.target, {
+        ref: session.card.ref,
+        targetColumnId: session.columnId,
+        ...request
+      })
+      handle(session, result)
+    } catch (cause) {
+      fail(session, taskBoardMoveErrorMessage(cause))
+    }
+  }
+
+  async function sendFromDialog(request: MoveRequest): Promise<void> {
+    const session = dialogRef.current
+    if (!session) {
+      return
+    }
+    setPending(true)
+    await send(session, request)
+    setPending(false)
   }
 
   function closeDialogs(): void {
-    if (!pending && dialogRef.current) {
-      endDialog(dialogRef.current, 'unchanged')
+    const session = dialogRef.current
+    if (!pending && session) {
+      closeDialog(session)
+      releaseTaskBoardMove(session.host, session.card.refKey)
     }
   }
 
-  function canDrop(card: TaskBoardCard, columnId: string): TaskBoardDropCheck {
-    if (card.provider !== 'gitlab' && card.provider !== 'github') {
-      return { ok: true }
-    }
-    const labelMove = resolveLabelProviderMove(card, columnId, args.columns, args.settings)
-    // The board never offers a card's own column as a target; moving there is a no-op.
-    return labelMove.ok || labelMove.reason === 'same-column'
-      ? { ok: true }
-      : {
+  function canDrop(card: TaskBoardWireCard, columnId: string): TaskBoardDropCheck {
+    const target = card.moveTargets.find((item) => item.columnId === columnId)
+    return target?.allowed === false
+      ? {
           ok: false,
           reason: t('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Tasks')
         }
+      : { ok: true }
   }
 
-  async function moveJira(session: MoveSession, issue: JiraIssue): Promise<MoveOutcome> {
-    const moveArgs = targetArgs(session.columnId)
-    const transitions = await loadJiraTaskBoardMoveTransitions(session.target, issue, moveArgs)
-    const [only] = transitions
-    if (transitions.length === 1 && classifyTransitionRequirements(only).kind === 'none') {
-      return applyJiraTaskBoardMove(session.target, session.card, issue, only, {
-        transitionId: only.id
-      })
-    }
-    claimDialog(session)
-    setJiraPrompt({
-      issue,
-      destination: moveArgs.columnLabel,
-      transitions,
-      selected: transitions.length === 1 ? only : null,
-      error: null,
-      loading: false
-    })
-    return 'dialog'
-  }
-
-  async function moveLinear(session: MoveSession, issue: LinearIssue): Promise<MoveOutcome> {
-    const moveArgs = targetArgs(session.columnId)
-    const states = await loadLinearTaskBoardMoveStates(session.target, issue, moveArgs)
-    if (states.length === 1) {
-      return applyLinearTaskBoardMove(session.target, session.card, issue, states[0])
-    }
-    claimDialog(session)
-    setLinearChoice({ issue, destination: moveArgs.columnLabel, states, error: null })
-    return 'dialog'
-  }
-
-  async function move(card: TaskBoardCard, columnId: string): Promise<void> {
-    const { source } = card
-    const drop = { host: args.accountHostId, card, columnId }
-    if (isTaskBoardMoveInFlight(drop.host, card.refKey)) {
+  async function move(card: TaskBoardWireCard, columnId: string): Promise<void> {
+    const host = args.accountHostId
+    if (isTaskBoardMoveInFlight(host, card.refKey)) {
       return
     }
-    // One open dialog at a time, as the Jira tab locks its board: a second must not take it over.
-    if ((source.provider === 'jira' || source.provider === 'linear') && dialogRef.current) {
+    // Only Jira/Linear moves can open a dialog; a second one must wait for the open one.
+    if ((card.provider === 'jira' || card.provider === 'linear') && dialogRef.current) {
       setError(t('taskBoard.finishOpenMove', 'Finish the open move first'))
+      return
+    }
+    const target = ipcOrRuntimeTargetForHostId(host)
+    if (!target) {
+      setError(t('taskBoard.hostUnavailable', 'This host is not available.'))
       return
     }
     setError(null)
     // The card shows in its target column at once; a failure puts it back.
-    holdTaskBoardMove(drop.host, card, columnId)
-    let outcome: MoveOutcome = 'unchanged'
-    try {
-      const session = (provider: 'jira' | 'linear'): MoveSession => ({
-        ...drop,
-        target: requireTaskBoardTarget(provider, args.accountHostId)
-      })
-      outcome =
-        source.provider === 'jira'
-          ? await moveJira(session('jira'), source.item)
-          : source.provider === 'linear'
-            ? await moveLinear(session('linear'), source.item)
-            : await moveTaskBoardCardWithLabels(card, {
-                ...targetArgs(columnId),
-                cards: args.cards
-              })
-    } catch (cause) {
-      setError(taskBoardMoveErrorMessage(cause))
-    }
-    if (outcome !== 'dialog') {
-      settle(drop, outcome)
-    }
-  }
-
-  async function applyJira(transition: JiraTransition, updates: JiraIssueUpdate): Promise<void> {
-    const session = dialogRef.current
-    if (session?.card.source.provider !== 'jira') {
-      return
-    }
-    setPending(true)
-    try {
-      const confirmed = await applyJiraTaskBoardMove(
-        session.target,
-        session.card,
-        session.card.source.item,
-        transition,
-        updates
-      )
-      endDialog(session, confirmed)
-    } catch (cause) {
-      if (dialogRef.current === session) {
-        setJiraPrompt((current) =>
-          current
-            ? { ...current, selected: transition, error: taskBoardMoveErrorMessage(cause) }
-            : null
-        )
-      }
-    }
-    setPending(false)
-  }
-
-  async function chooseJira(transition: JiraTransition): Promise<void> {
-    setJiraPrompt((current) => (current ? { ...current, selected: transition, error: null } : null))
-    if (classifyTransitionRequirements(transition).kind === 'none') {
-      await applyJira(transition, { transitionId: transition.id })
-    }
-  }
-
-  async function chooseLinear(stateId: string): Promise<void> {
-    const session = dialogRef.current
-    const state = linearChoice?.states.find((item) => item.id === stateId)
-    if (session?.card.source.provider !== 'linear' || !state) {
-      return
-    }
-    setPending(true)
-    try {
-      const confirmed = await applyLinearTaskBoardMove(
-        session.target,
-        session.card,
-        session.card.source.item,
-        state
-      )
-      endDialog(session, confirmed)
-    } catch (cause) {
-      if (dialogRef.current === session) {
-        setLinearChoice((current) =>
-          current ? { ...current, error: taskBoardMoveErrorMessage(cause) } : null
-        )
-      }
-    }
-    setPending(false)
+    holdTaskBoardMove(host, card, columnId)
+    const columnLabel = args.columns.find((column) => column.id === columnId)?.label ?? columnId
+    await send({ host, target, card, columnId, columnLabel }, {})
   }
 
   const dialogs = (
     <TaskBoardMoveDialogs
       jiraPrompt={jiraPrompt}
-      linearChoice={linearChoice}
+      stateChoice={stateChoice}
       pending={pending}
       onClose={closeDialogs}
-      onChooseJira={(transition) => void chooseJira(transition)}
-      onSubmitJira={applyJira}
-      onChooseLinear={(stateId) => void chooseLinear(stateId)}
+      onChooseJira={(choice) => {
+        setJiraPrompt((current) => (current ? { ...current, selected: choice, error: null } : null))
+        // A choice with fields shows its form; the host applies it once they are filled.
+        if (choice.fields === null) {
+          void sendFromDialog({ choiceId: choice.id })
+        }
+      }}
+      onSubmitJira={(submit) => sendFromDialog(submit)}
+      onChooseState={(choiceId) => void sendFromDialog({ choiceId })}
     />
   )
 

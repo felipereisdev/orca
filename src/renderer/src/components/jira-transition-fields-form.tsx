@@ -11,92 +11,86 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { useTranslate } from '@/i18n/use-translate'
 import { getCommentBodySubmitState } from '@/lib/source-control/review/comments/comment-body-submit-state'
-import {
-  buildResolutionFieldValue,
-  classifyTransitionRequirements,
-  transitionAllowedValueKey,
-  transitionAllowedValueLabel
-} from '../../../shared/jira/jira-transition-fields'
-import type { JiraIssueUpdate, JiraTransition } from '../../../shared/jira/jira-types'
+import type {
+  TaskBoardChoice,
+  TaskBoardMoveFields
+} from '../../../shared/task-board/task-board-wire-types'
+
+export type JiraTransitionFieldsSubmit = { choiceId: string; fields: TaskBoardMoveFields }
 
 type Props = {
-  transition: JiraTransition
+  choice: TaskBoardChoice
   pending: boolean
   onBack: () => void
-  onSubmit: (updates: JiraIssueUpdate) => Promise<void>
+  onSubmit: (submit: JiraTransitionFieldsSubmit) => Promise<void>
 }
 
+/** The Resolution/Comment form of a Jira status change; renders nothing for other choices. */
 export function JiraTransitionFieldsForm({
-  transition,
+  choice,
   pending,
   onBack,
   onSubmit
 }: Props): React.JSX.Element | null {
   const t = useTranslate()
-  const [resolution, setResolution] = useState('')
+  const [resolutionId, setResolutionId] = useState('')
   const [comment, setComment] = useState('')
-  const requirement = classifyTransitionRequirements(transition)
-  if (requirement.kind !== 'form') {
+  const fields = choice.fields
+  if (fields === null || fields === 'unsupported') {
     return null
   }
-  const resolutionValue = requirement.resolution
-    ? buildResolutionFieldValue(requirement.resolution, resolution)
-    : null
+  const { resolution, commentRequired } = fields
+  const resolutionReady = resolutionId !== '' || !resolution
   const commentState = getCommentBodySubmitState(comment)
-  const canSubmit =
-    (!requirement.resolution || resolutionValue !== null) &&
-    (!requirement.commentRequired || commentState.status === 'ready')
+  const canSubmit = resolutionReady && (!commentRequired || commentState.status === 'ready')
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    if (pending || !canSubmit || requirement.kind !== 'form') {
+    if (pending || !canSubmit) {
       return
     }
-    const updates: JiraIssueUpdate = { transitionId: transition.id }
-    if (requirement.resolution && resolutionValue) {
-      updates.transitionFields = { [requirement.resolution.key]: resolutionValue }
+    const filled: TaskBoardMoveFields = {}
+    if (resolution && resolutionId) {
+      filled.resolutionId = resolutionId
     }
-    if (requirement.commentRequired && commentState.status === 'ready') {
-      updates.transitionComment = commentState.body
+    if (commentRequired && commentState.status === 'ready') {
+      filled.comment = commentState.body
     }
-    await onSubmit(updates)
+    await onSubmit({ choiceId: choice.id, fields: filled })
   }
 
   return (
     <form className="space-y-3" onSubmit={(event) => void submit(event)}>
-      <p className="text-sm font-medium">{transition.name}</p>
-      {requirement.resolution ? (
+      <p className="text-sm font-medium">{choice.name}</p>
+      {resolution ? (
         <div className="space-y-2">
-          <Label htmlFor="jira-transition-resolution">{requirement.resolution.name}</Label>
-          <Select value={resolution} onValueChange={setResolution} disabled={pending}>
+          <Label htmlFor="jira-transition-resolution">
+            {t('jira.transitions.resolution', 'Resolution')}
+          </Label>
+          <Select value={resolutionId} onValueChange={setResolutionId} disabled={pending}>
             <SelectTrigger id="jira-transition-resolution" className="w-full" autoFocus>
               <SelectValue
                 placeholder={t('jira.transitions.chooseResolution', 'Choose a resolution')}
               />
             </SelectTrigger>
             <SelectContent>
-              {(requirement.resolution.allowedValues ?? [])
-                .filter((value) => transitionAllowedValueKey(value))
-                .map((value) => (
-                  <SelectItem
-                    key={transitionAllowedValueKey(value)}
-                    value={transitionAllowedValueKey(value)}
-                  >
-                    {transitionAllowedValueLabel(value)}
-                  </SelectItem>
-                ))}
+              {resolution.options.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       ) : null}
-      {requirement.commentRequired ? (
+      {commentRequired ? (
         <div className="space-y-2">
           <Label htmlFor="jira-transition-comment">
             {t('jira.transitions.comment', 'Comment')}
           </Label>
           <Textarea
             id="jira-transition-comment"
-            autoFocus={!requirement.resolution}
+            autoFocus={!resolution}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             required

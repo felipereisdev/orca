@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
-import type { TaskBoardCardsState } from '../../../../../shared/task-board/task-board-provider-results'
+import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 import { getSourceOptions } from '../task-page-localized-options'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
+import type { TaskBoardViewState } from './task-board-view-state'
 
-type BoardMock = { state: TaskBoardCardsState | null; error: string | null; clearError: Mock }
+type BoardMock = { state: TaskBoardViewState | null; error: string | null; clearError: Mock }
 const board = vi.hoisted((): BoardMock => ({ state: null, error: null, clearError: vi.fn() }))
 const statuses: WorkspaceStatusDefinition[] = [
   { id: 'todo', label: 'Todo' },
@@ -22,7 +22,7 @@ vi.mock('@/store', () => ({
     selector({ workspaceStatuses: statuses, settings: undefined })
 }))
 vi.mock('./use-task-board-cards', () => ({
-  useTaskBoardCards: () => ({ state: board.state, refresh: vi.fn(), refreshProvider: vi.fn() })
+  useTaskBoardCards: () => ({ state: board.state, refresh: vi.fn(), reread: vi.fn() })
 }))
 vi.mock('./use-task-board-move', () => ({
   useTaskBoardMove: () => ({
@@ -48,7 +48,11 @@ afterEach(() => {
 // The fields project filtering reads from each provider's item.
 const projectFields = { project: { key: 'APP' }, team: { id: 'eng' }, repoId: 'acme' }
 
-function card(provider: TaskProvider, displayId: string): TaskBoardCard {
+function card(
+  provider: TaskProvider,
+  displayId: string,
+  extra: Partial<TaskBoardWireCard> = {}
+): TaskBoardWireCard {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the page hands `item` to the handlers untouched; a marker stands in for the provider item.
   return {
     refKey: `${provider}:test:${displayId}`,
@@ -59,10 +63,13 @@ function card(provider: TaskProvider, displayId: string): TaskBoardCard {
     projectLabel: 'acme',
     statusName: 'Open',
     category: 'todo',
+    columnId: 'todo',
+    moveTargets: [],
     labels: [],
     updatedAt: '2026-11-01T00:00:00Z',
-    source: { provider, item: { marker: displayId, ...projectFields } }
-  } as unknown as TaskBoardCard
+    source: { provider, item: { marker: displayId, ...projectFields } },
+    ...extra
+  } as unknown as TaskBoardWireCard
 }
 
 const cards = [
@@ -72,9 +79,11 @@ const cards = [
   card('github', '#4')
 ]
 
-function renderContent() {
+function renderContent(boardCards = cards) {
   board.state = {
-    cards,
+    cards: boardCards,
+    columns: statuses,
+    error: null,
     providers: {
       github: { status: 'ready' },
       gitlab: { status: 'ready' },
@@ -131,6 +140,14 @@ describe('TaskPageOrcaContent', () => {
     expect(screen.queryByText('Issue APP-1')).not.toBeNull()
     expect(screen.queryByText('Issue ENG-2')).toBeNull()
     expect(screen.queryByText('Issue #3')).toBeNull()
+  })
+
+  it('places a card in the column the host chose, not the one its status category suggests', () => {
+    renderContent([card('jira', 'APP-7', { category: 'todo', columnId: 'completed' })])
+    const done = screen.getByText('Done').closest('section')
+    const todo = screen.getByText('Todo').closest('section')
+    expect(done && within(done).queryByText('Issue APP-7')).not.toBeNull()
+    expect(todo && within(todo).queryByText('Issue APP-7')).toBeNull()
   })
 
   it('shows a move error until it is dismissed', () => {

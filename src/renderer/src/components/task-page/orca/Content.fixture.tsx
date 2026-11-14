@@ -1,16 +1,13 @@
 import { defineFixture } from '../../../component-fixtures/component-fixture'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
-import type {
-  TaskBoardCardsState,
-  TaskBoardProviderState
-} from '../../../../../shared/task-board/task-board-provider-results'
-import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
+import type { TaskBoardProviderState } from '../../../../../shared/task-board/task-board-provider-results'
+import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 import { getSourceOptions } from '../task-page-localized-options'
 import { TaskPageOrcaBoard } from './Content'
 import type { TaskBoardMove } from './use-task-board-move'
+import type { TaskBoardViewState } from './task-board-view-state'
 
 const statuses: WorkspaceStatusDefinition[] = [
   { id: 'todo', label: 'Todo' },
@@ -23,8 +20,8 @@ function makeCard(
   provider: TaskProvider,
   displayId: string,
   title: string,
-  extra: Partial<TaskBoardCard> = {}
-): TaskBoardCard {
+  extra: Partial<TaskBoardWireCard> = {}
+): TaskBoardWireCard {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the board reads only the project fields of `source.item`; this static fixture supplies just those.
   return {
     refKey: `${provider}:fixture:${displayId}`,
@@ -35,6 +32,8 @@ function makeCard(
     projectLabel: 'acme/web',
     statusName: 'Open',
     category: 'todo',
+    columnId: 'todo',
+    moveTargets: [],
     labels: [],
     updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     source: {
@@ -42,7 +41,7 @@ function makeCard(
       item: { project: { key: 'ACME' }, team: { id: 'acme' }, repoId: 'acme/web' }
     },
     ...extra
-  } as TaskBoardCard
+  } as TaskBoardWireCard
 }
 
 function providers(
@@ -74,16 +73,15 @@ function Board({
   state,
   error = null
 }: {
-  state: TaskBoardCardsState
+  state: Omit<TaskBoardViewState, 'columns' | 'error'>
   error?: string | null
 }): React.JSX.Element {
   return (
     <TooltipProvider>
       <div className="flex h-[520px] flex-col bg-background p-3">
         <TaskPageOrcaBoard
-          state={state}
+          state={{ ...state, columns: statuses, error: null }}
           statuses={statuses}
-          settings={getDefaultTaskBoardSettings()}
           move={move(error)}
           sourceOptions={getSourceOptions()}
           onRefresh={() => {}}
@@ -119,9 +117,13 @@ export const cardsWithMoveError = defineFixture({
           makeCard('gitlab', '#45', 'Update the onboarding copy'),
           makeCard('jira', 'APP-12', 'Migrate the settings schema', {
             category: 'in-progress',
+            columnId: 'in-progress',
             statusName: 'In Progress'
           }),
-          makeCard('gitlab', '#46', 'Remove the legacy flag', { category: 'done' })
+          makeCard('gitlab', '#46', 'Remove the legacy flag', {
+            category: 'done',
+            columnId: 'completed'
+          })
         ],
         providers: providers('ready', {
           github: {

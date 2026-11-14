@@ -4,35 +4,35 @@ import {
   JiraBoardMoveDialog,
   type JiraBoardMovePrompt
 } from '@/components/task-page/jira/task-page-jira-board-move-dialog'
-import type { JiraIssueUpdate, JiraTransition } from '../../../../../shared/jira/jira-types'
-import type { LinearIssue } from '../../../../../shared/linear/issue-types'
-import type { LinearWorkflowState } from '../../../../../shared/linear/workspace-types'
+import type { JiraTransitionFieldsSubmit } from '@/components/jira-transition-fields-form'
+import type { TaskBoardChoice } from '../../../../../shared/task-board/task-board-wire-types'
 import { TaskBoardChoiceDialog } from './TaskBoardChoiceDialog'
 
-export type TaskBoardLinearChoice = {
-  issue: LinearIssue
+/** Several Linear states map to the drop's column. */
+export type TaskBoardStateChoice = {
+  displayId: string
   destination: string
-  states: LinearWorkflowState[]
+  choices: TaskBoardChoice[]
   error: string | null
 }
 
-/** The Jira transition and Linear state pickers a board drop opens when its target is ambiguous. */
+/** The Jira status change and Linear state pickers a board drop opens when the host asks. */
 export function TaskBoardMoveDialogs({
   jiraPrompt,
-  linearChoice,
+  stateChoice,
   pending,
   onClose,
   onChooseJira,
   onSubmitJira,
-  onChooseLinear
+  onChooseState
 }: {
   jiraPrompt: JiraBoardMovePrompt | null
-  linearChoice: TaskBoardLinearChoice | null
+  stateChoice: TaskBoardStateChoice | null
   pending: boolean
   onClose: () => void
-  onChooseJira: (transition: JiraTransition) => void
-  onSubmitJira: (transition: JiraTransition, updates: JiraIssueUpdate) => Promise<void>
-  onChooseLinear: (stateId: string) => void
+  onChooseJira: (choice: TaskBoardChoice) => void
+  onSubmitJira: (submit: JiraTransitionFieldsSubmit) => Promise<void>
+  onChooseState: (choiceId: string) => void
 }): React.JSX.Element {
   const t = useTranslate()
   return (
@@ -42,28 +42,27 @@ export function TaskBoardMoveDialogs({
         pending={pending}
         onClose={onClose}
         onChoose={onChooseJira}
-        onSubmit={async (updates) => {
-          if (jiraPrompt?.selected) {
-            await onSubmitJira(jiraPrompt.selected, updates)
-          }
-        }}
-        // Retry only shows for a prompt without transitions, which the board never opens.
+        onSubmit={onSubmitJira}
+        // Retry only shows for a prompt without choices, which the board never opens.
         onRetry={onClose}
       />
       <TaskBoardChoiceDialog
-        open={linearChoice !== null}
+        open={stateChoice !== null}
         title={t('taskBoard.chooseStateTitle', 'Move {{id}} to {{column}}', {
-          id: linearChoice?.issue.identifier,
-          column: linearChoice?.destination
+          id: stateChoice?.displayId,
+          column: stateChoice?.destination
         })}
         description={t(
           'taskBoard.chooseStateDescription',
           'Several Linear states match this column. Choose one:'
         )}
-        options={(linearChoice?.states ?? []).map((state) => ({ id: state.id, label: state.name }))}
+        options={(stateChoice?.choices ?? []).map((choice) => ({
+          id: choice.id,
+          label: choice.name
+        }))}
         pending={pending}
-        error={linearChoice?.error ?? null}
-        onChoose={onChooseLinear}
+        error={stateChoice?.error ?? null}
+        onChoose={onChooseState}
         onClose={onClose}
       />
     </>

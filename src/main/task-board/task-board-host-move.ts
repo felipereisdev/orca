@@ -1,8 +1,8 @@
 import { getRepoRoutingConnectionId } from '../../shared/execution-host'
 import {
-  buildResolutionFieldValue,
   classifyTransitionRequirements,
-  jiraTransitionChoice
+  jiraTransitionChoice,
+  jiraTransitionUpdate
 } from '../../shared/jira/jira-transition-fields'
 import type {
   JiraIssueUpdate,
@@ -116,31 +116,13 @@ export function decideJiraMove(
     return picked.stop
   }
   const transition = picked.candidate
-  const requirement = classifyTransitionRequirements(transition)
-  if (requirement.kind === 'none') {
-    return { kind: 'apply', transitionId: transition.id }
+  if (classifyTransitionRequirements(transition).kind === 'unsupported') {
+    return { status: 'unsupported-fields', choice: jiraTransitionChoice(transition) }
   }
-  const choice = jiraTransitionChoice(transition)
-  if (requirement.kind === 'unsupported') {
-    return { status: 'unsupported-fields', choice }
-  }
-  const { resolution: resolutionField, commentRequired } = requirement
-  const resolution = resolutionField
-    ? buildResolutionFieldValue(resolutionField, params.fields?.resolutionId ?? '')
-    : null
-  const comment = params.fields?.comment?.trim() ?? ''
-  if ((resolutionField && !resolution) || (commentRequired && !comment)) {
-    return { status: 'needs-fields', choice }
-  }
-  return {
-    kind: 'apply',
-    transitionId: transition.id,
-    ...(resolutionField && resolution
-      ? { transitionFields: { [resolutionField.key]: resolution } }
-      : {}),
-    // Like the desktop form, a comment goes only where the transition asks for one.
-    ...(commentRequired ? { transitionComment: comment } : {})
-  }
+  const update = jiraTransitionUpdate(transition, params.fields)
+  return update
+    ? { kind: 'apply', ...update, transitionId: transition.id }
+    : { status: 'needs-fields', choice: jiraTransitionChoice(transition) }
 }
 
 type BoardTarget = {

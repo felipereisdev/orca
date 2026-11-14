@@ -2,76 +2,69 @@
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import {
   placeTaskBoardCards,
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS
 } from '@/lib/work-items/task-board/task-board-move-overrides'
-import type { JiraIssue, JiraStatus, JiraTransition } from '../../../../../shared/jira/jira-types'
-import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
+import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { JiraIssue } from '../../../../../shared/jira/jira-types'
+import type {
+  TaskBoardMoveResult,
+  TaskBoardWireCard
+} from '../../../../../shared/task-board/task-board-wire-types'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 
-const moves = vi.hoisted(() => ({
-  loadJira: vi.fn(),
-  applyJira: vi.fn()
-}))
+const host = vi.hoisted(() => ({ move: vi.fn() }))
 
-vi.mock('./task-board-provider-moves', () => ({
-  requireTaskBoardTarget: () => ({ kind: 'local' }),
-  taskBoardMoveErrorMessage: (cause: unknown) =>
-    cause instanceof Error ? cause.message : 'Failed to change status.',
-  loadJiraTaskBoardMoveTransitions: moves.loadJira,
-  applyJiraTaskBoardMove: moves.applyJira,
-  loadLinearTaskBoardMoveStates: vi.fn(),
-  applyLinearTaskBoardMove: vi.fn()
+vi.mock('@/runtime/task-board/runtime-task-board-client', () => ({
+  moveTaskBoardCard: host.move
 }))
-vi.mock('./task-board-label-moves', () => ({ moveTaskBoardCardWithLabels: vi.fn() }))
-vi.mock('@/components/task-page/jira/task-page-jira-board-move-dialog', () => ({
-  JiraBoardMoveDialog: () => null
-}))
-vi.mock('./TaskBoardChoiceDialog', () => ({ TaskBoardChoiceDialog: () => null }))
 
 import { useTaskBoardMove } from './use-task-board-move'
 
-const todo: JiraStatus = { id: '1', name: 'To Do', categoryKey: 'new', categoryName: 'To Do' }
-const review: JiraStatus = { ...todo, id: '2', name: 'Review', categoryKey: 'indeterminate' }
-const testing: JiraStatus = { ...todo, id: '3', name: 'Testing', categoryKey: 'indeterminate' }
-const transitions: JiraTransition[] = [
-  { id: '21', name: 'Review', to: review },
-  { id: '31', name: 'Testing', to: testing }
-]
 const columns: WorkspaceStatusDefinition[] = [
   { id: 'todo', label: 'Todo' },
   { id: 'in-progress', label: 'In progress' },
   { id: 'completed', label: 'Done' }
 ]
+const progress = {
+  worktreeId: 'wt-1',
+  branch: 'app-1',
+  commitsAhead: 2,
+  review: null,
+  checks: 'none' as const
+}
 
-function jiraCard(key: string, status = todo, updatedAt = ''): TaskBoardCard {
-  const issue: JiraIssue = {
-    id: key,
-    key,
-    title: key,
-    url: `https://jira.example.com/browse/${key}`,
-    project: { id: '1', key: 'APP', name: 'App' },
-    issueType: { id: '1', name: 'Task' },
-    status,
-    labels: [],
-    createdAt: '',
-    updatedAt
-  }
+function jiraCard(key: string, columnId = 'todo', updatedAt = ''): TaskBoardWireCard {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: moves read only the card's identity and ref; the issue is a stand-in.
+  const issue = { key } as JiraIssue
   return {
     refKey: `jira::${key}`,
+    ref: { provider: 'jira', siteId: null, key },
     provider: 'jira',
     displayId: key,
     title: key,
-    url: issue.url,
+    url: `https://jira.example.com/browse/${key}`,
     projectLabel: 'APP',
-    statusName: status.name,
-    category: status.categoryKey === 'indeterminate' ? 'in-progress' : 'todo',
+    project: { key: 'jira::APP', provider: 'jira', label: 'APP' },
+    statusName: 'To Do',
+    category: 'todo',
+    columnId,
+    moveTargets: columns
+      .filter((column) => column.id !== columnId)
+      .map((column) => ({ columnId: column.id, allowed: true as const })),
     labels: [],
     updatedAt,
     source: { provider: 'jira', item: issue }
   }
+}
+
+function renderMove(reread = vi.fn(async () => {}), accountHostId: ExecutionHostId = 'local') {
+  return renderHook(() => useTaskBoardMove({ columns, accountHostId, reread }))
+}
+
+function answer(result: TaskBoardMoveResult): void {
+  host.move.mockResolvedValue(result)
 }
 
 afterEach(() => {
@@ -81,88 +74,104 @@ afterEach(() => {
 })
 
 describe('useTaskBoardMove', () => {
-  it('keeps an open Jira dialog when a second Jira card is dropped', async () => {
-    moves.loadJira.mockResolvedValue(transitions)
-    const reread = vi.fn(async () => {})
-    const { result } = renderHook(() =>
-      useTaskBoardMove({
-        cards: [],
-        columns,
-        settings: getDefaultTaskBoardSettings(),
-        accountHostId: 'local',
-        reread
-      })
-    )
+  it('keeps a confirmed move in its target column, with the card’s progress, while the list is stale', async () => {
+    const stale = { ...jiraCard('APP-3'), progress }
+    const moved = jiraCard('APP-3', 'in-progress', '2026-11-13T10:00:00Z')
+    answer({ status: 'moved', card: moved })
+    const { result } = renderMove(undefined, 'runtime:confirmed-host')
+
+    await act(() => result.current.move(stale, 'in-progress'))
+
+    expect(placeTaskBoardCards([stale], result.current.overrides)).toEqual([
+      { card: { ...moved, progress }, columnId: 'in-progress' }
+    ])
+  })
+
+  it('keeps the card where it was dropped when the host applied the move but could not re-read it', async () => {
+    const stale = jiraCard('APP-5')
+    answer({ status: 'moved', card: null })
+    const { result } = renderMove(undefined, 'runtime:null-card-host')
+
+    await act(() => result.current.move(stale, 'completed'))
+
+    expect(placeTaskBoardCards([stale], result.current.overrides)).toEqual([
+      { card: { ...stale, columnId: 'completed' }, columnId: 'completed' }
+    ])
+  })
+
+  it('puts the card back when the host refuses the move', async () => {
+    const card = jiraCard('APP-6')
+    answer({ status: 'blocked', reason: 'no-transition' })
+    const { result } = renderMove(undefined, 'runtime:blocked-host')
+
+    await act(() => result.current.move(card, 'completed'))
+
+    expect(placeTaskBoardCards([card], result.current.overrides)).toEqual([
+      { card, columnId: 'todo' }
+    ])
+  })
+
+  it('leaves a second Jira card in its column while the first card’s dialog is open', async () => {
+    answer({
+      status: 'needs-choice',
+      choices: [
+        { id: '21', name: 'Review', fields: null },
+        { id: '31', name: 'Testing', fields: null }
+      ]
+    })
+    const { result } = renderMove(undefined, 'runtime:dialog-host')
     const first = jiraCard('APP-1')
     const second = jiraCard('APP-2')
 
     await act(() => result.current.move(first, 'in-progress'))
     await act(() => result.current.move(second, 'in-progress'))
 
-    expect(moves.loadJira).toHaveBeenCalledTimes(1)
-    expect([...result.current.updatingRefKeys]).toEqual(['jira::APP-1'])
-    expect(result.current.error).toBe('Finish the open move first')
-    expect(reread).not.toHaveBeenCalled()
-  })
-
-  it('keeps a confirmed move in its target column when the next read is still stale', async () => {
-    const stale = jiraCard('APP-3')
-    const confirmed = jiraCard('APP-3', review, '2026-11-13T10:00:00Z')
-    moves.loadJira.mockResolvedValue([transitions[0]])
-    moves.applyJira.mockResolvedValue(confirmed)
-    const settings = getDefaultTaskBoardSettings()
-    const reread = vi.fn(async () => {})
-    const { result } = renderHook(() =>
-      useTaskBoardMove({ cards: [], columns, settings, accountHostId: 'local', reread })
-    )
-
-    await act(() => result.current.move(stale, 'in-progress'))
-
-    expect(reread).toHaveBeenCalledExactlyOnceWith('jira')
-    // The provider re-read after the move still returns the card in To Do.
-    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
-      { card: confirmed, columnId: 'in-progress' }
+    expect(placeTaskBoardCards([first, second], result.current.overrides)).toEqual([
+      { card: first, columnId: 'in-progress' },
+      { card: second, columnId: 'todo' }
     ])
   })
 
-  it('re-reads the provider when a held move expires and then shows what that read says', async () => {
+  it('refuses a drop on a column the host marked as blocked', () => {
+    const card = {
+      ...jiraCard('APP-8'),
+      moveTargets: [
+        { columnId: 'in-progress', allowed: true as const },
+        { columnId: 'completed', allowed: false as const, reason: 'no-mapping' as const }
+      ]
+    }
+    const { result } = renderMove(undefined, 'runtime:can-drop-host')
+
+    expect(result.current.canDrop(card, 'completed').ok).toBe(false)
+    expect(result.current.canDrop(card, 'in-progress').ok).toBe(true)
+  })
+
+  it('lists the board again when a held move expires and then shows what that list says', async () => {
     vi.useFakeTimers()
     const stale = jiraCard('APP-4')
-    const confirmed = jiraCard('APP-4', review, '2026-11-13T10:00:00Z')
-    moves.loadJira.mockResolvedValue([transitions[0]])
-    moves.applyJira.mockResolvedValue(confirmed)
-    const settings = getDefaultTaskBoardSettings()
-    const reread = vi.fn(async () => {})
-    const { result } = renderHook(() =>
-      useTaskBoardMove({
-        cards: [],
-        columns,
-        settings,
-        accountHostId: 'runtime:expiry-host',
-        reread
-      })
-    )
-    await act(() => result.current.move(stale, 'in-progress'))
+    const moved = jiraCard('APP-4', 'in-progress', '2026-11-13T10:00:00Z')
+    answer({ status: 'moved', card: moved })
     let finishReread: () => void = () => {}
-    reread.mockClear().mockImplementation(
+    const reread = vi.fn(
       () =>
         new Promise<void>((resolve) => {
           finishReread = resolve
         })
     )
+    const { result } = renderMove(reread, 'runtime:expiry-host')
+    await act(() => result.current.move(stale, 'in-progress'))
 
     await act(() => vi.advanceTimersByTimeAsync(TASK_BOARD_MOVE_OVERRIDE_TTL_MS))
 
-    expect(reread).toHaveBeenCalledExactlyOnceWith('jira')
-    // Still held while the fresh read is in flight, so the card does not snap back early.
-    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
-      { card: confirmed, columnId: 'in-progress' }
+    // Still held while the fresh list is in flight, so the card does not snap back early.
+    expect(placeTaskBoardCards([stale], result.current.overrides)).toEqual([
+      { card: moved, columnId: 'in-progress' }
     ])
 
     await act(async () => finishReread())
 
-    // The fresh read still says To Do: the provider is now authoritative.
-    expect(placeTaskBoardCards([stale], result.current.overrides, columns, settings)).toEqual([
+    // The fresh list still says Todo: the host is now authoritative.
+    expect(placeTaskBoardCards([stale], result.current.overrides)).toEqual([
       { card: stale, columnId: 'todo' }
     ])
   })

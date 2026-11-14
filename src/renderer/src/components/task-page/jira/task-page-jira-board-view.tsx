@@ -3,7 +3,11 @@ import { useAppStore } from '@/store/index'
 import { getEnvironmentRuntimeContextKey } from '@/runtime/hosts/observations/provider-runtime-context'
 import { runtimeTargetEnvironmentId } from '@/runtime/rpc/targets/runtime-client-target'
 import { useTranslate } from '@/i18n/use-translate'
-import { classifyTransitionRequirements } from '../../../../../shared/jira/jira-transition-fields'
+import {
+  classifyTransitionRequirements,
+  jiraTransitionChoice,
+  jiraTransitionUpdate
+} from '../../../../../shared/jira/jira-transition-fields'
 import type {
   JiraIssue,
   JiraIssueUpdate,
@@ -18,6 +22,28 @@ import { JiraBoardMoveDialog, type JiraBoardMovePrompt } from './task-page-jira-
 import { applyJiraBoardMove, getJiraBoardMoveTransitions } from './task-page-jira-board-move'
 import { formatRelativeTime } from '../task-page-source-context'
 import { enqueueJiraIssueMutation, jiraIssueRequestScope } from '../../jira-issue-mutation-queue'
+
+/** The tab keeps Jira's own transitions; the shared dialog sees them as board choices. */
+type JiraTabMovePrompt = {
+  issue: JiraIssue
+  destination: string
+  transitions: JiraTransition[]
+  selected: JiraTransition | null
+  error: string | null
+  loading: boolean
+}
+
+function toDialogPrompt(prompt: JiraTabMovePrompt): JiraBoardMovePrompt {
+  return {
+    issueKey: prompt.issue.key,
+    issueUrl: prompt.issue.url,
+    destination: prompt.destination,
+    choices: prompt.transitions.map(jiraTransitionChoice),
+    selected: prompt.selected ? jiraTransitionChoice(prompt.selected) : null,
+    error: prompt.error,
+    loading: prompt.loading
+  }
+}
 
 type Props = {
   issues: JiraIssue[]
@@ -48,7 +74,7 @@ export function TaskPageJiraBoardView({
 }: Props): React.JSX.Element {
   const t = useTranslate()
   const patchJiraIssue = useAppStore((state) => state.patchJiraIssue)
-  const [prompt, setPrompt] = useState<JiraBoardMovePrompt | null>(null)
+  const [prompt, setPrompt] = useState<JiraTabMovePrompt | null>(null)
   const [pending, setPending] = useState(false)
   const lockedIssueRef = useRef<string | null>(null)
   const lastDestinationRef = useRef<TaskPageJiraBoardSection | null>(null)
@@ -238,16 +264,18 @@ export function TaskPageJiraBoardView({
         onMoveIssue={move}
       />
       <JiraBoardMoveDialog
-        prompt={prompt}
+        prompt={prompt ? toDialogPrompt(prompt) : null}
         pending={pending}
         onClose={close}
-        onChoose={(transition) => {
-          if (prompt) {
+        onChoose={(choice) => {
+          const transition = prompt?.transitions.find((item) => item.id === choice.id)
+          if (prompt && transition) {
             void choose(prompt.issue, transition)
           }
         }}
-        onSubmit={async (updates) => {
-          if (prompt?.selected) {
+        onSubmit={async ({ fields }) => {
+          const updates = prompt?.selected ? jiraTransitionUpdate(prompt.selected, fields) : null
+          if (prompt?.selected && updates) {
             await apply(prompt.issue, prompt.selected, updates)
           }
         }}

@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import { TaskBoard, type TaskBoardColumn } from './TaskBoard'
 
 function makeDataTransfer(): DataTransfer {
@@ -32,7 +32,7 @@ const card = {
   category: 'todo',
   labels: [],
   updatedAt: '2026-11-01T00:00:00Z'
-} as unknown as TaskBoardCard
+} as unknown as TaskBoardWireCard
 
 const columns: TaskBoardColumn[] = [
   { id: 'todo', label: 'Todo', status: { id: 'todo', label: 'Todo' }, cards: [card] },

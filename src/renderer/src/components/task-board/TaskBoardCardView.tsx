@@ -15,7 +15,7 @@ import { LinearIcon } from '@/components/icons/LinearIcon'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
 import type { TaskBoardColumn, TaskBoardDropCheck } from './TaskBoard'
 
@@ -27,19 +27,19 @@ const PROVIDER_ICONS: Record<TaskProvider, (props: { className?: string }) => Re
 }
 
 type TaskBoardCardViewProps = {
-  card: TaskBoardCard
+  card: TaskBoardWireCard
   columnId: string
   columns: TaskBoardColumn[]
-  canDrop: (card: TaskBoardCard, columnId: string) => TaskBoardDropCheck
+  canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
   dragging: boolean
   selected: boolean
   updating: boolean
   formatUpdatedAt: (updatedAt: string) => string
-  onDragStart: (card: TaskBoardCard, event: React.DragEvent<HTMLDivElement>) => void
+  onDragStart: (card: TaskBoardWireCard, event: React.DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
-  onMove: (card: TaskBoardCard, columnId: string) => Promise<void>
-  onOpen: (card: TaskBoardCard) => void
-  onStartWorkspace: (card: TaskBoardCard) => void
+  onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
+  onOpen: (card: TaskBoardWireCard) => void
+  onStartWorkspace: (card: TaskBoardWireCard) => void
 }
 
 export function TaskBoardCardView({

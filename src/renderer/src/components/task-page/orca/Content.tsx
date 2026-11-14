@@ -3,15 +3,10 @@ import { AlertCircle, KanbanSquare, X } from 'lucide-react'
 import { TaskBoard, type TaskBoardColumn } from '@/components/task-board/TaskBoard'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
-import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
 import { matchesTaskBoardProjects } from '../../../../../shared/task-board/task-board-project-filter'
-import type { TaskBoardCardsState } from '../../../../../shared/task-board/task-board-provider-results'
 import { useAppStore } from '@/store'
-import {
-  getDefaultTaskBoardSettings,
-  type TaskBoardSettings
-} from '../../../../../shared/task-board/task-board-settings'
 import { isTaskProvider, type TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 import type { SourceOption } from '../task-page-localized-options'
@@ -22,6 +17,7 @@ import { TaskBoardToolbar, type TaskBoardToolbarProvider } from './TaskBoardTool
 import { useTaskBoardProjectFilter } from './use-task-board-project-filter'
 import { useTaskBoardCards } from './use-task-board-cards'
 import { useTaskBoardMove, type TaskBoardMove } from './use-task-board-move'
+import type { TaskBoardViewState } from './task-board-view-state'
 import {
   readHiddenTaskBoardProviders,
   writeHiddenTaskBoardProviders
@@ -44,20 +40,17 @@ export function TaskPageOrcaContent({
     openGitHubDetailPage,
     handleOpenOrUseGitHubWorkItem
   } = model
-  const statuses = useAppStore((s) => s.workspaceStatuses)
-  const savedSettings = useAppStore((s) => s.settings?.taskBoard)
-  // Why: a fallback built inside the selector would be a new object every render.
-  const settings = useMemo(() => savedSettings ?? getDefaultTaskBoardSettings(), [savedSettings])
-  const { state, refresh, refreshProvider } = useTaskBoardCards(accountBackedTaskSourceHostId)
+  const localStatuses = useAppStore((s) => s.workspaceStatuses)
+  const { state, refresh, reread } = useTaskBoardCards(accountBackedTaskSourceHostId)
+  // The host's columns; the local ones only shape the first-load skeleton.
+  const statuses = state.columns ?? localStatuses
   const move = useTaskBoardMove({
-    cards: state.cards,
     columns: statuses,
-    settings,
     accountHostId: accountBackedTaskSourceHostId,
-    reread: refreshProvider
+    reread
   })
 
-  const openCard = (card: TaskBoardCard): void => {
+  const openCard = (card: TaskBoardWireCard): void => {
     const { source } = card
     switch (source.provider) {
       case 'jira':
@@ -70,7 +63,7 @@ export function TaskPageOrcaContent({
         return openGitHubDetailPage(source.item)
     }
   }
-  const startWorkspace = (card: TaskBoardCard): void => {
+  const startWorkspace = (card: TaskBoardWireCard): void => {
     const { source } = card
     switch (source.provider) {
       case 'jira':
@@ -88,7 +81,6 @@ export function TaskPageOrcaContent({
     <TaskPageOrcaBoard
       state={state}
       statuses={statuses}
-      settings={settings}
       move={move}
       // A provider hidden in Settings → Tasks gets no chip.
       sourceOptions={visibleSourceOptions}
@@ -103,21 +95,19 @@ export function TaskPageOrcaContent({
 export function TaskPageOrcaBoard({
   state,
   statuses,
-  settings,
   move,
   sourceOptions,
   onRefresh,
   onOpen,
   onStartWorkspace
 }: {
-  state: TaskBoardCardsState
+  state: TaskBoardViewState
   statuses: readonly WorkspaceStatusDefinition[]
-  settings: TaskBoardSettings
   move: TaskBoardMove
   sourceOptions: readonly SourceOption[]
   onRefresh: () => void
-  onOpen: (card: TaskBoardCard) => void
-  onStartWorkspace: (card: TaskBoardCard) => void
+  onOpen: (card: TaskBoardWireCard) => void
+  onStartWorkspace: (card: TaskBoardWireCard) => void
 }): React.JSX.Element {
   const t = useTranslate()
   const [hiddenProviders, setHiddenProviders] = useState(readHiddenTaskBoardProviders)
@@ -125,10 +115,10 @@ export function TaskPageOrcaBoard({
   const providerPlaced = useMemo(() => {
     // A held move outlives its provider's reads, so a provider hidden in Settings must drop it too.
     const visible = new Set<string>(sourceOptions.map((option) => option.id))
-    return placeTaskBoardCards(state.cards, move.overrides, statuses, settings).filter(
+    return placeTaskBoardCards(state.cards, move.overrides).filter(
       ({ card }) => visible.has(card.provider) && !hiddenProviders.has(card.provider)
     )
-  }, [hiddenProviders, move.overrides, settings, sourceOptions, state.cards, statuses])
+  }, [hiddenProviders, move.overrides, sourceOptions, state.cards])
   const projectFilter = useTaskBoardProjectFilter(
     useMemo(() => providerPlaced.map(({ card }) => card), [providerPlaced])
   )
@@ -204,6 +194,15 @@ export function TaskPageOrcaBoard({
         onToggleProvider={toggleProvider}
         onRefresh={onRefresh}
       />
+      {state.error ? (
+        <div
+          role="alert"
+          className="mx-3 mt-3 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <AlertCircle className="size-3.5 flex-none" />
+          <span className="min-w-0 flex-1">{state.error}</span>
+        </div>
+      ) : null}
       {move.error ? (
         <div
           role="alert"

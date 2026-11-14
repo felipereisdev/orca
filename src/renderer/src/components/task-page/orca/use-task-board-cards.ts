@@ -1,68 +1,46 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
-import { listGitHubTaskBoardCards } from '@/lib/work-items/task-board/adapters/github-task-board-adapter'
-import { listGitLabTaskBoardCards } from '@/lib/work-items/task-board/adapters/gitlab-task-board-adapter'
-import { listJiraTaskBoardCards } from '@/lib/work-items/task-board/adapters/jira-task-board-adapter'
-import { listLinearTaskBoardCards } from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
-import { getTaskBoardProviderScopeKey } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
-import {
-  mergeTaskBoardProviderResult,
-  type TaskBoardCardsState,
-  type TaskBoardLoadOptions,
-  type TaskBoardProviderResult
-} from '../../../../../shared/task-board/task-board-provider-results'
+import { translate } from '@/i18n/i18n'
+import { listTaskBoard } from '@/runtime/task-board/runtime-task-board-client'
+import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
 import {
-  markTaskBoardProviderLoaded,
+  markTaskBoardLoaded,
   readTaskBoardCards,
-  readTaskBoardProviderLoaded,
+  readTaskBoardLoaded,
   writeTaskBoardCards
 } from './task-board-session-cache'
+import {
+  applyTaskBoardList,
+  failTaskBoardList,
+  startTaskBoardReload,
+  type TaskBoardViewState
+} from './task-board-view-state'
 
-/** A provider read this recently is shown from the session cache when the board mounts again. */
+/** A board listed this recently is shown from the session cache when it mounts again. */
 const MOUNT_REUSE_MS = 45_000
 
-const PROVIDER_LOADERS: Record<
-  TaskProvider,
-  (
-    signal: AbortSignal,
-    accountHostId: ExecutionHostId,
-    options: TaskBoardLoadOptions
-  ) => Promise<TaskBoardProviderResult>
-> = {
-  github: (signal, _accountHostId, options) => listGitHubTaskBoardCards(signal, options),
-  gitlab: listGitLabTaskBoardCards,
-  linear: listLinearTaskBoardCards,
-  jira: listJiraTaskBoardCards
-}
-
-/** Per-provider scope keys; repos hydrate per host after mount, so a provider must reload when its key changes. */
-function useTaskBoardScopeKeys(): Record<TaskProvider, string> {
-  const repos = useAppStore((s) => s.repos)
-  const preflightStatus = useAppStore((s) => s.preflightStatus)
-  const preflightStatusChecked = useAppStore((s) => s.preflightStatusChecked)
+/** Settings that change what the host lists; editing them in Settings → Tasks re-lists. */
+function useTaskBoardScopeKey(): string {
   const visibleTaskProviders = useAppStore((s) => s.settings?.visibleTaskProviders)
-  // A new object only when an input changes; the reload effect still compares key strings.
-  return useMemo(() => {
-    const scope = { repos, preflightStatus, preflightStatusChecked, visibleTaskProviders }
-    return {
-      github: getTaskBoardProviderScopeKey('github', scope),
-      gitlab: getTaskBoardProviderScopeKey('gitlab', scope),
-      linear: getTaskBoardProviderScopeKey('linear', scope),
-      jira: getTaskBoardProviderScopeKey('jira', scope)
-    }
-  }, [repos, preflightStatus, preflightStatusChecked, visibleTaskProviders])
+  const taskBoard = useAppStore((s) => s.settings?.taskBoard)
+  return JSON.stringify([visibleTaskProviders ?? null, taskBoard ?? null])
 }
 
-/** `accountHostId` routes Jira and Linear: pass the Tasks page's `accountBackedTaskSourceHostId`. */
+function listErrorMessage(cause: unknown): string {
+  return cause instanceof Error && cause.message
+    ? cause.message
+    : translate('taskBoard.loadFailed', 'Could not load issues. Refresh to try again.')
+}
+
+/** The board of `accountHostId` (the Tasks page's `accountBackedTaskSourceHostId`), read from its host. */
 export function useTaskBoardCards(accountHostId: ExecutionHostId): {
-  state: TaskBoardCardsState
+  state: TaskBoardViewState
   refresh: () => void
-  /** A fresh read; resolves once its result reached the board (or was superseded). */
-  refreshProvider: (provider: TaskProvider) => Promise<void>
+  /** A fresh list; resolves once its result reached the board (or was superseded). */
+  reread: () => Promise<void>
 } {
-  // The last cards for this host show at once; the mount load then updates the stale ones.
+  // The last board for this host shows at once; the mount load then updates it.
   const [stateHostId, setStateHostId] = useState(accountHostId)
   const [state, setState] = useState(() => readTaskBoardCards(accountHostId))
   if (stateHostId !== accountHostId) {
@@ -70,97 +48,84 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     setState(readTaskBoardCards(accountHostId))
   }
   useEffect(() => writeTaskBoardCards(stateHostId, state), [stateHostId, state])
-  const controllersRef = useRef(new Map<TaskProvider, AbortController>())
+  const controllerRef = useRef<AbortController | null>(null)
   const mountedRef = useRef(false)
-  const scopeKeys = useTaskBoardScopeKeys()
-  const scopeKeysRef = useRef(scopeKeys)
-  const loadedScopeKeysRef = useRef<Record<TaskProvider, string> | null>(null)
+  const scopeKey = useTaskBoardScopeKey()
+  const scopeKeyRef = useRef(scopeKey)
+  const loadedScopeKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    scopeKeysRef.current = scopeKeys
-  }, [scopeKeys])
+    scopeKeyRef.current = scopeKey
+  }, [scopeKey])
 
   const load = useCallback(
-    (provider: TaskProvider, options: TaskBoardLoadOptions) => {
-      controllersRef.current.get(provider)?.abort()
+    async (fresh: boolean): Promise<void> => {
+      controllerRef.current?.abort()
       const controller = new AbortController()
-      controllersRef.current.set(provider, controller)
-      const scopeKey = scopeKeysRef.current[provider]
-      // Previous cards and a settled status stay visible while the provider reloads.
-      setState((current) => {
-        const previous = current.providers[provider]
-        const next = previous.status === 'loading' ? previous : { ...previous, refreshing: true }
-        return { ...current, providers: { ...current.providers, [provider]: next } }
-      })
-      return PROVIDER_LOADERS[provider](controller.signal, accountHostId, options).then(
-        (result) => {
-          if (controller.signal.aborted) {
-            return
-          }
-          markTaskBoardProviderLoaded(accountHostId, provider, { at: Date.now(), scopeKey })
-          if (mountedRef.current) {
-            setState((current) => mergeTaskBoardProviderResult(current, result))
-            return
-          }
-          // Why: a move settling after the board unmounted still reloads; the next mount trusts this cache.
-          const cached = readTaskBoardCards(accountHostId)
-          writeTaskBoardCards(accountHostId, mergeTaskBoardProviderResult(cached, result))
+      controllerRef.current = controller
+      const loadScopeKey = scopeKeyRef.current
+      const update = (next: (current: TaskBoardViewState) => TaskBoardViewState): void => {
+        if (mountedRef.current) {
+          setState(next)
+          return
         }
-      )
+        // Why: a move settling after the board unmounted still re-lists; the next mount trusts this cache.
+        writeTaskBoardCards(accountHostId, next(readTaskBoardCards(accountHostId)))
+      }
+      update(startTaskBoardReload)
+      try {
+        const target = ipcOrRuntimeTargetForHostId(accountHostId)
+        if (!target) {
+          throw new Error(translate('taskBoard.hostUnavailable', 'This host is not available.'))
+        }
+        const result = await listTaskBoard(target, { fresh, signal: controller.signal })
+        if (controller.signal.aborted) {
+          return
+        }
+        markTaskBoardLoaded(accountHostId, { at: Date.now(), scopeKey: loadScopeKey })
+        update(() => applyTaskBoardList(result))
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          update((current) => failTaskBoardList(current, listErrorMessage(cause)))
+        }
+      }
     },
     [accountHostId]
   )
 
-  // Refresh and post-move reloads are explicit, so they bypass provider response caches.
-  const refreshProvider = useCallback(
-    (provider: TaskProvider) => load(provider, { fresh: true }),
-    [load]
-  )
-  const refresh = useCallback(() => {
-    for (const provider of TASK_PROVIDERS) {
-      void refreshProvider(provider)
-    }
-  }, [refreshProvider])
+  // Refresh and post-move reads are explicit, so they bypass the host's and providers' caches.
+  const reread = useCallback(() => load(true), [load])
+  const refresh = useCallback(() => void load(true), [load])
 
   useEffect(() => {
-    const controllers = controllersRef.current
     mountedRef.current = true
-    // Why: opening a card's detail and coming back must not refetch all four providers every time.
-    const now = Date.now()
-    const cached = readTaskBoardCards(accountHostId).providers
-    for (const provider of TASK_PROVIDERS) {
-      const loaded = readTaskBoardProviderLoaded(accountHostId, provider)
-      const reusable =
-        loaded !== undefined &&
-        now - loaded.at < MOUNT_REUSE_MS &&
-        loaded.scopeKey === scopeKeysRef.current[provider] &&
-        cached[provider].status !== 'loading' &&
-        cached[provider].refreshing !== true
-      if (!reusable) {
-        void load(provider, {})
-      }
+    // Why: opening a card's detail and coming back must not re-list the whole board every time.
+    const loaded = readTaskBoardLoaded(accountHostId)
+    const cached = readTaskBoardCards(accountHostId)
+    const reusable =
+      loaded !== undefined &&
+      Date.now() - loaded.at < MOUNT_REUSE_MS &&
+      loaded.scopeKey === scopeKeyRef.current &&
+      Object.values(cached.providers).every(
+        (provider) => provider.status !== 'loading' && provider.refreshing !== true
+      )
+    if (!reusable) {
+      void load(false)
     }
     return () => {
-      for (const controller of controllers.values()) {
-        controller.abort()
-      }
-      controllers.clear()
+      controllerRef.current?.abort()
+      controllerRef.current = null
       mountedRef.current = false
     }
   }, [accountHostId, load])
 
-  // The mount load covers the first keys; afterwards only providers whose scope changed reload.
+  // The mount load covers the first key; afterwards a settings change re-lists.
   useEffect(() => {
-    const previous = loadedScopeKeysRef.current
-    loadedScopeKeysRef.current = scopeKeys
-    if (!previous) {
-      return
+    const previous = loadedScopeKeyRef.current
+    loadedScopeKeyRef.current = scopeKey
+    if (previous !== null && previous !== scopeKey) {
+      void load(false)
     }
-    for (const provider of TASK_PROVIDERS) {
-      if (previous[provider] !== scopeKeys[provider]) {
-        void load(provider, {})
-      }
-    }
-  }, [scopeKeys, load])
+  }, [scopeKey, load])
 
-  return { state, refresh, refreshProvider }
+  return { state, refresh, reread }
 }

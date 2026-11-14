@@ -1,5 +1,5 @@
 import { defineFixture } from '../../component-fixtures/component-fixture'
-import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
+import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
 import { TaskBoard, type TaskBoardColumn } from './TaskBoard'
 
@@ -7,8 +7,8 @@ function makeCard(
   provider: TaskProvider,
   displayId: string,
   title: string,
-  extra: Partial<TaskBoardCard> = {}
-): TaskBoardCard {
+  extra: Partial<TaskBoardWireCard> = {}
+): TaskBoardWireCard {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the board never reads `source`; this static fixture omits it.
   return {
     refKey: `${provider}:fixture:${displayId}`,
@@ -22,7 +22,7 @@ function makeCard(
     labels: [],
     updatedAt: '2h ago',
     ...extra
-  } as TaskBoardCard
+  } as TaskBoardWireCard
 }
 
 const columns: TaskBoardColumn[] = [
