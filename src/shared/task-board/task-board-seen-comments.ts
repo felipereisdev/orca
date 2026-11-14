@@ -13,7 +13,8 @@ function normalizeMarker(value: unknown): TaskBoardSeenMarker | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null
   }
-  const { at, ids } = value as { at?: unknown; ids?: unknown }
+  const at = 'at' in value ? value.at : undefined
+  const ids = 'ids' in value ? value.ids : undefined
   if (typeof at !== 'string' || Number.isNaN(toMs(at)) || !Array.isArray(ids)) {
     return null
   }
