@@ -1,3 +1,4 @@
+import { failedTaskBoardResult } from './task-board-failed-result'
 import { jiraSearchIssuesForTarget } from '@/runtime/jira/runtime-jira-client'
 import { jiraStatusForTarget } from '@/runtime/jira/runtime-jira-project-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
@@ -6,12 +7,14 @@ import type { RuntimeClientTarget } from '../../../../../../shared/runtime-clien
 import { buildJiraPresetJql } from '../../../../../../shared/jira/jira-preset-jql'
 import { resolveJiraSourceHostId } from '../../../../../../shared/jira/jira-source-host'
 import type { JiraIssue } from '../../../../../../shared/jira/jira-types'
-import { jiraStatusCategory, type TaskBoardCard } from '../task-board-card'
+import {
+  jiraStatusCategory,
+  type TaskBoardCard
+} from '../../../../../../shared/task-board/task-board-card'
 import {
   disconnectedTaskBoardResult,
-  failedTaskBoardResult,
   type TaskBoardProviderResult
-} from '../task-board-provider-results'
+} from '../../../../../../shared/task-board/task-board-provider-results'
 import { isTaskBoardProviderVisible } from './task-board-provider-scope'
 
 // Jira search caps each request at 100 issues.

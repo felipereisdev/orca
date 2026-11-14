@@ -3,7 +3,7 @@ import { getRepoBackedProviderAvailability } from '@/components/task-source-prov
 import {
   getDefaultTaskRepoSelection,
   getTaskEligibleRepos
-} from '@/components/task-page/task-page-default-repo-selection'
+} from '../../../../../../shared/task-board/task-board-repo-scope'
 import type { PreflightStatus } from '../../../../../../preload/api/preflight-api'
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
 import type { Repo } from '../../../../../../shared/repo-types'

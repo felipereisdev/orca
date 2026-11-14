@@ -21,11 +21,11 @@ import {
   resolveLinearTaskBoardTarget,
   toLinearTaskBoardCard
 } from '@/lib/work-items/task-board/adapters/linear-task-board-adapter'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import {
   selectJiraMoveTransitions,
   selectLinearMoveStates
-} from '@/lib/work-items/task-board/task-board-move-targets'
+} from '../../../../../shared/task-board/task-board-move-targets'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type {
   JiraIssue,

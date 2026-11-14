@@ -1,16 +1,19 @@
+import { failedTaskBoardResult } from './task-board-failed-result'
 import { getLinearPriorityLabel } from '@/components/task-page/task-page-localized-options'
 import { linearListIssues, linearStatusForTarget } from '@/runtime/linear/runtime-linear-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { LinearIssue } from '../../../../../../shared/linear/issue-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import { linearStatusCategory, type TaskBoardCard } from '../task-board-card'
+import {
+  linearStatusCategory,
+  type TaskBoardCard
+} from '../../../../../../shared/task-board/task-board-card'
 import {
   disconnectedTaskBoardResult,
-  failedTaskBoardResult,
   isWithinDoneWindow,
   type TaskBoardProviderResult
-} from '../task-board-provider-results'
+} from '../../../../../../shared/task-board/task-board-provider-results'
 import { isTaskBoardProviderVisible } from './task-board-provider-scope'
 
 const ASSIGNED_LIMIT = 100

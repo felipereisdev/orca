@@ -26,7 +26,7 @@ import {
 import type { Repo } from '../../../../shared/repo-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PaletteFilterState } from './palette-filter'
-import { getTaskEligibleRepos } from '../task-page/task-page-default-repo-selection'
+import { getTaskEligibleRepos } from '../../../../shared/task-board/task-board-repo-scope'
 import { getRepoBackedProviderAvailability } from '../task-source-provider-availability'
 import { getTaskPageRepoSourceContext } from '../../lib/work-items/task-repo-source-context'
 import { searchJiraIssuesByKeyOrText } from '../jira-key-or-text-search'

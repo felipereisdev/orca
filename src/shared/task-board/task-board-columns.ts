@@ -1,9 +1,6 @@
-import type {
-  TaskBoardRule,
-  TaskBoardSettings
-} from '../../../../../shared/task-board/task-board-settings'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
-import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
+import type { TaskBoardRule, TaskBoardSettings } from './task-board-settings'
+import type { TaskProvider } from '../work-items/task-providers'
+import type { WorkspaceStatusDefinition } from '../worktree/types'
 import type { TaskBoardStatusCategory } from './task-board-card'
 
 export type TaskBoardStatusInput = {

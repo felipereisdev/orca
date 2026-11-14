@@ -1,37 +1,14 @@
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
-import {
-  getProjectIdentityKey,
-  hasProjectRemoteIdentity,
-  isProjectRemoteIdentityPending
-} from '../../../../shared/project-host-setup-projection'
-import { isGitRepoKind } from '../../../../shared/repo-kind'
 import type { Repo } from '../../../../shared/repo-types'
+import {
+  compareDefaultTaskRepoCandidate,
+  getDefaultTaskRepoSelection,
+  getTaskRepoProjectKey
+} from '../../../../shared/task-board/task-board-repo-scope'
 
 export type TaskProjectPickerGroup = {
   projectKey: string
   repo: Repo
   sources: Repo[]
-}
-
-// Keep unknown/offline identities eligible until probing proves no usable remote, so repos cannot vanish without explanation.
-export function getTaskEligibleRepos(repos: readonly Repo[]): Repo[] {
-  return repos.filter(
-    (repo) =>
-      isGitRepoKind(repo) &&
-      (hasProjectRemoteIdentity(repo) || isProjectRemoteIdentityPending(repo))
-  )
-}
-
-export function getDefaultTaskRepoSelection(repos: readonly Repo[]): Set<string> {
-  const selectedByProject = new Map<string, Repo>()
-  for (const repo of repos) {
-    const projectKey = getTaskRepoProjectKey(repo)
-    const current = selectedByProject.get(projectKey)
-    if (!current || compareDefaultTaskRepoCandidate(repo, current) < 0) {
-      selectedByProject.set(projectKey, repo)
-    }
-  }
-  return new Set([...selectedByProject.values()].map((repo) => repo.id))
 }
 
 export function getTaskProjectPickerGroups(
@@ -79,10 +56,6 @@ export function normalizeTaskRepoSelection(
   return new Set([...selectedByProject.values()].map((repo) => repo.id))
 }
 
-export function getTaskRepoProjectKey(repo: Repo): string {
-  return getProjectIdentityKey(repo)
-}
-
 function compareTaskProjectPickerCandidate(
   a: Repo,
   b: Repo,
@@ -94,14 +67,4 @@ function compareTaskProjectPickerCandidate(
     return aPreferred ? -1 : 1
   }
   return compareDefaultTaskRepoCandidate(a, b)
-}
-
-function compareDefaultTaskRepoCandidate(a: Repo, b: Repo): number {
-  // Prefer local checkout among host twins to avoid unexpected remote auth/network work on first load.
-  const aLocal = getRepoExecutionHostId(a) === LOCAL_EXECUTION_HOST_ID
-  const bLocal = getRepoExecutionHostId(b) === LOCAL_EXECUTION_HOST_ID
-  if (aLocal !== bLocal) {
-    return aLocal ? -1 : 1
-  }
-  return (a.addedAt ?? 0) - (b.addedAt ?? 0) || a.id.localeCompare(b.id)
 }

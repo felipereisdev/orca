@@ -1,8 +1,8 @@
 import type { TaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
-import type { TaskBoardCard } from './task-board-card'
-import { resolveTaskBoardColumnId } from './task-board-columns'
-import { taskBoardCardUpdatedAtMs } from './task-board-provider-results'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import { resolveTaskBoardColumnId } from '../../../../../shared/task-board/task-board-columns'
+import { taskBoardCardUpdatedAtMs } from '../../../../../shared/task-board/task-board-provider-results'
 
 /** How long a confirmed move outlives provider reads that still show the old status. */
 export const TASK_BOARD_MOVE_OVERRIDE_TTL_MS = 2 * 60 * 1000

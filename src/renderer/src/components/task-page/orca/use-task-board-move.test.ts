@@ -2,7 +2,7 @@
 
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import {
   placeTaskBoardCards,
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS

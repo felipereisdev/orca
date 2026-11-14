@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../../shared/constants'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 

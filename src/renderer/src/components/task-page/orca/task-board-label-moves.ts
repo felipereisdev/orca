@@ -15,13 +15,13 @@ import {
   toGitLabTaskBoardCard
 } from '@/lib/work-items/task-board/adapters/gitlab-task-board-adapter'
 import { findTaskBoardRepo } from '@/lib/work-items/task-board/adapters/task-board-provider-scope'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
-import { normalizeTaskBoardMatch } from '@/lib/work-items/task-board/task-board-columns'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
+import { normalizeTaskBoardMatch } from '../../../../../shared/task-board/task-board-columns'
 import {
   resolveLabelProviderMove,
   taskBoardRepoLabels,
   type LabelProviderMove
-} from '@/lib/work-items/task-board/task-board-move-targets'
+} from '../../../../../shared/task-board/task-board-move-targets'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
 import { parseGitHubItemRepository } from '../../../../../shared/github/work-items/work-item-target'
 import type { TaskChange } from '@/store/github/task-records/task-change'

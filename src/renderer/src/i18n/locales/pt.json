@@ -24822,6 +24822,8 @@
     "loadFailed": "Não foi possível carregar as issues. Atualize para tentar novamente.",
     "githubDidNotSettle": "As issues do GitHub não terminaram de carregar.",
     "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Tarefas",
+    "providerAuthFailed": "{{provider}} precisa que você entre novamente.",
+    "providerHostUnavailable": "{{provider}} não está disponível neste host.",
     "providerUnavailable": "{{provider}} não está conectado.",
     "repoUnavailable": "O repositório de {{id}} não está mais no Orca.",
     "chooseStateTitle": "Mover {{id}} para {{column}}",

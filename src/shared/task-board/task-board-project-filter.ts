@@ -1,4 +1,4 @@
-import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
+import { TASK_PROVIDERS, type TaskProvider } from '../work-items/task-providers'
 import type { TaskBoardCard } from './task-board-card'
 
 export type TaskBoardProject = { key: string; provider: TaskProvider; label: string }

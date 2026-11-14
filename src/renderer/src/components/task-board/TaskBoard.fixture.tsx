@@ -1,5 +1,5 @@
 import { defineFixture } from '../../component-fixtures/component-fixture'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
 import { TaskBoard, type TaskBoardColumn } from './TaskBoard'
 

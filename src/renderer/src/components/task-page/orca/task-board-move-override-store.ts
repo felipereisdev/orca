@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import {
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS,
   type TaskBoardMoveOverride

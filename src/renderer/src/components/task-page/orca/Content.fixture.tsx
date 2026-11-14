@@ -1,10 +1,10 @@
 import { defineFixture } from '../../../component-fixtures/component-fixture'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import type {
   TaskBoardCardsState,
   TaskBoardProviderState
-} from '@/lib/work-items/task-board/task-board-provider-results'
+} from '../../../../../shared/task-board/task-board-provider-results'
 import { getDefaultTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
@@ -124,7 +124,10 @@ export const cardsWithMoveError = defineFixture({
           makeCard('gitlab', '#46', 'Remove the legacy flag', { category: 'done' })
         ],
         providers: providers('ready', {
-          github: { status: 'error', error: 'gh is not authenticated on this host.' },
+          github: {
+            status: 'error',
+            error: { code: 'auth', message: 'gh is not authenticated on this host.' }
+          },
           linear: { status: 'disconnected' }
         })
       }}

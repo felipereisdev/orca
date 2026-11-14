@@ -1,11 +1,13 @@
 import type { TaskPageStoreBindingsModel } from './use-task-page-store-bindings'
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import {
-  getTaskEligibleRepos,
   normalizeTaskRepoSelection,
-  getDefaultTaskRepoSelection,
   getTaskProjectPickerGroups
 } from '@/components/task-page/task-page-default-repo-selection'
+import {
+  getDefaultTaskRepoSelection,
+  getTaskEligibleRepos
+} from '../../../../shared/task-board/task-board-repo-scope'
 import { areStringSetsEqual } from '@/components/task-page/task-page-string-set-equality'
 import { buildSelectedReposKey } from '@/components/task-page/task-page-work-item-pagination'
 import {

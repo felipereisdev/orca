@@ -1,8 +1,8 @@
-import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
-import type { GitLabWorkItem } from '../../../../../shared/gitlab-types'
-import type { JiraIssue } from '../../../../../shared/jira/jira-types'
-import type { LinearIssue } from '../../../../../shared/linear/issue-types'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { GitHubWorkItem } from '../github/work-items/work-item-types'
+import type { GitLabWorkItem } from '../gitlab-types'
+import type { JiraIssue } from '../jira/jira-types'
+import type { LinearIssue } from '../linear/issue-types'
+import type { TaskProvider } from '../work-items/task-providers'
 
 export type TaskBoardStatusCategory = 'todo' | 'in-progress' | 'done' | 'excluded'
 

@@ -1,17 +1,20 @@
+import { failedTaskBoardResult } from './task-board-failed-result'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { GitHubWorkItem } from '../../../../../../shared/github/work-items/work-item-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { TASK_BOARD_DONE_WINDOW_DAYS } from '../../../../../../shared/task-board/task-board-settings'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
-import { openClosedStatusCategory, type TaskBoardCard } from '../task-board-card'
+import {
+  openClosedStatusCategory,
+  type TaskBoardCard
+} from '../../../../../../shared/task-board/task-board-card'
 import {
   disconnectedTaskBoardResult,
-  failedTaskBoardResult,
   isWithinDoneWindow,
   type TaskBoardLoadOptions,
   type TaskBoardProviderResult
-} from '../task-board-provider-results'
+} from '../../../../../../shared/task-board/task-board-provider-results'
 import { getTaskBoardRepos } from './task-board-provider-scope'
 
 const OPEN_PER_REPO_LIMIT = 50
@@ -85,7 +88,7 @@ async function readGitHubCards(
     )
   }
   if (open.githubUnavailable || (open.failedCount === repos.length && open.items.length === 0)) {
-    return failedTaskBoardResult('github', undefined)
+    return failedTaskBoardResult('github', undefined, 'unavailable')
   }
   const labels = new Map(repos.map((repo) => [repo.id, repo.displayName]))
   const cards = [

@@ -1,8 +1,8 @@
 import {
   emptyTaskBoardCardsState,
   type TaskBoardCardsState
-} from '@/lib/work-items/task-board/task-board-provider-results'
-import type { TaskBoardProject } from '@/lib/work-items/task-board/task-board-project-filter'
+} from '../../../../../shared/task-board/task-board-provider-results'
+import type { TaskBoardProject } from '../../../../../shared/task-board/task-board-project-filter'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 

@@ -3,8 +3,8 @@ import {
   getDefaultTaskBoardSettings,
   type TaskBoardRule,
   type TaskBoardSettings
-} from '../../../../../shared/task-board/task-board-settings'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+} from './task-board-settings'
+import type { TaskProvider } from '../work-items/task-providers'
 import { jiraStatusCategory, linearStatusCategory } from './task-board-card'
 import { resolveTaskBoardColumnId } from './task-board-columns'
 

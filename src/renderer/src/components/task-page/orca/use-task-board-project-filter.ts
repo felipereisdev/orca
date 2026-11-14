@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import {
   listTaskBoardProjects,
   type TaskBoardProject,
   type TaskBoardProjectOption
-} from '@/lib/work-items/task-board/task-board-project-filter'
+} from '../../../../../shared/task-board/task-board-project-filter'
 import {
   readTaskBoardProjectSelection,
   writeTaskBoardProjectSelection

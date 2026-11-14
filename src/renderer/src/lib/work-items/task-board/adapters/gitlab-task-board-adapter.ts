@@ -1,3 +1,4 @@
+import { failedTaskBoardResult } from './task-board-failed-result'
 import { gitLabApiFor } from '@/runtime/repository-gitlab/gitlab-owner-api'
 import type { ForgeRepoSelector } from '@/runtime/source-control/forge/forge-credential-target'
 import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
@@ -5,13 +6,15 @@ import type { GitLabWorkItem } from '../../../../../../shared/gitlab-types'
 import { mapSettledWithConcurrency } from '../../../../../../shared/map-with-concurrency'
 import type { Repo } from '../../../../../../shared/repo-types'
 import { getTaskPageRepoSourceContext } from '../../task-repo-source-context'
-import { openClosedStatusCategory, type TaskBoardCard } from '../task-board-card'
+import {
+  openClosedStatusCategory,
+  type TaskBoardCard
+} from '../../../../../../shared/task-board/task-board-card'
 import {
   disconnectedTaskBoardResult,
-  failedTaskBoardResult,
   isWithinDoneWindow,
   type TaskBoardProviderResult
-} from '../task-board-provider-results'
+} from '../../../../../../shared/task-board/task-board-provider-results'
 import { getTaskBoardRepos } from './task-board-provider-scope'
 
 // Leave headroom below the runtime RPC foreground concurrency of eight, as the GitLab task list does.

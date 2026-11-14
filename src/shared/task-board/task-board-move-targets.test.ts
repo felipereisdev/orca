@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getDefaultTaskBoardSettings,
-  type TaskBoardSettings
-} from '../../../../../shared/task-board/task-board-settings'
-import type { JiraTransition } from '../../../../../shared/jira/jira-types'
-import type { LinearWorkflowState } from '../../../../../shared/linear/workspace-types'
+import { getDefaultTaskBoardSettings, type TaskBoardSettings } from './task-board-settings'
+import type { JiraTransition } from '../jira/jira-types'
+import type { LinearWorkflowState } from '../linear/workspace-types'
 import type { TaskBoardCard } from './task-board-card'
 import {
   resolveLabelProviderMove,

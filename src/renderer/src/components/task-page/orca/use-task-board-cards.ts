@@ -10,7 +10,7 @@ import {
   type TaskBoardCardsState,
   type TaskBoardLoadOptions,
   type TaskBoardProviderResult
-} from '@/lib/work-items/task-board/task-board-provider-results'
+} from '../../../../../shared/task-board/task-board-provider-results'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import { TASK_PROVIDERS, type TaskProvider } from '../../../../../shared/work-items/task-providers'
 import {

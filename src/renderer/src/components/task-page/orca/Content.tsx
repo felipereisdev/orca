@@ -3,10 +3,10 @@ import { AlertCircle, KanbanSquare, X } from 'lucide-react'
 import { TaskBoard, type TaskBoardColumn } from '@/components/task-board/TaskBoard'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../../shared/task-board/task-board-card'
 import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
-import { matchesTaskBoardProjects } from '@/lib/work-items/task-board/task-board-project-filter'
-import type { TaskBoardCardsState } from '@/lib/work-items/task-board/task-board-provider-results'
+import { matchesTaskBoardProjects } from '../../../../../shared/task-board/task-board-project-filter'
+import type { TaskBoardCardsState } from '../../../../../shared/task-board/task-board-provider-results'
 import { useAppStore } from '@/store'
 import {
   getDefaultTaskBoardSettings,

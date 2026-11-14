@@ -15,7 +15,7 @@ import { LinearIcon } from '@/components/icons/LinearIcon'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
 import type { TaskBoardColumn, TaskBoardDropCheck } from './TaskBoard'
 

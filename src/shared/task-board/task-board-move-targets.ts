@@ -1,7 +1,7 @@
-import type { JiraTransition } from '../../../../../shared/jira/jira-types'
-import type { LinearWorkflowState } from '../../../../../shared/linear/workspace-types'
-import type { TaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
-import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
+import type { JiraTransition } from '../jira/jira-types'
+import type { LinearWorkflowState } from '../linear/workspace-types'
+import type { TaskBoardSettings } from './task-board-settings'
+import type { WorkspaceStatusDefinition } from '../worktree/types'
 import { jiraStatusCategory, linearStatusCategory, type TaskBoardCard } from './task-board-card'
 import {
   getActiveTaskBoardRules,

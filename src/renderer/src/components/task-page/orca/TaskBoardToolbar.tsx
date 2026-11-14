@@ -2,9 +2,12 @@ import React from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
-import type { TaskBoardProviderState } from '@/lib/work-items/task-board/task-board-provider-results'
+import type {
+  TaskBoardProviderError,
+  TaskBoardProviderState
+} from '../../../../../shared/task-board/task-board-provider-results'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 
 export type TaskBoardToolbarProvider = {
@@ -13,6 +16,29 @@ export type TaskBoardToolbarProvider = {
   Icon: (props: { className?: string }) => React.JSX.Element
   state: TaskBoardProviderState
   shown: boolean
+}
+
+// Unknown errors keep their message as-is; classified ones lead with a localized summary and keep the message as detail.
+function providerErrorTooltip(
+  error: TaskBoardProviderError | undefined,
+  label: string,
+  t: Translate
+): string {
+  if (!error) {
+    return t('taskBoard.loadFailed', 'Could not load issues. Refresh to try again.')
+  }
+  if (error.code === 'unknown') {
+    return error.message
+  }
+  const summary =
+    error.code === 'auth'
+      ? t('taskBoard.providerAuthFailed', '{{provider}} needs you to sign in again.', {
+          provider: label
+        })
+      : t('taskBoard.providerHostUnavailable', '{{provider}} is not available on this host.', {
+          provider: label
+        })
+  return error.message ? `${summary} ${error.message}` : summary
 }
 
 export function TaskBoardToolbar({
@@ -37,7 +63,7 @@ export function TaskBoardToolbar({
         {providers.map(({ provider, label, Icon, state, shown }) => {
           const tooltip =
             state.status === 'error'
-              ? state.error
+              ? providerErrorTooltip(state.error, label, t)
               : state.status === 'disconnected'
                 ? t('taskBoard.providerUnavailable', '{{provider}} is not connected.', {
                     provider: label

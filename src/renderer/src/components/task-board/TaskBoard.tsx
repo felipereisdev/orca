@@ -8,7 +8,7 @@ import {
   readTaskBoardCardDragData,
   writeTaskBoardCardDragData
 } from '@/lib/work-items/task-board/task-board-drag-payload'
-import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
+import type { TaskBoardCard } from '../../../../shared/task-board/task-board-card'
 import type { WorkspaceStatusDefinition } from '../../../../shared/worktree/types'
 import { getWorkspaceStatusVisualMeta } from '../sidebar/workspace-status/presentation/workspace-status'
 import { TaskBoardCardView } from './TaskBoardCardView'

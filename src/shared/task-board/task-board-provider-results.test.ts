@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GitHubWorkItem } from '../../../../../shared/github/work-items/work-item-types'
-import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { GitHubWorkItem } from '../github/work-items/work-item-types'
+import type { TaskProvider } from '../work-items/task-providers'
 import type { TaskBoardCard } from './task-board-card'
 import {
   emptyTaskBoardCardsState,
@@ -50,11 +50,14 @@ describe('mergeTaskBoardProviderResult', () => {
       provider: 'gitlab',
       status: 'error',
       cards: [],
-      error: 'boom'
+      error: { code: 'unknown', message: 'boom' }
     })
     expect(state.cards).toEqual([jira])
     expect(state.providers.jira).toEqual({ status: 'ready' })
-    expect(state.providers.gitlab).toEqual({ status: 'error', error: 'boom' })
+    expect(state.providers.gitlab).toEqual({
+      status: 'error',
+      error: { code: 'unknown', message: 'boom' }
+    })
     expect(state.providers.linear).toEqual({ status: 'loading' })
   })
 

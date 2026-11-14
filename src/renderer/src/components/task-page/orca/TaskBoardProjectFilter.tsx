@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
-import type { TaskBoardProjectOption } from '@/lib/work-items/task-board/task-board-project-filter'
+import type { TaskBoardProjectOption } from '../../../../../shared/task-board/task-board-project-filter'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 
 export function TaskBoardProjectFilter({
