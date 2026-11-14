@@ -18,6 +18,7 @@ import type { MobileSessionTab } from '../session/tabs/mobile-session-tabs'
 import { activeSessionTabOf } from '../session/tabs/active-session-tab'
 import { storedTabChatTranscriptIdentity } from '../session/native-chat/transcript/mobile-native-chat-transcript-store'
 import { gitStatusQuery } from '../source-control/mobile-git-status-query'
+import { firstPaintTaskBoardKeys } from '../tasks/board/task-board-query-storage'
 import { firstPaintTaskKeys } from '../tasks/screen-state/task-query-storage'
 import { hostQueryKey } from './host-query-key'
 import { persistedHostQueryKey, type PersistedHostQueryKey } from './host-query-persistence'
@@ -44,6 +45,9 @@ export function firstPaintQueryKeys(hostId: string, route: URL): PersistedHostQu
   }
   if (screen === 'tasks') {
     return firstPaintTaskKeys(hostId)
+  }
+  if (screen === 'board') {
+    return firstPaintTaskBoardKeys(hostId)
   }
   if (screen === 'accounts') {
     return [persistedHostQueryKey(accountsSnapshotFamily, accountsSnapshotKey(hostId))].filter(
