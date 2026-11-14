@@ -89,7 +89,7 @@ vi.mock('../../components/nav-bar/NavBarButton', () => ({ NavBarButton: () => nu
 vi.mock('../../components/nav-bar/FilterChip', () => ({ FilterChip: () => null }))
 vi.mock('../../components/MobileSegmentedControl', async () => {
   const { createElement: h } = await import('react')
-  return { MobileSegmentedControl: (props: object) => h('Stages', props) }
+  return { MobileSegmentedControl: (props: Record<string, unknown>) => h('Stages', props) }
 })
 vi.mock('../../components/StatusDot', () => ({ StatusDot: () => null }))
 vi.mock('../../components/TaskProviderLogo', () => ({ TaskProviderLogo: () => null }))
@@ -245,6 +245,7 @@ async function renderBoard(stored: TaskBoardListResult | null): Promise<ReactTes
   queryClients.push(queryClient)
   if (stored) {
     queryClient.setQueryData(taskBoardCardsKey(link.hostId), stored, {
+      // ast-grep-ignore: test-no-wall-clock -- cache age is relative to the real query-client clock
       updatedAt: Date.now() - 60_000
     })
   }

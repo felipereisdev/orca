@@ -75,7 +75,13 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
       try {
         const target = ipcOrRuntimeTargetForHostId(accountHostId)
         if (!target) {
-          throw new Error(translate('taskBoard.hostUnavailable', 'This host is not available.'))
+          update((current) =>
+            failTaskBoardList(
+              current,
+              translate('taskBoard.hostUnavailable', 'This host is not available.')
+            )
+          )
+          return
         }
         const result = await listTaskBoard(target, { fresh, signal: controller.signal })
         if (controller.signal.aborted) {

@@ -2681,6 +2681,9 @@
       }
     }
   },
+  "taskBoard": {
+    "hostUpdateRequired": "Update Orca on the host to use My board."
+  },
   "taskProviders": {
     "linear": {
       "truncated": {
