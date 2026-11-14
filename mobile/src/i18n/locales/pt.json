@@ -4334,7 +4334,8 @@
       "reposLabel": "Repositórios: {{repos}}",
       "filter": "Filtro",
       "filterLabel": "Filtrar e exibir",
-      "filterCount": "Filtro · {{count}}"
+      "filterCount": "Filtro · {{count}}",
+      "myBoard": "Meu quadro"
     },
     "providerItemList": {
       "intoBranch": "para {{base}}",
@@ -4585,7 +4586,90 @@
     "runtimeHydration": {
       "loadFailed": "Falha ao carregar as configurações de Tarefas"
     },
-    "rerunUnsuccessful": "Repetir verificações"
+    "rerunUnsuccessful": "Repetir verificações",
+    "board": {
+      "screen": {
+        "updateHost": "Atualize o Orca no host para usar o Meu quadro",
+        "loading": "Carregando seu quadro…",
+        "noProvidersTitle": "Nenhum provedor de tarefas conectado",
+        "noProvidersMessage": "Conecte Jira, Linear, GitLab ou GitHub no Orca, no host, para ver seu quadro.",
+        "providersFailed": "Não foi possível ler {{providers}}",
+        "refreshFailed": "Não foi possível atualizar: {{message}}",
+        "noMatch": "Nenhuma tarefa corresponde a estes filtros",
+        "emptyStage": "Nada em {{stage}}",
+        "title": "Meu quadro",
+        "filtersActive": "Filtros, {{count}} ativos",
+        "filters": "Filtros",
+        "refresh": "Atualizar quadro",
+        "providerLists": "Listas dos provedores"
+      },
+      "card": {
+        "noReview": "Ainda sem {{review}}",
+        "stepWorkspace": "Workspace",
+        "stepCommits": "Commits",
+        "stepChecks": "Verificações",
+        "noBranch": "Sem branch",
+        "progressUnavailable": "Progresso indisponível",
+        "noWorkspace": "Ainda sem workspace",
+        "stepsDone": "{{done}} de {{total}} etapas concluídas",
+        "move": "Mover",
+        "stepPr": "PR",
+        "stepMr": "MR",
+        "checksPassed": "Verificações aprovadas",
+        "checksFailed": "Verificações com falha",
+        "checksRunning": "Verificações em andamento",
+        "unread_one": "{{count}} nova",
+        "unread_other": "{{count}} novas",
+        "unread_many": "{{count}} novas"
+      },
+      "detail": {
+        "commentFailed": "Não foi possível adicionar o comentário: {{error}}",
+        "commentUnconfirmed": "Não foi possível confirmar que o comentário foi adicionado ({{error}}). Confira os comentários antes de enviar novamente.",
+        "offline": "Os comentários precisam do host",
+        "offlineMessage": "Reconecte para ler e adicionar comentários.",
+        "loadFailed": "Não foi possível carregar os comentários",
+        "loading": "Carregando comentários…",
+        "noComments": "Ainda sem comentários",
+        "comments": "Comentários",
+        "commentPlaceholder": "Adicionar um comentário",
+        "sendComment": "Enviar comentário",
+        "progress": "Progresso",
+        "none": "Nada ainda",
+        "commitsAhead": "{{count}} à frente"
+      },
+      "filter": {
+        "title": "Filtros",
+        "clear": "Limpar",
+        "providers": "Provedores",
+        "show_one": "Mostrar {{count}} tarefa",
+        "show_other": "Mostrar {{count}} tarefas",
+        "show_many": "Mostrar {{count}} tarefas"
+      },
+      "move": {
+        "noMapping": "Nenhum status está mapeado para esta coluna.",
+        "noTransition": "Esta tarefa não pode ir para essa coluna a partir do status atual.",
+        "sameColumn": "A tarefa já está nesta coluna.",
+        "invalidChoice": "Essa transição não está mais disponível. Escolha a coluna novamente.",
+        "failed": "Não foi possível mover a tarefa: {{error}}",
+        "unconfirmed": "Não foi possível confirmar a movimentação ({{error}}). O quadro está verificando onde a tarefa está agora.",
+        "resolution": "Resolução",
+        "required": "Obrigatório",
+        "comment": "Comentário",
+        "commentPlaceholder": "Adicionar um comentário",
+        "title": "Mover {{id}}",
+        "finishElsewhere": "Conclua esta movimentação no desktop ou na web",
+        "unsupportedFields": "{{transition}} precisa de {{fields}}.",
+        "choose": "Escolha uma transição",
+        "offline": "Mover uma tarefa precisa do host. Reconecte para movê-la.",
+        "confirm": "Mover"
+      },
+      "summary": {
+        "noNewComments": "Nenhum comentário novo",
+        "newComments_one": "{{count}} com comentários novos",
+        "newComments_other": "{{count}} com comentários novos",
+        "newComments_many": "{{count}} com comentários novos"
+      }
+    }
   },
   "terminal": {
     "keyDefinitions": {

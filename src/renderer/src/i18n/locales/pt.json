@@ -24824,6 +24824,7 @@
     "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Tarefas",
     "providerAuthFailed": "{{provider}} precisa que você entre novamente.",
     "providerHostUnavailable": "{{provider}} não está disponível neste host.",
+    "hostUpdateRequired": "Atualize o Orca no host para usar o Meu quadro.",
     "providerUnavailable": "{{provider}} não está conectado.",
     "repoUnavailable": "O repositório de {{id}} não está mais no Orca.",
     "chooseStateTitle": "Mover {{id}} para {{column}}",
@@ -24865,6 +24866,14 @@
       "all": "Todos os projetos",
       "count": "{{count}} projetos",
       "filter": "Filtrar por projeto"
-    }
+    },
+    "commitsAhead": "{{count}} à frente",
+    "checksPassed": "Verificações aprovadas",
+    "checksFailed": "Verificações com falha",
+    "checksPending": "Verificações pendentes",
+    "unreadComments": "{{count}} comentários não lidos",
+    "noColumnMapping": "Mapeie um status para {{column}} em Configurações → Tarefas.",
+    "choiceExpired": "Essa mudança de status não está mais disponível. Tente mover novamente.",
+    "hostUnavailable": "Este host não está disponível."
   }
 }

@@ -843,7 +843,8 @@
       "changes": "Changes",
       "pullRequest": "Pull Request",
       "workspace": "Workspace",
-      "automations": "Automations"
+      "automations": "Automations",
+      "board": "My board"
     }
   },
   "notifications": {
@@ -4401,7 +4402,8 @@
       "reposLabel": "Repositories: {{repos}}",
       "filterCount": "Filter · {{count}}",
       "filter": "Filter",
-      "filterLabel": "Filter and display"
+      "filterLabel": "Filter and display",
+      "myBoard": "My board"
     },
     "providerItemList": {
       "previousPage": "Previous page",
@@ -4643,7 +4645,87 @@
     "runtimeHydration": {
       "loadFailed": "Failed to load Tasks settings"
     },
-    "rerunUnsuccessful": "Retry checks"
+    "rerunUnsuccessful": "Retry checks",
+    "board": {
+      "screen": {
+        "updateHost": "Update Orca on the host to use My board",
+        "loading": "Loading your board…",
+        "noProvidersTitle": "No task providers connected",
+        "noProvidersMessage": "Connect Jira, Linear, GitLab or GitHub in Orca on the host to see your board.",
+        "providersFailed": "Couldn't read {{providers}}",
+        "refreshFailed": "Couldn't refresh: {{message}}",
+        "noMatch": "No tasks match these filters",
+        "emptyStage": "Nothing in {{stage}}",
+        "title": "My board",
+        "filtersActive": "Filters, {{count}} active",
+        "filters": "Filters",
+        "refresh": "Refresh board",
+        "providerLists": "Provider lists"
+      },
+      "card": {
+        "noReview": "No {{review}} yet",
+        "stepWorkspace": "Workspace",
+        "stepCommits": "Commits",
+        "stepChecks": "Checks",
+        "noBranch": "No branch",
+        "progressUnavailable": "Progress unavailable",
+        "noWorkspace": "No workspace yet",
+        "stepsDone": "{{done}} of {{total}} steps done",
+        "move": "Move",
+        "stepPr": "PR",
+        "stepMr": "MR",
+        "checksPassed": "Checks passed",
+        "checksFailed": "Checks failed",
+        "checksRunning": "Checks running",
+        "unread_one": "{{count}} new",
+        "unread_other": "{{count}} new"
+      },
+      "detail": {
+        "commentFailed": "Couldn't add the comment: {{error}}",
+        "commentUnconfirmed": "Couldn't confirm the comment was added ({{error}}). Check the comments before sending it again.",
+        "offline": "Comments need the host",
+        "offlineMessage": "Reconnect to read and add comments.",
+        "loadFailed": "Couldn't load comments",
+        "loading": "Loading comments…",
+        "noComments": "No comments yet",
+        "comments": "Comments",
+        "commentPlaceholder": "Add a comment",
+        "sendComment": "Send comment",
+        "progress": "Progress",
+        "none": "None yet",
+        "commitsAhead": "{{count}} ahead"
+      },
+      "filter": {
+        "title": "Filters",
+        "clear": "Clear",
+        "providers": "Providers",
+        "show_one": "Show {{count}} task",
+        "show_other": "Show {{count}} tasks"
+      },
+      "move": {
+        "noMapping": "No status is mapped to this column.",
+        "noTransition": "This task can't move to that column from its current status.",
+        "sameColumn": "The task is already in this column.",
+        "invalidChoice": "That transition is no longer available. Pick the column again.",
+        "failed": "Couldn't move the task: {{error}}",
+        "unconfirmed": "Couldn't confirm the move ({{error}}). The board is reading where the task is now.",
+        "resolution": "Resolution",
+        "required": "Required",
+        "comment": "Comment",
+        "commentPlaceholder": "Add a comment",
+        "title": "Move {{id}}",
+        "finishElsewhere": "Finish this move on the desktop or web",
+        "unsupportedFields": "{{transition}} needs {{fields}}.",
+        "choose": "Choose a transition",
+        "offline": "Moving a task needs the host. Reconnect to move it.",
+        "confirm": "Move"
+      },
+      "summary": {
+        "noNewComments": "No new comments",
+        "newComments_one": "{{count}} with new comments",
+        "newComments_other": "{{count}} with new comments"
+      }
+    }
   },
   "terminal": {
     "webView": {

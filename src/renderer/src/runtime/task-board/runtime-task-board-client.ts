@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import {
   TASK_BOARD_RUNTIME_CAPABILITY,
@@ -31,7 +32,7 @@ async function callTaskBoard<TResult>(
     await assertRuntimeEnvironmentCapability(
       target.environmentId,
       TASK_BOARD_RUNTIME_CAPABILITY,
-      TASK_BOARD_UPDATE_REQUIRED,
+      translate('taskBoard.hostUpdateRequired', TASK_BOARD_UPDATE_REQUIRED),
       CAPABILITY_TIMEOUT_MS
     )
   }
