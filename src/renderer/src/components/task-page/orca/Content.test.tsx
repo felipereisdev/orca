@@ -37,11 +37,16 @@ vi.mock('./use-task-board-move', () => ({
 }))
 
 import { TaskPageOrcaContent } from './Content'
+import { writeTaskBoardProjectSelection } from './task-board-session-cache'
 
 afterEach(() => {
   cleanup()
   board.error = null
+  writeTaskBoardProjectSelection(new Map())
 })
+
+// The fields project filtering reads from each provider's item.
+const projectFields = { project: { key: 'APP' }, team: { id: 'eng' }, repoId: 'acme' }
 
 function card(provider: TaskProvider, displayId: string): TaskBoardCard {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the page hands `item` to the handlers untouched; a marker stands in for the provider item.
@@ -56,7 +61,7 @@ function card(provider: TaskProvider, displayId: string): TaskBoardCard {
     category: 'todo',
     labels: [],
     updatedAt: '2026-11-01T00:00:00Z',
-    source: { provider, item: { marker: displayId } }
+    source: { provider, item: { marker: displayId, ...projectFields } }
   } as unknown as TaskBoardCard
 }
 
@@ -113,9 +118,19 @@ describe('TaskPageOrcaContent', () => {
     for (const [id, open, start] of expected) {
       fireEvent.click(screen.getByText(`Issue ${id}`))
       fireEvent.click(screen.getByRole('button', { name: `Start workspace from ${id}` }))
-      expect(handlers[open]).toHaveBeenCalledExactlyOnceWith({ marker: id })
-      expect(handlers[start]).toHaveBeenCalledExactlyOnceWith({ marker: id })
+      expect(handlers[open]).toHaveBeenCalledExactlyOnceWith({ marker: id, ...projectFields })
+      expect(handlers[start]).toHaveBeenCalledExactlyOnceWith({ marker: id, ...projectFields })
     }
+  })
+
+  it('shows only the cards of the selected projects', () => {
+    writeTaskBoardProjectSelection(
+      new Map([['jira::APP', { key: 'jira::APP', provider: 'jira', label: 'acme' }]])
+    )
+    renderContent()
+    expect(screen.queryByText('Issue APP-1')).not.toBeNull()
+    expect(screen.queryByText('Issue ENG-2')).toBeNull()
+    expect(screen.queryByText('Issue #3')).toBeNull()
   })
 
   it('shows a move error until it is dismissed', () => {

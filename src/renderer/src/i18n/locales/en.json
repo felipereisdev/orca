@@ -25644,6 +25644,11 @@
         "kanban": "kanban",
         "done": "done column"
       }
+    },
+    "projects": {
+      "all": "All projects",
+      "count": "{{count}} projects",
+      "filter": "Filter by project"
     }
   }
 }

@@ -24858,6 +24858,11 @@
         "kanban": "kanban",
         "done": "coluna concluída"
       }
+    },
+    "projects": {
+      "all": "Todos os projetos",
+      "count": "{{count}} projetos",
+      "filter": "Filtrar por projeto"
     }
   }
 }

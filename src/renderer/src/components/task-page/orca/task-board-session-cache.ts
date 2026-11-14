@@ -2,6 +2,7 @@ import {
   emptyTaskBoardCardsState,
   type TaskBoardCardsState
 } from '@/lib/work-items/task-board/task-board-provider-results'
+import type { TaskBoardProject } from '@/lib/work-items/task-board/task-board-project-filter'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 
@@ -14,6 +15,7 @@ const loadsByAccountHost = new Map<
   Partial<Record<TaskProvider, TaskBoardProviderLoad>>
 >()
 let hiddenProviders: ReadonlySet<TaskProvider> = new Set()
+let projectSelection: ReadonlyMap<string, TaskBoardProject> = new Map()
 
 export function readTaskBoardCards(accountHostId: ExecutionHostId): TaskBoardCardsState {
   return cardsByAccountHost.get(accountHostId) ?? emptyTaskBoardCardsState()
@@ -50,4 +52,14 @@ export function readHiddenTaskBoardProviders(): ReadonlySet<TaskProvider> {
 
 export function writeHiddenTaskBoardProviders(providers: ReadonlySet<TaskProvider>): void {
   hiddenProviders = providers
+}
+
+export function readTaskBoardProjectSelection(): ReadonlyMap<string, TaskBoardProject> {
+  return projectSelection
+}
+
+export function writeTaskBoardProjectSelection(
+  selection: ReadonlyMap<string, TaskBoardProject>
+): void {
+  projectSelection = selection
 }

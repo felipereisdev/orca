@@ -25,7 +25,7 @@ function makeCard(
   title: string,
   extra: Partial<TaskBoardCard> = {}
 ): TaskBoardCard {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the board never reads `source`; this static fixture omits it.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the board reads only the project fields of `source.item`; this static fixture supplies just those.
   return {
     refKey: `${provider}:fixture:${displayId}`,
     provider,
@@ -37,6 +37,10 @@ function makeCard(
     category: 'todo',
     labels: [],
     updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    source: {
+      provider,
+      item: { project: { key: 'ACME' }, team: { id: 'acme' }, repoId: 'acme/web' }
+    },
     ...extra
   } as TaskBoardCard
 }

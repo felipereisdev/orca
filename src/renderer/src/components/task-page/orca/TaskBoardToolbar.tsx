@@ -17,12 +17,14 @@ export type TaskBoardToolbarProvider = {
 
 export function TaskBoardToolbar({
   providers,
+  projectFilter,
   shownCount,
   refreshing,
   onToggleProvider,
   onRefresh
 }: {
   providers: TaskBoardToolbarProvider[]
+  projectFilter?: React.ReactNode
   shownCount: number
   refreshing: boolean
   onToggleProvider: (provider: TaskProvider) => void
@@ -69,6 +71,7 @@ export function TaskBoardToolbar({
             </Tooltip>
           )
         })}
+        {projectFilter}
       </div>
       <div className="flex shrink-0 items-center gap-2 text-2xs text-muted-foreground">
         <span>

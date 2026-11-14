@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardCard } from '@/lib/work-items/task-board/task-board-card'
 import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
+import { matchesTaskBoardProjects } from '@/lib/work-items/task-board/task-board-project-filter'
 import type { TaskBoardCardsState } from '@/lib/work-items/task-board/task-board-provider-results'
 import { useAppStore } from '@/store'
 import {
@@ -16,7 +17,9 @@ import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/t
 import type { SourceOption } from '../task-page-localized-options'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import { formatRelativeTime } from '../task-page-source-context'
+import { TaskBoardProjectFilter } from './TaskBoardProjectFilter'
 import { TaskBoardToolbar, type TaskBoardToolbarProvider } from './TaskBoardToolbar'
+import { useTaskBoardProjectFilter } from './use-task-board-project-filter'
 import { useTaskBoardCards } from './use-task-board-cards'
 import { useTaskBoardMove, type TaskBoardMove } from './use-task-board-move'
 import {
@@ -119,6 +122,17 @@ export function TaskPageOrcaBoard({
   const t = useTranslate()
   const [hiddenProviders, setHiddenProviders] = useState(readHiddenTaskBoardProviders)
 
+  const providerPlaced = useMemo(() => {
+    // A held move outlives its provider's reads, so a provider hidden in Settings must drop it too.
+    const visible = new Set<string>(sourceOptions.map((option) => option.id))
+    return placeTaskBoardCards(state.cards, move.overrides, statuses, settings).filter(
+      ({ card }) => visible.has(card.provider) && !hiddenProviders.has(card.provider)
+    )
+  }, [hiddenProviders, move.overrides, settings, sourceOptions, state.cards, statuses])
+  const projectFilter = useTaskBoardProjectFilter(
+    useMemo(() => providerPlaced.map(({ card }) => card), [providerPlaced])
+  )
+
   const columns = useMemo<TaskBoardColumn[]>(() => {
     const byId = new Map<string, TaskBoardColumn>(
       statuses.map((status) => [
@@ -126,20 +140,13 @@ export function TaskPageOrcaBoard({
         { id: status.id, label: status.label, status, cards: [] }
       ])
     )
-    // A held move outlives its provider's reads, so a provider hidden in Settings must drop it too.
-    const visible = new Set<string>(sourceOptions.map((option) => option.id))
-    for (const { card, columnId } of placeTaskBoardCards(
-      state.cards,
-      move.overrides,
-      statuses,
-      settings
-    )) {
-      if (visible.has(card.provider) && !hiddenProviders.has(card.provider)) {
+    for (const { card, columnId } of providerPlaced) {
+      if (matchesTaskBoardProjects(card, projectFilter.selection)) {
         byId.get(columnId)?.cards.push(card)
       }
     }
     return [...byId.values()]
-  }, [hiddenProviders, move.overrides, settings, sourceOptions, state.cards, statuses])
+  }, [projectFilter.selection, providerPlaced, statuses])
 
   const toolbarProviders = sourceOptions.flatMap((option): TaskBoardToolbarProvider[] =>
     isTaskProvider(option.id)
@@ -182,6 +189,16 @@ export function TaskPageOrcaBoard({
     <div className="mt-3 flex min-h-0 max-h-full flex-col overflow-hidden rounded-md border border-border/50 bg-background shadow-sm">
       <TaskBoardToolbar
         providers={toolbarProviders}
+        projectFilter={
+          <TaskBoardProjectFilter
+            options={projectFilter.options}
+            providerLabels={Object.fromEntries(
+              toolbarProviders.map(({ provider, label }) => [provider, label])
+            )}
+            onToggle={projectFilter.toggle}
+            onClear={projectFilter.clear}
+          />
+        }
         shownCount={columns.reduce((count, column) => count + column.cards.length, 0)}
         refreshing={refreshing}
         onToggleProvider={toggleProvider}
