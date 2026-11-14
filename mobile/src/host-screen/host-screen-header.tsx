@@ -27,6 +27,7 @@ import {
   verdictDisplayLabel,
   type ConnectionVerdict
 } from '../transport/connection/connection-health'
+import { mobileTasksEntryHref } from '../tasks/mobile-task-navigation'
 import type { HostScreenController } from './use-host-screen-controller'
 
 function isErrorVerdict(v: ConnectionVerdict): boolean {
@@ -108,7 +109,8 @@ export function HostScreenHeader({
       icon: List,
       disabled: disconnected,
       closeBeforePress: true,
-      onPress: () => actions.navigateFromHostList(`${hostPath}/tasks`)
+      onPress: () =>
+        void mobileTasksEntryHref(hostId).then((target) => actions.navigateFromHostList(target))
     },
     {
       id: 'automations',
