@@ -708,6 +708,12 @@ import {
 import { RenameParams } from './structured-agent-session-rename-params'
 import { SendRecordedParams } from './structured-agent-session-send-recorded-params'
 import { SubscribeParams } from './structured-agent-session-subscribe-params'
+import {
+  TaskBoardAddCommentParams,
+  TaskBoardDetailParams,
+  TaskBoardListParams,
+  TaskBoardMarkSeenParams
+} from './task-board-params'
 import { TerminalInferCodexQuestionSkip } from './terminal-codex-question-params'
 import { TerminalDaemonRestartSeveredParams } from './terminal-daemon-params'
 import { TerminalLimitUpdateParams } from './terminal-limit-params'
@@ -1636,6 +1642,10 @@ export const RPC_PARAMS_BY_METHOD = {
   'ssh.updateTarget': SshTargetUpdate,
   'stats.summary': null,
   'status.get': StatusGetParams,
+  'taskBoard.addComment': TaskBoardAddCommentParams,
+  'taskBoard.detail': TaskBoardDetailParams,
+  'taskBoard.list': TaskBoardListParams,
+  'taskBoard.markSeen': TaskBoardMarkSeenParams,
   'terminal.ackOutput': TerminalAckOutput,
   'terminal.adoptOrphans': TerminalAdoptOrphans,
   'terminal.agentId': TerminalAgentId,

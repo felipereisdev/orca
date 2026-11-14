@@ -227,6 +227,11 @@ export const EXECUTION_HOST_METHODS = [
   'session.tabs.unsubscribe',
   'session.tabs.unsubscribeAll',
   ...MOBILE_AGENT_SESSION_RPC_METHODS,
+  // The board is the connected host's: its accounts, repos, columns and read markers.
+  'taskBoard.addComment',
+  'taskBoard.detail',
+  'taskBoard.list',
+  'taskBoard.markSeen',
   'terminal.ackOutput',
   'terminal.adoptOrphans',
   'terminal.agentStatus',

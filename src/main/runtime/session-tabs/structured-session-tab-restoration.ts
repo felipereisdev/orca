@@ -256,7 +256,7 @@ export abstract class OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce exten
       : undefined
   }
 
-  protected getLocalGitExecutionOptionArgs(repo: Repo): [] | [LocalProjectGhExecOptions] {
+  getLocalGitExecutionOptionArgs(repo: Repo): [] | [LocalProjectGhExecOptions] {
     const localGitOptions = getLocalProjectGhExecOptions(this.requireStore(), repo)
     return Object.keys(localGitOptions).length > 0 ? [localGitOptions] : []
   }

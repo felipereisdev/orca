@@ -2,16 +2,38 @@ import type { GitHubWorkItem } from '../github/work-items/work-item-types'
 import type { GitLabWorkItem } from '../gitlab-types'
 import type { JiraIssue } from '../jira/jira-types'
 import type { LinearIssue } from '../linear/issue-types'
+import type { ExecutionHostId } from '../execution-host'
 import {
   jiraStatusCategory,
   linearStatusCategory,
   openClosedStatusCategory,
   type TaskBoardCard
 } from './task-board-card'
+import type { TaskBoardCardRef } from './task-board-wire-types'
+
+/** The card's identity for markers and caches; `repoHostId` is the executing host of a GitHub/GitLab card's repo. */
+export function taskBoardRefKey(
+  ref: TaskBoardCardRef,
+  repoHostId: ExecutionHostId | null | undefined
+): string {
+  switch (ref.provider) {
+    case 'jira':
+      return `jira:${ref.siteId ?? ''}:${ref.key}`
+    case 'linear':
+      return `linear:${ref.workspaceId ?? ''}:${ref.id}`
+    case 'gitlab':
+      return `gitlab:${repoHostId ?? ''}:${ref.projectRef?.path ?? ref.repoId}:${ref.number}`
+    case 'github':
+      return `github:${repoHostId ?? ''}:${ref.repoId}:${ref.number}`
+  }
+}
 
 export function toJiraTaskBoardCard(issue: JiraIssue, showSiteName = false): TaskBoardCard {
   return {
-    refKey: `jira:${issue.siteId ?? ''}:${issue.key}`,
+    refKey: taskBoardRefKey(
+      { provider: 'jira', siteId: issue.siteId ?? null, key: issue.key },
+      null
+    ),
     provider: 'jira',
     displayId: issue.key,
     title: issue.title,
@@ -35,7 +57,15 @@ export function toLinearTaskBoardCard(
   priorityLabel: (priority: number) => string
 ): TaskBoardCard {
   return {
-    refKey: `linear:${issue.workspaceId ?? ''}:${issue.id}`,
+    refKey: taskBoardRefKey(
+      {
+        provider: 'linear',
+        workspaceId: issue.workspaceId ?? null,
+        id: issue.id,
+        teamId: issue.team.id
+      },
+      null
+    ),
     provider: 'linear',
     displayId: issue.identifier,
     title: issue.title,
@@ -52,7 +82,15 @@ export function toLinearTaskBoardCard(
 
 export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): TaskBoardCard {
   return {
-    refKey: `gitlab:${item.repoHostId ?? ''}:${item.projectRef?.path ?? item.repoId}:${item.number}`,
+    refKey: taskBoardRefKey(
+      {
+        provider: 'gitlab',
+        repoId: item.repoId,
+        number: item.number,
+        projectRef: item.projectRef ?? null
+      },
+      item.repoHostId
+    ),
     provider: 'gitlab',
     displayId: `#${item.number}`,
     title: item.title,
@@ -68,7 +106,10 @@ export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): 
 
 export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): TaskBoardCard {
   return {
-    refKey: `github:${item.repoHostId ?? ''}:${item.repoId}:${item.number}`,
+    refKey: taskBoardRefKey(
+      { provider: 'github', repoId: item.repoId, number: item.number, issueRepo: null },
+      item.repoHostId
+    ),
     provider: 'github',
     displayId: `#${item.number}`,
     title: item.title,

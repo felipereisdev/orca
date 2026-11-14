@@ -50,7 +50,7 @@ function linearWorkspaceError(error: LinearWorkspaceError): TaskBoardProviderErr
 }
 
 // The host has no locale; clients can relabel from `source.item.priority`.
-function hostLinearPriorityLabel(priority: number): string {
+export function hostLinearPriorityLabel(priority: number): string {
   const label = linearPriorityLabel(priority)
   return label.charAt(0).toUpperCase() + label.slice(1)
 }

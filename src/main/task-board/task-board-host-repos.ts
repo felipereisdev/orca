@@ -1,4 +1,8 @@
-import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
 import {
   getDefaultTaskRepoSelection,
@@ -10,10 +14,14 @@ function repoHostKind(repo: Repo) {
   return parseExecutionHostId(getRepoExecutionHostId(repo))?.kind ?? null
 }
 
-function isHostExecutedRepo(repo: Repo): boolean {
-  // Runtime repos belong to another Orca; SSH repos are driven from this host today.
-  const kind = repoHostKind(repo)
+/** Runtime hosts belong to another Orca; SSH hosts are driven from this host today. */
+export function isTaskBoardHostExecuted(hostId: ExecutionHostId): boolean {
+  const kind = parseExecutionHostId(hostId)?.kind
   return kind === 'local' || kind === 'ssh'
+}
+
+function isHostExecutedRepo(repo: Repo): boolean {
+  return isTaskBoardHostExecuted(getRepoExecutionHostId(repo))
 }
 
 /** False only when this host's preflight proves the provider CLI is missing or unknown to it. */
@@ -43,4 +51,9 @@ export function selectTaskBoardHostRepos(
     // The local preflight describes only this machine; SSH repos run the CLI on their remote.
     return repoHostKind(repo) !== 'local' || hasProviderCli(provider, preflight)
   })
+}
+
+/** The host-executed repo a card's ref names; never another Orca's repo that shares the id. */
+export function findTaskBoardHostRepo(repos: readonly Repo[], repoId: string): Repo | null {
+  return repos.find((repo) => repo.id === repoId && isHostExecutedRepo(repo)) ?? null
 }

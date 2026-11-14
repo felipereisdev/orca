@@ -105,24 +105,23 @@ function taskBoardMoveTargets(
   })
 }
 
-function toWireCard(
+/** The card as the host places it; null when no column takes its status. */
+export function placeTaskBoardCard(
   card: TaskBoardCard,
   columns: readonly WorkspaceStatusDefinition[],
   settings: TaskBoardSettings
-): TaskBoardWireCard[] {
+): TaskBoardWireCard | null {
   const columnId = resolveTaskBoardColumnId(card, columns, settings)
   if (columnId === null) {
-    return []
+    return null
   }
-  return [
-    {
-      ...card,
-      ref: taskBoardCardRef(card),
-      columnId,
-      project: taskBoardProject(card),
-      moveTargets: taskBoardMoveTargets(card, columnId, columns, settings)
-    }
-  ]
+  return {
+    ...card,
+    ref: taskBoardCardRef(card),
+    columnId,
+    project: taskBoardProject(card),
+    moveTargets: taskBoardMoveTargets(card, columnId, columns, settings)
+  }
 }
 
 async function settleProvider(
@@ -179,7 +178,7 @@ export async function buildTaskBoardList(
   return {
     columns,
     doneColumnId: resolveCategoryColumnId('done', columns, taskBoard) ?? taskBoard.doneStatusId,
-    cards: state.cards.flatMap((card) => toWireCard(card, columns, taskBoard)),
+    cards: state.cards.flatMap((card) => placeTaskBoardCard(card, columns, taskBoard) ?? []),
     providers: state.providers,
     generatedAt: new Date().toISOString()
   }

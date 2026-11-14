@@ -63,7 +63,7 @@ function isEnrichable(card: TaskBoardWireCard, ctx: TaskBoardEnrichContext): boo
 async function cachedProgress(
   card: TaskBoardWireCard,
   workspaces: readonly TaskBoardWorkspaceCandidate[] | null,
-  ctx: TaskBoardEnrichContext,
+  fresh: boolean,
   deps: TaskBoardEnrichDeps
 ): Promise<TaskBoardProgress | null> {
   if (!workspaces) {
@@ -73,28 +73,43 @@ async function cachedProgress(
   if (!workspace) {
     return null
   }
-  const cached = ctx.fresh ? undefined : deps.caches.progress.get(card.refKey)
+  const cached = fresh ? undefined : deps.caches.progress.get(card.refKey)
   // A relinked workspace or a switched branch makes the cached progress describe something else.
   if (cached && cached.worktreeId === workspace.worktreeId && cached.branch === workspace.branch) {
     return cached
   }
-  const progress = await readTaskBoardProgress(workspace, { fresh: ctx.fresh }, deps)
+  const progress = await readTaskBoardProgress(workspace, { fresh }, deps)
   deps.caches.progress.set(card.refKey, progress)
   return progress
 }
 
 async function cachedComments(
   card: TaskBoardWireCard,
-  ctx: TaskBoardEnrichContext,
+  fresh: boolean,
   deps: TaskBoardEnrichDeps
 ): Promise<TaskBoardComment[]> {
-  const cached = ctx.fresh ? undefined : deps.caches.comments.get(card.refKey)
+  const cached = fresh ? undefined : deps.caches.comments.get(card.refKey)
   if (cached) {
     return cached
   }
   const comments = await readTaskBoardComments(card, deps)
   deps.caches.comments.set(card.refKey, comments)
   return comments
+}
+
+/** A card's progress and comments, each settled on its own; `fresh` reads skip (and refill) the cache. */
+export function readTaskBoardCardParts(
+  card: TaskBoardWireCard,
+  workspaces: readonly TaskBoardWorkspaceCandidate[] | null,
+  fresh: boolean,
+  deps: TaskBoardEnrichDeps
+): Promise<
+  [PromiseSettledResult<TaskBoardProgress | null>, PromiseSettledResult<TaskBoardComment[]>]
+> {
+  return Promise.allSettled([
+    cachedProgress(card, workspaces, fresh, deps),
+    cachedComments(card, fresh, deps)
+  ])
 }
 
 function summarize(comment: TaskBoardComment): TaskBoardCommentSummary {
@@ -112,10 +127,7 @@ async function enrichCard(
   ctx: TaskBoardEnrichContext,
   deps: TaskBoardEnrichDeps
 ): Promise<TaskBoardWireCard> {
-  const [progress, comments] = await Promise.allSettled([
-    cachedProgress(card, workspaces, ctx, deps),
-    cachedComments(card, ctx, deps)
-  ])
+  const [progress, comments] = await readTaskBoardCardParts(card, workspaces, ctx.fresh, deps)
   // A failed read keeps the card and says so; null/0 would claim "no workspace"/"no comments".
   const enriched: TaskBoardWireCard = {
     ...card,

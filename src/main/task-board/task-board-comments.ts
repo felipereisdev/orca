@@ -1,6 +1,7 @@
 import { getRepoRoutingConnectionId } from '../../shared/execution-host'
 import type { PRComment } from '../../shared/github/comments/comment-types'
-import type { MRComment } from '../../shared/gitlab-types'
+import type { GitHubWorkItemDetails } from '../../shared/github/work-items/work-item-types'
+import type { GitLabWorkItemDetails, MRComment } from '../../shared/gitlab-types'
 import type { JiraComment, JiraSite } from '../../shared/jira/jira-types'
 import type { LinearComment } from '../../shared/linear/issue-types'
 import type { Repo } from '../../shared/repo-types'
@@ -85,12 +86,12 @@ async function readLinear(
   }))
 }
 
-async function readGitLab(
+/** The GitLab issue on the ref's project; the checkout's current source may differ. Throws when unreadable. */
+export async function readTaskBoardGitLabIssue(
   ref: Extract<TaskBoardCardRef, { provider: 'gitlab' }>,
   deps: TaskBoardCommentDeps
-): Promise<TaskBoardComment[]> {
+): Promise<{ repo: Repo; details: GitLabWorkItemDetails }> {
   const repo = requireRepo(ref, deps)
-  // The ref's project pins the issue's source; the checkout's current source may differ.
   const details = await deps.gitlabWorkItemDetails(
     repo.path,
     ref.number,
@@ -104,13 +105,14 @@ async function readGitLab(
   if (!details) {
     throw new Error(`GitLab issue #${ref.number} could not be read`)
   }
-  return details.comments.map(fromRepoComment)
+  return { repo, details }
 }
 
-async function readGitHub(
+/** The GitHub issue on the ref's repository (origin vs upstream). Throws when unreadable. */
+export async function readTaskBoardGitHubIssue(
   ref: Extract<TaskBoardCardRef, { provider: 'github' }>,
   deps: TaskBoardCommentDeps
-): Promise<TaskBoardComment[]> {
+): Promise<{ repo: Repo; details: GitHubWorkItemDetails }> {
   const repo = requireRepo(ref, deps)
   const details = await deps.githubWorkItemDetails(
     repo.path,
@@ -126,7 +128,7 @@ async function readGitHub(
   if (!details) {
     throw new Error(`GitHub issue #${ref.number} could not be read`)
   }
-  return details.comments.map(fromRepoComment)
+  return { repo, details }
 }
 
 /** The card's comments, oldest first, with `own` set for the user's account on the issue's source. */
@@ -141,8 +143,8 @@ export async function readTaskBoardComments(
       : ref.provider === 'linear'
         ? await readLinear(ref, deps)
         : ref.provider === 'gitlab'
-          ? await readGitLab(ref, deps)
-          : await readGitHub(ref, deps)
+          ? (await readTaskBoardGitLabIssue(ref, deps)).details.comments.map(fromRepoComment)
+          : (await readTaskBoardGitHubIssue(ref, deps)).details.comments.map(fromRepoComment)
   // An unparseable timestamp sorts first instead of poisoning the comparator with NaN.
   return comments.toSorted((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0))
 }
