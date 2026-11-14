@@ -32,6 +32,8 @@ export type TaskBoardView = {
   // Moves and comments need the host; the board shown may be an earlier read.
   isOffline: boolean
   isRefreshing: boolean
+  // When the shown board was read from the host, which may be an earlier launch's; null without one.
+  readAt: number | null
   // The host has no taskBoard.* methods: "Update Orca on the host".
   unsupported: boolean
   // A read that failed while the host was reachable; offline and unsupported are reported above.
@@ -67,6 +69,7 @@ export function useTaskBoard(hostId: string): TaskBoardView {
     data: board.data,
     isOffline: client === null || state !== 'connected',
     isRefreshing: board.isFetching,
+    readAt: board.data ? board.dataUpdatedAt : null,
     unsupported,
     error: unsupported || isHostNotConnectedError(board.error) ? null : board.error,
     refresh
