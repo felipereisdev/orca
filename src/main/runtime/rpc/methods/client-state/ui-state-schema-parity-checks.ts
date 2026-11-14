@@ -8,6 +8,7 @@ import type { AssertNoMissingKeys, AssertNoMissingValues } from './ui-state-sche
 type MainOwnedUIState =
   | 'jiraSavedFilterState'
   | 'jiraQuickFilterState'
+  | 'taskBoardSeenComments'
   | '_explorerDisplayRootMigrated'
   | 'trayMinimizeNoticeShown'
   | 'dashboardPopoutBounds'

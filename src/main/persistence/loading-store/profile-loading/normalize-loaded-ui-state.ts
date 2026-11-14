@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/worktree/card-properties'
 import { isExistingPersistedProfile } from '../../../../shared/project-order-manual-default-notice'
 import { resolveUsagePercentageDisplayChangeNoticeDismissed } from '../../../../shared/usage-percentage-display-change-notice'
+import { normalizeTaskBoardSeenComments } from '../../../../shared/task-board/task-board-seen-comments'
 import { normalizePersistedWorkspaceStatuses } from '../../../../shared/workspace-statuses'
 import {
   normalizeRightSidebarExplorerView,
@@ -226,6 +227,9 @@ export function normalizeLoadedUiState(
     explorerDisplayRootByWorktree,
     gitGraphFiltersByWorktree: normalizeGitGraphFilters(parsed.ui?.gitGraphFiltersByWorktree),
     showDotfilesByWorktree: normalizeShowDotfilesByWorktree(parsed.ui?.showDotfilesByWorktree),
+    ...(parsed.ui?.taskBoardSeenComments !== undefined
+      ? { taskBoardSeenComments: normalizeTaskBoardSeenComments(parsed.ui.taskBoardSeenComments) }
+      : {}),
     workspaceStatuses,
     _workspaceStatusesDefaultOrderMigrated: true,
     _workspaceStatusesReorderedDefaultRepaired: true,

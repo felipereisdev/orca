@@ -73,6 +73,10 @@ export const UI_STATE_DISPOSITIONS = {
     38,
     'Filters belong to the Jira host, not a moved workspace.'
   ),
+  taskBoardSeenComments: notApplicableDisposition(
+    38,
+    'Read markers belong to the account host, not a moved workspace.'
+  ),
   taskResumeState: notApplicableDisposition(38)
 } as const satisfies Partial<Record<keyof PersistedUIState, WslMoveFieldDisposition>>
 
