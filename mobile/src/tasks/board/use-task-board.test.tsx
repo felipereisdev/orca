@@ -113,7 +113,7 @@ async function storeFromEarlierLaunch(store: OrcaQueryStoreBackend): Promise<voi
     queryKey: key,
     meta: { persist: taskBoardCardsStorage.persist }
   })
-  // ast-grep-ignore: test-no-wall-clock -- cache age is relative to the real query-client clock
+  // ast-grep-ignore: test-no-wall-clock-tsx -- cache age is relative to the real query-client clock
   earlier.setQueryData(key, storedBoard, { updatedAt: Date.now() - 3_600_000 })
   await settleQueryNotifications()
   await persistence.flush()

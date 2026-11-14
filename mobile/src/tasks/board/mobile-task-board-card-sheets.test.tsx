@@ -245,7 +245,7 @@ async function renderBoard(stored: TaskBoardListResult | null): Promise<ReactTes
   queryClients.push(queryClient)
   if (stored) {
     queryClient.setQueryData(taskBoardCardsKey(link.hostId), stored, {
-      // ast-grep-ignore: test-no-wall-clock -- cache age is relative to the real query-client clock
+      // ast-grep-ignore: test-no-wall-clock-tsx -- cache age is relative to the real query-client clock
       updatedAt: Date.now() - 60_000
     })
   }
