@@ -22,8 +22,8 @@ import {
 } from '../linear/accounts/linear-account-client'
 import { listIssues as listLinearIssues } from '../linear/issues/linear-issue-listing'
 import type { TaskBoardListOptions, TaskBoardSources } from './task-board-host-list'
+import { readGitHubTaskBoardRepos } from './task-board-host-github-source'
 import {
-  readGitHubTaskBoardRepos,
   readGitLabTaskBoardRepos,
   type TaskBoardRepoSourceDeps
 } from './task-board-host-repo-sources'
