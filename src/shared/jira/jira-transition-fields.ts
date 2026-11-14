@@ -1,3 +1,4 @@
+import type { TaskBoardChoice } from '../task-board/task-board-wire-types'
 import type { JiraCreateField, JiraCreateFieldAllowedValue, JiraTransition } from './jira-types'
 
 export type JiraTransitionRequirement =
@@ -90,4 +91,32 @@ export function buildResolutionFieldValue(
     return { value: match.value.trim() }
   }
   return null
+}
+
+/** The transition as a client renders it: Resolution and Comment are fillable, any other required field is not. */
+export function jiraTransitionChoice(transition: JiraTransition): TaskBoardChoice {
+  const requirement = classifyTransitionRequirements(transition)
+  const choice = { id: transition.id, name: transition.name }
+  if (requirement.kind === 'none') {
+    return { ...choice, fields: null }
+  }
+  if (requirement.kind === 'unsupported') {
+    return { ...choice, fields: 'unsupported' }
+  }
+  const { resolution, commentRequired } = requirement
+  return {
+    ...choice,
+    fields: {
+      resolution: resolution
+        ? {
+            required: true,
+            options: (resolution.allowedValues ?? []).flatMap((value) => {
+              const id = transitionAllowedValueKey(value)
+              return id ? [{ id, name: transitionAllowedValueLabel(value) }] : []
+            })
+          }
+        : null,
+      commentRequired
+    }
+  }
 }

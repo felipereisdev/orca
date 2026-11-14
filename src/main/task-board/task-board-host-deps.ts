@@ -1,4 +1,8 @@
-import { getRepoExecutionHostId, getWorktreeExecutionHostId } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoRoutingConnectionId,
+  getWorktreeExecutionHostId
+} from '../../shared/execution-host'
 import type { FolderWorkspace } from '../../shared/folder-workspaces/folder-workspace-types'
 import type { GitBranchCompareResult } from '../../shared/git/diff/git-diff-compare-types'
 import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
@@ -10,20 +14,32 @@ import type { TaskBoardSettings } from '../../shared/task-board/task-board-setti
 import { normalizeVisibleTaskProviders } from '../../shared/work-items/task-providers'
 import { normalizeWorkspaceStatuses } from '../../shared/workspace-statuses'
 import { addIssueComment as addGitHubIssueComment } from '../github/issues/issue-comment'
+import { listLabels as listGitHubLabels } from '../github/issues/issue-field-options'
+import { updateIssue as updateGitHubIssue } from '../github/issues/issue-update'
 import { getWorkItemDetails as getGitHubWorkItemDetails } from '../github/work-items/work-item-details'
 import { addIssueComment as addGitLabIssueComment } from '../gitlab/issues/gitlab-issue-queries'
+import { updateIssue as updateGitLabIssue } from '../gitlab/issues/issue-update'
+import { listLabels as listGitLabLabels } from '../gitlab/projects/project-label-and-member-lookup'
 import { getWorkItemDetails as getGitLabWorkItemDetails } from '../gitlab/work-items/work-item-details'
 import { getStatus as getJiraStatus } from '../jira/client'
 import { getIssueComments as getJiraIssueComments } from '../jira/jira-issue-comments'
-import { addIssueComment as addJiraIssueComment } from '../jira/jira-issue-mutations'
+import {
+  addIssueComment as addJiraIssueComment,
+  updateIssue as updateJiraIssue
+} from '../jira/jira-issue-mutations'
 import { getIssue as getJiraIssue } from '../jira/jira-issue-read'
+import { listTransitions as listJiraTransitions } from '../jira/jira-transition-queries'
 import { getClients as getLinearClients } from '../linear/accounts/linear-account-client'
 import {
   addIssueComment as addLinearIssueComment,
   getIssueComments as getLinearIssueComments
 } from '../linear/issues/linear-issue-comments'
 import { getIssue as getLinearIssue } from '../linear/issues/linear-issue-lookups'
-import { getViewerForWorkspaceOrThrow } from '../linear/teams/linear-team-queries'
+import { updateIssue as updateLinearIssue } from '../linear/issues/linear-issue-mutations'
+import {
+  getTeamStatesOrThrow as getLinearTeamStates,
+  getViewerForWorkspaceOrThrow
+} from '../linear/teams/linear-team-queries'
 import { runPreflightCheck } from '../preflight/agent-detection'
 import { readHostedReviewForBranch } from '../source-control/hosted-review'
 import { getStoredRepoExecutionHostId } from '../workspaces/execution-host/repo-execution-host'
@@ -31,6 +47,7 @@ import type { LocalProjectGhExecOptions } from '../workspaces/execution-host/pro
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
 import { findTaskBoardHostRepo, isTaskBoardHostExecuted } from './task-board-host-repos'
 import { createTaskBoardHostSources } from './task-board-host-sources'
+import type { TaskBoardMoveWriteDeps } from './task-board-host-move'
 import type { TaskBoardServiceDeps } from './task-board-host-service'
 import {
   taskBoardWorkspaceCandidates,
@@ -95,7 +112,9 @@ async function readHostWorkspaces(runtime: TaskBoardRuntime): Promise<HostWorksp
 }
 
 /** Wires the board service to this host's runtime and provider clients. */
-export function createTaskBoardServiceDeps(runtime: TaskBoardRuntime): TaskBoardServiceDeps {
+export function createTaskBoardServiceDeps(
+  runtime: TaskBoardRuntime
+): TaskBoardServiceDeps & TaskBoardMoveWriteDeps {
   const repo = (repoId: string) => findTaskBoardHostRepo(runtime.listRepos(), repoId)
   const getLocalGitArgs = (target: Repo) => runtime.getLocalGitExecutionOptionArgs(target)
   // Filled by workspaces(); progress reads need the worktree's base ref and linked review numbers.
@@ -181,6 +200,31 @@ export function createTaskBoardServiceDeps(runtime: TaskBoardRuntime): TaskBoard
       addLinearIssueComment(issueId, body, workspaceId),
     addGitLabComment: addGitLabIssueComment,
     addGitHubComment: addGitHubIssueComment,
+    jiraTransitions: (key, siteId) => listJiraTransitions(key, siteId, true),
+    updateJiraIssue: (key, updates, siteId) => updateJiraIssue(key, updates, siteId),
+    linearTeamStates: (teamId, workspaceId) => getLinearTeamStates(teamId, workspaceId),
+    updateLinearIssue: (id, updates, workspaceId) => updateLinearIssue(id, updates, workspaceId),
+    repoLabels: (ref, target) => {
+      const connectionId = getRepoRoutingConnectionId(target)
+      const localGit = getLocalGitArgs(target)[0] ?? {}
+      return ref.provider === 'gitlab'
+        ? listGitLabLabels(
+            target.path,
+            target.issueSourcePreference,
+            connectionId,
+            localGit,
+            ref.projectRef
+          )
+        : listGitHubLabels(
+            target.path,
+            target.issueSourcePreference,
+            connectionId,
+            localGit,
+            ref.issueRepo
+          )
+    },
+    updateGitLabIssue,
+    updateGitHubIssue,
     readSeen: () => normalizeTaskBoardSeenComments(runtime.getUIState().taskBoardSeenComments),
     writeSeen: (next) => runtime.updateUIState({ taskBoardSeenComments: next })
   }

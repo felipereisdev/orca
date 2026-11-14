@@ -2,9 +2,11 @@ import {
   TaskBoardAddCommentParams,
   TaskBoardDetailParams,
   TaskBoardListParams,
-  TaskBoardMarkSeenParams
+  TaskBoardMarkSeenParams,
+  TaskBoardMoveParams
 } from '../../../../../shared/rpc-contract/task-board-params'
 import { createTaskBoardServiceDeps } from '../../../../task-board/task-board-host-deps'
+import { moveTaskBoardCard } from '../../../../task-board/task-board-host-move'
 import {
   addTaskBoardComment,
   getTaskBoardDetail,
@@ -50,5 +52,11 @@ export const TASK_BOARD_METHODS = [
       })
       return { ok: true as const }
     }
+  }),
+  defineMethod({
+    name: 'taskBoard.move',
+    permission: 'workspace',
+    params: TaskBoardMoveParams,
+    handler: (params, { runtime }) => moveTaskBoardCard(params, createTaskBoardServiceDeps(runtime))
   })
 ]

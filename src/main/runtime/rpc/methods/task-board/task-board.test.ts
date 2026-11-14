@@ -57,5 +57,6 @@ it('routes the board to the phone’s execution host without opening Jira writes
   expect(MOBILE_RPC_METHOD_ROUTES.get('taskBoard.detail')).toBe('execution-host')
   expect(MOBILE_RPC_METHOD_ROUTES.get('taskBoard.addComment')).toBe('execution-host')
   expect(MOBILE_RPC_METHOD_ROUTES.get('taskBoard.markSeen')).toBe('execution-host')
+  expect(MOBILE_RPC_METHOD_ROUTES.get('taskBoard.move')).toBe('execution-host')
   expect(MOBILE_RPC_METHOD_ROUTES.has('jira.updateIssue')).toBe(false)
 })
