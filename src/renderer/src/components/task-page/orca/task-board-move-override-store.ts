@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import {
+  finishTaskBoardMoveRereads,
+  nextTaskBoardMoveExpiry,
+  startExpiredTaskBoardMoveRereads,
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS,
   type TaskBoardMoveOverride
-} from '@/lib/work-items/task-board/task-board-move-overrides'
+} from '../../../../../shared/task-board/task-board-move-overrides'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 
 type Overrides = ReadonlyMap<string, TaskBoardMoveOverride>
@@ -62,25 +65,13 @@ export function releaseTaskBoardMove(host: ExecutionHostId, refKey: string): voi
 function startExpiredRereads(host: ExecutionHostId, now: number): boolean {
   let expired = false
   change(host, (next) => {
-    for (const [refKey, override] of next) {
-      if (override.expiresAt !== undefined && !override.rereading && override.expiresAt <= now) {
-        next.set(refKey, { ...override, rereading: true })
-        expired = true
-      }
-    }
+    expired = startExpiredTaskBoardMoveRereads(next, now)
   })
   return expired
 }
 
-/** The fresh list is now authoritative; a hold re-made meanwhile (no `rereading`) stays. */
 function finishRereads(host: ExecutionHostId): void {
-  change(host, (next) => {
-    for (const [refKey, override] of next) {
-      if (override.rereading) {
-        next.delete(refKey)
-      }
-    }
-  })
+  change(host, finishTaskBoardMoveRereads)
 }
 
 /** `reread` must resolve once a fresh list has reached the board (or was dropped). */
@@ -103,10 +94,8 @@ export function useTaskBoardMoveOverrides(
     [current]
   )
   useEffect(() => {
-    const expiries = [...current.values()].flatMap((override) =>
-      override.expiresAt === undefined || override.rereading ? [] : [override.expiresAt]
-    )
-    if (expiries.length === 0) {
+    const expiry = nextTaskBoardMoveExpiry(current)
+    if (expiry === null) {
       return
     }
     // Why: a list that lagged the move left the old card in the board's state; dropping the hold
@@ -117,7 +106,7 @@ export function useTaskBoardMoveOverrides(
           void reread().finally(() => finishRereads(host))
         }
       },
-      Math.max(0, Math.min(...expiries) - Date.now())
+      Math.max(0, expiry - Date.now())
     )
     return () => clearTimeout(timer)
   }, [current, host, reread])

@@ -4,7 +4,7 @@ import { TaskBoard, type TaskBoardColumn } from '@/components/task-board/TaskBoa
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
-import { placeTaskBoardCards } from '@/lib/work-items/task-board/task-board-move-overrides'
+import { placeTaskBoardCards } from '../../../../../shared/task-board/task-board-move-overrides'
 import { matchesTaskBoardProjects } from '../../../../../shared/task-board/task-board-project-filter'
 import { useAppStore } from '@/store'
 import { isTaskProvider, type TaskProvider } from '../../../../../shared/work-items/task-providers'

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   placeTaskBoardCards,
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS
-} from '@/lib/work-items/task-board/task-board-move-overrides'
+} from '../../../../../shared/task-board/task-board-move-overrides'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { JiraIssue } from '../../../../../shared/jira/jira-types'
 import type {

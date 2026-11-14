@@ -7,11 +7,44 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { moveTaskBoardCard } from './task-board-operations'
 import type { MobileTaskBoardChoice, MobileTaskBoardMoveResult } from './task-board-reply-schema'
 
+// Each step owns its picks, so a new step or a way back never carries an earlier step's choice.
 export type TaskBoardMoveStep =
-  | { kind: 'targets' }
-  | { kind: 'choice'; targetColumnId: string; choices: MobileTaskBoardChoice[] }
-  | { kind: 'fields'; targetColumnId: string; choice: MobileTaskBoardChoice }
+  | { kind: 'targets'; targetId: string | null }
+  | {
+      kind: 'choice'
+      targetColumnId: string
+      choices: MobileTaskBoardChoice[]
+      choiceId: string | null
+    }
+  | {
+      kind: 'fields'
+      targetColumnId: string
+      choice: MobileTaskBoardChoice
+      resolutionId: string | null
+      comment: string
+    }
   | { kind: 'unsupported'; choice: MobileTaskBoardChoice }
+
+const START: TaskBoardMoveStep = { kind: 'targets', targetId: null }
+
+/** The step's picks are complete: a column, a transition, or every required field. */
+function isReady(step: TaskBoardMoveStep): boolean {
+  switch (step.kind) {
+    case 'targets':
+      return step.targetId !== null
+    case 'choice':
+      return step.choiceId !== null
+    case 'fields': {
+      const fields = typeof step.choice.fields === 'object' ? step.choice.fields : null
+      return (
+        (!fields?.resolution?.required || step.resolutionId !== null) &&
+        (!fields?.commentRequired || step.comment.trim().length > 0)
+      )
+    }
+    case 'unsupported':
+      return false
+  }
+}
 
 export type BlockedReason = Extract<MobileTaskBoardMoveResult, { status: 'blocked' }>['reason']
 
@@ -32,7 +65,7 @@ type Params = {
 
 /** One card's move: the column, then whatever transition or fields the host asks for. */
 export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed }: Params) {
-  const [step, setStep] = useState<TaskBoardMoveStep>({ kind: 'targets' })
+  const [step, setStep] = useState<TaskBoardMoveStep>(START)
   const [problem, setProblem] = useState<TaskBoardMoveProblem | null>(null)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
@@ -55,10 +88,16 @@ export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed
           onMoved(targetColumnId, result.card)
           return
         case 'needs-choice':
-          setStep({ kind: 'choice', targetColumnId, choices: result.choices })
+          setStep({ kind: 'choice', targetColumnId, choices: result.choices, choiceId: null })
           return
         case 'needs-fields':
-          setStep({ kind: 'fields', targetColumnId, choice: result.choice })
+          setStep({
+            kind: 'fields',
+            targetColumnId,
+            choice: result.choice,
+            resolutionId: null,
+            comment: ''
+          })
           return
         case 'unsupported-fields':
           setStep({ kind: 'unsupported', choice: result.choice })
@@ -66,7 +105,7 @@ export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed
         case 'blocked':
           // The column's transitions changed under the picked one: start again from the columns.
           if (result.reason === 'invalid-choice') {
-            setStep({ kind: 'targets' })
+            setStep(START)
           }
           setProblem({ kind: 'blocked', reason: result.reason })
           return
@@ -86,10 +125,56 @@ export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed
     }
   }
 
+  const confirm = () => {
+    switch (step.kind) {
+      case 'targets':
+        if (step.targetId) {
+          void submit(step.targetId)
+        }
+        return
+      case 'choice':
+        if (step.choiceId) {
+          void submit(step.targetColumnId, { choiceId: step.choiceId })
+        }
+        return
+      case 'fields': {
+        if (!isReady(step)) {
+          return
+        }
+        const comment = step.comment.trim()
+        void submit(step.targetColumnId, {
+          choiceId: step.choice.id,
+          fields: {
+            ...(step.resolutionId ? { resolutionId: step.resolutionId } : {}),
+            ...(comment ? { comment } : {})
+          }
+        })
+        return
+      }
+      case 'unsupported':
+        return
+    }
+  }
+
   const back = () => {
-    setStep({ kind: 'targets' })
+    setStep(START)
     setProblem(null)
   }
 
-  return { step, problem, busy, submit, back }
+  return {
+    step,
+    problem,
+    busy,
+    ready: isReady(step),
+    confirm,
+    back,
+    pickTarget: (targetId: string) =>
+      setStep((current) => (current.kind === 'targets' ? { ...current, targetId } : current)),
+    pickChoice: (choiceId: string) =>
+      setStep((current) => (current.kind === 'choice' ? { ...current, choiceId } : current)),
+    pickResolution: (resolutionId: string) =>
+      setStep((current) => (current.kind === 'fields' ? { ...current, resolutionId } : current)),
+    editComment: (comment: string) =>
+      setStep((current) => (current.kind === 'fields' ? { ...current, comment } : current))
+  }
 }

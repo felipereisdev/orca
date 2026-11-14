@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Text, View } from 'react-native'
 import { Monitor } from 'lucide-react-native'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
@@ -14,11 +13,11 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { colors, spacing, typography } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
-import type { MobileTaskBoardChoice } from './task-board-reply-schema'
 import {
   useTaskBoardMove,
+  type BlockedReason,
   type TaskBoardMoveProblem,
-  type BlockedReason
+  type TaskBoardMoveStep
 } from './use-task-board-move'
 
 type Props = {
@@ -69,20 +68,16 @@ function problemText(problem: TaskBoardMoveProblem, t: Translate): string {
 
 /** The fields a needs-fields reply asks for; only a filled required field lets the move go. */
 function MoveFields({
-  choice,
-  resolutionId,
+  step,
   onResolution,
-  comment,
   onComment
 }: {
-  choice: MobileTaskBoardChoice
-  resolutionId: string | null
+  step: Extract<TaskBoardMoveStep, { kind: 'fields' }>
   onResolution: (id: string) => void
-  comment: string
   onComment: (text: string) => void
 }) {
   const t = useMobileTranslation()
-  const fields = typeof choice.fields === 'object' ? choice.fields : null
+  const fields = typeof step.choice.fields === 'object' ? step.choice.fields : null
   const resolution = fields?.resolution ?? null
   return (
     <>
@@ -98,7 +93,7 @@ function MoveFields({
               <ListRow
                 key={option.id}
                 title={option.name}
-                selected={option.id === resolutionId}
+                selected={option.id === step.resolutionId}
                 onPress={() => onResolution(option.id)}
               />
             ))}
@@ -112,7 +107,7 @@ function MoveFields({
             trailing={t('tasks.board.move.required', 'Required')}
           />
           <MessageBox
-            value={comment}
+            value={step.comment}
             onChangeText={onComment}
             placeholder={t('tasks.board.move.commentPlaceholder', 'Add a comment')}
             accessibilityLabel={t('tasks.board.move.comment', 'Comment')}
@@ -136,10 +131,6 @@ export function MobileTaskBoardMoveSheet({
   useMobileColorScheme()
   const t = useMobileTranslation()
   const move = useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed })
-  const [targetId, setTargetId] = useState<string | null>(null)
-  const [choiceId, setChoiceId] = useState<string | null>(null)
-  const [resolutionId, setResolutionId] = useState<string | null>(null)
-  const [comment, setComment] = useState('')
   const { step } = move
   const title = t('tasks.board.move.title', 'Move {{id}}', { id: card.displayId })
 
@@ -171,36 +162,6 @@ export function MobileTaskBoardMoveSheet({
       // A column the host sent no verdict for is one it cannot place the card in.
       target: card.moveTargets.find((candidate) => candidate.columnId === column.id) ?? null
     }))
-  const fields =
-    step.kind === 'fields' && typeof step.choice.fields === 'object' ? step.choice.fields : null
-  const ready =
-    step.kind === 'targets'
-      ? targetId !== null
-      : step.kind === 'choice'
-        ? choiceId !== null
-        : (!fields?.resolution?.required || resolutionId !== null) &&
-          (!fields?.commentRequired || comment.trim().length > 0)
-
-  const confirm = () => {
-    if (step.kind === 'targets') {
-      if (targetId) {
-        void move.submit(targetId)
-      }
-    } else if (step.kind === 'choice') {
-      if (choiceId) {
-        void move.submit(step.targetColumnId, { choiceId })
-      }
-    } else {
-      void move.submit(step.targetColumnId, {
-        choiceId: step.choice.id,
-        fields: {
-          ...(resolutionId ? { resolutionId } : {}),
-          ...(comment.trim() ? { comment: comment.trim() } : {})
-        }
-      })
-    }
-  }
-
   return (
     <>
       <SheetHeader
@@ -225,8 +186,8 @@ export function MobileTaskBoardMoveSheet({
                   : t('tasks.board.move.noMapping', 'No status is mapped to this column.')
               }
               disabled={!target?.allowed}
-              selected={column.id === targetId}
-              onPress={() => setTargetId(column.id)}
+              selected={column.id === step.targetId}
+              onPress={() => move.pickTarget(column.id)}
             />
           ))}
         </ListGroup>
@@ -239,21 +200,15 @@ export function MobileTaskBoardMoveSheet({
               <ListRow
                 key={choice.id}
                 title={choice.name}
-                selected={choice.id === choiceId}
-                onPress={() => setChoiceId(choice.id)}
+                selected={choice.id === step.choiceId}
+                onPress={() => move.pickChoice(choice.id)}
               />
             ))}
           </ListGroup>
         </>
       ) : null}
       {step.kind === 'fields' ? (
-        <MoveFields
-          choice={step.choice}
-          resolutionId={resolutionId}
-          onResolution={setResolutionId}
-          comment={comment}
-          onComment={setComment}
-        />
+        <MoveFields step={step} onResolution={move.pickResolution} onComment={move.editComment} />
       ) : null}
       <View style={styles.footer}>
         {offline ? (
@@ -264,8 +219,8 @@ export function MobileTaskBoardMoveSheet({
         {move.problem ? <Text style={styles.problem}>{problemText(move.problem, t)}</Text> : null}
         <SheetPrimaryButton
           label={t('tasks.board.move.confirm', 'Move')}
-          onPress={confirm}
-          disabled={!ready || offline}
+          onPress={move.confirm}
+          disabled={!move.ready || offline}
           busy={move.busy}
         />
       </View>

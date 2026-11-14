@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
+  TaskBoardCardRef,
   TaskBoardComment,
   TaskBoardDetailResult,
   TaskBoardWireCard
@@ -27,19 +28,37 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// Own comments never count as unread, and may carry the phone's clock instead of the provider's.
-function newestOtherComment(comments: readonly TaskBoardComment[]): TaskBoardComment | null {
-  let newest: TaskBoardComment | null = null
+/**
+ * Others' comments at the newest instant: the host keeps every id it was told at that instant,
+ * so a tie marks each one. Own comments never count as unread and may carry the phone's clock.
+ */
+function newestOtherComments(comments: readonly TaskBoardComment[]): TaskBoardComment[] {
+  let newestMs = Number.NEGATIVE_INFINITY
+  let newest: TaskBoardComment[] = []
   for (const comment of comments) {
-    // An unparseable timestamp never wins over a real one; a tie goes to the later-listed comment.
-    if (
-      !comment.own &&
-      (!newest || (Date.parse(comment.at) || 0) >= (Date.parse(newest.at) || 0))
-    ) {
-      newest = comment
+    const ms = Date.parse(comment.at)
+    // The host cannot place an unparseable timestamp, so it is never sent as a marker.
+    if (comment.own || Number.isNaN(ms) || ms < newestMs) {
+      continue
     }
+    newest = ms > newestMs ? [comment] : [...newest, comment]
+    newestMs = ms
   }
   return newest
+}
+
+/** True only once the host accepted a marker for every comment; stops at the first that fails. */
+async function markAllSeen(
+  client: RpcClient,
+  ref: TaskBoardCardRef,
+  comments: readonly TaskBoardComment[]
+): Promise<boolean> {
+  for (const comment of comments) {
+    if (!(await markTaskBoardSeen(client, ref, { at: comment.at, id: comment.id }))) {
+      return false
+    }
+  }
+  return true
 }
 
 type Params = {
@@ -60,6 +79,11 @@ export function useTaskBoardDetail({ client, connected, card, open, onSeen }: Pa
   const [send, setSend] = useState<TaskBoardCommentSend>({ status: 'idle' })
   const marked = useRef<string | null>(null)
   const sending = useRef(false)
+  // The caller's latest callback, so a new one each render never re-runs the marker effect.
+  const onSeenRef = useRef(onSeen)
+  useEffect(() => {
+    onSeenRef.current = onSeen
+  }, [onSeen])
   // The board's card changes identity on every list; the issue it names does not.
   const [ref] = useState(() => card.ref)
 
@@ -85,30 +109,26 @@ export function useTaskBoardDetail({ client, connected, card, open, onSeen }: Pa
 
   // Runs after the commit that drew the comments, so only a rendered comment is ever marked.
   useEffect(() => {
-    if (!open || !client || read.status !== 'ready') {
+    if (!open || !connected || !client || read.status !== 'ready') {
       return
     }
-    const newest = newestOtherComment(read.detail.comments)
-    if (!newest || marked.current === newest.id) {
+    const newest = newestOtherComments(read.detail.comments)
+    const key = newest.map((comment) => comment.id).join('\0')
+    if (newest.length === 0 || marked.current === key) {
       return
     }
-    marked.current = newest.id
-    // Best effort: a refused or lost mark leaves the card unread, and the next detail tries again.
-    markTaskBoardSeen(client, ref, { at: newest.at, id: newest.id }).then(
-      (accepted) => {
-        if (accepted) {
-          onSeen()
-        } else if (marked.current === newest.id) {
-          marked.current = null
-        }
-      },
-      () => {
-        if (marked.current === newest.id) {
-          marked.current = null
-        }
+    marked.current = key
+    const retryLater = () => {
+      if (marked.current === key) {
+        marked.current = null
       }
+    }
+    // Best effort: a refused or lost mark leaves the card unread, and the next detail tries again.
+    markAllSeen(client, ref, newest).then(
+      (accepted) => (accepted ? onSeenRef.current() : retryLater()),
+      retryLater
     )
-  }, [open, client, read, ref, onSeen])
+  }, [open, connected, client, read, ref])
 
   const sendComment = async (): Promise<void> => {
     const body = draft.trim()

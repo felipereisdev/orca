@@ -3,46 +3,28 @@ import type {
   TaskBoardListResult,
   TaskBoardWireCard
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import { changeHeldTaskBoardCard } from './task-board-move-holds'
 import { taskBoardCardsKey } from './task-board-query-storage'
 
 // What a write already changed on the host, shown on the board before its next list.
 
-function changeCard(
-  queryClient: QueryClient,
-  hostId: string,
-  refKey: string,
-  change: (card: TaskBoardWireCard) => TaskBoardWireCard
-): void {
-  queryClient.setQueryData<TaskBoardListResult>(taskBoardCardsKey(hostId), (board) =>
-    board
-      ? {
-          ...board,
-          cards: board.cards.map((card) => (card.refKey === refKey ? change(card) : card))
-        }
-      : board
-  )
-}
-
-/** `moved` null: the host applied the move but could not read the card back. */
-export function applyTaskBoardMove(
-  queryClient: QueryClient,
-  hostId: string,
-  refKey: string,
-  targetColumnId: string,
-  moved: TaskBoardWireCard | null
-): void {
-  changeCard(queryClient, hostId, refKey, (previous) =>
-    moved
-      ? {
-          ...moved,
-          // The move reply is not enriched; the earlier card's enrichment stands until the next list.
-          enrichment: previous.enrichment,
-          progress: previous.progress,
-          latestComment: previous.latestComment,
-          unreadComments: previous.unreadComments
-        }
-      : { ...previous, columnId: targetColumnId }
-  )
+/** The card a move left; `moved` null: the host applied it but could not read the card back. */
+export function movedTaskBoardCard(
+  previous: TaskBoardWireCard,
+  moved: TaskBoardWireCard | null,
+  targetColumnId: string
+): TaskBoardWireCard {
+  if (!moved) {
+    return { ...previous, columnId: targetColumnId }
+  }
+  return {
+    ...moved,
+    // The move reply is not enriched; the earlier card's enrichment stands until the next list.
+    enrichment: previous.enrichment,
+    progress: previous.progress,
+    latestComment: previous.latestComment,
+    unreadComments: previous.unreadComments
+  }
 }
 
 export function clearTaskBoardUnread(
@@ -50,5 +32,14 @@ export function clearTaskBoardUnread(
   hostId: string,
   refKey: string
 ): void {
-  changeCard(queryClient, hostId, refKey, (card) => ({ ...card, unreadComments: 0 }))
+  const clear = (card: TaskBoardWireCard): TaskBoardWireCard => ({ ...card, unreadComments: 0 })
+  queryClient.setQueryData<TaskBoardListResult>(taskBoardCardsKey(hostId), (board) =>
+    board
+      ? {
+          ...board,
+          cards: board.cards.map((card) => (card.refKey === refKey ? clear(card) : card))
+        }
+      : board
+  )
+  changeHeldTaskBoardCard(hostId, refKey, clear)
 }

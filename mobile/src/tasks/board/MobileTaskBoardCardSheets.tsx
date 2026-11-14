@@ -7,7 +7,8 @@ import { KeyedBottomDrawer } from '../../components/bottom-drawer/keyed-bottom-d
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { MobileTaskBoardDetailDrawer } from './MobileTaskBoardDetailDrawer'
 import { MobileTaskBoardMoveSheet } from './MobileTaskBoardMoveSheet'
-import { applyTaskBoardMove, clearTaskBoardUnread } from './task-board-local-changes'
+import { clearTaskBoardUnread, movedTaskBoardCard } from './task-board-local-changes'
+import { holdTaskBoardMove } from './task-board-move-holds'
 import type { TaskBoardStage } from './task-board-stages'
 import type { TaskBoardView } from './use-task-board'
 
@@ -67,7 +68,8 @@ export function MobileTaskBoardCardSheets({
             client={client}
             offline={view.isOffline}
             onMoved={(targetColumnId, moved) => {
-              applyTaskBoardMove(queryClient, hostId, card.refKey, targetColumnId, moved)
+              const placed = movedTaskBoardCard(card, moved, targetColumnId)
+              holdTaskBoardMove(hostId, placed, placed.columnId)
               onSheet(null)
               void refresh()
             }}

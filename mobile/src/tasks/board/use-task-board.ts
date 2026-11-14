@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { TaskBoardListResult } from '../../../../src/shared/task-board/task-board-wire-types'
 import { defineHostQuery, readHostQueryLive, useHostQuery } from '../../query/host-query'
@@ -6,6 +6,7 @@ import { isHostNotConnectedError } from '../../query/host-query-errors'
 import { useHostClient } from '../../transport/connection/host-client-hooks'
 import { assertTaskBoardSupported, TaskBoardUnsupportedError } from './task-board-capability'
 import { readTaskBoardList } from './task-board-operations'
+import { useTaskBoardMoveHolds, withTaskBoardMoveHolds } from './task-board-move-holds'
 import {
   NO_TASK_BOARD_INPUT,
   TASK_BOARD_TARGET,
@@ -27,7 +28,7 @@ export const taskBoardCardsQuery = defineHostQuery<typeof NO_TASK_BOARD_INPUT, T
 )
 
 export type TaskBoardView = {
-  // The host's board: this launch's read, else the one an earlier launch stored.
+  // The host's board (this launch's read, else the one an earlier launch stored), with held moves placed.
   data: TaskBoardListResult | undefined
   // Moves and comments need the host; the board shown may be an earlier read.
   isOffline: boolean
@@ -64,9 +65,12 @@ export function useTaskBoard(hostId: string): TaskBoardView {
       { replace: true }
     ).catch(() => undefined)
   }, [client, hostId, queryClient])
+  // A confirmed move stays in its column while lists lag the provider, as on the desktop board.
+  const holds = useTaskBoardMoveHolds(hostId, refresh)
+  const data = useMemo(() => withTaskBoardMoveHolds(board.data, holds), [board.data, holds])
   const unsupported = board.error instanceof TaskBoardUnsupportedError
   return {
-    data: board.data,
+    data,
     isOffline: client === null || state !== 'connected',
     isRefreshing: board.isFetching,
     readAt: board.data ? board.dataUpdatedAt : null,

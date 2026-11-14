@@ -1,5 +1,5 @@
-import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
-import { taskBoardCardUpdatedAtMs } from '../../../../../shared/task-board/task-board-provider-results'
+import type { TaskBoardWireCard } from './task-board-wire-types'
+import { taskBoardCardUpdatedAtMs } from './task-board-provider-results'
 
 /** How long a confirmed move outlives host lists that still show the old status. */
 export const TASK_BOARD_MOVE_OVERRIDE_TTL_MS = 2 * 60 * 1000
@@ -49,4 +49,38 @@ export function placeTaskBoardCards(
     }
   }
   return placed.sort((a, b) => taskBoardCardUpdatedAtMs(b.card) - taskBoardCardUpdatedAtMs(a.card))
+}
+
+/** Marks expired confirmed holds as re-reading, in place; true when any did expire. */
+export function startExpiredTaskBoardMoveRereads(
+  overrides: Map<string, TaskBoardMoveOverride>,
+  now: number
+): boolean {
+  let expired = false
+  for (const [refKey, override] of overrides) {
+    if (override.expiresAt !== undefined && !override.rereading && override.expiresAt <= now) {
+      overrides.set(refKey, { ...override, rereading: true })
+      expired = true
+    }
+  }
+  return expired
+}
+
+/** The fresh list is now authoritative; a hold re-made meanwhile (no `rereading`) stays. */
+export function finishTaskBoardMoveRereads(overrides: Map<string, TaskBoardMoveOverride>): void {
+  for (const [refKey, override] of overrides) {
+    if (override.rereading) {
+      overrides.delete(refKey)
+    }
+  }
+}
+
+/** When the next confirmed hold expires; null when none is waiting to. */
+export function nextTaskBoardMoveExpiry(
+  overrides: ReadonlyMap<string, TaskBoardMoveOverride>
+): number | null {
+  const expiries = [...overrides.values()].flatMap((override) =>
+    override.expiresAt === undefined || override.rereading ? [] : [override.expiresAt]
+  )
+  return expiries.length > 0 ? Math.min(...expiries) : null
 }

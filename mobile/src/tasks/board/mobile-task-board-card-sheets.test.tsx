@@ -7,6 +7,10 @@ import type {
   TaskBoardListResult,
   TaskBoardWireCard
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import {
+  markTaskBoardCommentsSeen,
+  type TaskBoardSeenComments
+} from '../../../../src/shared/task-board/task-board-seen-comments'
 import type { ConnectionState } from '../../transport/connection/connection-state'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import type { RpcResponse } from '../../transport/rpc/rpc-wire-types'
@@ -73,7 +77,7 @@ vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 })
 }))
-vi.mock('expo-router', () => ({ useLocalSearchParams: () => ({ hostId: 'host-1' }) }))
+vi.mock('expo-router', () => ({ useLocalSearchParams: () => ({ hostId: link.hostId }) }))
 vi.mock('../../navigation/route-handoff', () => ({
   useRouteHandoff: () => ({ back: () => undefined, replace: () => undefined })
 }))
@@ -129,10 +133,14 @@ vi.mock('../../transport/connection/connection-health', () => ({
   classifyConnection: () => 'healthy',
   isConnectionOutage: () => false
 }))
-const link = vi.hoisted((): { client: RpcClient | null; state: ConnectionState } => ({
-  client: null,
-  state: 'connected'
-}))
+// Each test is its own host: held moves live per host for the app's whole run.
+const link = vi.hoisted(
+  (): { hostId: string; client: RpcClient | null; state: ConnectionState } => ({
+    hostId: 'host-1',
+    client: null,
+    state: 'connected'
+  })
+)
 vi.mock('../../transport/connection/host-client-hooks', () => ({
   useHostClient: () => ({ client: link.client, clientId: null, state: link.state }),
   useForceReconnect: () => null
@@ -140,11 +148,11 @@ vi.mock('../../transport/connection/host-client-hooks', () => ({
 
 import { MobileTaskBoardScreen } from './MobileTaskBoardScreen'
 
-const HOST = 'host-1'
+const REF_KEY = 'jira:site-1:ORCA-12'
 
-function boardCard(columnId: string): TaskBoardWireCard {
+function boardCard(columnId: string, unreadComments?: number): TaskBoardWireCard {
   return {
-    refKey: 'jira:site-1:ORCA-12',
+    refKey: REF_KEY,
     provider: 'jira',
     displayId: 'ORCA-12',
     title: 'Ship the board on mobile',
@@ -180,11 +188,12 @@ function boardCard(columnId: string): TaskBoardWireCard {
     project: { key: 'jira:site-1:ORCA', provider: 'jira', label: 'Orca' },
     moveTargets: ['todo', 'in-progress', 'done']
       .filter((target) => target !== columnId)
-      .map((target) => ({ columnId: target, allowed: true }))
+      .map((target) => ({ columnId: target, allowed: true })),
+    ...(unreadComments === undefined ? {} : { unreadComments })
   }
 }
 
-function board(columnId: string): TaskBoardListResult {
+function board(columnId: string, unreadComments?: number): TaskBoardListResult {
   return {
     columns: [
       { id: 'todo', label: 'To do' },
@@ -192,7 +201,7 @@ function board(columnId: string): TaskBoardListResult {
       { id: 'done', label: 'Done' }
     ],
     doneColumnId: 'done',
-    cards: [boardCard(columnId)],
+    cards: [boardCard(columnId, unreadComments)],
     providers: {
       github: { status: 'disconnected' },
       gitlab: { status: 'disconnected' },
@@ -209,8 +218,16 @@ const moveParams = z.object({
   fields: z.object({ resolutionId: z.string().optional() }).optional()
 })
 
+const seenParams = z.object({ at: z.string(), id: z.string() })
+
 function reply(result: unknown): RpcResponse {
   return { id: 'reply', ok: true, result }
+}
+
+const NO_STATUS: RpcResponse = {
+  id: 'reply',
+  ok: false,
+  error: { code: 'unavailable', message: 'no status' }
 }
 
 let tree: ReactTestRenderer | null = null
@@ -227,7 +244,9 @@ async function renderBoard(stored: TaskBoardListResult | null): Promise<ReactTes
   const queryClient = createOrcaQueryClient()
   queryClients.push(queryClient)
   if (stored) {
-    queryClient.setQueryData(taskBoardCardsKey(HOST), stored, { updatedAt: Date.now() - 60_000 })
+    queryClient.setQueryData(taskBoardCardsKey(link.hostId), stored, {
+      updatedAt: Date.now() - 60_000
+    })
   }
   await act(async () => {
     tree = create(
@@ -293,12 +312,13 @@ function shownCardLabel(root: ReactTestInstance): string {
 describe('moving a card on My board', () => {
   it('sends nothing while the host is unreachable and leaves the card where it was', async () => {
     const sent: string[] = []
+    link.hostId = 'host-offline'
     link.state = 'disconnected'
     link.client = stubRpcClient({
       getState: () => 'disconnected',
       sendRequest: (method) => {
         sent.push(method)
-        return Promise.reject(new Error(`Not connected: ${HOST}`))
+        return Promise.reject(new Error(`Not connected: ${link.hostId}`))
       }
     })
     const root = (await renderBoard(board('in-progress'))).root
@@ -317,12 +337,13 @@ describe('moving a card on My board', () => {
 
   it('finishes a move that needs a resolution with the card in the target column', async () => {
     let column = 'in-progress'
+    link.hostId = 'host-fields'
     link.state = 'connected'
     link.client = stubRpcClient({
       sendRequest: async (method, params) => {
         switch (method) {
           case 'status.get':
-            return { id: 'reply', ok: false, error: { code: 'unavailable', message: 'no status' } }
+            return NO_STATUS
           case 'taskBoard.list':
             return reply(board(column))
           case 'taskBoard.move': {
@@ -373,5 +394,110 @@ describe('moving a card on My board', () => {
     expect(shownCardIds(root)).toEqual(['ORCA-12'])
     await showStage(root, 'in-progress')
     expect(shownCardIds(root)).toEqual([])
+  })
+
+  it('keeps a moved card in its target column while the host still lists the old one', async () => {
+    link.hostId = 'host-lagging'
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      sendRequest: async (method) => {
+        switch (method) {
+          case 'status.get':
+            return NO_STATUS
+          // The provider has not caught up: every list still shows the card where it was.
+          case 'taskBoard.list':
+            return reply(board('in-progress'))
+          case 'taskBoard.move':
+            return reply({ status: 'moved', card: boardCard('done') })
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+    await act(async () => {
+      pressable(root, shownCardLabel(root)).props.onLongPress()
+    })
+    await press(root, 'Done')
+    await press(root, 'Move')
+
+    await showStage(root, 'done')
+    expect(shownCardIds(root)).toEqual(['ORCA-12'])
+    await showStage(root, 'in-progress')
+    expect(shownCardIds(root)).toEqual([])
+  })
+})
+
+describe('reading a card on My board', () => {
+  const OLDER = '2026-11-13T08:00:00.000Z'
+  const NEWEST = '2026-11-13T09:00:00.000Z'
+  const LATER_OWN = '2026-11-13T09:30:00.000Z'
+  const comments = [
+    { id: 'c-0', author: 'Ana', at: OLDER, body: 'Picked this up', own: false },
+    { id: 'c-1', author: 'Ana', at: NEWEST, body: 'Repro attached', own: false },
+    { id: 'c-2', author: 'Rui', at: NEWEST, body: 'Same here', own: false },
+    { id: 'c-3', author: 'Me', at: LATER_OWN, body: 'Looking', own: true }
+  ]
+
+  // A host that keeps read markers the way the real one does, or refuses every marker.
+  function readHost(hostId: string, refuse: boolean) {
+    const host: { markers: TaskBoardSeenComments } = { markers: {} }
+    link.hostId = hostId
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      sendRequest: async (method, params) => {
+        switch (method) {
+          case 'status.get':
+            return NO_STATUS
+          case 'taskBoard.list':
+            return reply(board('in-progress', 2))
+          case 'taskBoard.detail':
+            return reply({
+              card: boardCard('in-progress', 2),
+              progress: null,
+              comments,
+              enrichment: 'ok'
+            })
+          case 'taskBoard.markSeen':
+            if (refuse) {
+              return { id: 'reply', ok: false, error: { code: 'internal', message: 'store busy' } }
+            }
+            host.markers = markTaskBoardCommentsSeen(
+              host.markers,
+              REF_KEY,
+              seenParams.parse(params)
+            )
+            return reply({})
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    return host
+  }
+
+  it('marks every comment from others at the newest instant, never its own', async () => {
+    const host = readHost('host-read', false)
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+    await press(root, shownCardLabel(root))
+    await settleQueryNotifications()
+
+    expect(host.markers[REF_KEY]).toEqual({ at: NEWEST, ids: ['c-1', 'c-2'] })
+    expect(shownCardLabel(root)).not.toContain('2 new')
+  })
+
+  it('keeps the unread count when the host refuses the marker', async () => {
+    readHost('host-refusing', true)
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+    await press(root, shownCardLabel(root))
+    await settleQueryNotifications()
+
+    expect(shownCardLabel(root)).toContain('2 new')
   })
 })
