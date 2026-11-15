@@ -45,34 +45,51 @@ describe('resolveTaskStartRepo', () => {
   })
 })
 
+const account = {
+  id: 'acc-1',
+  email: 'a@example.com',
+  authMethod: 'subscription-oauth' as const,
+  createdAt: 1,
+  updatedAt: 1,
+  lastAuthenticatedAt: 1
+}
+
+function optionsDeps(
+  target: Repo,
+  overrides: Partial<TaskStartOptionsDeps> = {}
+): TaskStartOptionsDeps {
+  return {
+    repos: () => [target],
+    settings: () => ({ taskStart: { roles: {} }, defaultTuiAgent: 'claude' }),
+    jiraIssue: async () => null,
+    baseRefDefault: async () => 'origin/main',
+    launchHost: async () => ({
+      agents: ['claude'],
+      claudeAccountTarget: { runtime: 'host', wslDistro: null }
+    }),
+    claudeAccounts: () => [account],
+    modelCatalog: async () => ({ origin: 'unknown' }),
+    ...overrides
+  }
+}
+
 describe('getTaskStartOptions', () => {
   it('offers no Claude accounts on an SSH repo and flags a role configured with one', async () => {
     const sshRepo = repo('remote', {
       connectionId: 'box',
       taskStart: { roles: { reviewer: { agent: 'claude', accountId: 'acc-1' } } }
     })
-    const deps: TaskStartOptionsDeps = {
-      repos: () => [sshRepo],
-      settings: () => ({ taskStart: { roles: {} }, defaultTuiAgent: 'claude' }),
-      jiraIssue: async () => null,
-      baseRefDefault: async () => 'origin/main',
-      enabledAgents: async () => ['claude'],
-      claudeAccounts: () => [
-        {
-          id: 'acc-1',
-          email: 'a@example.com',
-          authMethod: 'subscription-oauth',
-          createdAt: 1,
-          updatedAt: 1,
-          lastAuthenticatedAt: 1
-        }
-      ],
-      claudeAccountTarget: () => ({ runtime: 'host', wslDistro: null }),
-      modelCatalog: async () => ({ origin: 'unknown' })
-    }
-    const options = await getTaskStartOptions({ repoId: 'remote' }, deps)
+    const options = await getTaskStartOptions({ repoId: 'remote' }, optionsDeps(sshRepo))
     expect(options.catalog.filter((entry) => entry.accountId !== undefined)).toEqual([])
     expect(options.catalog.map((entry) => entry.agent)).toEqual(['claude'])
     expect(options.invalidRoles).toEqual(['reviewer'])
+  })
+
+  it('flags a role whose model the agent does not offer', async () => {
+    const target = repo('web', {
+      taskStart: { roles: { planner: { agent: 'claude', model: 'no-such-model' } } }
+    })
+    const options = await getTaskStartOptions({ repoId: 'web' }, optionsDeps(target))
+    expect(options.invalidRoles).toEqual(['planner'])
   })
 })

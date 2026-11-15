@@ -126,6 +126,8 @@ export type TaskStartAgentCatalogEntry = {
 
 export type TaskStartOptionsResult = {
   repoId: string | null
+  /** Unresolved Jira card: the repos mapping its project (several); empty otherwise. */
+  repoCandidates: string[]
   repos: { id: string; label: string; kind: 'git' | 'folder' }[]
   workspaceMode: TaskStartWorkspaceMode
   baseRef: string | null

@@ -2,12 +2,14 @@ import { ALL_TUI_AGENTS } from '../../shared/agent-launch/catalog/tui-agent-disp
 import { isTuiAgent } from '../../shared/agent-launch/catalog/tui-agent-config'
 import { filterEnabledTuiAgents } from '../../shared/agent-launch/catalog/tui-agent-selection'
 import { orderAgentLaunchPickerAgents } from '../../shared/agent-launch/picker/agent-launch-picker-rows'
-import { getRepoExecutionHostId, getRepoSshConnectionId } from '../../shared/execution-host'
-import { resolveWslSessionContext } from '../daemon/pty-subprocess/wsl-session-context'
+import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { getClaudeProfileRouter } from '../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { getIssue as getJiraIssue } from '../jira/jira-issue-read'
 import { agentCommandOverrideDetectionOptions } from '../preflight/installed-agent-detection'
 import { detectAgentsOnHost } from '../preflight/workspace-agent-detection'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { claudeLaunchTargetForDetectionHost } from '../runtime/rpc/methods/accounts/workspace-accounts-snapshot'
 import { isTaskBoardHostExecuted } from './task-board-host-repos'
 import type { TaskStartOptionsDeps } from './task-start-options'
 
@@ -18,7 +20,7 @@ export type TaskStartOptionsRuntime = Pick<
   | 'getRepoBaseRefDefault'
   | 'getAccountsSnapshot'
   | 'structuredAgentModelCatalog'
-  | 'prepareClaudeAccountLaunch'
+  | 'resolveAgentDetectionHost'
 >
 
 /** Wires the start options to this host's settings, agent detection, accounts and saved catalogs. */
@@ -33,41 +35,58 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
     jiraIssue: (key, siteId) => getJiraIssue(key, siteId, true),
     baseRefDefault: async (repo) =>
       (await runtime.getRepoBaseRefDefault(`id:${repo.id}`)).defaultBaseRef,
-    enabledAgents: async (repo) => {
+    launchHost: async (repo) => {
       const settings = runtime.getClientSettings()
-      const connectionId = getRepoSshConnectionId(repo)
-      // Same detection as a new workspace's agent; a host that cannot detect offers every enabled agent.
-      const detected: string[] = await detectAgentsOnHost(
-        connectionId ? { kind: 'ssh', connectionId } : { kind: 'local' },
-        {
+      // The new-workspace resolution: an SSH target, or local with the project's runtime (WSL).
+      const host = await runtime.resolveAgentDetectionHost(undefined, repo.id)
+      let detected: string[]
+      try {
+        detected = await detectAgentsOnHost(host, {
           disabledTuiAgents: settings.disabledTuiAgents,
           ...agentCommandOverrideDetectionOptions(settings.agentCmdOverrides)
+        })
+      } catch (error) {
+        if (!(host.kind === 'ssh' && error instanceof SshHostNotServedError)) {
+          throw error
         }
-      ).catch(() => [...ALL_TUI_AGENTS])
-      return orderAgentLaunchPickerAgents(
-        settings.defaultTuiAgent,
-        filterEnabledTuiAgents(detected.filter(isTuiAgent), settings.disabledTuiAgents)
-      )
+        // This process never detects over SSH; the remote's launch reports a missing CLI itself.
+        detected = [...ALL_TUI_AGENTS]
+      }
+      return {
+        agents: orderAgentLaunchPickerAgents(
+          settings.defaultTuiAgent,
+          filterEnabledTuiAgents(detected.filter(isTuiAgent), settings.disabledTuiAgents)
+        ),
+        claudeAccountTarget: claudeLaunchTargetForDetectionHost(host)
+      }
     },
     claudeAccounts: () => runtime.getAccountsSnapshot().claude.accounts,
-    claudeAccountTarget: (repo) => {
-      const wsl = resolveWslSessionContext({ cwd: repo.path })
-      return wsl ? { runtime: 'wsl', wslDistro: wsl.distro } : { runtime: 'host', wslDistro: null }
-    },
     modelCatalog: async (agent, accountId) => {
       const catalog = await runtime.structuredAgentModelCatalog()
       if (!catalog) {
         return { origin: 'unknown' }
       }
-      // As agentSession.modelCatalog with savedOnly: an explicit account reads its own home's catalog.
-      const account = accountId ? await runtime.prepareClaudeAccountLaunch(accountId) : undefined
+      // Read-only: preparing the account's launch would set up its profile on every read.
+      const account = accountId
+        ? runtime
+            .getAccountsSnapshot()
+            .claude.accounts.find((candidate) => candidate.id === accountId)
+        : undefined
+      const accountHome =
+        account && (account.managedAuthRuntime ?? 'host') === 'host'
+          ? getClaudeProfileRouter()?.accountHome(account.id)
+          : undefined
+      if (accountId && !accountHome) {
+        // No read-only home (WSL account, or a host without profiles): the picker's seeds apply.
+        return { origin: 'unknown' }
+      }
       return catalog.read({
         agent,
         savedOnly: true,
-        ...(account
+        ...(accountHome
           ? {
               claudeAccountId: accountId,
-              accountHome: { variable: 'CLAUDE_CONFIG_DIR', path: account.configDir }
+              accountHome: { variable: 'CLAUDE_CONFIG_DIR', path: accountHome }
             }
           : {})
       })
