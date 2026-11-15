@@ -25005,7 +25005,10 @@
       "launchFailed": "O orquestrador não iniciou.",
       "cancelled": "O início foi cancelado.",
       "repoUnresolved": "Escolha um repositório para esta tarefa.",
-      "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação."
+      "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação.",
+      "roleAgentUnavailable": "O agente escolhido para {{role}} não está disponível neste host.",
+      "roleAccountNeedsSignIn": "Entre na conta escolhida para {{role}} e inicie novamente.",
+      "primaryStatusFailed": "Não foi possível ler o estado do checkout principal."
     },
     "primaryReason": {
       "uncommitted": "Há alterações não commitadas.",

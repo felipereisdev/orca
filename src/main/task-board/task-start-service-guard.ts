@@ -9,6 +9,7 @@ import {
   type TaskStartOrchestratorRef,
   type TaskStartRun
 } from '../../shared/task-board/task-start-run'
+import type { TaskStartRole } from '../../shared/task-board/task-start-settings'
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
 import type { TaskStartRunPatch } from './task-start-run-store'
 import { settleStoppingTaskStartRun, type TaskStartStopDeps } from './task-start-stop'
@@ -42,12 +43,13 @@ const FAILURE_ERRORS: Partial<Record<TaskStartFailure, TaskStartError>> = {
 export function refuseTaskStart(
   error: TaskStartError,
   run?: TaskStartRun | null,
-  reasons?: TaskStartPrimaryReason[]
+  details: { reasons?: TaskStartPrimaryReason[]; role?: TaskStartRole } = {}
 ): TaskStartResult {
   return {
     ok: false,
     error,
-    ...(reasons ? { reasons } : {}),
+    ...(details.reasons ? { reasons: details.reasons } : {}),
+    ...(details.role ? { role: details.role } : {}),
     ...(run ? { run: summarizeTaskStartRun(run) } : {})
   }
 }

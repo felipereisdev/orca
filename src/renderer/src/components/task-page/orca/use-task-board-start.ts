@@ -139,7 +139,7 @@ export function useTaskBoardStart(args: {
             setPrimaryConfirm({ card, params: rest, reasons: result.reasons ?? [] })
             return
           }
-          const message = taskStartErrorMessage(result.error)
+          const message = taskStartErrorMessage(result.error, result.role)
           if (result.error === 'already_running' || result.error === 'primary_busy') {
             setDialog(null)
             toast.info(message)

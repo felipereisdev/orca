@@ -7,7 +7,9 @@ import type {
   TaskStartPhase,
   TaskStartRunSummary
 } from '../../../../src/shared/task-board/task-start-run'
+import type { TaskStartRole } from '../../../../src/shared/task-board/task-start-settings'
 import type { Translate } from '../../i18n/mobile-i18n'
+import { roleLabel } from './task-start-role-choices'
 
 // The desktop card's vocabulary (TaskBoardCardRunProgress, task-board-start-messages), in the phone's catalog.
 
@@ -128,8 +130,13 @@ export function taskStartRunHint(run: TaskStartRunSummary, t: Translate): string
   return run.note ?? null
 }
 
-/** A start the host refused; `repo_unresolved` and the primary confirmation open sheets instead. */
-export function taskStartErrorMessage(error: TaskStartError, t: Translate): string {
+/** A start the host refused; `repo_unresolved` and the primary confirmation open sheets instead.
+ *  `role` names the role whose agent or account refused (older hosts send none). */
+export function taskStartErrorMessage(
+  error: TaskStartError,
+  t: Translate,
+  role?: TaskStartRole
+): string {
   switch (error) {
     case 'already_running':
       return t('tasks.board.start.error.alreadyRunning', 'This task is already running.')
@@ -139,17 +146,36 @@ export function taskStartErrorMessage(error: TaskStartError, t: Translate): stri
         'Another task is running in the primary checkout.'
       )
     case 'agent_unavailable':
+      if (role) {
+        return t(
+          'tasks.board.start.error.roleAgentUnavailable',
+          'The agent chosen for {{role}} is not available on this host.',
+          { role: roleLabel(role, t) }
+        )
+      }
       return t(
         'tasks.board.start.error.agentUnavailable',
         "The orchestrator's agent is not available on this host."
       )
     case 'account_needs_sign_in':
+      if (role) {
+        return t(
+          'tasks.board.start.error.roleAccountNeedsSignIn',
+          'Sign in to the account chosen for {{role}}, then start again.',
+          { role: roleLabel(role, t) }
+        )
+      }
       return t(
         'tasks.board.start.error.accountNeedsSignIn',
         "Sign in to the orchestrator's account, then start again."
       )
     case 'worktree_create_failed':
       return t('tasks.board.start.error.worktreeCreateFailed', 'Could not create the worktree.')
+    case 'primary_status_failed':
+      return t(
+        'tasks.board.start.error.primaryStatusFailed',
+        "Could not read the primary checkout's status."
+      )
     case 'context_fetch_failed':
       return t('tasks.board.start.error.contextFetchFailed', 'Could not read the issue.')
     case 'launch_failed':

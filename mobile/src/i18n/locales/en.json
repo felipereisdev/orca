@@ -4803,7 +4803,10 @@
           "repoUnresolved": "Choose a repository for this task.",
           "primaryNeedsConfirmation": "The primary checkout needs your confirmation.",
           "startFailed": "Could not start the task.",
-          "stopFailed": "Could not stop the task."
+          "stopFailed": "Could not stop the task.",
+          "roleAgentUnavailable": "The agent chosen for {{role}} is not available on this host.",
+          "roleAccountNeedsSignIn": "Sign in to the account chosen for {{role}}, then start again.",
+          "primaryStatusFailed": "Could not read the primary checkout's status."
         },
         "primaryReason": {
           "uncommitted": "It has uncommitted changes.",

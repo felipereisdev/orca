@@ -129,13 +129,15 @@ async function prepare(
     overrides: params.roles
   })
   if (!roles) {
-    return refuse('agent_unavailable')
+    // Only the orchestrator has no fallback: every other role falls back to it.
+    return refuse('agent_unavailable', null, { role: 'orchestrator' })
   }
   const catalog = await buildTaskStartAgentCatalog(repo, options)
-  if (invalidTaskStartRoles(roles, catalog).length > 0) {
-    return refuse('agent_unavailable')
+  const [unavailable] = invalidTaskStartRoles(roles, catalog)
+  if (unavailable) {
+    return refuse('agent_unavailable', null, { role: unavailable })
   }
-  const signInNeeded = TASK_START_ROLES.some((role) =>
+  const signInNeeded = TASK_START_ROLES.find((role) =>
     catalog.some(
       (entry) =>
         entry.needsSignIn &&
@@ -144,7 +146,7 @@ async function prepare(
     )
   )
   if (signInNeeded) {
-    return refuse('account_needs_sign_in')
+    return refuse('account_needs_sign_in', null, { role: signInNeeded })
   }
   const workspaceMode = resolveTaskStartWorkspaceMode(repo, params.workspaceMode)
   const accounts = new Map(options.claudeAccounts().map((account) => [account.id, account]))
@@ -162,10 +164,10 @@ async function prepare(
       return null
     })
     if (!primary) {
-      return refuse('worktree_create_failed')
+      return refuse('primary_status_failed')
     }
     if (primary.reasons.length > 0 && params.confirmPrimary !== true) {
-      return refuse('primary_needs_confirmation', null, primary.reasons)
+      return refuse('primary_needs_confirmation', null, { reasons: primary.reasons })
     }
     prepared.primaryWorktreeId = primary.worktreeId
   }

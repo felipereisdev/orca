@@ -142,7 +142,7 @@ export function useTaskBoardStart(args: {
           setStartAs({ pending: false, error: null })
           settle(
             { kind: 'start-as', card, repoRequired: true },
-            taskStartErrorMessage(result.error, t)
+            taskStartErrorMessage(result.error, t, result.role)
           )
           return
         }
@@ -151,11 +151,11 @@ export function useTaskBoardStart(args: {
           setStartAs({ pending: false, error: null })
           settle(
             { kind: 'confirm-primary', card, choices: rest, reasons: result.reasons ?? [] },
-            taskStartErrorMessage(result.error, t)
+            taskStartErrorMessage(result.error, t, result.role)
           )
           return
         }
-        const message = taskStartErrorMessage(result.error, t)
+        const message = taskStartErrorMessage(result.error, t, result.role)
         if (result.error === 'already_running' || result.error === 'primary_busy') {
           setStartAs({ pending: false, error: null })
           settle(null, null)

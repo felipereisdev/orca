@@ -149,6 +149,7 @@ export type TaskStartError =
   | 'agent_unavailable'
   | 'account_needs_sign_in'
   | 'worktree_create_failed'
+  | 'primary_status_failed'
   | 'context_fetch_failed'
   | 'launch_failed'
   | 'cancelled'
@@ -161,6 +162,8 @@ export type TaskStartResult =
       ok: false
       error: TaskStartError
       reasons?: TaskStartPrimaryReason[]
+      /** The role whose agent or account refused (`agent_unavailable`, `account_needs_sign_in`). */
+      role?: TaskStartRole
       run?: TaskStartRunSummary
     }
 

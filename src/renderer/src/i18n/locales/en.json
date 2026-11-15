@@ -25790,7 +25790,10 @@
       "launchFailed": "The orchestrator did not start.",
       "cancelled": "The start was cancelled.",
       "repoUnresolved": "Choose a repository for this task.",
-      "primaryNeedsConfirmation": "The primary checkout needs your confirmation."
+      "primaryNeedsConfirmation": "The primary checkout needs your confirmation.",
+      "roleAgentUnavailable": "The agent chosen for {{role}} is not available on this host.",
+      "roleAccountNeedsSignIn": "Sign in to the account chosen for {{role}}, then start again.",
+      "primaryStatusFailed": "Could not read the primary checkout's status."
     },
     "primaryReason": {
       "uncommitted": "It has uncommitted changes.",

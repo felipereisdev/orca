@@ -69,6 +69,7 @@ const START_ERRORS = [
   'agent_unavailable',
   'account_needs_sign_in',
   'worktree_create_failed',
+  'primary_status_failed',
   'context_fetch_failed',
   'launch_failed',
   'cancelled'
@@ -83,6 +84,7 @@ export const taskStartResultSchema: z.ZodType<TaskStartResult, unknown> = z.disc
       // A newer host's error reads as the generic launch failure.
       error: openEnum(START_ERRORS, 'launch_failed'),
       reasons: salvagedOptional('reasons', salvagingArray(z.enum(['uncommitted', 'other-branch']))),
+      role: salvagedOptional('role', z.enum(TASK_START_ROLES)),
       run: salvagedOptional('run', taskStartSummarySchema)
     })
   ]

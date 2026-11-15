@@ -4748,7 +4748,10 @@
           "repoUnresolved": "Escolha um repositório para esta tarefa.",
           "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação.",
           "startFailed": "Não foi possível iniciar a tarefa.",
-          "stopFailed": "Não foi possível parar a tarefa."
+          "stopFailed": "Não foi possível parar a tarefa.",
+          "roleAgentUnavailable": "O agente escolhido para {{role}} não está disponível neste host.",
+          "roleAccountNeedsSignIn": "Entre na conta escolhida para {{role}} e inicie novamente.",
+          "primaryStatusFailed": "Não foi possível ler o estado do checkout principal."
         },
         "primaryReason": {
           "uncommitted": "Há alterações não commitadas.",
