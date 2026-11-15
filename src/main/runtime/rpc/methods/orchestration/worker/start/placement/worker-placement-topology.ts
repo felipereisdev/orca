@@ -64,6 +64,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   worktreeId: string
   agent: TuiAgent
   launchPreferences?: AgentLaunchPreferences
+  claudeAccountId?: string
   taskId: string
   effects: WorkerEffect[]
 }): Promise<RuntimeTerminalCreate> {
@@ -73,6 +74,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     launchSource: 'orchestration',
     suppressStartupUpdatePrompt: true,
     ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
     title: `worker-${args.taskId}`,
     // Worker creation is background work and must not pull the sidebar away.
     surfaceOwner: false
@@ -96,6 +98,7 @@ export async function createStructuredWorkerSessionForWorktree(args: {
   dispatchId: string
   /** `--model`/`--effort`; the session seeds them exactly as a saved selection is seeded. */
   launchPreferences?: AgentLaunchPreferences
+  claudeAccountId?: string
   effects: WorkerEffect[]
 }): Promise<Awaited<ReturnType<typeof createStructuredWorkerSession>>> {
   const options = narrowStructuredLaunchSeedOptions(args.launchPreferences)
@@ -104,7 +107,8 @@ export async function createStructuredWorkerSessionForWorktree(args: {
     worktreeId: args.worktreeId,
     agent: args.agent,
     dispatchId: args.dispatchId,
-    ...(options ? { options } : {})
+    ...(options ? { options } : {}),
+    ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {})
   })
   args.effects.push({
     kind: 'terminal',

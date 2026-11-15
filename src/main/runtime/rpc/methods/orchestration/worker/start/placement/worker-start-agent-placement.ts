@@ -233,6 +233,7 @@ function workerSurfaceFactory(
         agent,
         dispatchId: args.dispatchId,
         ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
+        ...(args.params.claudeAccountId ? { claudeAccountId: args.params.claudeAccountId } : {}),
         effects: args.effects
       })
       onStructuredSession(session)
@@ -249,6 +250,7 @@ function workerSurfaceFactory(
         worktreeId,
         agent,
         ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
+        ...(args.params.claudeAccountId ? { claudeAccountId: args.params.claudeAccountId } : {}),
         taskId: args.taskId,
         effects: args.effects
       })

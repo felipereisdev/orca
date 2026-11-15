@@ -110,6 +110,9 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
   'skills install': {
     agent: '--agent <names>        Comma-separated install targets; default is detected agents'
   },
+  'orchestration worker-start': {
+    account: '--account <id|email|label> Claude account from `orca account list`; not system'
+  },
   'orchestration run-show': {
     removed: '--removed              List the Tasks, Dispatches and workers removed from this Run',
     cursor: '--cursor <cursor>      Cursor printed by the previous page of removed work'

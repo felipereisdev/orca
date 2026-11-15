@@ -71,7 +71,7 @@ export function prepareLocalWorkerStart(args: {
       'Creation and setup options apply only to new-child or new-top-level worktrees.'
     )
   }
-  return resolveWorkerStartAgent({
+  const resolved = resolveWorkerStartAgent({
     runtime,
     openCodeModelLaunchSupported: args.openCodeModelLaunchSupported,
     createsWorktree,
@@ -81,6 +81,84 @@ export function prepareLocalWorkerStart(args: {
     effort: params.effort,
     missingAgentMessage: 'A configured --agent is required when worker-start creates a terminal.'
   })
+  assertWorkerClaudeAccountAgent(params, resolved.agent)
+  return resolved
+}
+
+function assertWorkerClaudeAccountAgent(
+  params: Pick<WorkerStartInput, 'claudeAccountId' | 'terminal'>,
+  agent: TuiAgent | undefined
+): void {
+  if (!params.claudeAccountId) {
+    return
+  }
+  if (params.terminal) {
+    throw new OrchestrationError(
+      'invalid_argument',
+      '--account cannot be applied when reusing an existing terminal.'
+    )
+  }
+  if (agent !== 'claude') {
+    throw new OrchestrationError(
+      'invalid_argument',
+      '--account selects a managed Claude account, so it requires --agent claude.'
+    )
+  }
+}
+
+/** Account ids name this host's vault, so a start placed on another machine cannot use one. */
+export function refuseRemoteWorkerClaudeAccount(
+  params: Pick<WorkerStartInput, 'claudeAccountId' | 'on'>,
+  peerCaller: boolean
+): void {
+  if (params.claudeAccountId && (params.on || peerCaller)) {
+    throw new OrchestrationError(
+      'account_unsupported_remote',
+      '--account cannot be used for a worker on a connected Orca server. No effects were applied.',
+      { effectsApplied: false }
+    )
+  }
+}
+
+/** Refuses before anything is created: an SSH destination, then an account missing or signed out here. */
+export async function assertWorkerClaudeAccountUsable(args: {
+  runtime: OrcaRuntimeService
+  claudeAccountId: string | undefined
+  /** The existing workspace the worker joins; otherwise the repo its new worktree is created in. */
+  worktreeId: string | undefined
+  repoSelector: string | undefined
+}): Promise<void> {
+  const { runtime, claudeAccountId } = args
+  if (!claudeAccountId) {
+    return
+  }
+  const connectionId = args.worktreeId
+    ? (await runtime.showTerminalWorkspaceLaunchScope(`id:${args.worktreeId}`)).connectionId
+    : args.repoSelector
+      ? (await runtime.showRepo(args.repoSelector)).connectionId
+      : undefined
+  if (connectionId) {
+    throw new OrchestrationError(
+      'account_unsupported_remote',
+      '--account cannot be used for a worker in an SSH workspace. No effects were applied.',
+      { effectsApplied: false }
+    )
+  }
+  const account = runtime
+    .getAccountsSnapshot()
+    .claude.accounts.find((candidate) => candidate.id === claudeAccountId)
+  if (!account) {
+    throw new OrchestrationError(
+      'invalid_argument',
+      `No managed Claude account ${claudeAccountId} on this host. Run \`orca account list\` to see the saved accounts.`
+    )
+  }
+  if (account.needsSignIn) {
+    throw new OrchestrationError(
+      'invalid_argument',
+      `Claude account ${account.email} needs a sign-in before a worker can use it.`
+    )
+  }
 }
 
 export function prepareFederationAttachmentWorkerStart(args: {

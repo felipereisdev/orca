@@ -18,6 +18,7 @@ import {
   qualifyLiveWorkerFollowUp
 } from './start/admission/worker-start-authority'
 import { parseTaskDeps } from './start/admission/task-deps-argument'
+import { refuseRemoteWorkerClaudeAccount } from './start/launch/worker-start-validation'
 import { WorkerStartParams } from '../../../../../../shared/rpc-contract/orchestration-worker-start-params'
 import {
   isWorkerStartTimeoutWithinTimerLimit,
@@ -130,6 +131,7 @@ export async function prepareWorkerStart(
       { effectsApplied: false }
     )
   }
+  refuseRemoteWorkerClaudeAccount(params, orchestrationCaller?.kind === 'peer')
   if (params.adoptTaskId !== undefined && orchestrationCaller?.kind !== 'peer') {
     throw new OrchestrationError(
       'invalid_argument',

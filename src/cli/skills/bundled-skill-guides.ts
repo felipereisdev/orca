@@ -4140,6 +4140,8 @@ const ORCHESTRATION_MARKDOWN = [
   "  `ORCA worktree create --name <name> --no-parent --agent <agent> --prompt \"<brief>\" --json`",
   "  and end your turn.",
   "- Add `--model` only if the user named one.",
+  "- Add `--account <id|email|label>` (from `ORCA account list`) only with",
+  "  `--agent claude`, and only when the user or the Task names one.",
   "- If `worker-start` fails, do not rerun it; read `failedStage` and load",
   "  `references/recovery-and-cleanup.md`.",
   "- To talk to a worker, use",

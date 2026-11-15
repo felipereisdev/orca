@@ -10,6 +10,7 @@ import { resolveUnattendedSetupDecision } from '../../../../../../../workspace-h
 import { OrchestrationError } from '../../../../../../orchestration/orchestration-error'
 import { parseWorkspaceKey } from '../../../../../../../../shared/workspace-scope'
 import type { WorkerEffect, WorkerSetupReceipt } from './worker-placement-topology'
+import { explicitClaudeAccountEnv } from '../../../../../../../claude-accounts/runtime-auth/environment'
 
 /** The repo a new worker worktree is created in, and its parent for `new-child`. */
 export type WorkerWorktreeCreationTarget = {
@@ -107,6 +108,7 @@ export async function createWorkerWorktree(args: {
     comment?: string
     setup?: 'run' | 'skip' | 'inherit'
     from: string
+    claudeAccountId?: string
   }
   agent: TuiAgent
   /** Structured creation skips startup agent and TUI trust presets: no PTY menu can consume its first paste. Setup/default tabs still run, matching renderer chat creates. */
@@ -151,7 +153,11 @@ export async function createWorkerWorktree(args: {
           startupAgent: args.agent,
           startupLaunchSource: 'orchestration',
           startupSuppressUpdatePrompt: true,
-          ...(args.launchPreferences ? { startupLaunchPreferences: args.launchPreferences } : {})
+          ...(args.launchPreferences ? { startupLaunchPreferences: args.launchPreferences } : {}),
+          // The startup terminal's create prepares this account's login from the pinned id.
+          ...(params.claudeAccountId
+            ? { startupAccountEnv: explicitClaudeAccountEnv({}, params.claudeAccountId, {}) }
+            : {})
         }
       : {}),
     activate: false,

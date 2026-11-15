@@ -28,7 +28,7 @@ const AGENT_FLAG_HINT = 'Use --agent claude|codex|opencode|devin|antigravity.'
 const ACCOUNT_FLAG_HINT = 'Use --account <id|email|label|system> from `orca account list`.'
 
 /** One saved account and the names `--account` may call it by (email, label, subject). */
-type AccountChoice = { id: string; names: readonly (string | null | undefined)[] }
+export type AccountChoice = { id: string; names: readonly (string | null | undefined)[] }
 
 /**
  * Every provider with saved accounts, behind one shape so select and rm resolve
@@ -241,7 +241,7 @@ function readAccountFlag(ctx: HandlerContext): string {
  * (null). A name shared by several accounts — one email in two organizations — is
  * refused with their ids rather than guessing which subscription to bill.
  */
-function resolveAccountId(
+export function resolveAccountId(
   label: string,
   accounts: readonly AccountChoice[],
   query: string,

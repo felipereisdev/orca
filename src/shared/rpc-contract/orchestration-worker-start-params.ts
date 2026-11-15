@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { OptionalFiniteNumber, OptionalString, requiredString } from './rpc-param-primitives'
+import { ClaudeAccountIdParam } from './structured-agent-session-account-params'
 
 export const OptionalWorkerLaunchPreference = z
   .string()
@@ -29,6 +30,8 @@ export const WorkerStartParams = z
     agent: OptionalString,
     model: OptionalWorkerLaunchPreference,
     effort: OptionalWorkerLaunchPreference,
+    /** A managed Claude account on the worker's host; Claude only, never with --terminal or a remote placement. */
+    claudeAccountId: ClaudeAccountIdParam.optional(),
     retryOf: OptionalString,
     timeoutMs: OptionalFiniteNumber,
     devMode: z.boolean().optional(),

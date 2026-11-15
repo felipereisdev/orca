@@ -92,6 +92,7 @@ export async function createStructuredWorkerSession(args: {
   dispatchId: string
   /** The dispatch's own `--model`/`--effort`, already narrowed to the seedable string subset. */
   options?: Readonly<Record<string, string>>
+  claudeAccountId?: string
 }): Promise<{
   identity: StructuredWorkerIdentity
   host: StructuredAgentSessionHost
@@ -130,6 +131,7 @@ export async function createStructuredWorkerSession(args: {
       agent: args.agent,
       // Absent, the host seeds the user's saved selection — the same fallback a chat gets.
       ...(args.options ? { options: args.options } : {}),
+      ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
       // Dispatching a worker is background work; it must not pull the surface away from the user.
       atRest: true,
       activate: false

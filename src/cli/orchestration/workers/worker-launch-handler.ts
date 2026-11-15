@@ -5,7 +5,12 @@ import { getOptionalStringFlag, getPresentStringFlag } from '../../arguments/fla
 import { RuntimeClientError } from '../../runtime/types'
 import type { RuntimeClient } from '../../runtime/client'
 import type { RuntimeStatus } from '../../../shared/runtime-session-contracts'
-import { ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY } from '../../../shared/orchestration/orchestration-runtime-capabilities'
+import {
+  ORCHESTRATION_WORKER_ACCOUNT_RUNTIME_CAPABILITY,
+  ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
+} from '../../../shared/orchestration/orchestration-runtime-capabilities'
+import type { ClaudeRateLimitAccountsState } from '../../../shared/managed-account-types'
+import { resolveAccountId } from '../../accounts/account-selection'
 import { callOrchestrationMutation } from '../recovery/mutation-request'
 import { getOptionalPositiveIntegerValueFlag } from '../numeric-flags'
 import { isDevCliInvocation } from '../recovery/runtime-compatibility'
@@ -29,19 +34,27 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
     const terminal = getPresentStringFlag(flags, 'terminal')
     const model = getOptionalStringFlag(flags, 'model')
     const effort = getOptionalStringFlag(flags, 'effort')
-    if (model || effort) {
-      const status = await client.call<RuntimeStatus>('status.get')
-      if (
-        !status.result.capabilities?.includes(
-          ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
-        )
-      ) {
-        throw new RuntimeClientError(
-          'incompatible_runtime',
-          'The connected Orca runtime does not support worker model or effort overrides. Update or restart Orca and try again.'
-        )
-      }
+    const account = getOptionalStringFlag(flags, 'account')?.trim()
+    const capabilities =
+      model || effort || account
+        ? ((await client.call<RuntimeStatus>('status.get')).result.capabilities ?? [])
+        : []
+    if (
+      (model || effort) &&
+      !capabilities.includes(ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY)
+    ) {
+      throw new RuntimeClientError(
+        'incompatible_runtime',
+        'The connected Orca runtime does not support worker model or effort overrides. Update or restart Orca and try again.'
+      )
     }
+    if (account && !capabilities.includes(ORCHESTRATION_WORKER_ACCOUNT_RUNTIME_CAPABILITY)) {
+      throw new RuntimeClientError(
+        'incompatible_runtime',
+        'The connected Orca runtime does not support --account on worker-start. Update or restart Orca and try again.'
+      )
+    }
+    const claudeAccountId = account ? await resolveWorkerClaudeAccount(client, account) : undefined
     const task = getOptionalStringFlag(flags, 'task')
     const spec = await readTextOrFileFlag(flags, cwd, 'spec', false)
     const taskTitle = getOptionalStringFlag(flags, 'task-title')
@@ -77,6 +90,7 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
       agent: getOptionalStringFlag(flags, 'agent'),
       model,
       effort,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
       terminal,
       retryOf: getOptionalStringFlag(flags, 'retry-of'),
       timeoutMs: getOptionalPositiveIntegerValueFlag(flags, 'timeout-ms'),
@@ -127,6 +141,23 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
       })
     }
   }
+}
+
+/** `--account` as `orca account select` reads it, among this host's Claude accounts; never `system`. */
+async function resolveWorkerClaudeAccount(client: RuntimeClient, query: string): Promise<string> {
+  const { result } = await client.call<{ claude: ClaudeRateLimitAccountsState }>('accounts.list', {
+    refreshUsage: false
+  })
+  const choices = result.claude.accounts.map((account) => ({
+    id: account.id,
+    names: [account.email, account.label]
+  }))
+  // Why no system: a worker pins a saved account; the provider's own sign-in is the default already.
+  const accountId = resolveAccountId('Claude', choices, query, { allowSystem: false })
+  if (!accountId) {
+    throw new RuntimeClientError('invalid_argument', 'Claude has no system default.')
+  }
+  return accountId
 }
 
 // A worker given its own new workspace is that workspace's chat; closing it frees no space.
