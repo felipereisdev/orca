@@ -12,6 +12,11 @@ import type {
   TaskBoardProgress,
   TaskBoardWireCard
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import {
+  TASK_START_PHASES,
+  type TaskStartOrchestratorRef,
+  type TaskStartRunSummary
+} from '../../../../src/shared/task-board/task-start-run'
 import type { TaskBoardProviderState } from '../../../../src/shared/task-board/task-board-provider-results'
 import {
   openEnum,
@@ -90,6 +95,41 @@ const commentSummary: z.ZodType<TaskBoardCommentSummary, unknown> = z.object({
   excerpt: z.string()
 })
 
+const orchestratorRef = z.custom<TaskStartOrchestratorRef>(
+  (value) =>
+    z
+      .looseObject({
+        hostId: z.string(),
+        agent: z.string(),
+        worktreeId: z.string(),
+        surface: z.enum(['terminal', 'chat'])
+      })
+      .safeParse(value).success
+)
+
+const taskStartSummary: z.ZodType<TaskStartRunSummary, unknown> = z.looseObject({
+  id: z.string(),
+  state: openEnum(['running', 'waiting', 'stopping', 'stopped', 'completed', 'failed'], 'running'),
+  phase: openEnum(TASK_START_PHASES, 'starting'),
+  progress: salvagedOptional(
+    'progress',
+    z.object({
+      current: z.number(),
+      total: z.number(),
+      step: salvagedOptional('step', z.enum(['implementing', 'reviewing']))
+    })
+  ),
+  note: text('note'),
+  failure: salvagedOptional(
+    'failure',
+    z.custom<TaskStartRunSummary['failure']>((v) => typeof v === 'string')
+  ),
+  orchestrator: salvagedOptional('orchestrator', orchestratorRef),
+  worktreeId: text('worktreeId'),
+  updatedAt: z.string(),
+  percent: z.number()
+})
+
 const enrichment = openEnum(['ok', 'unavailable'], 'unavailable')
 
 const taskBoardCardSchema: z.ZodType<TaskBoardWireCard, unknown> = z.object({
@@ -112,7 +152,8 @@ const taskBoardCardSchema: z.ZodType<TaskBoardWireCard, unknown> = z.object({
   enrichment: salvagedOptional('enrichment', enrichment),
   progress: salvagedOptional('progress', progress.nullable()),
   latestComment: salvagedOptional('latestComment', commentSummary.nullable()),
-  unreadComments: salvagedOptional('unreadComments', z.number().int().nonnegative())
+  unreadComments: salvagedOptional('unreadComments', z.number().int().nonnegative()),
+  taskStart: salvagedOptional('taskStart', taskStartSummary.nullable())
 })
 
 const column: z.ZodType<WorkspaceStatusDefinition, unknown> = z.object({

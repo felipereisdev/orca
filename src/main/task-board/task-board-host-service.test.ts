@@ -3,6 +3,7 @@ import type { JiraComment, JiraIssue } from '../../shared/jira/jira-types'
 import { toJiraTaskBoardCard } from '../../shared/task-board/task-board-provider-cards'
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
+import type { TaskStartRun } from '../../shared/task-board/task-start-run'
 import { createTaskStartRunStore } from './task-start-run-store'
 import {
   addTaskBoardComment,
@@ -44,6 +45,7 @@ function unused(): never {
 }
 
 function setup(writeResult: { ok: true; id: string } | { ok: false; error: string }) {
+  let runs: Record<string, TaskStartRun> = {}
   const upstream = [comment('c-1', 'First look', '2026-11-13T09:00:00Z')]
   const deps: TaskBoardServiceDeps = {
     host: {
@@ -72,10 +74,12 @@ function setup(writeResult: { ok: true; id: string } | { ok: false; error: strin
     },
     taskStart: {
       store: createTaskStartRunStore({
-        read: () => ({}),
-        write: unused,
+        read: () => runs,
+        write: (next) => {
+          runs = next
+        },
         now: () => new Date(),
-        emit: unused
+        emit: () => {}
       }),
       hostReachable: unused,
       terminal: {
@@ -143,5 +147,38 @@ it('reports an unconfirmed provider write as failed', async () => {
   expect(await addTaskBoardComment(deps, ref, 'Shipped behind a flag')).toEqual({
     status: 'failed',
     error: 'Jira did not confirm the comment. Verify in Jira before retrying.'
+  })
+})
+
+it('lists the task-start run of a card in any column', async () => {
+  const { deps } = setup({ ok: true, id: 'c-2' })
+  const claimed = deps.taskStart.store.claim({
+    cardKey: (await listTaskBoard(deps, { fresh: false })).cards[0].refKey,
+    repoId: 'repo-1',
+    workspaceMode: 'primary'
+  })
+  if (!claimed.ok) {
+    throw new Error('claim failed')
+  }
+  // A start alive in this process is not reconciled away.
+  deps.taskStart.store.inFlight.add(claimed.run.id)
+  deps.taskStart.store.transition(claimed.run.id, ['running'], {
+    state: 'waiting',
+    phase: 'plan-review',
+    orchestrator: {
+      hostId: 'local',
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      surface: 'terminal',
+      paneKey: 'tab-1:1'
+    }
+  })
+
+  const [card] = (await listTaskBoard(deps, { fresh: false })).cards
+
+  expect(card.taskStart).toMatchObject({
+    state: 'waiting',
+    percent: 20,
+    orchestrator: { paneKey: 'tab-1:1' }
   })
 })

@@ -32,6 +32,7 @@ import {
   type TaskBoardListOptions
 } from './task-board-host-list'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
+import { summarizeTaskStartRun } from '../../shared/task-board/task-start-run'
 import { reconcileTaskStartRuns, type TaskStartLifecycleDeps } from './task-start-lifecycle'
 
 type ProviderWrite = { ok: true; id: string } | { ok: false; error: string }
@@ -73,7 +74,14 @@ export async function listTaskBoard(
     now: new Date(),
     deps
   })
-  return { ...list, cards }
+  const { store } = deps.taskStart
+  return {
+    ...list,
+    cards: cards.map((card) => {
+      const run = store.get(card.refKey)
+      return { ...card, taskStart: run ? summarizeTaskStartRun(run) : null }
+    })
+  }
 }
 
 /** Lets the card read and the comment read of one GitHub/GitLab issue share a single request. */

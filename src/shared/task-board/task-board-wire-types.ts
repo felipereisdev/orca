@@ -55,6 +55,8 @@ export type TaskBoardWireCard = TaskBoardCard & {
   progress?: TaskBoardProgress | null
   latestComment?: TaskBoardCommentSummary | null
   unreadComments?: number
+  /** The card's task-start run, when it has one. */
+  taskStart?: TaskStartRunSummary | null
 }
 
 export type TaskBoardListResult = {
