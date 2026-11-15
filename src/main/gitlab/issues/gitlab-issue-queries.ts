@@ -236,7 +236,9 @@ export async function addIssueComment(
       body: data.body ?? body,
       createdAt: data.created_at ?? new Date().toISOString(),
       url: '',
-      isBot: data.author?.state === 'bot'
+      isBot: data.author?.state === 'bot',
+      // The poster is the viewer, so a caller that appends this copy never counts it as someone else's.
+      viewerDidAuthor: true
     }
     return { ok: true, comment }
   } catch (err) {

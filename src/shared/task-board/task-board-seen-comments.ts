@@ -80,6 +80,28 @@ export function markTaskBoardCommentsSeen(
 
 export type TaskBoardCommentForCount = { id: string; at: string; own: boolean }
 
+/**
+ * What a client marks after rendering comments: others' comments at the newest instant. The host
+ * keeps every id at the marker's instant, so a tie marks each one; marking one would leave the rest
+ * unread. Own comments never count as unread and may carry the client's clock.
+ */
+export function newestOtherTaskBoardComments<C extends TaskBoardCommentForCount>(
+  comments: readonly C[]
+): C[] {
+  let newestMs = Number.NEGATIVE_INFINITY
+  let newest: C[] = []
+  for (const comment of comments) {
+    const ms = toMs(comment.at)
+    // The host cannot place an unparseable timestamp, so it is never sent as a marker.
+    if (comment.own || Number.isNaN(ms) || ms < newestMs) {
+      continue
+    }
+    newest = ms > newestMs ? [comment] : [...newest, comment]
+    newestMs = ms
+  }
+  return newest
+}
+
 export function countUnreadTaskBoardComments(
   comments: readonly TaskBoardCommentForCount[],
   marker: TaskBoardSeenMarker | undefined,

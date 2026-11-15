@@ -14,10 +14,10 @@ import { useGitLabItemDialogState } from './gitlab-item-dialog/use-gitlab-item-d
 import { useGitLabPipelineActions } from './gitlab-item-dialog/use-gitlab-pipeline-actions'
 import { useGitLabPrimaryActions } from './gitlab-item-dialog/use-gitlab-primary-actions'
 import { useGitLabReviewActions } from './gitlab-item-dialog/use-gitlab-review-actions'
-import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
-
-const isViewerComment = (comment: { viewerDidAuthor?: boolean }): boolean =>
-  comment.viewerDidAuthor === true
+import {
+  isViewerComment,
+  useReportRenderedComments
+} from '@/lib/work-items/task-board/task-board-rendered-comments'
 
 export default function GitLabItemDialog({
   item,

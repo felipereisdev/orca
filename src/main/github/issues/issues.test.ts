@@ -86,6 +86,7 @@ vi.mock('../repositories/github-api-repository', async (importOriginal) => {
     }
   }
 })
+import { addIssueComment } from './issue-comment'
 import { createIssue } from './issue-create'
 import { updateIssue } from './issue-update'
 
@@ -180,6 +181,24 @@ describe('issue source operations', () => {
       })
     }
   )
+
+  it("returns a posted comment as the viewer's own", async () => {
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    ghExecFileAsyncMock.mockResolvedValueOnce({
+      stdout: JSON.stringify({
+        id: 501,
+        user: { login: 'someone', avatar_url: '' },
+        body: 'Reply',
+        created_at: '2026-11-14T12:00:00Z'
+      })
+    })
+
+    // The dialog appends this copy without a re-read; a non-own copy would be marked seen past unseen ones.
+    await expect(addIssueComment('/repo-root', 924, 'Reply')).resolves.toMatchObject({
+      ok: true,
+      comment: { id: 501, viewerDidAuthor: true }
+    })
+  })
 
   it('reports a failed close whose gh error mentions "already"', async () => {
     getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })

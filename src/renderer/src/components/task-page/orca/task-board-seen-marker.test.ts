@@ -51,6 +51,22 @@ describe('useTaskBoardSeenMarker', () => {
     )
   })
 
+  it('marks every comment at the newest instant, so a tie leaves none unread', async () => {
+    rememberTaskBoardDetailCard('runtime:board-host', card)
+    const { result } = renderHook(() => useTaskBoardSeenMarker(true))
+    const tied = [...comments, { id: '14', createdAt: '2026-11-14T12:00:00Z' }]
+
+    await act(async () => result.current?.({ provider: 'jira', url, comments: tied }))
+
+    for (const id of ['13', '14']) {
+      expect(host.markSeen).toHaveBeenCalledWith(
+        { kind: 'environment', environmentId: 'board-host' },
+        { provider: 'jira', siteId: 'site-a', key: 'APP-1' },
+        { at: '2026-11-14T12:00:00Z', id }
+      )
+    }
+  })
+
   it('marks nothing for another issue shown on the detail page', () => {
     rememberTaskBoardDetailCard('runtime:board-host', card)
     const { result } = renderHook(() => useTaskBoardSeenMarker(true))

@@ -75,7 +75,9 @@ export async function addIssueComment(
       bodyImageUrls: githubBodyImageUrls(data.body ?? body, data.body_html),
       createdAt: data.created_at ?? new Date().toISOString(),
       url: data.html_url ?? '',
-      isBot: data.user?.type === 'Bot'
+      isBot: data.user?.type === 'Bot',
+      // The poster is the viewer: the dialog appends this copy without a re-read that would say so.
+      viewerDidAuthor: true
     }
     return { ok: true, comment }
   } catch (err) {

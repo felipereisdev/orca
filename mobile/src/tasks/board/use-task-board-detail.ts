@@ -5,6 +5,7 @@ import type {
   TaskBoardDetailResult,
   TaskBoardWireCard
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import { newestOtherTaskBoardComments } from '../../../../src/shared/task-board/task-board-seen-comments'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import {
   addTaskBoardComment,
@@ -26,25 +27,6 @@ export type TaskBoardCommentSend =
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-/**
- * Others' comments at the newest instant: the host keeps every id it was told at that instant,
- * so a tie marks each one. Own comments never count as unread and may carry the phone's clock.
- */
-function newestOtherComments(comments: readonly TaskBoardComment[]): TaskBoardComment[] {
-  let newestMs = Number.NEGATIVE_INFINITY
-  let newest: TaskBoardComment[] = []
-  for (const comment of comments) {
-    const ms = Date.parse(comment.at)
-    // The host cannot place an unparseable timestamp, so it is never sent as a marker.
-    if (comment.own || Number.isNaN(ms) || ms < newestMs) {
-      continue
-    }
-    newest = ms > newestMs ? [comment] : [...newest, comment]
-    newestMs = ms
-  }
-  return newest
 }
 
 /** True only once the host accepted a marker for every comment; stops at the first that fails. */
@@ -112,7 +94,7 @@ export function useTaskBoardDetail({ client, connected, card, open, onSeen }: Pa
     if (!open || !connected || !client || read.status !== 'ready') {
       return
     }
-    const newest = newestOtherComments(read.detail.comments)
+    const newest = newestOtherTaskBoardComments(read.detail.comments)
     const key = newest.map((comment) => comment.id).join('\0')
     if (newest.length === 0 || marked.current === key) {
       return

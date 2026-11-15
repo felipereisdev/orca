@@ -3,6 +3,7 @@ import {
   TASK_BOARD_SEEN_MAX_ENTRIES,
   countUnreadTaskBoardComments,
   markTaskBoardCommentsSeen,
+  newestOtherTaskBoardComments,
   normalizeTaskBoardSeenComments
 } from './task-board-seen-comments'
 
@@ -73,5 +74,18 @@ describe('normalizeTaskBoardSeenComments', () => {
       })
     ).toEqual({ ok: { at: '2026-11-10T10:00:00Z', ids: ['a'] } })
     expect(normalizeTaskBoardSeenComments([1])).toEqual({})
+  })
+})
+
+describe('newestOtherTaskBoardComments', () => {
+  it('picks every other-person comment at the newest instant, never own or unparseable ones', () => {
+    const comments = [
+      { id: 'old', at: '2026-11-10T09:00:00Z', own: false },
+      { id: 'a', at: '2026-11-10T10:00:00Z', own: false },
+      { id: 'mine', at: '2026-11-10T11:00:00Z', own: true },
+      { id: 'bad', at: 'not a date', own: false },
+      { id: 'b', at: '2026-11-10T10:00:00.000Z', own: false }
+    ]
+    expect(newestOtherTaskBoardComments(comments).map((comment) => comment.id)).toEqual(['a', 'b'])
   })
 })

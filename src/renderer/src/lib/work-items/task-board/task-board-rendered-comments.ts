@@ -12,6 +12,10 @@ export type RenderedTaskComments = {
 
 export type OnTaskCommentsRendered = (rendered: RenderedTaskComments) => void
 
+/** GitHub/GitLab own comments: the provider read says so, and a just-posted copy comes back marked. */
+export const isViewerComment = (comment: { viewerDidAuthor?: boolean }): boolean =>
+  comment.viewerDidAuthor === true
+
 /**
  * Reports after commit, so only comments that reached the screen are reported. `url`/`comments`
  * must be null while the comments are loading or belong to an issue other than the one shown.

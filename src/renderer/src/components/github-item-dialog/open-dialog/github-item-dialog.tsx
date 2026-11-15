@@ -17,10 +17,10 @@ import { GitHubItemDialogPRTabs } from './github-item-dialog-pr-tabs'
 import { GHEditSection } from '../edit-item-fields/gh-edit-section'
 import { useGitHubWorkItemDetails } from '../load-item-details/use-github-work-item-details'
 import { useGitHubItemDialogLinkCopy } from './use-github-item-dialog-link-copy'
-import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
-
-const isViewerComment = (comment: { viewerDidAuthor?: boolean }): boolean =>
-  comment.viewerDidAuthor === true
+import {
+  isViewerComment,
+  useReportRenderedComments
+} from '@/lib/work-items/task-board/task-board-rendered-comments'
 
 export default function GitHubItemDialog(props: GitHubItemDialogProps): React.JSX.Element {
   const { workItem, sourceContext } = props
