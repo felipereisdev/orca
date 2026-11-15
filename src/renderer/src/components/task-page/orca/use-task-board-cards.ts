@@ -20,7 +20,7 @@ import {
 /** A board listed this recently is shown from the session cache when it mounts again. */
 const MOUNT_REUSE_MS = 45_000
 
-/** Settings that change what the host lists; editing them in Settings → Tasks re-lists. */
+/** Settings that change what the host lists; editing them in Settings → Task Sources re-lists. */
 function useTaskBoardScopeKey(): string {
   const visibleTaskProviders = useAppStore((s) => s.settings?.visibleTaskProviders)
   const taskBoard = useAppStore((s) => s.settings?.taskBoard)

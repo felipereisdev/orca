@@ -24820,7 +24820,7 @@
     "openExternal": "Abrir {{id}} no navegador",
     "openExternalTooltip": "Abrir no navegador",
     "loadFailed": "Não foi possível carregar as issues. Atualize para tentar novamente.",
-    "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Tarefas",
+    "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Origens de Tarefas",
     "providerAuthFailed": "{{provider}} precisa que você entre novamente.",
     "providerHostUnavailable": "{{provider}} não está disponível neste host.",
     "hostUpdateRequired": "Atualize o Orca no host para usar o Meu quadro.",
@@ -24832,7 +24832,7 @@
     "source": "Meu quadro",
     "contextSummary": "Atribuídas a você",
     "contextSummaryTitle": "Issues atribuídas a você em todos os provedores conectados",
-    "noProviders": "Conecte um provedor de tarefas em Configurações → Tarefas",
+    "noProviders": "Conecte um provedor de tarefas em Configurações → Origens de Tarefas",
     "refresh": "Atualizar",
     "dismissError": "Dispensar",
     "settings": {
@@ -24870,7 +24870,7 @@
     "checksFailed": "Verificações com falha",
     "checksPending": "Verificações pendentes",
     "unreadComments": "{{count}} comentários não lidos",
-    "noColumnMapping": "Mapeie um status para {{column}} em Configurações → Tarefas.",
+    "noColumnMapping": "Mapeie um status para {{column}} em Configurações → Origens de Tarefas.",
     "choiceExpired": "Essa mudança de status não está mais disponível. Tente mover novamente.",
     "hostUnavailable": "Este host não está disponível."
   }

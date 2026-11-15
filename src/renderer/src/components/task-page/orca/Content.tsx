@@ -84,7 +84,7 @@ export function TaskPageOrcaContent({
       state={state}
       statuses={statuses}
       move={move}
-      // A provider hidden in Settings → Tasks gets no chip.
+      // A provider hidden in Settings → Task Sources gets no chip.
       sourceOptions={visibleSourceOptions}
       onRefresh={refresh}
       onOpen={openCard}
@@ -171,7 +171,7 @@ export function TaskPageOrcaBoard({
       <div className="mt-3 flex flex-col items-center justify-center rounded-md border border-border/50 bg-muted/50 px-6 py-14 text-center shadow-sm">
         <KanbanSquare className="mb-4 size-8 text-muted-foreground/60" />
         <p className="text-sm text-muted-foreground">
-          {t('taskBoard.noProviders', 'Connect a task provider in Settings → Tasks')}
+          {t('taskBoard.noProviders', 'Connect a task provider in Settings → Task Sources')}
         </p>
       </div>
     )

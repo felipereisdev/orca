@@ -19,7 +19,7 @@ export function taskBoardBlockedMessage(
     case 'no-mapping':
       return translate(
         'taskBoard.noColumnMapping',
-        'Map a status to {{column}} in Settings → Tasks.',
+        'Map a status to {{column}} in Settings → Task Sources.',
         { column: columnLabel }
       )
     case 'no-transition':

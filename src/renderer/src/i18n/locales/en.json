@@ -25606,7 +25606,7 @@
     "openExternal": "Open {{id}} in browser",
     "openExternalTooltip": "Open in browser",
     "loadFailed": "Could not load issues. Refresh to try again.",
-    "noLabelMapping": "Map a label to this column in Settings → Tasks",
+    "noLabelMapping": "Map a label to this column in Settings → Task Sources",
     "providerAuthFailed": "{{provider}} needs you to sign in again.",
     "providerHostUnavailable": "{{provider}} is not available on this host.",
     "hostUpdateRequired": "Update Orca on the host to use My board.",
@@ -25618,7 +25618,7 @@
     "source": "My board",
     "contextSummary": "Assigned to you",
     "contextSummaryTitle": "Issues assigned to you in every connected provider",
-    "noProviders": "Connect a task provider in Settings → Tasks",
+    "noProviders": "Connect a task provider in Settings → Task Sources",
     "refresh": "Refresh",
     "dismissError": "Dismiss",
     "settings": {
@@ -25656,7 +25656,7 @@
     "checksFailed": "Checks failed",
     "checksPending": "Checks pending",
     "unreadComments": "{{count}} unread comments",
-    "noColumnMapping": "Map a status to {{column}} in Settings → Tasks.",
+    "noColumnMapping": "Map a status to {{column}} in Settings → Task Sources.",
     "choiceExpired": "That status change is no longer available. Try the move again.",
     "hostUnavailable": "This host is not available."
   }

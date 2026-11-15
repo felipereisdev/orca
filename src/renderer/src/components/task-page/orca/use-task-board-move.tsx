@@ -196,7 +196,10 @@ export function useTaskBoardMove(args: {
     return target?.allowed === false
       ? {
           ok: false,
-          reason: t('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Tasks')
+          reason: t(
+            'taskBoard.noLabelMapping',
+            'Map a label to this column in Settings → Task Sources'
+          )
         }
       : { ok: true }
   }
