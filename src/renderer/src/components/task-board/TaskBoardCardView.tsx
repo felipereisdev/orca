@@ -22,7 +22,7 @@ import { TaskBoardCardActivity } from './TaskBoardCardActivity'
 import { TaskBoardCardRunProgress } from './TaskBoardCardRunProgress'
 import { TaskBoardCardStartButton } from './TaskBoardCardStartButton'
 
-// Card actions show on hover or focus and take no room otherwise, so a run's ▶︎/⏹ sits at the edge.
+// Card actions show on hover or focus and take no room otherwise, and the run's ▶︎/⏹ is the rightmost action so revealing them never moves it.
 // An open menu keeps them shown: its trigger anchors the menu.
 const HOVER_ACTIONS =
   'flex shrink-0 items-center gap-1 md:hidden md:group-hover/card:flex md:group-focus-within/card:flex md:has-[[data-state=open]]:flex'
@@ -115,17 +115,6 @@ export function TaskBoardCardView({
           </h3>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {runActions ? (
-            <div className={run || runPending ? 'flex shrink-0 items-center' : HOVER_ACTIONS}>
-              <TaskBoardCardStartButton
-                card={card}
-                pending={runPending}
-                onStart={runActions.onStart}
-                onStartAs={runActions.onStartAs}
-                onStop={runActions.onStop}
-              />
-            </div>
-          ) : null}
           <div className={HOVER_ACTIONS}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -211,6 +200,17 @@ export function TaskBoardCardView({
               </TooltipContent>
             </Tooltip>
           </div>
+          {runActions ? (
+            <div className={run || runPending ? 'flex shrink-0 items-center' : HOVER_ACTIONS}>
+              <TaskBoardCardStartButton
+                card={card}
+                pending={runPending}
+                onStart={runActions.onStart}
+                onStartAs={runActions.onStartAs}
+                onStop={runActions.onStop}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
       {labels.length > 0 ? (
