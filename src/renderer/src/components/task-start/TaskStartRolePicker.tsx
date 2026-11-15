@@ -8,7 +8,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
 import type { TaskStartAgentCatalogEntry } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskStartAgentChoice } from '../../../../shared/task-board/task-start-settings'
 
@@ -50,8 +49,6 @@ export function TaskStartRolePicker({
   const unavailable = t('taskStart.unavailable', '{{name}} (unavailable)')
   const mark = (name: string): string => unavailable.replace('{{name}}', name)
   const prefix = ariaLabel ? `${ariaLabel}: ` : ''
-  const markedClass = (flag: boolean): string | undefined =>
-    flag ? 'border-destructive text-destructive' : undefined
 
   const selectProvider = (key: string): void => {
     if (key === INHERIT) {
@@ -88,10 +85,7 @@ export function TaskStartRolePicker({
         <SelectTrigger
           size="sm"
           density="compact"
-          className={cn(
-            'min-w-0 max-w-full flex-1 basis-40',
-            markedClass(providerInvalid || !!invalid)
-          )}
+          className="min-w-0 max-w-full flex-1 basis-40"
           aria-label={`${prefix}${t('taskStart.provider', 'Agent')}`}
           aria-invalid={providerInvalid || invalid ? true : undefined}
         >
@@ -127,7 +121,7 @@ export function TaskStartRolePicker({
         <SelectTrigger
           size="sm"
           density="compact"
-          className={cn('min-w-0 max-w-full flex-1 basis-32', markedClass(modelInvalid))}
+          className="min-w-0 max-w-full flex-1 basis-32"
           aria-label={`${prefix}${t('taskStart.model', 'Model')}`}
           aria-invalid={modelInvalid ? true : undefined}
         >
@@ -151,7 +145,7 @@ export function TaskStartRolePicker({
         <SelectTrigger
           size="sm"
           density="compact"
-          className={cn('min-w-0 max-w-full flex-1 basis-24', markedClass(effortInvalid))}
+          className="min-w-0 max-w-full flex-1 basis-24"
           aria-label={`${prefix}${t('taskStart.effort', 'Effort')}`}
           aria-invalid={effortInvalid ? true : undefined}
         >
