@@ -27,6 +27,7 @@ type Props = {
   offline: boolean
   onMoved: (targetColumnId: string, moved: TaskBoardWireCard | null) => void
   onUnconfirmed: () => void
+  onAlreadyThere: () => void
   onClose: () => void
 }
 
@@ -126,11 +127,12 @@ export function MobileTaskBoardMoveSheet({
   offline,
   onMoved,
   onUnconfirmed,
+  onAlreadyThere,
   onClose
 }: Props) {
   useMobileColorScheme()
   const t = useMobileTranslation()
-  const move = useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed })
+  const move = useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed, onAlreadyThere })
   const { step } = move
   const title = t('tasks.board.move.title', 'Move {{id}}', { id: card.displayId })
 

@@ -10,6 +10,7 @@ import { useTaskBoardMoveHolds, withTaskBoardMoveHolds } from './task-board-move
 import {
   NO_TASK_BOARD_INPUT,
   TASK_BOARD_TARGET,
+  taskBoardCardsKey,
   taskBoardCardsStorage
 } from './task-board-query-storage'
 
@@ -40,6 +41,8 @@ export type TaskBoardView = {
   // A read that failed while the host was reachable; offline and unsupported are reported above.
   error: Error | null
   refresh: () => Promise<void>
+  // Lists again through the host's caches: after a confirmed move, whose hold covers a lagging list.
+  relist: () => void
 }
 
 export function useTaskBoard(hostId: string): TaskBoardView {
@@ -65,6 +68,9 @@ export function useTaskBoard(hostId: string): TaskBoardView {
       { replace: true }
     ).catch(() => undefined)
   }, [client, hostId, queryClient])
+  const relist = useCallback((): void => {
+    void queryClient.invalidateQueries({ queryKey: taskBoardCardsKey(hostId), exact: true })
+  }, [hostId, queryClient])
   // A confirmed move stays in its column while lists lag the provider, as on the desktop board.
   const holds = useTaskBoardMoveHolds(hostId, refresh)
   const data = useMemo(() => withTaskBoardMoveHolds(board.data, holds), [board.data, holds])
@@ -76,6 +82,7 @@ export function useTaskBoard(hostId: string): TaskBoardView {
     readAt: board.data ? board.dataUpdatedAt : null,
     unsupported,
     error: unsupported || isHostNotConnectedError(board.error) ? null : board.error,
-    refresh
+    refresh,
+    relist
   }
 }

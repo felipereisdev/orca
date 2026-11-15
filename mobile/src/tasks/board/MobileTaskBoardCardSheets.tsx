@@ -8,7 +8,7 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { MobileTaskBoardDetailDrawer } from './MobileTaskBoardDetailDrawer'
 import { MobileTaskBoardMoveSheet } from './MobileTaskBoardMoveSheet'
 import { clearTaskBoardUnread, movedTaskBoardCard } from './task-board-local-changes'
-import { holdTaskBoardMove } from './task-board-move-holds'
+import { holdTaskBoardMove, releaseTaskBoardMove } from './task-board-move-holds'
 import type { TaskBoardStage } from './task-board-stages'
 import type { TaskBoardView } from './use-task-board'
 
@@ -37,7 +37,7 @@ export function MobileTaskBoardCardSheets({
   onSheet
 }: Props) {
   const queryClient = useQueryClient()
-  const { refresh } = view
+  const { refresh, relist } = view
   const openRefKey = sheet?.kind === 'detail' ? sheet.card.refKey : null
 
   return (
@@ -71,9 +71,15 @@ export function MobileTaskBoardCardSheets({
               const placed = movedTaskBoardCard(card, moved, targetColumnId)
               holdTaskBoardMove(hostId, placed, placed.columnId)
               onSheet(null)
-              void refresh()
+              relist()
             }}
             onUnconfirmed={() => void refresh()}
+            onAlreadyThere={() => {
+              // No hold may keep the card where the phone last put it; a fresh list places it.
+              releaseTaskBoardMove(hostId, card.refKey)
+              onSheet(null)
+              void refresh()
+            }}
             onClose={() => onSheet(null)}
           />
         )

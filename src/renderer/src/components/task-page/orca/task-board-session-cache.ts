@@ -1,6 +1,8 @@
 import type { TaskBoardProject } from '../../../../../shared/task-board/task-board-project-filter'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
+import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
+import { changeHeldTaskBoardCard } from './task-board-move-override-store'
 import { emptyTaskBoardViewState, type TaskBoardViewState } from './task-board-view-state'
 
 // Why: opening a card's detail unmounts the board; returning should show the last cards and chips at once.
@@ -24,13 +26,15 @@ export function writeTaskBoardCards(
 
 /** The board shows a card the user just read as read until its next list. */
 export function clearTaskBoardUnread(accountHostId: ExecutionHostId, refKey: string): void {
+  const clear = (card: TaskBoardWireCard): TaskBoardWireCard =>
+    card.unreadComments ? { ...card, unreadComments: 0 } : card
   const board = boardsByAccountHost.get(accountHostId)
   if (board) {
-    const cards = board.cards.map((card) =>
-      card.refKey === refKey && card.unreadComments ? { ...card, unreadComments: 0 } : card
-    )
+    const cards = board.cards.map((card) => (card.refKey === refKey ? clear(card) : card))
     boardsByAccountHost.set(accountHostId, { ...board, cards })
   }
+  // A card held after a move shows the held copy, not the session board's.
+  changeHeldTaskBoardCard(accountHostId, refKey, clear)
 }
 
 export function readTaskBoardLoaded(accountHostId: ExecutionHostId): TaskBoardLoad | undefined {

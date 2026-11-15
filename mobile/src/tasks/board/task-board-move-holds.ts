@@ -39,6 +39,13 @@ export function holdTaskBoardMove(hostId: string, card: TaskBoardWireCard, colum
   change(hostId, (next) => next.set(card.refKey, { card, columnId, expiresAt }))
 }
 
+/** Lets the host's list place the card again. */
+export function releaseTaskBoardMove(hostId: string, refKey: string): void {
+  if (holdsByHost.get(hostId)?.has(refKey)) {
+    change(hostId, (next) => next.delete(refKey))
+  }
+}
+
 /** A held card shows the held copy, so a change made after the move must reach it too. */
 export function changeHeldTaskBoardCard(
   hostId: string,

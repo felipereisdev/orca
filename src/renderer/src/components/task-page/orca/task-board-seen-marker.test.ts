@@ -14,6 +14,7 @@ vi.mock('@/runtime/task-board/runtime-task-board-client', () => ({
 import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
 import { isLocalJiraComment } from '@/components/use-jira-issue-comment-submission'
 import { rememberTaskBoardDetailCard, useTaskBoardSeenMarker } from './task-board-seen-marker'
+import { confirmTaskBoardMove, useTaskBoardMoveOverrides } from './task-board-move-override-store'
 import { readTaskBoardCards, writeTaskBoardCards } from './task-board-session-cache'
 import { emptyTaskBoardViewState } from './task-board-view-state'
 
@@ -110,6 +111,17 @@ describe('useTaskBoardSeenMarker', () => {
       { provider: 'jira', siteId: 'site-a', key: 'APP-1' },
       { at: '2026-11-14T10:00:00Z', id: '10' }
     )
+  })
+
+  it('clears the unread badge of a card held in its column after a move', async () => {
+    confirmTaskBoardMove('runtime:held-host', { ...card, unreadComments: 2 }, 'done')
+    rememberTaskBoardDetailCard('runtime:held-host', card)
+    const { result } = renderHook(() => useTaskBoardSeenMarker(true))
+    const held = renderHook(() => useTaskBoardMoveOverrides('runtime:held-host', async () => {}))
+
+    await act(async () => result.current?.({ provider: 'jira', url, comments }))
+
+    expect(held.result.current.overrides.get(card.refKey)?.card.unreadComments).toBe(0)
   })
 
   it('keeps the card unread on the board when the host did not record the mark', async () => {

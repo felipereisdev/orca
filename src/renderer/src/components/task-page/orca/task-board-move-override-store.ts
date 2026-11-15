@@ -56,6 +56,18 @@ export function confirmTaskBoardMove(
   change(host, (next) => next.set(card.refKey, { card, columnId, expiresAt }))
 }
 
+/** A held card shows the held copy, so a change made after the move must reach it too. */
+export function changeHeldTaskBoardCard(
+  host: ExecutionHostId,
+  refKey: string,
+  update: (card: TaskBoardWireCard) => TaskBoardWireCard
+): void {
+  const held = overridesByHost.get(host)?.get(refKey)
+  if (held) {
+    change(host, (next) => next.set(refKey, { ...held, card: update(held.card) }))
+  }
+}
+
 /** Rolls the card back to wherever the host's list places it. */
 export function releaseTaskBoardMove(host: ExecutionHostId, refKey: string): void {
   change(host, (next) => next.delete(refKey))

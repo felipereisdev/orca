@@ -61,10 +61,19 @@ type Params = {
   onMoved: (targetColumnId: string, moved: TaskBoardWireCard | null) => void
   /** Reads the board again, to show where an unconfirmed move left the card. */
   onUnconfirmed: () => void
+  /** The host already has the card in the picked column, while the phone's board still shows it elsewhere. */
+  onAlreadyThere: () => void
 }
 
 /** One card's move: the column, then whatever transition or fields the host asks for. */
-export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed }: Params) {
+export function useTaskBoardMove({
+  client,
+  offline,
+  card,
+  onMoved,
+  onUnconfirmed,
+  onAlreadyThere
+}: Params) {
   const [step, setStep] = useState<TaskBoardMoveStep>(START)
   const [problem, setProblem] = useState<TaskBoardMoveProblem | null>(null)
   const [busy, setBusy] = useState(false)
@@ -103,6 +112,11 @@ export function useTaskBoardMove({ client, offline, card, onMoved, onUnconfirmed
           setStep({ kind: 'unsupported', choice: result.choice })
           return
         case 'blocked':
+          // The card already moved there (another client); the board's list shows where, as on desktop.
+          if (result.reason === 'same-column') {
+            onAlreadyThere()
+            return
+          }
           // The column's transitions changed under the picked one: start again from the columns.
           if (result.reason === 'invalid-choice') {
             setStep(START)

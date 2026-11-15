@@ -397,16 +397,52 @@ describe('moving a card on My board', () => {
     expect(shownCardIds(root)).toEqual([])
   })
 
-  it('keeps a moved card in its target column while the host still lists the old one', async () => {
-    link.hostId = 'host-lagging'
+  it('shows where the card is when the host already has it in the picked column', async () => {
+    let column = 'in-progress'
+    link.hostId = 'host-already-moved'
     link.state = 'connected'
     link.client = stubRpcClient({
       sendRequest: async (method) => {
         switch (method) {
           case 'status.get':
             return NO_STATUS
+          case 'taskBoard.list':
+            return reply(board(column))
+          case 'taskBoard.move':
+            // Another client moved it after this board's last list.
+            column = 'done'
+            return reply({ status: 'blocked', reason: 'same-column' })
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+    await act(async () => {
+      pressable(root, shownCardLabel(root)).props.onLongPress()
+    })
+    await press(root, 'Done')
+    await press(root, 'Move')
+    await settleQueryNotifications()
+
+    await showStage(root, 'done')
+    expect(shownCardIds(root)).toEqual(['ORCA-12'])
+  })
+
+  it('keeps a moved card in its target column while the host still lists the old one', async () => {
+    const lists: unknown[] = []
+    link.hostId = 'host-lagging'
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      sendRequest: async (method, params) => {
+        switch (method) {
+          case 'status.get':
+            return NO_STATUS
           // The provider has not caught up: every list still shows the card where it was.
           case 'taskBoard.list':
+            lists.push(params)
             return reply(board('in-progress'))
           case 'taskBoard.move':
             return reply({ status: 'moved', card: boardCard('done') })
@@ -421,13 +457,19 @@ describe('moving a card on My board', () => {
     await act(async () => {
       pressable(root, shownCardLabel(root)).props.onLongPress()
     })
+    const listedBeforeMove = lists.length
     await press(root, 'Done')
     await press(root, 'Move')
+    await settleQueryNotifications()
 
     await showStage(root, 'done')
     expect(shownCardIds(root)).toEqual(['ORCA-12'])
     await showStage(root, 'in-progress')
     expect(shownCardIds(root)).toEqual([])
+    // The hold covers the lag, so the move's re-list keeps the host's provider caches.
+    const relists = lists.slice(listedBeforeMove)
+    expect(relists).not.toEqual([])
+    expect(relists).not.toContainEqual(expect.objectContaining({ fresh: true }))
   })
 })
 
