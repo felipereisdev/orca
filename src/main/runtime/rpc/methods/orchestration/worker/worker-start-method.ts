@@ -29,6 +29,7 @@ import { assertWorkerStartTaskSpecWithinPromptBudget } from './start/admission/w
 import { ORCA_SESSION_ADDRESS_PREFIX } from '../../../../../../shared/orca-session-address-prefix'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as SESSION_CODES } from '../../../../../../shared/orchestration/orchestration-session-caller-codes'
 import { resolveDispatchCreator } from '../runs/dispatch-creator'
+import { refuseFencedCoordinator } from '../../../../orchestration/workers/launch/coordinator-start-fence'
 
 type WorkerStartContext = Pick<
   RpcContext,
@@ -70,6 +71,11 @@ export async function startWorker(
   const { params, followUp, coordinator, bindRun, helperCreator, taskDeps, existingTask, withRun } =
     prepared
   const db = runtime.getOrchestrationDb()
+  // Each start calls this synchronously before its Dispatch insert, after its awaited checks.
+  const bindFencedRun = () => {
+    refuseFencedCoordinator(runtime, coordinator)
+    return bindRun()
+  }
   const mode = decideWorkerStartMode({
     params,
     settings: readWorkerStartModeSettings(runtime)
@@ -80,7 +86,7 @@ export async function startWorker(
       params,
       runtime,
       db,
-      bindRunId: () => bindRun().run.id,
+      bindRunId: () => bindFencedRun().run.id,
       task: existingTask,
       taskDeps,
       orchestrationMutation,
@@ -93,7 +99,7 @@ export async function startWorker(
     params: { ...params, timeoutMs: resolveWorkerStartReadinessTimeoutMs(params.timeoutMs) },
     runtime,
     db,
-    bindRun: () => bindRun().run,
+    bindRun: () => bindFencedRun().run,
     taskDeps,
     coordinator,
     callerSession: orchestrationCaller,

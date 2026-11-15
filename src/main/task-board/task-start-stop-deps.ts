@@ -10,6 +10,7 @@ import {
 } from '../runtime/agent-session/structured-agent-session-close'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
+import { fenceCoordinator } from '../runtime/orchestration/workers/launch/coordinator-start-fence'
 import { stopWorkerAndHelpers } from '../runtime/rpc/methods/orchestration/worker/worker-stop'
 import { taskBoardRefKeyForRef } from './task-board-host-card'
 import { createTaskBoardServiceDeps } from './task-board-host-deps'
@@ -39,18 +40,15 @@ export async function closeTaskStartOrchestrator(
   }
 }
 
-/** This host's orchestration database behind ⏹; no database means no Runs and no workers. */
+/** This host's orchestration database behind ⏹; no database means no workers. */
 export function createTaskStartStopDeps(runtime: OrcaRuntimeService): TaskStartStopDeps {
   const db = () => runtime.getExistingOrchestrationDb()
   return {
     lifecycle: createTaskStartLifecycleDeps(runtime),
     closeOrchestrator: (ref) => closeTaskStartOrchestrator(runtime, ref),
     orchestration: {
-      boundRunIds: (key) =>
-        db()
-          ?.runsBoundToCoordinator(key)
-          .map((run) => run.id) ?? [],
-      workers: (runId) => db()?.listWorkerTerminalResources({ runId }) ?? [],
+      fence: (coordinator) => fenceCoordinator(runtime, coordinator),
+      liveWorkers: (coordinator) => db()?.listLiveWorkerDispatchIdsCreatedBy(coordinator) ?? [],
       stopWorker: (dispatchId, mutation) => stopWorkerAndHelpers(runtime, dispatchId, mutation)
     }
   }
@@ -59,6 +57,7 @@ export function createTaskStartStopDeps(runtime: OrcaRuntimeService): TaskStartS
 /** A worker on a paired server is stopped under a request id it can replay; a fresh one per ⏹,
  *  as each `orca orchestration worker-stop` mints. */
 export function taskStartStopMutation(): StopMutation {
+  // Only `requestId` is read on the stop path; the other fields are placeholders.
   return {
     callerFingerprint: 'task-board',
     requestId: crypto.randomUUID(),

@@ -53,6 +53,7 @@ import { attachWorkerDispatchOutcome } from './worker-dispatch/worker-dispatch-o
 import { attachWorkerDispatchStage } from './worker-dispatch/worker-dispatch-stage'
 import { attachWorkerDispatchStart } from './worker-dispatch/worker-dispatch-start'
 import { attachWorkerDispatchStop } from './worker-dispatch/worker-dispatch-stop'
+import { attachWorkerDispatchCreatorListing } from './worker-dispatch/worker-dispatch-creator-listing'
 import { attachWorkerTerminalRecovery } from './worker-dispatch/worker-terminal-recovery'
 import { attachWorkerTerminalArchive } from './worker-terminal/worker-terminal-archive'
 import { attachWorkerTerminalAutoRelease } from './worker-terminal/worker-terminal-auto-release'
@@ -103,6 +104,7 @@ export function attachOrchestrationDbMethods(ctor: { prototype: object }): void 
   attachWorkerDispatchOutcome(ctor)
   attachWorkerTerminalRecovery(ctor)
   attachWorkerDispatchStop(ctor)
+  attachWorkerDispatchCreatorListing(ctor)
   attachWorkerDispatchAbandon(ctor)
   attachLegacyRemoteHomeDbMethods(ctor)
   attachLegacyRemoteDbMethods(ctor)

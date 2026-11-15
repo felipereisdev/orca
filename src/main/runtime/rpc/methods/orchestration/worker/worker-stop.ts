@@ -134,7 +134,8 @@ function listUnderKeptOpen(
   })
 }
 
-function helperMutation(mutation: StopMutation, dispatchId: string): StopMutation {
+/** One request id per Dispatch, derived from the stop that reaches it. */
+export function helperMutation(mutation: StopMutation, dispatchId: string): StopMutation {
   return mutation && { ...mutation, requestId: `${mutation.requestId}:${dispatchId}` }
 }
 

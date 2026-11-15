@@ -51,6 +51,7 @@ import type { WorkerDispatchOutcomeMethods } from './worker-dispatch/worker-disp
 import type { WorkerDispatchStageMethods } from './worker-dispatch/worker-dispatch-stage'
 import type { WorkerDispatchStartMethods } from './worker-dispatch/worker-dispatch-start'
 import type { WorkerDispatchStopMethods } from './worker-dispatch/worker-dispatch-stop'
+import type { WorkerDispatchCreatorListingMethods } from './worker-dispatch/worker-dispatch-creator-listing'
 import type { WorkerTerminalRecoveryMethods } from './worker-dispatch/worker-terminal-recovery'
 import type { WorkerTerminalArchiveMethods } from './worker-terminal/worker-terminal-archive'
 import type { WorkerTerminalAutoReleaseMethods } from './worker-terminal/worker-terminal-auto-release'
@@ -100,6 +101,7 @@ export type OrchestrationDbMethods = AttemptObservationStoreMethods &
   WorkerDispatchOutcomeMethods &
   WorkerTerminalRecoveryMethods &
   WorkerDispatchStopMethods &
+  WorkerDispatchCreatorListingMethods &
   WorkerDispatchAbandonMethods &
   LegacyRemoteHomeDbMethods &
   LegacyRemoteDbMethods &
