@@ -8,6 +8,15 @@ import {
 } from '../../../../shared/task-board/task-start-settings'
 import { TaskStartRolePicker } from './TaskStartRolePicker'
 
+function withRole(
+  roles: TaskStartRoles,
+  role: TaskStartRole,
+  next: TaskStartRoles[TaskStartRole] | null | undefined
+): TaskStartRoles {
+  const { [role]: _removed, ...rest } = roles
+  return next ? { ...rest, [role]: next } : rest
+}
+
 export function TaskStartRolesEditor({
   catalog,
   roles,
@@ -54,8 +63,7 @@ export function TaskStartRolesEditor({
             inheritLabel={inherited?.[role]}
             ariaLabel={labels[role]}
             onChange={(next) => {
-              const { [role]: _removed, ...rest } = roles
-              onChange(next ? { ...rest, [role]: next } : rest)
+              onChange(withRole(roles, role, next))
             }}
           />
         </div>

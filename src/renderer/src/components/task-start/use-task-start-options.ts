@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import { getTaskStartOptions } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
@@ -20,6 +20,11 @@ export function useTaskStartOptions(
     key,
     loading: true
   })
+  // The fetch below reads the latest params; `key` alone decides when it re-runs.
+  const paramsRef = useRef(params)
+  useEffect(() => {
+    paramsRef.current = params
+  })
   useEffect(() => {
     const controller = new AbortController()
     const target = ipcOrRuntimeTargetForHostId(hostId)
@@ -32,7 +37,7 @@ export function useTaskStartOptions(
       return
     }
     setState({ key, loading: true })
-    getTaskStartOptions(target, params, { signal: controller.signal })
+    getTaskStartOptions(target, paramsRef.current, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) {
           setState({ key, loading: false, data })
@@ -51,8 +56,7 @@ export function useTaskStartOptions(
         }
       })
     return () => controller.abort()
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- key covers hostId and params by value.
-  }, [key])
+  }, [key, hostId])
   // A stale result for another key is never shown as current.
   return state.key === key
     ? { loading: state.loading, data: state.data, error: state.error }

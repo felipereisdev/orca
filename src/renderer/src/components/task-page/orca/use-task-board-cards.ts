@@ -20,6 +20,15 @@ import {
 
 /** A board listed this recently is shown from the session cache when it mounts again. */
 const MOUNT_REUSE_MS = 45_000
+/** `finally` lives here because the React compiler cannot compile it inside a hook. */
+async function settleAfter(work: () => Promise<void>, settle: () => void): Promise<void> {
+  try {
+    await work()
+  } finally {
+    settle()
+  }
+}
+
 /** A run's phase reports come in bursts; one list answers them all. */
 const RUNS_REREAD_DELAY_MS = 300
 
@@ -79,41 +88,46 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
       if (!options.quiet) {
         update(startTaskBoardReload)
       }
-      try {
-        const target = ipcOrRuntimeTargetForHostId(accountHostId)
-        if (!target) {
-          if (options.quiet) {
-            return
+      await settleAfter(
+        async () => {
+          try {
+            const target = ipcOrRuntimeTargetForHostId(accountHostId)
+            if (!target) {
+              if (options.quiet) {
+                return
+              }
+              update((current) =>
+                failTaskBoardList(
+                  current,
+                  translate('taskBoard.hostUnavailable', 'This host is not available.')
+                )
+              )
+              return
+            }
+            const result = await listTaskBoard(target, { fresh, signal: controller.signal })
+            if (controller.signal.aborted) {
+              return
+            }
+            markTaskBoardLoaded(accountHostId, { at: Date.now(), scopeKey: loadScopeKey })
+            update(() => applyTaskBoardList(result))
+          } catch (cause) {
+            if (controller.signal.aborted) {
+              return
+            }
+            // A background run re-read keeps the board as it was; only a read the user asked for reports.
+            if (options.quiet) {
+              console.warn('[task-board] re-reading task-start runs failed', cause)
+              return
+            }
+            update((current) => failTaskBoardList(current, listErrorMessage(cause)))
           }
-          update((current) =>
-            failTaskBoardList(
-              current,
-              translate('taskBoard.hostUnavailable', 'This host is not available.')
-            )
-          )
-          return
+        },
+        () => {
+          if (controllerRef.current === controller) {
+            controllerRef.current = null
+          }
         }
-        const result = await listTaskBoard(target, { fresh, signal: controller.signal })
-        if (controller.signal.aborted) {
-          return
-        }
-        markTaskBoardLoaded(accountHostId, { at: Date.now(), scopeKey: loadScopeKey })
-        update(() => applyTaskBoardList(result))
-      } catch (cause) {
-        if (controller.signal.aborted) {
-          return
-        }
-        // A background run re-read keeps the board as it was; only a read the user asked for reports.
-        if (options.quiet) {
-          console.warn('[task-board] re-reading task-start runs failed', cause)
-          return
-        }
-        update((current) => failTaskBoardList(current, listErrorMessage(cause)))
-      } finally {
-        if (controllerRef.current === controller) {
-          controllerRef.current = null
-        }
-      }
+      )
     },
     [accountHostId]
   )

@@ -29,7 +29,7 @@ function memoryStore(): TaskStartRunStore {
     write: (next) => {
       runs = next
     },
-    now: () => new Date(),
+    now: () => new Date('2026-01-01T00:00:00.000Z'),
     emit: () => {}
   })
 }

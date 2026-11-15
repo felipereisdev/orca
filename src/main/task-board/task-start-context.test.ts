@@ -111,7 +111,7 @@ describe('collectTaskStartContext for Jira', () => {
 
 describe('createTaskStartFetchDeps', () => {
   it('returns GitLab upload bytes unchanged', async () => {
-    const glabExec = vi.fn(async (_args: string[], _options: object) => ({
+    const glabExec = vi.fn(async (_args: string[], _options: { encoding?: string }) => ({
       stdout: Buffer.from([0x89, 0x50])
     }))
     const fetchDeps = createTaskStartFetchDeps(() => null, createJiraAttachmentRegistry(), glabExec)

@@ -36,10 +36,9 @@ const catalogEntry = z.custom<TaskStartAgentCatalogEntry>(
 const agentChoice = z.looseObject({ agent: z.string() })
 
 function isRoleRecord<T>(value: unknown, entry: z.ZodType<T>): boolean {
+  const record = z.record(z.string(), z.unknown()).safeParse(value)
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    TASK_START_ROLES.every((role) => entry.safeParse(Reflect.get(value, role)).success)
+    record.success && TASK_START_ROLES.every((role) => entry.safeParse(record.data[role]).success)
   )
 }
 

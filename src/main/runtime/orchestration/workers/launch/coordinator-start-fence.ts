@@ -1,12 +1,13 @@
 import type { OrchestrationCoordinatorKey } from '../../addressing/orchestration-caller-identity'
 import { isEquivalentPaneKey } from '../../db/pane-key-match'
 import { OrchestrationError } from '../../orchestration-error'
+import type { OrcaRuntimeService } from '../../../orca-runtime'
 
 // A stopped coordinator never coordinates again, so its fence is never lifted; the cap bounds memory.
 const MAX_FENCES = 256
 
 // In this process only, per runtime, like the in-flight worker stops it sits beside.
-const fencesByRuntime = new WeakMap<object, OrchestrationCoordinatorKey[]>()
+const fencesByRuntime = new WeakMap<OrcaRuntimeService, OrchestrationCoordinatorKey[]>()
 
 function sameCoordinator(a: OrchestrationCoordinatorKey, b: OrchestrationCoordinatorKey): boolean {
   return (
@@ -17,7 +18,10 @@ function sameCoordinator(a: OrchestrationCoordinatorKey, b: OrchestrationCoordin
 }
 
 /** Refuses every later worker start by this coordinator: its task is being stopped. */
-export function fenceCoordinator(runtime: object, coordinator: OrchestrationCoordinatorKey): void {
+export function fenceCoordinator(
+  runtime: OrcaRuntimeService,
+  coordinator: OrchestrationCoordinatorKey
+): void {
   if (!coordinator.terminalHandle && !coordinator.paneKey && !coordinator.orcaSessionId) {
     return
   }
@@ -33,7 +37,7 @@ export function fenceCoordinator(runtime: object, coordinator: OrchestrationCoor
 }
 
 export function isCoordinatorFenced(
-  runtime: object,
+  runtime: OrcaRuntimeService,
   coordinator: OrchestrationCoordinatorKey | null
 ): boolean {
   return (
@@ -44,7 +48,7 @@ export function isCoordinatorFenced(
 
 /** Checked synchronously before a start binds its Run and inserts its Dispatch. */
 export function refuseFencedCoordinator(
-  runtime: object,
+  runtime: OrcaRuntimeService,
   coordinator: OrchestrationCoordinatorKey | null
 ): void {
   if (isCoordinatorFenced(runtime, coordinator)) {

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import {
   startTask,
@@ -46,6 +47,15 @@ export type TaskBoardStart = {
   cancelStop: () => void
 }
 
+/** `finally` lives here because the React compiler cannot compile it inside a hook. */
+async function settleAfter(work: () => Promise<void>, settle: () => void): Promise<void> {
+  try {
+    await work()
+  } finally {
+    settle()
+  }
+}
+
 function hostUnavailable(): string {
   return translate('taskBoard.hostUnavailable', 'This host is not available.')
 }
@@ -57,6 +67,7 @@ export function useTaskBoardStart(args: {
   rereadRuns: () => void
 }): TaskBoardStart {
   const { accountHostId, rereadRuns } = args
+  const t = useTranslate()
   const [pendingRefKeys, setPendingRefKeys] = useState<ReadonlySet<string>>(new Set())
   const [dialog, setDialog] = useState<TaskStartDialogState | null>(null)
   const [primaryConfirm, setPrimaryConfirm] = useState<TaskStartPrimaryConfirm | null>(null)
@@ -84,10 +95,7 @@ export function useTaskBoardStart(args: {
     void openTaskStartRun(run, accountHostId).then((opened) => {
       if (!opened) {
         toast.error(
-          translate(
-            'taskStart.openRunFailed',
-            'The task workspace is not available in this window.'
-          )
+          t('taskStart.openRunFailed', 'The task workspace is not available in this window.')
         )
       }
     })
@@ -107,48 +115,57 @@ export function useTaskBoardStart(args: {
     setDialog((current) =>
       current && fromDialog ? { ...current, pending: true, error: null } : current
     )
-    try {
-      const result = await startTask(target, { ref: card.ref, ...params })
-      if (result.ok) {
-        setDialog(null)
-        openRun(result.run)
-        return
+    await settleAfter(
+      async () => {
+        try {
+          const result = await startTask(target, { ref: card.ref, ...params })
+          if (result.ok) {
+            setDialog(null)
+            openRun(result.run)
+            return
+          }
+          if (result.error === 'repo_unresolved') {
+            setDialog({ card, repoRequired: true, pending: false, error: null })
+            return
+          }
+          if (result.error === 'primary_needs_confirmation') {
+            setDialog(null)
+            const { confirmPrimary: _confirmed, ...rest } = params
+            setPrimaryConfirm({ card, params: rest, reasons: result.reasons ?? [] })
+            return
+          }
+          const message = taskStartErrorMessage(result.error)
+          if (result.error === 'already_running' || result.error === 'primary_busy') {
+            setDialog(null)
+            toast.info(message)
+            return
+          }
+          if (fromDialog) {
+            setDialog((current) =>
+              current ? { ...current, pending: false, error: message } : current
+            )
+            return
+          }
+          toast.error(message)
+        } catch (cause) {
+          const message = taskStartFailureMessage(
+            cause,
+            t('taskStart.error.startFailed', 'Could not start the task.')
+          )
+          if (fromDialog) {
+            setDialog((current) =>
+              current ? { ...current, pending: false, error: message } : current
+            )
+            return
+          }
+          toast.error(message)
+        }
+      },
+      () => {
+        setPending(card.refKey, false)
+        rereadRuns()
       }
-      if (result.error === 'repo_unresolved') {
-        setDialog({ card, repoRequired: true, pending: false, error: null })
-        return
-      }
-      if (result.error === 'primary_needs_confirmation') {
-        setDialog(null)
-        const { confirmPrimary: _confirmed, ...rest } = params
-        setPrimaryConfirm({ card, params: rest, reasons: result.reasons ?? [] })
-        return
-      }
-      const message = taskStartErrorMessage(result.error)
-      if (result.error === 'already_running' || result.error === 'primary_busy') {
-        setDialog(null)
-        toast.info(message)
-        return
-      }
-      if (fromDialog) {
-        setDialog((current) => (current ? { ...current, pending: false, error: message } : current))
-        return
-      }
-      toast.error(message)
-    } catch (cause) {
-      const message = taskStartFailureMessage(
-        cause,
-        translate('taskStart.error.startFailed', 'Could not start the task.')
-      )
-      if (fromDialog) {
-        setDialog((current) => (current ? { ...current, pending: false, error: message } : current))
-        return
-      }
-      toast.error(message)
-    } finally {
-      setPending(card.refKey, false)
-      rereadRuns()
-    }
+    )
   }
 
   const stop = async (card: TaskBoardWireCard): Promise<void> => {
@@ -157,19 +174,24 @@ export function useTaskBoardStart(args: {
       return
     }
     setPending(card.refKey, true)
-    try {
-      await stopTask(target, { ref: card.ref })
-    } catch (cause) {
-      toast.error(
-        taskStartFailureMessage(
-          cause,
-          translate('taskStart.error.stopFailed', 'Could not stop the task.')
-        )
-      )
-    } finally {
-      setPending(card.refKey, false)
-      rereadRuns()
-    }
+    await settleAfter(
+      async () => {
+        try {
+          await stopTask(target, { ref: card.ref })
+        } catch (cause) {
+          toast.error(
+            taskStartFailureMessage(
+              cause,
+              t('taskStart.error.stopFailed', 'Could not stop the task.')
+            )
+          )
+        }
+      },
+      () => {
+        setPending(card.refKey, false)
+        rereadRuns()
+      }
+    )
   }
 
   const askStop = async (card: TaskBoardWireCard): Promise<void> => {
@@ -184,14 +206,17 @@ export function useTaskBoardStart(args: {
     }
     setPending(card.refKey, true)
     let workers: number | null = null
-    try {
-      const preview = await stopTask(target, { ref: card.ref, preview: true })
-      workers = preview.agents === undefined ? null : Math.max(0, preview.agents - 1)
-    } catch {
-      // The confirmation still opens; it just cannot name how many agents stop.
-    } finally {
-      setPending(card.refKey, false)
-    }
+    await settleAfter(
+      async () => {
+        try {
+          const preview = await stopTask(target, { ref: card.ref, preview: true })
+          workers = preview.agents === undefined ? null : Math.max(0, preview.agents - 1)
+        } catch {
+          // The confirmation still opens; it just cannot name how many agents stop.
+        }
+      },
+      () => setPending(card.refKey, false)
+    )
     setStopConfirm({ card, workers })
   }
 
