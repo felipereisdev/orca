@@ -25713,6 +25713,87 @@
         "agent": "agent model effort roles"
       },
       "inheritGlobal": "global"
-    }
+    },
+    "phase": {
+      "starting": "Starting",
+      "planning": "Planning",
+      "planReview": "Plan review",
+      "qaScript": "QA script",
+      "development": "Development",
+      "finalReview": "Final review",
+      "qa": "QA",
+      "completed": "Completed"
+    },
+    "state": {
+      "waiting": "Waiting for you",
+      "stopping": "Stopping…",
+      "stopped": "Stopped",
+      "failed": "Error"
+    },
+    "progress": {
+      "reviewing": "{{current}}/{{total}} · reviewing",
+      "implementing": "{{current}}/{{total}} · implementing"
+    },
+    "failure": {
+      "orchestratorExited": "The orchestrator session ended",
+      "launchFailed": "The orchestrator did not start",
+      "contextFetchFailed": "Could not read the issue",
+      "worktreeCreateFailed": "Could not create the worktree",
+      "stopUnconfirmed": "Stop not confirmed. Stop again.",
+      "cancelled": "Start cancelled"
+    },
+    "openOrchestrator": "Open the orchestrator session",
+    "openRun": "Open the orchestrator: {{status}}, {{percent}}%",
+    "pending": "Working on {{id}}…",
+    "stopAgainCard": "Stop {{id}} again",
+    "stopCard": "Stop {{id}}",
+    "stopAgain": "Stop again",
+    "stop": "Stop",
+    "startCard": "Start {{id}}",
+    "start": "Start task",
+    "startOptions": "Start options for {{id}}",
+    "startAs": "Start as…",
+    "dialog": {
+      "title": "Start {{id}} as…",
+      "description": "Choices here apply to this start only; saved settings stay as they are.",
+      "repository": "Repository",
+      "chooseRepository": "Choose a repository",
+      "repositoryRequired": "Orca could not tell which repository this issue belongs to. Choose one.",
+      "baseBranch": "Base branch",
+      "cancel": "Cancel",
+      "starting": "Starting…",
+      "start": "Start"
+    },
+    "stopConfirm": {
+      "titleNoAgents": "Stop the orchestrator?",
+      "title_one": "Stop the orchestrator and {{count}} agent?",
+      "title_other": "Stop the orchestrator and {{count}} agents?",
+      "description": "The worktree, its branch and commits stay as they are."
+    },
+    "primaryConfirm": {
+      "title": "Start {{id}} in the primary checkout?",
+      "description": "The agents will work directly in the primary checkout.",
+      "action": "Start anyway"
+    },
+    "openRunFailed": "The task workspace is not available in this window.",
+    "error": {
+      "startFailed": "Could not start the task.",
+      "stopFailed": "Could not stop the task.",
+      "alreadyRunning": "This task is already running.",
+      "primaryBusy": "Another task is running in the primary checkout.",
+      "agentUnavailable": "The orchestrator's agent is not available on this host.",
+      "accountNeedsSignIn": "Sign in to the orchestrator's account, then start again.",
+      "worktreeCreateFailed": "Could not create the worktree.",
+      "contextFetchFailed": "Could not read the issue.",
+      "launchFailed": "The orchestrator did not start.",
+      "cancelled": "The start was cancelled.",
+      "repoUnresolved": "Choose a repository for this task.",
+      "primaryNeedsConfirmation": "The primary checkout needs your confirmation."
+    },
+    "primaryReason": {
+      "uncommitted": "It has uncommitted changes.",
+      "otherBranch": "It is on a branch other than the base branch."
+    },
+    "waitingNotification": "{{title}} is waiting for you"
   }
 }

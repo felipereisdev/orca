@@ -17,6 +17,7 @@ import type {
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { ClientHostedBrowserRowsEvent } from '../../shared/client-hosted-browser-rows'
 import type { SidebarInputsChangedEvent } from '../../shared/sidebar-list/sidebar-inputs-feed-contract'
+import type { TaskBoardRunsChangedEvent } from '../../shared/runtime-client-events'
 import type {
   PublicKnownRuntimeEnvironment,
   RuntimeEnvironmentRemoval
@@ -89,6 +90,8 @@ export type RuntimeApi = {
       callback: (event: ClientHostedBrowserRowsEvent) => void
     ) => () => void
     onSidebarInputsChanged: (callback: (event: SidebarInputsChangedEvent) => void) => () => void
+    /** The local host's task-start runs; absent in the web client, which reads paired hosts' events. */
+    onTaskBoardRunsChanged?: (callback: (event: TaskBoardRunsChangedEvent) => void) => () => void
   }
   runtimeEnvironments: {
     desktopCreatedChatIds?: () => Promise<string[]>

@@ -6,13 +6,19 @@ import {
   TASK_BOARD_UPDATE_REQUIRED
 } from '../../../../shared/task-board/task-board-runtime-capability'
 import type {
+  TaskStartRoles,
+  TaskStartWorkspaceMode
+} from '../../../../shared/task-board/task-start-settings'
+import type {
   TaskBoardAddCommentResult,
   TaskBoardCardRef,
   TaskBoardDetailResult,
   TaskBoardListResult,
   TaskBoardMoveFields,
   TaskBoardMoveResult,
-  TaskStartOptionsResult
+  TaskStartOptionsResult,
+  TaskStartResult,
+  TaskStopResult
 } from '../../../../shared/task-board/task-board-wire-types'
 import { assertRuntimeEnvironmentCapability } from '../rpc/compatibility/runtime-capability-proof'
 import { callRuntimeRpc } from '../rpc/calls/runtime-rpc-call'
@@ -22,6 +28,8 @@ const CAPABILITY_TIMEOUT_MS = 15_000
 const LIST_TIMEOUT_MS = 120_000
 const WRITE_TIMEOUT_MS = 60_000
 const READ_TIMEOUT_MS = 30_000
+// A start creates the worktree, reads the issue and its images, then launches the orchestrator.
+const START_TIMEOUT_MS = 120_000
 
 /** The board is the host's: a host without the service gets an update hint instead of a method error. */
 async function callTaskBoard<TResult>(
@@ -112,5 +120,36 @@ export function getTaskStartOptions(
     timeoutMs: READ_TIMEOUT_MS,
     capability: TASK_BOARD_START_RUNTIME_CAPABILITY,
     ...(options.signal ? { signal: options.signal } : {})
+  })
+}
+
+export type TaskStartParams = {
+  ref: TaskBoardCardRef
+  repoId?: string
+  workspaceMode?: TaskStartWorkspaceMode
+  baseRef?: string
+  roles?: TaskStartRoles
+  confirmPrimary?: boolean
+}
+
+/** ▶︎ / "Start as…": the host creates the workspace and launches the card's orchestrator. */
+export function startTask(
+  target: RuntimeClientTarget,
+  params: TaskStartParams
+): Promise<TaskStartResult> {
+  return callTaskBoard(target, 'taskBoard.startTask', params, {
+    timeoutMs: START_TIMEOUT_MS,
+    capability: TASK_BOARD_START_RUNTIME_CAPABILITY
+  })
+}
+
+/** ⏹; `preview` only counts the agents a stop would end. */
+export function stopTask(
+  target: RuntimeClientTarget,
+  params: { ref: TaskBoardCardRef; preview?: boolean }
+): Promise<TaskStopResult> {
+  return callTaskBoard(target, 'taskBoard.stopTask', params, {
+    timeoutMs: WRITE_TIMEOUT_MS,
+    capability: TASK_BOARD_START_RUNTIME_CAPABILITY
   })
 }

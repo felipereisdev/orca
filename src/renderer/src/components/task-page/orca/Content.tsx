@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import { AlertCircle, KanbanSquare, X } from 'lucide-react'
-import { TaskBoard, type TaskBoardColumn } from '@/components/task-board/TaskBoard'
+import {
+  TaskBoard,
+  type TaskBoardColumn,
+  type TaskBoardRunActions
+} from '@/components/task-board/TaskBoard'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
@@ -17,6 +21,8 @@ import { TaskBoardToolbar, type TaskBoardToolbarProvider } from './TaskBoardTool
 import { useTaskBoardProjectFilter } from './use-task-board-project-filter'
 import { useTaskBoardCards } from './use-task-board-cards'
 import { useTaskBoardMove, type TaskBoardMove } from './use-task-board-move'
+import { useTaskBoardStart } from './use-task-board-start'
+import { TaskBoardStartDialogs } from './TaskBoardStartDialogs'
 import type { TaskBoardViewState } from './task-board-view-state'
 import {
   readHiddenTaskBoardProviders,
@@ -42,7 +48,7 @@ export function TaskPageOrcaContent({
     handleOpenOrUseGitHubWorkItem
   } = model
   const localStatuses = useAppStore((s) => s.workspaceStatuses)
-  const { state, refresh, reread } = useTaskBoardCards(accountBackedTaskSourceHostId)
+  const { state, refresh, reread, rereadRuns } = useTaskBoardCards(accountBackedTaskSourceHostId)
   // The host's columns; the local ones only shape the first-load skeleton.
   const statuses = state.columns ?? localStatuses
   const move = useTaskBoardMove({
@@ -50,6 +56,7 @@ export function TaskPageOrcaContent({
     accountHostId: accountBackedTaskSourceHostId,
     reread
   })
+  const start = useTaskBoardStart({ accountHostId: accountBackedTaskSourceHostId, rereadRuns })
 
   const openCard = (card: TaskBoardWireCard): void => {
     rememberTaskBoardDetailCard(accountBackedTaskSourceHostId, card)
@@ -89,6 +96,8 @@ export function TaskPageOrcaContent({
       onRefresh={refresh}
       onOpen={openCard}
       onStartWorkspace={startWorkspace}
+      runActions={start.actions}
+      runDialogs={<TaskBoardStartDialogs start={start} hostId={accountBackedTaskSourceHostId} />}
     />
   )
 }
@@ -101,7 +110,9 @@ export function TaskPageOrcaBoard({
   sourceOptions,
   onRefresh,
   onOpen,
-  onStartWorkspace
+  onStartWorkspace,
+  runActions,
+  runDialogs
 }: {
   state: TaskBoardViewState
   statuses: readonly WorkspaceStatusDefinition[]
@@ -110,6 +121,9 @@ export function TaskPageOrcaBoard({
   onRefresh: () => void
   onOpen: (card: TaskBoardWireCard) => void
   onStartWorkspace: (card: TaskBoardWireCard) => void
+  /** ▶︎ / "Start as…" / ⏹ and opening a run's orchestrator. */
+  runActions?: TaskBoardRunActions
+  runDialogs?: React.ReactNode
 }): React.JSX.Element {
   const t = useTranslate()
   const [hiddenProviders, setHiddenProviders] = useState(readHiddenTaskBoardProviders)
@@ -233,6 +247,7 @@ export function TaskPageOrcaBoard({
             onMove={move.move}
             onOpen={onOpen}
             onStartWorkspace={onStartWorkspace}
+            runActions={runActions}
             updatingRefKeys={move.updatingRefKeys}
             selectedRefKey={null}
             formatUpdatedAt={formatRelativeTime}
@@ -240,6 +255,7 @@ export function TaskPageOrcaBoard({
         )}
       </div>
       {move.dialogs}
+      {runDialogs}
     </div>
   )
 }

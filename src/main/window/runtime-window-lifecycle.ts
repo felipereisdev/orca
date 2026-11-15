@@ -244,6 +244,9 @@ export function registerRuntimeWindowLifecycle(
     (event) => {
       if (event.type === 'linearLinkedIssueUpdated') {
         send('linear:linkedIssueUpdated', event)
+      } else if (event.type === 'taskBoardRunsChanged') {
+        // This window reads the local board; paired hosts reach it through their client events.
+        send('runtime:taskBoardRunsChanged', event)
       } else if (ORCA_SIDEBAR_INPUTS_IS_MAIN && event.type === 'sidebarInputsChanged') {
         send('runtime:sidebarInputsChanged', event)
       }

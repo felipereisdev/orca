@@ -1,6 +1,7 @@
 import { ipcRenderer } from 'electron'
 import type { ClientHostedBrowserRowsEvent } from '../../shared/client-hosted-browser-rows'
 import type { SidebarInputsChangedEvent } from '../../shared/sidebar-list/sidebar-inputs-feed-contract'
+import type { TaskBoardRunsChangedEvent } from '../../shared/runtime-client-events'
 import type {
   RuntimeRendererSyncWindowGraph,
   RuntimeStatus,
@@ -147,5 +148,11 @@ export const runtimeApi = {
       callback(data)
     ipcRenderer.on('runtime:sidebarInputsChanged', listener)
     return () => ipcRenderer.removeListener('runtime:sidebarInputsChanged', listener)
+  },
+  onTaskBoardRunsChanged: (callback: (event: TaskBoardRunsChangedEvent) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: TaskBoardRunsChangedEvent) =>
+      callback(data)
+    ipcRenderer.on('runtime:taskBoardRunsChanged', listener)
+    return () => ipcRenderer.removeListener('runtime:taskBoardRunsChanged', listener)
   }
 } satisfies PreloadApi['runtime']

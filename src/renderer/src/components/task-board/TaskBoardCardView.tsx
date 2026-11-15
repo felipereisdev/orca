@@ -17,8 +17,14 @@ import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
-import type { TaskBoardColumn, TaskBoardDropCheck } from './TaskBoard'
+import type { TaskBoardColumn, TaskBoardDropCheck, TaskBoardRunActions } from './TaskBoard'
 import { TaskBoardCardActivity } from './TaskBoardCardActivity'
+import { TaskBoardCardRunProgress } from './TaskBoardCardRunProgress'
+import { TaskBoardCardStartButton } from './TaskBoardCardStartButton'
+
+// Card actions show on hover; a card with a run keeps its ▶︎/⏹ visible so the status reads at a glance.
+const HOVER_ACTIONS =
+  'flex shrink-0 items-center gap-1 md:opacity-0 md:transition-opacity md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100'
 
 const PROVIDER_ICONS: Record<TaskProvider, (props: { className?: string }) => React.JSX.Element> = {
   github: ({ className }) => <GitHubIcon className={className} />,
@@ -41,6 +47,8 @@ type TaskBoardCardViewProps = {
   onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
   onOpen: (card: TaskBoardWireCard) => void
   onStartWorkspace: (card: TaskBoardWireCard) => void
+  /** Task start; absent where the board offers none. */
+  runActions?: TaskBoardRunActions
 }
 
 export function TaskBoardCardView({
@@ -56,11 +64,14 @@ export function TaskBoardCardView({
   onDragEnd,
   onMove,
   onOpen,
-  onStartWorkspace
+  onStartWorkspace,
+  runActions
 }: TaskBoardCardViewProps): React.JSX.Element {
   const t = useTranslate()
   const ProviderIcon = PROVIDER_ICONS[card.provider]
   const labels = card.labels.slice(0, 2)
+  const run = card.taskStart ?? null
+  const runPending = runActions?.pendingRefKeys.has(card.refKey) ?? false
   return (
     <div
       role="button"
@@ -102,90 +113,103 @@ export function TaskBoardCardView({
             {card.title}
           </h3>
         </div>
-        <div className="flex shrink-0 items-center gap-1 md:opacity-0 md:transition-opacity md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                disabled={updating}
-                aria-label={t('taskBoard.moveCard', 'Move {{id}}', { id: card.displayId })}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <MoveRight className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {columns
-                .filter((target) => target.id !== columnId)
-                .map((target) => {
-                  const check = canDrop(card, target.id)
-                  const item = (
-                    <DropdownMenuItem
-                      key={target.id}
-                      disabled={!check.ok}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        void onMove(card, target.id)
-                      }}
-                    >
-                      {target.label}
-                    </DropdownMenuItem>
-                  )
-                  if (check.ok) {
-                    return item
-                  }
-                  return (
-                    <Tooltip key={target.id}>
-                      <TooltipTrigger asChild>
-                        <span>{item}</span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{check.reason}</TooltipContent>
-                    </Tooltip>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onStartWorkspace(card)
-                }}
-                aria-label={t('taskBoard.startWorkspace', 'Start workspace from {{id}}', {
-                  id: card.displayId
-                })}
-              >
-                <ArrowRight className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {t('taskBoard.startWorkspaceTooltip', 'Start workspace')}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  openAppHttpLink(card.url, { event })
-                }}
-                aria-label={t('taskBoard.openExternal', 'Open {{id}} in browser', {
-                  id: card.displayId
-                })}
-              >
-                <ExternalLink className="size-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {t('taskBoard.openExternalTooltip', 'Open in browser')}
-            </TooltipContent>
-          </Tooltip>
+        <div className="flex shrink-0 items-center gap-1">
+          {runActions ? (
+            <div className={run || runPending ? 'flex shrink-0 items-center' : HOVER_ACTIONS}>
+              <TaskBoardCardStartButton
+                card={card}
+                pending={runPending}
+                onStart={runActions.onStart}
+                onStartAs={runActions.onStartAs}
+                onStop={runActions.onStop}
+              />
+            </div>
+          ) : null}
+          <div className={HOVER_ACTIONS}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={updating}
+                  aria-label={t('taskBoard.moveCard', 'Move {{id}}', { id: card.displayId })}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <MoveRight className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {columns
+                  .filter((target) => target.id !== columnId)
+                  .map((target) => {
+                    const check = canDrop(card, target.id)
+                    const item = (
+                      <DropdownMenuItem
+                        key={target.id}
+                        disabled={!check.ok}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void onMove(card, target.id)
+                        }}
+                      >
+                        {target.label}
+                      </DropdownMenuItem>
+                    )
+                    if (check.ok) {
+                      return item
+                    }
+                    return (
+                      <Tooltip key={target.id}>
+                        <TooltipTrigger asChild>
+                          <span>{item}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{check.reason}</TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onStartWorkspace(card)
+                  }}
+                  aria-label={t('taskBoard.startWorkspace', 'Start workspace from {{id}}', {
+                    id: card.displayId
+                  })}
+                >
+                  <ArrowRight className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {t('taskBoard.startWorkspaceTooltip', 'Start workspace')}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openAppHttpLink(card.url, { event })
+                  }}
+                  aria-label={t('taskBoard.openExternal', 'Open {{id}} in browser', {
+                    id: card.displayId
+                  })}
+                >
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {t('taskBoard.openExternalTooltip', 'Open in browser')}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
       {labels.length > 0 ? (
@@ -206,9 +230,12 @@ export function TaskBoardCardView({
         </div>
       ) : null}
       <TaskBoardCardActivity card={card} />
+      {run && runActions ? (
+        <TaskBoardCardRunProgress run={run} onOpen={() => runActions.onOpenRun(card)} />
+      ) : null}
       <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-2xs text-muted-foreground">
         <span className="truncate text-3xs">{card.projectLabel}</span>
-        <span className="shrink-0">{formatUpdatedAt(card.updatedAt)}</span>
+        <span className="shrink-0">{formatUpdatedAt(run?.updatedAt ?? card.updatedAt)}</span>
       </div>
     </div>
   )

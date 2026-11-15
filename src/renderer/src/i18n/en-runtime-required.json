@@ -2709,6 +2709,10 @@
         "start": "start task",
         "worktree": "worktree"
       }
+    },
+    "stopConfirm": {
+      "title_one": "Stop the orchestrator and {{count}} agent?",
+      "title_other": "Stop the orchestrator and {{count}} agents?"
     }
   },
   "terminal": {

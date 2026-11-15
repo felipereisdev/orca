@@ -20,12 +20,22 @@ export type TaskBoardColumn = {
   cards: TaskBoardWireCard[]
 }
 export type TaskBoardDropCheck = { ok: true } | { ok: false; reason: string }
+/** ▶︎ / "Start as…" / ⏹ and opening a card's orchestrator. */
+export type TaskBoardRunActions = {
+  onStart: (card: TaskBoardWireCard) => void
+  onStartAs: (card: TaskBoardWireCard) => void
+  onStop: (card: TaskBoardWireCard) => void
+  onOpenRun: (card: TaskBoardWireCard) => void
+  /** Cards whose start or stop request is in flight. */
+  pendingRefKeys: ReadonlySet<string>
+}
 export type TaskBoardProps = {
   columns: TaskBoardColumn[]
   canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
   onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
   onOpen: (card: TaskBoardWireCard) => void
   onStartWorkspace: (card: TaskBoardWireCard) => void
+  runActions?: TaskBoardRunActions
   updatingRefKeys: ReadonlySet<string>
   selectedRefKey: string | null
   formatUpdatedAt: (updatedAt: string) => string
@@ -37,6 +47,7 @@ export function TaskBoard({
   onMove,
   onOpen,
   onStartWorkspace,
+  runActions,
   updatingRefKeys,
   selectedRefKey,
   formatUpdatedAt
@@ -159,6 +170,7 @@ export function TaskBoard({
                   onMove={onMove}
                   onOpen={onOpen}
                   onStartWorkspace={onStartWorkspace}
+                  runActions={runActions}
                 />
               ))}
             </div>

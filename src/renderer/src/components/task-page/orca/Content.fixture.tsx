@@ -2,6 +2,10 @@ import { defineFixture } from '../../../component-fixtures/component-fixture'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { TaskBoardProviderState } from '../../../../../shared/task-board/task-board-provider-results'
 import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
+import {
+  taskStartPercent,
+  type TaskStartRunSummary
+} from '../../../../../shared/task-board/task-start-run'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { WorkspaceStatusDefinition } from '../../../../../shared/worktree/types'
 import { getSourceOptions } from '../task-page-localized-options'
@@ -69,6 +73,26 @@ function move(error: string | null): TaskBoardMove {
   }
 }
 
+function run(
+  fields: Pick<TaskStartRunSummary, 'state' | 'phase'> & Partial<TaskStartRunSummary>
+): TaskStartRunSummary {
+  return {
+    id: `run-${fields.state}-${fields.phase}`,
+    updatedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    worktreeId: 'acme::/work/acme-task',
+    percent: taskStartPercent(fields.phase, fields.progress),
+    ...fields
+  }
+}
+
+const runActions = {
+  onStart: () => {},
+  onStartAs: () => {},
+  onStop: () => {},
+  onOpenRun: () => {},
+  pendingRefKeys: new Set<string>()
+}
+
 function Board({
   state,
   error = null
@@ -87,6 +111,7 @@ function Board({
           onRefresh={() => {}}
           onOpen={() => {}}
           onStartWorkspace={() => {}}
+          runActions={runActions}
         />
       </div>
     </TooltipProvider>
@@ -145,6 +170,57 @@ export const cardsWithMoveError = defineFixture({
           },
           linear: { status: 'disconnected' }
         })
+      }}
+    />
+  )
+})
+
+/** No run, Development 3/7 reviewing, Waiting for you, Stopping…, Error and Completed. */
+export const taskStartRuns = defineFixture({
+  width: 1280,
+  render: () => (
+    <Board
+      state={{
+        cards: [
+          makeCard('jira', 'APP-20', 'Adjust the invoice filter', {
+            labels: ['backend'],
+            taskStart: null
+          }),
+          makeCard('jira', 'APP-21', 'Migrate the settings schema', {
+            category: 'in-progress',
+            columnId: 'in-progress',
+            taskStart: run({
+              state: 'running',
+              phase: 'development',
+              progress: { current: 3, total: 7, step: 'reviewing' }
+            })
+          }),
+          makeCard('gitlab', '#52', 'Ask before deleting stale branches', {
+            category: 'in-progress',
+            columnId: 'in-progress',
+            taskStart: run({ state: 'waiting', phase: 'planning' })
+          }),
+          makeCard('gitlab', '#53', 'Retire the legacy exporter', {
+            category: 'in-progress',
+            columnId: 'in-progress',
+            taskStart: run({ state: 'stopping', phase: 'qa' })
+          }),
+          makeCard('jira', 'APP-22', 'Speed up the board list', {
+            category: 'in-progress',
+            columnId: 'in-review',
+            taskStart: run({
+              state: 'failed',
+              phase: 'final-review',
+              failure: 'orchestrator-exited'
+            })
+          }),
+          makeCard('jira', 'APP-23', 'Add retry to the exporter', {
+            category: 'done',
+            columnId: 'completed',
+            taskStart: run({ state: 'completed', phase: 'completed' })
+          })
+        ],
+        providers: providers('ready')
       }}
     />
   )

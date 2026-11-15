@@ -110,6 +110,11 @@ export type RuntimeClientEventStreamMessage =
 
 export type RuntimeActivateWorktreeEvent = Extract<RuntimeClientEvent, { type: 'activateWorktree' }>
 
+export type TaskBoardRunsChangedEvent = Extract<
+  RuntimeClientEvent,
+  { type: 'taskBoardRunsChanged' }
+>
+
 export type AutomationsChangedEvent = Extract<RuntimeClientEvent, { type: 'automationsChanged' }>
 
 /** Publisher payload; `selector` scoping is added by a later host-scope step. */

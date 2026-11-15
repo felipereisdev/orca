@@ -3,6 +3,7 @@ import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { listTaskBoard } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
+import { subscribeTaskBoardRunsChanged } from '@/runtime/task-board/task-board-runs-changed'
 import type { ExecutionHostId } from '../../../../../shared/execution-host'
 import {
   markTaskBoardLoaded,
@@ -19,6 +20,8 @@ import {
 
 /** A board listed this recently is shown from the session cache when it mounts again. */
 const MOUNT_REUSE_MS = 45_000
+/** A run's phase reports come in bursts; one list answers them all. */
+const RUNS_REREAD_DELAY_MS = 300
 
 /** Settings that change what the host lists; editing them in Settings → Task Sources re-lists. */
 function useTaskBoardScopeKey(): string {
@@ -39,6 +42,8 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   refresh: () => void
   /** A fresh list; resolves once its result reached the board (or was superseded). */
   reread: () => Promise<void>
+  /** The host's cached list without the reload indicator, for task-start run changes. */
+  rereadRuns: () => Promise<void>
 } {
   // The last board for this host shows at once; the mount load then updates it.
   const [stateHostId, setStateHostId] = useState(accountHostId)
@@ -58,7 +63,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   }, [scopeKey])
 
   const load = useCallback(
-    async (fresh: boolean): Promise<void> => {
+    async (fresh: boolean, options: { quiet?: boolean } = {}): Promise<void> => {
       controllerRef.current?.abort()
       const controller = new AbortController()
       controllerRef.current = controller
@@ -71,7 +76,9 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         // Why: a move settling after the board unmounted still re-lists; the next mount trusts this cache.
         writeTaskBoardCards(accountHostId, next(readTaskBoardCards(accountHostId)))
       }
-      update(startTaskBoardReload)
+      if (!options.quiet) {
+        update(startTaskBoardReload)
+      }
       try {
         const target = ipcOrRuntimeTargetForHostId(accountHostId)
         if (!target) {
@@ -93,6 +100,10 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         if (!controller.signal.aborted) {
           update((current) => failTaskBoardList(current, listErrorMessage(cause)))
         }
+      } finally {
+        if (controllerRef.current === controller) {
+          controllerRef.current = null
+        }
       }
     },
     [accountHostId]
@@ -101,6 +112,7 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   // Refresh and post-move reads are explicit, so they bypass the host's and providers' caches.
   const reread = useCallback(() => load(true), [load])
   const refresh = useCallback(() => void load(true), [load])
+  const rereadRuns = useCallback(() => load(false, { quiet: true }), [load])
 
   useEffect(() => {
     mountedRef.current = true
@@ -124,6 +136,31 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     }
   }, [accountHostId, load])
 
+  // Run changes re-read the host's cached list quietly; a list already in flight is let finish first.
+  useEffect(() => {
+    let timer: number | null = null
+    const schedule = (): void => {
+      if (timer !== null) {
+        return
+      }
+      timer = window.setTimeout(() => {
+        timer = null
+        if (controllerRef.current) {
+          schedule()
+          return
+        }
+        void load(false, { quiet: true })
+      }, RUNS_REREAD_DELAY_MS)
+    }
+    const unsubscribe = subscribeTaskBoardRunsChanged(accountHostId, schedule)
+    return () => {
+      unsubscribe()
+      if (timer !== null) {
+        window.clearTimeout(timer)
+      }
+    }
+  }, [accountHostId, load])
+
   // The mount load covers the first key; afterwards a settings change re-lists.
   useEffect(() => {
     const previous = loadedScopeKeyRef.current
@@ -133,5 +170,5 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
     }
   }, [scopeKey, load])
 
-  return { state, refresh, reread }
+  return { state, refresh, reread, rereadRuns }
 }
