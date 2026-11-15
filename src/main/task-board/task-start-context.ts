@@ -34,6 +34,8 @@ export type TaskStartContextDeps = {
   ): Promise<{ body: string; comments: Pick<MRComment, 'author' | 'createdAt' | 'body'>[] }>
   jira(ref: ProviderRef<'jira'>): Promise<{
     description: string
+    /** Absolute URLs of the issue's image attachments. */
+    attachmentUrls: string[]
     comments: (Pick<JiraComment, 'createdAt' | 'body'> & { user?: { displayName: string } })[]
   }>
   linear(ref: ProviderRef<'linear'>): Promise<{
@@ -63,12 +65,24 @@ function gitlabProjectBase(card: TaskStartCard): string {
   return card.url.replace(/\/-\/(?:issues|work_items)\/.*$/, '')
 }
 
+const DATA_IMAGE = /!\[[^\]]*\]\(\s*<?data:[^)]*\)/gi
+const GITLAB_IMAGE_EXTENSION = /\.(?:png|jpe?g|gif|webp|svg|bmp)$/i
+
+/** Inline base64 images would bloat the prompt; they are never collected as prints. */
+function stripDataImages(markdown: string): string {
+  return markdown.replace(DATA_IMAGE, '[imagem]')
+}
+
 function markdownUrls(markdown: string): string[] {
-  return extractLinearInlineMedia(markdown, 'description').map((m) => m.url)
+  return extractLinearInlineMedia(markdown, 'description')
+    .map((m) => m.url)
+    .filter((url) => /^https?:/i.test(url))
 }
 
 function gitlabUrls(markdown: string, base: string): string[] {
-  const uploads = [...markdown.matchAll(GITLAB_UPLOAD)].map((m) => `${base}${m[1]}`)
+  const uploads = [...markdown.matchAll(GITLAB_UPLOAD)]
+    .filter((m) => GITLAB_IMAGE_EXTENSION.test(m[1]))
+    .map((m) => `${base}${m[1]}`)
   return [...new Set([...markdownUrls(markdown), ...uploads])]
 }
 
@@ -108,14 +122,15 @@ async function normalize(card: TaskStartCard, deps: TaskStartContextDeps): Promi
   }
   if (ref.provider === 'jira') {
     const item = await deps.jira(ref)
+    // Attachments are the source of Jira images; markdown media is only text.
     return {
-      description: item.description,
-      descriptionUrls: markdownUrls(item.description),
+      description: stripDataImages(item.description),
+      descriptionUrls: item.attachmentUrls,
       comments: item.comments.map((c) => ({
         author: c.user?.displayName ?? '',
         at: c.createdAt,
-        body: c.body,
-        urls: markdownUrls(c.body)
+        body: stripDataImages(c.body),
+        urls: []
       }))
     }
   }

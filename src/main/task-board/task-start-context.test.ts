@@ -9,6 +9,7 @@ import {
   type TaskStartCard,
   type TaskStartContextDeps
 } from './task-start-context'
+import { createTaskStartFetchDeps } from './task-start-context-deps'
 import { writeTaskStartImages } from './task-start-context-images'
 
 function card(ref: TaskStartCard['ref'], provider: TaskStartCard['provider']): TaskStartCard {
@@ -76,6 +77,54 @@ describe('collectTaskStartContext', () => {
   })
 })
 
+describe('collectTaskStartContext for Jira', () => {
+  it('uses attachments as images and drops inline base64 media', async () => {
+    const deps = depsWith({
+      jira: async () => ({
+        description: 'a ![](data:image/png;base64,AAAA) b',
+        attachmentUrls: ['https://j/att/1'],
+        comments: [{ createdAt: '2026-01-01T00:00:00Z', body: '![](data:image/png;base64,BBBB)' }]
+      })
+    })
+    const ctx = await collectTaskStartContext(
+      card({ provider: 'jira', siteId: null, key: 'A-1' }, 'jira'),
+      deps
+    )
+    expect(ctx.images.map((i) => i.url)).toEqual(['https://j/att/1'])
+    expect(JSON.stringify(ctx)).not.toContain('base64')
+  })
+
+  it('collects only image uploads from GitLab', async () => {
+    const deps = depsWith({
+      gitlab: async () => ({
+        body: '[f](/uploads/a1/doc.pdf) ![x](/uploads/b2/x.png)',
+        comments: []
+      })
+    })
+    const ctx = await collectTaskStartContext(
+      card({ provider: 'gitlab', repoId: 'r', number: 1, projectRef: null }, 'gitlab'),
+      deps
+    )
+    expect(ctx.images.map((i) => i.url)).toEqual(['https://gitlab.example/g/p/uploads/b2/x.png'])
+  })
+})
+
+describe('createTaskStartFetchDeps', () => {
+  it('returns GitLab upload bytes unchanged', async () => {
+    const glabExec = vi.fn(async (_args: string[], _options: object) => ({
+      stdout: Buffer.from([0x89, 0x50])
+    }))
+    const fetchDeps = createTaskStartFetchDeps(() => null, glabExec)
+    const bytes = await fetchDeps.gitlabUpload(
+      card({ provider: 'gitlab', repoId: 'r', number: 1, projectRef: null }, 'gitlab'),
+      'abc',
+      'x.png'
+    )
+    expect([...bytes]).toEqual([0x89, 0x50])
+    expect(glabExec.mock.calls[0][1]).toMatchObject({ encoding: 'buffer' })
+  })
+})
+
 describe('writeTaskStartImages', () => {
   it('keeps going when one image fails', async () => {
     const root = await mkdtemp(join(tmpdir(), 'task-start-'))
@@ -100,7 +149,7 @@ describe('writeTaskStartImages', () => {
   })
 
   it('does not write over SSH to a Windows host', async () => {
-    const ssh = { exec: vi.fn(), writeBuffer: vi.fn() }
+    const ssh = { exec: vi.fn(async () => '/home/u'), writeBuffer: vi.fn() }
     const fetchBytes = vi.fn(async () => Buffer.from('x'))
     const out = await writeTaskStartImages(
       [{ origin: description, url: 'https://h/a.png' }],
@@ -109,6 +158,7 @@ describe('writeTaskStartImages', () => {
       fetchBytes,
       ssh
     )
+    expect(ssh.exec).not.toHaveBeenCalled()
     expect(ssh.writeBuffer).not.toHaveBeenCalled()
     expect(out[0].failed).toBe(true)
   })

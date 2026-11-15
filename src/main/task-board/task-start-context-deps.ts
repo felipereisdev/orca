@@ -1,8 +1,15 @@
 import type { Repo } from '../../shared/repo-types'
-import type { JiraSiteSelection } from '../../shared/jira/jira-types'
-import { glabExecFileAsync } from '../git/command-runner/hosted-cli/glab-exec-file'
+import {
+  glabExecFileAsync as defaultGlabExec,
+  type GlabExecOptions
+} from '../git/command-runner/hosted-cli/glab-exec-file'
 import { getClients as getJiraClients } from '../jira/client'
-import { jiraRequestBinary } from '../jira/authenticated-request'
+import { apiBasePath, jiraRequest } from '../jira/authenticated-request'
+import { attachmentContentUrl } from '../jira/attachments/content-url'
+import { readAttachmentImageBytes } from '../jira/attachments/image-bytes'
+import { parseImageAttachmentMetas, type AttachmentMeta } from '../jira/attachments/meta'
+import type { JiraClientForSite } from '../jira/authenticated-request'
+import { execCommand } from '../ssh/remote-exec/remote-exec-command'
 import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
 import {
   readTaskBoardGitHubIssue,
@@ -20,6 +27,29 @@ type IssueDeps = {
   ): Promise<{ description?: string; descriptionImageUrls?: Record<string, string> } | null>
 }
 
+const jiraAttachments = new Map<string, { client: JiraClientForSite; meta: AttachmentMeta }>()
+
+/** The issue's image attachments (never the base64 media in descriptions) registered for download. */
+async function readJiraImageUrls(key: string, siteId: string | null): Promise<string[]> {
+  const [client] = getJiraClients(siteId)
+  if (!client) {
+    throw new Error('Jira site unavailable')
+  }
+  const issue = await jiraRequest<{ fields?: { attachment?: unknown } }>(
+    client,
+    `${apiBasePath(client.site)}/issue/${encodeURIComponent(key)}?fields=attachment`
+  )
+  const urls: string[] = []
+  for (const meta of parseImageAttachmentMetas(issue.fields?.attachment)) {
+    const url = attachmentContentUrl(client.site, meta)?.toString()
+    if (url) {
+      jiraAttachments.set(url, { client, meta })
+      urls.push(url)
+    }
+  }
+  return urls
+}
+
 /** Real readers for the card context, reusing the board's own provider deps. */
 export function createTaskStartContextDeps(
   deps: TaskBoardCommentDeps & IssueDeps
@@ -28,14 +58,15 @@ export function createTaskStartContextDeps(
     github: async (ref) => (await readTaskBoardGitHubIssue(ref, deps)).details,
     gitlab: async (ref) => (await readTaskBoardGitLabIssue(ref, deps)).details,
     jira: async (ref) => {
-      const [issue, comments] = await Promise.all([
+      const [issue, comments, attachmentUrls] = await Promise.all([
         deps.jiraIssue(ref.key, ref.siteId),
-        deps.jiraComments(ref.key, ref.siteId)
+        deps.jiraComments(ref.key, ref.siteId),
+        readJiraImageUrls(ref.key, ref.siteId)
       ])
       if (!issue) {
         throw new Error(`Jira issue ${ref.key} could not be read`)
       }
-      return { description: issue.description ?? '', comments }
+      return { description: issue.description ?? '', comments, attachmentUrls }
     },
     linear: async (ref) => {
       const [issue, comments] = await Promise.all([
@@ -54,17 +85,22 @@ export function createTaskStartContextDeps(
   }
 }
 
+/** Narrowed so a test double can answer raw bytes, as `encoding: 'buffer'` does. */
+type GlabExec = (args: string[], options: GlabExecOptions) => Promise<{ stdout: unknown }>
+
 export function createTaskStartFetchDeps(
-  repo: (repoId: string) => Repo | null
+  repo: (repoId: string) => Repo | null,
+  glabExec: GlabExec = defaultGlabExec
 ): TaskStartFetchDeps {
   return {
-    fetchUrl: async (card, url) => {
-      if (card.ref.provider === 'jira') {
-        const site: JiraSiteSelection | null = card.ref.siteId
-        const [client] = getJiraClients(site)
-        if (client && url.startsWith(client.site.siteUrl)) {
-          return Buffer.from((await jiraRequestBinary(client, url)).data)
+    fetchUrl: async (_card, url) => {
+      const attachment = jiraAttachments.get(url)
+      if (attachment) {
+        const image = await readAttachmentImageBytes(attachment.client, attachment.meta)
+        if (!image) {
+          throw new Error('Jira image unavailable')
         }
+        return Buffer.from(image.data)
       }
       const response = await fetch(url)
       if (!response.ok) {
@@ -78,15 +114,19 @@ export function createTaskStartFetchDeps(
       }
       const target = repo(card.ref.repoId)
       const path = card.ref.projectRef?.path ?? new URL(card.url).pathname.split('/-/')[0].slice(1)
-      const { stdout } = await glabExecFileAsync(
+      const { stdout } = await glabExec(
         [
           'api',
           `projects/${encodeURIComponent(path)}/uploads/${secret}/${encodeURIComponent(fileName)}`
         ],
-        { cwd: target?.path, encoding: 'latin1' }
+        { cwd: target?.path, encoding: 'buffer' }
       )
-      // latin1 maps every byte to one char, so the binary body round-trips intact.
-      return Buffer.from(stdout, 'latin1')
+      // Only encoding 'buffer' keeps raw bytes; any text encoding would mangle bytes >= 0x80.
+      const body = stdout
+      if (!Buffer.isBuffer(body)) {
+        throw new Error('glab returned text for a binary download')
+      }
+      return body
     }
   }
 }
@@ -100,17 +140,7 @@ export function createTaskStartSshAccess(): TaskStartSshAccess {
     return found
   }
   return {
-    exec: async (id, command) => {
-      const channel = await connection(id).exec(command)
-      return new Promise<string>((resolve, reject) => {
-        let out = ''
-        channel.on('data', (chunk: Buffer) => (out += chunk.toString('utf8')))
-        channel.on('error', reject)
-        channel.on('close', (code: number | null) =>
-          code ? reject(new Error(`remote command exited ${code}`)) : resolve(out)
-        )
-      })
-    },
+    exec: (id, command) => execCommand(connection(id), command),
     writeBuffer: (id, remotePath, contents) => connection(id).writeBuffer(remotePath, contents)
   }
 }

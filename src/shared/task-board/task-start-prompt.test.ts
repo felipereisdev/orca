@@ -48,4 +48,9 @@ describe('taskStartWorkerCommand', () => {
       '--agent claude --account acc --model opus --effort high --worktree current'
     )
   })
+
+  it('shell-quotes values with unsafe characters', () => {
+    const command = taskStartWorkerCommand({ agent: 'claude', model: "o p'us" })
+    expect(command).toContain("--model 'o p'\\''us'")
+  })
 })

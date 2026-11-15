@@ -31,15 +31,19 @@ export function taskStartRoleLabel(choice: TaskStartAgentChoice, accountLabel?: 
   return parts.join(' · ')
 }
 
+function shellQuote(value: string): string {
+  return /^[A-Za-z0-9._:@/-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`
+}
+
 export function taskStartWorkerCommand(choice: TaskStartAgentChoice): string {
-  const flags = [`--agent ${choice.agent}`]
+  const flags = [`--agent ${shellQuote(choice.agent)}`]
   if (choice.accountId) {
-    flags.push(`--account ${choice.accountId}`)
+    flags.push(`--account ${shellQuote(choice.accountId)}`)
   }
   if (choice.model) {
-    flags.push(`--model ${choice.model}`)
+    flags.push(`--model ${shellQuote(choice.model)}`)
     if (choice.effort) {
-      flags.push(`--effort ${choice.effort}`)
+      flags.push(`--effort ${shellQuote(choice.effort)}`)
     }
   }
   return `ORCA orchestration worker-start ${flags.join(' ')} --worktree current --spec-file <arquivo>`
@@ -63,7 +67,7 @@ function renderImages(context: TaskStartContext): string {
       image.origin.kind === 'description'
         ? 'descrição'
         : `comentário de ${image.origin.author} em ${image.origin.at}`
-    const target = image.path ?? `${image.url} (não baixada)`
+    const target = image.path ?? `${image.url} (não foi possível baixar)`
     return `- ${target}  (origem: ${where})`
   })
   return `## Prints\n${lines.join('\n')}\n\n`
