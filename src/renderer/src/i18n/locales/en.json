@@ -25600,9 +25600,6 @@
   },
   "taskBoard": {
     "emptyColumn": "No issues",
-    "moveCard": "Move {{id}}",
-    "startWorkspace": "Start workspace from {{id}}",
-    "startWorkspaceTooltip": "Start workspace",
     "openExternal": "Open {{id}} in browser",
     "openExternalTooltip": "Open in browser",
     "loadFailed": "Could not load issues. Refresh to try again.",

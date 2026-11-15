@@ -39,13 +39,9 @@ export function TaskPageOrcaContent({
     accountBackedTaskSourceHostId,
     visibleSourceOptions,
     openJiraDetailPage,
-    handleUseJiraItem,
     openLinearDetailPage,
-    handleOpenOrUseLinearItem,
     openGitLabDetailPage,
-    handleUseGitLabItem,
-    openGitHubDetailPage,
-    handleOpenOrUseGitHubWorkItem
+    openGitHubDetailPage
   } = model
   const localStatuses = useAppStore((s) => s.workspaceStatuses)
   const { state, refresh, reread, rereadRuns } = useTaskBoardCards(accountBackedTaskSourceHostId)
@@ -72,20 +68,6 @@ export function TaskPageOrcaContent({
         return openGitHubDetailPage(source.item)
     }
   }
-  const startWorkspace = (card: TaskBoardWireCard): void => {
-    const { source } = card
-    switch (source.provider) {
-      case 'jira':
-        return handleUseJiraItem(source.item)
-      case 'linear':
-        return handleOpenOrUseLinearItem(source.item)
-      case 'gitlab':
-        return handleUseGitLabItem(source.item)
-      case 'github':
-        return handleOpenOrUseGitHubWorkItem(source.item)
-    }
-  }
-
   return (
     <TaskPageOrcaBoard
       state={state}
@@ -95,7 +77,6 @@ export function TaskPageOrcaContent({
       sourceOptions={visibleSourceOptions}
       onRefresh={refresh}
       onOpen={openCard}
-      onStartWorkspace={startWorkspace}
       runActions={start.actions}
       runDialogs={<TaskBoardStartDialogs start={start} hostId={accountBackedTaskSourceHostId} />}
     />
@@ -110,7 +91,6 @@ export function TaskPageOrcaBoard({
   sourceOptions,
   onRefresh,
   onOpen,
-  onStartWorkspace,
   runActions,
   runDialogs
 }: {
@@ -120,7 +100,6 @@ export function TaskPageOrcaBoard({
   sourceOptions: readonly SourceOption[]
   onRefresh: () => void
   onOpen: (card: TaskBoardWireCard) => void
-  onStartWorkspace: (card: TaskBoardWireCard) => void
   /** ▶︎ / "Start as…" / ⏹ and opening a run's orchestrator. */
   runActions?: TaskBoardRunActions
   runDialogs?: React.ReactNode
@@ -246,7 +225,6 @@ export function TaskPageOrcaBoard({
             canDrop={move.canDrop}
             onMove={move.move}
             onOpen={onOpen}
-            onStartWorkspace={onStartWorkspace}
             runActions={runActions}
             updatingRefKeys={move.updatingRefKeys}
             selectedRefKey={null}

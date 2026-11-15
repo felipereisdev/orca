@@ -111,7 +111,6 @@ function Board({
           sourceOptions={getSourceOptions()}
           onRefresh={() => {}}
           onOpen={() => {}}
-          onStartWorkspace={() => {}}
           runActions={runActions}
         />
       </div>

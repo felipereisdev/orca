@@ -69,7 +69,6 @@ export const allProviders = defineFixture({
         }
         onMove={async () => {}}
         onOpen={() => {}}
-        onStartWorkspace={() => {}}
         updatingRefKeys={new Set()}
         selectedRefKey="linear:fixture:ENG-77"
         formatUpdatedAt={(value) => value}
@@ -186,7 +185,6 @@ export const taskStartStates = defineFixture({
         canDrop={() => ({ ok: true })}
         onMove={async () => {}}
         onOpen={() => {}}
-        onStartWorkspace={() => {}}
         runActions={runActions}
         updatingRefKeys={new Set()}
         selectedRefKey={null}
@@ -206,7 +204,6 @@ export const startAsMenu = defineFixture({
         canDrop={() => ({ ok: true })}
         onMove={async () => {}}
         onOpen={() => {}}
-        onStartWorkspace={() => {}}
         runActions={runActions}
         updatingRefKeys={new Set()}
         selectedRefKey={null}
@@ -241,7 +238,6 @@ export const forgetRunMenu = defineFixture({
         canDrop={() => ({ ok: true })}
         onMove={async () => {}}
         onOpen={() => {}}
-        onStartWorkspace={() => {}}
         runActions={runActions}
         updatingRefKeys={new Set()}
         selectedRefKey={null}

@@ -56,7 +56,6 @@ function setup() {
         }
         onMove={onMove}
         onOpen={vi.fn()}
-        onStartWorkspace={vi.fn()}
         updatingRefKeys={new Set()}
         selectedRefKey={null}
         formatUpdatedAt={(value) => value}

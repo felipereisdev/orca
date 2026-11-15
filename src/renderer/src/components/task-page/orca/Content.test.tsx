@@ -93,13 +93,9 @@ function renderContent(boardCards = cards) {
   }
   const handlers = {
     openJiraDetailPage: vi.fn(),
-    handleUseJiraItem: vi.fn(),
     openLinearDetailPage: vi.fn(),
-    handleOpenOrUseLinearItem: vi.fn(),
     openGitLabDetailPage: vi.fn(),
-    handleUseGitLabItem: vi.fn(),
-    openGitHubDetailPage: vi.fn(),
-    handleOpenOrUseGitHubWorkItem: vi.fn()
+    openGitHubDetailPage: vi.fn()
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture supplies every model field this content reads.
   const model = {
@@ -116,19 +112,17 @@ function renderContent(boardCards = cards) {
 }
 
 describe('TaskPageOrcaContent', () => {
-  it('opens and starts each card through its own provider handlers', () => {
+  it('opens each card through its own provider handler', () => {
     const handlers = renderContent()
-    const expected: [string, keyof typeof handlers, keyof typeof handlers][] = [
-      ['APP-1', 'openJiraDetailPage', 'handleUseJiraItem'],
-      ['ENG-2', 'openLinearDetailPage', 'handleOpenOrUseLinearItem'],
-      ['#3', 'openGitLabDetailPage', 'handleUseGitLabItem'],
-      ['#4', 'openGitHubDetailPage', 'handleOpenOrUseGitHubWorkItem']
+    const expected: [string, keyof typeof handlers][] = [
+      ['APP-1', 'openJiraDetailPage'],
+      ['ENG-2', 'openLinearDetailPage'],
+      ['#3', 'openGitLabDetailPage'],
+      ['#4', 'openGitHubDetailPage']
     ]
-    for (const [id, open, start] of expected) {
+    for (const [id, open] of expected) {
       fireEvent.click(screen.getByText(`Issue ${id}`))
-      fireEvent.click(screen.getByRole('button', { name: `Start workspace from ${id}` }))
       expect(handlers[open]).toHaveBeenCalledExactlyOnceWith({ marker: id, ...projectFields })
-      expect(handlers[start]).toHaveBeenCalledExactlyOnceWith({ marker: id, ...projectFields })
     }
   })
 

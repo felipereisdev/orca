@@ -1,14 +1,8 @@
 import React from 'react'
-import { ArrowRight, ExternalLink, Gitlab, MoveRight } from 'lucide-react'
+import { ExternalLink, Gitlab } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
 import { GitHubIcon } from '@/components/icons/GitHubIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
@@ -17,7 +11,7 @@ import { cn } from '@/lib/class-names'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 import type { TaskBoardWireCard } from '../../../../shared/task-board/task-board-wire-types'
 import type { TaskProvider } from '../../../../shared/work-items/task-providers'
-import type { TaskBoardColumn, TaskBoardDropCheck, TaskBoardRunActions } from './TaskBoard'
+import type { TaskBoardRunActions } from './TaskBoard'
 import { TaskBoardCardActivity } from './TaskBoardCardActivity'
 import { TaskBoardCardRunProgress } from './TaskBoardCardRunProgress'
 import { TaskBoardCardStartButton } from './TaskBoardCardStartButton'
@@ -36,36 +30,26 @@ const PROVIDER_ICONS: Record<TaskProvider, (props: { className?: string }) => Re
 
 type TaskBoardCardViewProps = {
   card: TaskBoardWireCard
-  columnId: string
-  columns: TaskBoardColumn[]
-  canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
   dragging: boolean
   selected: boolean
   updating: boolean
   formatUpdatedAt: (updatedAt: string) => string
   onDragStart: (card: TaskBoardWireCard, event: React.DragEvent<HTMLDivElement>) => void
   onDragEnd: () => void
-  onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
   onOpen: (card: TaskBoardWireCard) => void
-  onStartWorkspace: (card: TaskBoardWireCard) => void
   /** Task start; absent where the board offers none. */
   runActions?: TaskBoardRunActions
 }
 
 export function TaskBoardCardView({
   card,
-  columnId,
-  columns,
-  canDrop,
   dragging,
   selected,
   updating,
   formatUpdatedAt,
   onDragStart,
   onDragEnd,
-  onMove,
   onOpen,
-  onStartWorkspace,
   runActions
 }: TaskBoardCardViewProps): React.JSX.Element {
   const t = useTranslate()
@@ -116,69 +100,6 @@ export function TaskBoardCardView({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <div className={HOVER_ACTIONS}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  disabled={updating}
-                  aria-label={t('taskBoard.moveCard', 'Move {{id}}', { id: card.displayId })}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <MoveRight className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {columns
-                  .filter((target) => target.id !== columnId)
-                  .map((target) => {
-                    const check = canDrop(card, target.id)
-                    const item = (
-                      <DropdownMenuItem
-                        key={target.id}
-                        disabled={!check.ok}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          void onMove(card, target.id)
-                        }}
-                      >
-                        {target.label}
-                      </DropdownMenuItem>
-                    )
-                    if (check.ok) {
-                      return item
-                    }
-                    return (
-                      <Tooltip key={target.id}>
-                        <TooltipTrigger asChild>
-                          <span>{item}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">{check.reason}</TooltipContent>
-                      </Tooltip>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onStartWorkspace(card)
-                  }}
-                  aria-label={t('taskBoard.startWorkspace', 'Start workspace from {{id}}', {
-                    id: card.displayId
-                  })}
-                >
-                  <ArrowRight className="size-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={6}>
-                {t('taskBoard.startWorkspaceTooltip', 'Start workspace')}
-              </TooltipContent>
-            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

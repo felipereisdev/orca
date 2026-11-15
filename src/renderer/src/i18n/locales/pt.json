@@ -24814,9 +24814,6 @@
   },
   "taskBoard": {
     "emptyColumn": "Nenhuma issue",
-    "moveCard": "Mover {{id}}",
-    "startWorkspace": "Iniciar workspace a partir de {{id}}",
-    "startWorkspaceTooltip": "Iniciar workspace",
     "openExternal": "Abrir {{id}} no navegador",
     "openExternalTooltip": "Abrir no navegador",
     "loadFailed": "Não foi possível carregar as issues. Atualize para tentar novamente.",

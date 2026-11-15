@@ -36,7 +36,6 @@ export type TaskBoardProps = {
   canDrop: (card: TaskBoardWireCard, columnId: string) => TaskBoardDropCheck
   onMove: (card: TaskBoardWireCard, columnId: string) => Promise<void>
   onOpen: (card: TaskBoardWireCard) => void
-  onStartWorkspace: (card: TaskBoardWireCard) => void
   runActions?: TaskBoardRunActions
   updatingRefKeys: ReadonlySet<string>
   selectedRefKey: string | null
@@ -48,7 +47,6 @@ export function TaskBoard({
   canDrop,
   onMove,
   onOpen,
-  onStartWorkspace,
   runActions,
   updatingRefKeys,
   selectedRefKey,
@@ -157,9 +155,6 @@ export function TaskBoard({
                 <TaskBoardCardView
                   key={card.refKey}
                   card={card}
-                  columnId={column.id}
-                  columns={columns}
-                  canDrop={canDrop}
                   dragging={draggingRefKey === card.refKey}
                   selected={selectedRefKey === card.refKey}
                   updating={updatingRefKeys.has(card.refKey)}
@@ -169,9 +164,7 @@ export function TaskBoard({
                     setDraggingRefKey(null)
                     setDragOverColumnId(null)
                   }}
-                  onMove={onMove}
                   onOpen={onOpen}
-                  onStartWorkspace={onStartWorkspace}
                   runActions={runActions}
                 />
               ))}
