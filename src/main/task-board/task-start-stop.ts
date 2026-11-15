@@ -104,9 +104,10 @@ async function stopOrchestration(
   const attempted = new Set<string>()
   const first = await stopLiveWorkers(coordinator, attempted, deps, mutation)
   const gone = (await probeOrchestrator(ref, deps.lifecycle, run.startedAt)) === 'gone'
+  // Counted before the last listing: an answer recorded after it would leave its Dispatch unlisted.
+  const settled = noPendingStarts(coordinator, deps)
   // Once more after the probe: a start inserted before the fence may have listed late.
   const second = await stopLiveWorkers(coordinator, attempted, deps, mutation)
-  const settled = noPendingStarts(coordinator, deps)
   // A key naming nobody lists no workers, which proves nothing.
   const identified = !!(
     coordinator.terminalHandle ||

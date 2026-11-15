@@ -112,6 +112,7 @@ export async function startRemoteOwnedWorker(
     taskId,
     requestKey: forward.key,
     retryOf: params.retryOf,
+    startedBy: coordinator,
     create: existingTask
       ? undefined
       : {

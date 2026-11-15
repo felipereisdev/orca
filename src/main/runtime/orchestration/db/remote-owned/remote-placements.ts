@@ -1,4 +1,5 @@
 import type { TaskRow } from '../orchestration-records'
+import type { OrchestrationCoordinatorKey } from '../../addressing/orchestration-caller-identity'
 import type { OrchestrationDb } from '../orchestration-db'
 import { OrchestrationError } from '../../orchestration-error'
 import { taskNotFoundError } from '../../coordinator/dispatch/task-dispatch-refusal'
@@ -24,6 +25,7 @@ import {
 } from './remote-dispatch-records'
 import { getOpenRemoteRunLink, type RemoteRunLinkRow } from './remote-run-links'
 import { getLiveRemotePlacement, type RemotePlacementRow } from './remote-placement-hold'
+import { copyPlacementStarter, writePlacementStarter } from './remote-start-starter'
 import { writtenRow } from './written-row'
 
 export function getRemotePlacement(
@@ -51,6 +53,7 @@ export function reserveRemotePlacement(
     requestKey: string
     create?: TaskCreation
     retryOf?: string
+    startedBy?: OrchestrationCoordinatorKey | null
   }
 ): { placement: RemotePlacementRow; task: TaskRow } {
   const transaction = beginLifecycleWriteTransaction(db.db, 'reserve_remote_placement')
@@ -108,6 +111,7 @@ export function reserveRemotePlacement(
         task.status,
         params.retryOf ?? null
       )
+    writePlacementStarter(db, task.id, params.startedBy)
     transitionLifecycleWithDb(db.db, {
       entity: 'task',
       id: task.id,
@@ -222,6 +226,9 @@ export function adoptRemoteAttempt(
   const known = getRemoteDispatch(db, attempt.dispatchId)
   const record = ensureRemoteDispatchRecord(db, link, attempt)
   const placement = getRemotePlacement(db, attempt.taskId)
+  if (!known && placement?.conversation_id === link.conversation_id) {
+    copyPlacementStarter(db, placement, record.dispatch_id)
+  }
   if (
     placement?.conversation_id !== link.conversation_id ||
     placement.dispatch_id === record.dispatch_id

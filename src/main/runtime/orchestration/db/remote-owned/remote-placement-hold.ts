@@ -12,6 +12,9 @@ export type RemotePlacementRow = {
   prior_task_status: TaskStatus
   dispatch_id: string | null
   created_at: string
+  started_by_handle: string | null
+  started_by_pane_key: string | null
+  started_by_orca_session_id: string | null
 }
 
 /**

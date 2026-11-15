@@ -1,3 +1,10 @@
+/** Who sent a start --on a server, on its placement and the attempt that answered it. */
+export const STARTED_BY_COLUMNS = [
+  'started_by_handle',
+  'started_by_pane_key',
+  'started_by_orca_session_id'
+] as const
+
 // What this Orca placed on paired servers that own the workers. New tables only, so an older build
 // opens the file and ignores them. Facts in them change only from the server's queue, in its order.
 export const REMOTE_OWNED_SCHEMA_SQL = `
@@ -39,7 +46,11 @@ CREATE TABLE IF NOT EXISTS remote_placements (
   request_key        TEXT NOT NULL,
   prior_task_status  TEXT NOT NULL,
   dispatch_id        TEXT,
-  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  -- The coordinator that sent this start (a ⏹ stops only its own); all NULL on rows from older builds.
+  started_by_handle          TEXT,
+  started_by_pane_key        TEXT,
+  started_by_orca_session_id TEXT
 );
 -- Closing a link visits only its own rows here and in remote_dispatches.
 CREATE INDEX IF NOT EXISTS idx_remote_placements_conversation ON remote_placements(conversation_id);
@@ -69,7 +80,11 @@ CREATE TABLE IF NOT EXISTS remote_dispatches (
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
   -- When this Orca recorded the server's start answer or, after that, its latest state for the
   -- Dispatch. Reports and this Orca's own stop bookkeeping leave it.
-  updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  -- The starter of the placement this attempt answered, copied when it was first recorded.
+  started_by_handle          TEXT,
+  started_by_pane_key        TEXT,
+  started_by_orca_session_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_remote_dispatches_run ON remote_dispatches(run_id);
 CREATE INDEX IF NOT EXISTS idx_remote_dispatches_task ON remote_dispatches(task_id);
