@@ -136,6 +136,14 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     debug: '--debug                Include the planner route the host used',
     'index-status': '--index-status         Report the index instead of searching'
   },
+  'task-start phase': {
+    phase:
+      '--phase <stage>        planning, plan-review, qa-script, development, final-review, qa, waiting or completed; also positional',
+    current: '--current <n>          Subtasks done so far (development only, with --total)',
+    total: '--total <m>            Subtasks in the plan (development only, with --current)',
+    step: '--step <step>          implementing or reviewing the current subtask (development only)',
+    note: '--note <text>          Short note shown on the card'
+  },
   ports: {
     all: '--all                  List every listener on the workspace host, not just this workspace'
   },

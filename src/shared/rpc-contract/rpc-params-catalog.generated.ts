@@ -709,13 +709,15 @@ import { RenameParams } from './structured-agent-session-rename-params'
 import { SendRecordedParams } from './structured-agent-session-send-recorded-params'
 import { SubscribeParams } from './structured-agent-session-subscribe-params'
 import {
+  OrchestrationTaskStartPhaseParams,
   TaskBoardAddCommentParams,
   TaskBoardDetailParams,
   TaskBoardListParams,
   TaskBoardMarkSeenParams,
   TaskBoardMoveParams,
   TaskBoardStartOptionsParams,
-  TaskBoardStartTaskParams
+  TaskBoardStartTaskParams,
+  TaskBoardStopTaskParams
 } from './task-board-params'
 import { TerminalInferCodexQuestionSkip } from './terminal-codex-question-params'
 import { TerminalDaemonRestartSeveredParams } from './terminal-daemon-params'
@@ -1471,6 +1473,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'orchestration.sessionAddress': SessionAddressParams,
   'orchestration.taskCreate': TaskCreateParams,
   'orchestration.taskList': TaskListParams,
+  'orchestration.taskStartPhase': OrchestrationTaskStartPhaseParams,
   'orchestration.workerAbandon': WorkerDispatchParams,
   'orchestration.workerApprovalsSubscribe': WorkerApprovalsSubscribeParams,
   'orchestration.workerAutoClose': OrchestrationWorkerSubjectParams,
@@ -1652,6 +1655,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'taskBoard.move': TaskBoardMoveParams,
   'taskBoard.startOptions': TaskBoardStartOptionsParams,
   'taskBoard.startTask': TaskBoardStartTaskParams,
+  'taskBoard.stopTask': TaskBoardStopTaskParams,
   'terminal.ackOutput': TerminalAckOutput,
   'terminal.adoptOrphans': TerminalAdoptOrphans,
   'terminal.agentId': TerminalAgentId,

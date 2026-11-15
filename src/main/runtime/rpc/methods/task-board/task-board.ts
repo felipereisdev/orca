@@ -5,7 +5,8 @@ import {
   TaskBoardMarkSeenParams,
   TaskBoardMoveParams,
   TaskBoardStartOptionsParams,
-  TaskBoardStartTaskParams
+  TaskBoardStartTaskParams,
+  TaskBoardStopTaskParams
 } from '../../../../../shared/rpc-contract/task-board-params'
 import { createTaskBoardServiceDeps } from '../../../../task-board/task-board-host-deps'
 import { moveTaskBoardCard } from '../../../../task-board/task-board-host-move'
@@ -19,6 +20,7 @@ import { getTaskStartOptions } from '../../../../task-board/task-start-options'
 import { createTaskStartOptionsDeps } from '../../../../task-board/task-start-options-deps'
 import { startTaskFromCard } from '../../../../task-board/task-start-service'
 import { createTaskStartServiceDeps } from '../../../../task-board/task-start-service-deps'
+import { stopTaskFromCard } from '../../../../task-board/task-start-stop-deps'
 import { defineMethod } from '../../core'
 
 // The board is the called host's: its accounts, repos, columns and read markers.
@@ -78,5 +80,11 @@ export const TASK_BOARD_METHODS = [
     params: TaskBoardStartTaskParams,
     handler: (params, context) =>
       startTaskFromCard(params, createTaskStartServiceDeps(context.runtime, context))
+  }),
+  defineMethod({
+    name: 'taskBoard.stopTask',
+    permission: 'workspace',
+    params: TaskBoardStopTaskParams,
+    handler: (params, { runtime }) => stopTaskFromCard(runtime, params.ref, params.preview === true)
   })
 ]

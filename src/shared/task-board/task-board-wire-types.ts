@@ -161,3 +161,9 @@ export type TaskStartResult =
       reasons?: TaskStartPrimaryReason[]
       run?: TaskStartRunSummary
     }
+
+/** `run` is the card's run after the stop (still `stopping` while an end is unproven);
+ *  `agents` (preview only) counts the orchestrator and its live workers. */
+export type TaskStopResult = { ok: true; run: TaskStartRunSummary | null; agents?: number }
+
+export type TaskStartPhaseResult = { run: TaskStartRunSummary; applied: boolean }

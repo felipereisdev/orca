@@ -214,7 +214,7 @@ async function runStart(
     return guard.fail('worktree-create-failed', 'worktree_create_failed')
   }
   guard.worktreeId = worktreeId
-  if (!guard.alive() || !guard.patch({ worktreeId })) {
+  if (!guard.alive() || !guard.patch({ worktreeId, cardTitle: card.title })) {
     return guard.settle()
   }
   const prompt = buildTaskStartPrompt({ context, roles: prepared.roles, labels: prepared.labels })

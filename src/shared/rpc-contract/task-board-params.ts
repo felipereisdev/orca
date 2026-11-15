@@ -85,3 +85,27 @@ export const TaskBoardStartTaskParams = z.strictObject({
     .optional(),
   confirmPrimary: z.boolean().optional()
 })
+
+// `preview` only counts the agents a stop would end, for the confirmation.
+export const TaskBoardStopTaskParams = z.strictObject({
+  ref: TaskBoardCardRefParam,
+  preview: z.boolean().optional()
+})
+
+// The caller's own session names the run; `starting` is Orca's alone to report.
+export const OrchestrationTaskStartPhaseParams = z.strictObject({
+  phase: z.enum([
+    'planning',
+    'plan-review',
+    'qa-script',
+    'development',
+    'final-review',
+    'qa',
+    'completed',
+    'waiting'
+  ]),
+  current: z.number().int().nonnegative().optional(),
+  total: z.number().int().positive().optional(),
+  step: z.enum(['implementing', 'reviewing']).optional(),
+  note: Str(2000).optional()
+})

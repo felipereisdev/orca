@@ -61,6 +61,8 @@ export type TaskStartRun = {
   /** Set as soon as the worktree exists, before the orchestrator surface is published. */
   worktreeId?: string
   orchestrator?: TaskStartOrchestratorRef
+  /** Names the run in the "waiting on you" notification. */
+  cardTitle?: string
   state: TaskStartRunState
   phase: TaskStartPhase
   progress?: TaskStartProgress
@@ -251,6 +253,10 @@ function normalizeRun(value: unknown): TaskStartRun | undefined {
   const worktreeId = str(value.worktreeId)
   if (worktreeId) {
     run.worktreeId = worktreeId
+  }
+  const cardTitle = str(value.cardTitle)
+  if (cardTitle) {
+    run.cardTitle = cardTitle
   }
   const orchestrator = normalizeOrchestrator(value.orchestrator)
   if (orchestrator) {

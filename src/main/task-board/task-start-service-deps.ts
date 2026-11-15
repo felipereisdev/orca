@@ -1,12 +1,7 @@
 import { getRepoSshConnectionId } from '../../shared/execution-host'
 import { WorktreeCreate } from '../../shared/rpc-contract/worktree-create-params'
 import { createWorktreeWithStartupAgent } from '../agent-launch/startup-agent-worktree-create'
-import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
-import {
-  captureStructuredSessionSurface,
-  retireCapturedStructuredSessionSurface
-} from '../runtime/agent-session/structured-agent-session-close'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { resolveRpcWorkspaceCreatorProvenance } from '../runtime/rpc/callers/workspace-creator-context'
 import type { RpcContext } from '../runtime/rpc/core'
@@ -27,6 +22,7 @@ import {
 import { writeTaskStartImages } from './task-start-context-images'
 import { createTaskStartOptionsDeps } from './task-start-options-deps'
 import type { TaskStartServiceDeps } from './task-start-service'
+import { closeTaskStartOrchestrator } from './task-start-stop-deps'
 import { taskStartWorktreeCreateFields } from './task-start-worktree-link'
 
 // In-process like automations: the host launches the orchestrator for whichever client asked.
@@ -112,23 +108,6 @@ export function createTaskStartServiceDeps(
       paneKey: runtime.getTerminalPaneKey(handle) ?? undefined,
       ptyId: runtime.getTerminalPtyIdForHandle(handle) ?? undefined
     }),
-    closeOrchestrator: async (ref) => {
-      if (ref.surface === 'terminal') {
-        if (ref.handle) {
-          await runtime.closeTerminal(ref.handle)
-        }
-        return
-      }
-      const host = getStructuredAgentSessionHost()
-      if (!host || !ref.sessionId) {
-        return
-      }
-      const surface = captureStructuredSessionSurface(host, ref.sessionId, runtime)
-      try {
-        await retireCapturedStructuredSessionSurface(host, ref.sessionId, surface, runtime)
-      } finally {
-        await host.close(ref.sessionId, 'user-close')
-      }
-    }
+    closeOrchestrator: (ref) => closeTaskStartOrchestrator(runtime, ref)
   }
 }

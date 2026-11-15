@@ -235,6 +235,7 @@ export const EXECUTION_HOST_METHODS = [
   'taskBoard.move',
   'taskBoard.startOptions',
   'taskBoard.startTask',
+  'taskBoard.stopTask',
   'terminal.ackOutput',
   'terminal.adoptOrphans',
   'terminal.agentStatus',

@@ -88,6 +88,7 @@ export const ROOT_HELP_TEXT_SECONDARY = [
   '  orca repo unhide --repo <selector> [--host <host>] [--json]',
   '  orca repo set-base-ref --repo <selector> --ref <ref> [--json]',
   '  orca repo search-refs --repo <selector> --query <text> [--limit <n>] [--json]',
+  '  orca task-start phase <stage> [--current <n> --total <m> [--step implementing|reviewing]] [--note <text>] [--json]',
   '',
   'Selectors:',
   '  --repo <selector>         Registered repo selector such as id:<id>, name:<name>, or path:<path>',
