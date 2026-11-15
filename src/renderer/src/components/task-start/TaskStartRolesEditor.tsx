@@ -33,8 +33,20 @@ export function TaskStartRolesEditor({
   return (
     <div className="flex flex-col gap-3">
       {TASK_START_ROLES.map((role) => (
-        <div key={role} className="flex min-w-0 flex-col gap-1">
-          <div className="text-xs font-medium text-muted-foreground">{labels[role]}</div>
+        <div
+          key={role}
+          className="flex min-w-0 flex-col gap-1"
+          aria-invalid={invalidRoles?.includes(role) ? true : undefined}
+        >
+          <div
+            className={
+              invalidRoles?.includes(role)
+                ? 'text-xs font-medium text-destructive'
+                : 'text-xs font-medium text-muted-foreground'
+            }
+          >
+            {labels[role]}
+          </div>
           <TaskStartRolePicker
             catalog={catalog}
             value={roles[role]}

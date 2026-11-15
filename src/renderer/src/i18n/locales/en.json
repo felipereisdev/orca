@@ -25668,7 +25668,7 @@
     "chooseAgent": "Choose an agent",
     "inherit": "Inherit ({{value}})",
     "defaultOption": "Default",
-    "unavailable": "{{name}} (unavailable)",
+    "unavailable": "Unavailable · {{name}}",
     "needsSignIn": "needs sign-in",
     "roles": {
       "orchestrator": "Orchestrator",
