@@ -89,6 +89,7 @@ const runActions = {
   onStart: () => {},
   onStartAs: () => {},
   onStop: () => {},
+  onForget: () => {},
   onOpenRun: () => {},
   pendingRefKeys: new Set<string>()
 }

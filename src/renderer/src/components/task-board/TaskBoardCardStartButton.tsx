@@ -50,13 +50,51 @@ function IconAction({
   )
 }
 
-/** ▶︎ with "Start as…" while the card has no exclusive run; ⏹ while one runs (again while stopping). */
+function OptionsMenu({
+  label,
+  item,
+  onSelect
+}: {
+  label: string
+  item: string
+  onSelect: () => void
+}): React.JSX.Element {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="w-4"
+          aria-label={label}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <ChevronDown className="size-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation()
+            onSelect()
+          }}
+        >
+          {item}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** ▶︎ with "Start as…" while the card has no exclusive run; ⏹ while one runs (again while
+ *  stopping, with "Forget run" once the stop stays unconfirmed). */
 export function TaskBoardCardStartButton({
   card,
   pending,
   onStart,
   onStartAs,
-  onStop
+  onStop,
+  onForget
 }: {
   card: TaskBoardWireCard
   /** A start or stop request for this card is in flight. */
@@ -64,6 +102,7 @@ export function TaskBoardCardStartButton({
   onStart: (card: TaskBoardWireCard) => void
   onStartAs: (card: TaskBoardWireCard) => void
   onStop: (card: TaskBoardWireCard) => void
+  onForget: (card: TaskBoardWireCard) => void
 }): React.JSX.Element | null {
   const t = useTranslate()
   const run = card.taskStart
@@ -85,7 +124,7 @@ export function TaskBoardCardStartButton({
   }
   if (run && isTaskStartRunExclusive(run)) {
     const stopping = run.state === 'stopping'
-    return (
+    const stop = (
       <IconAction
         label={
           stopping
@@ -98,6 +137,19 @@ export function TaskBoardCardStartButton({
         <Square className="size-3.5" />
       </IconAction>
     )
+    if (!stopping || run.failure !== 'stop-unconfirmed') {
+      return stop
+    }
+    return (
+      <ButtonGroup>
+        {stop}
+        <OptionsMenu
+          label={t('taskStart.stopOptions', 'Stop options for {{id}}', { id: card.displayId })}
+          item={t('taskStart.forget', 'Forget run')}
+          onSelect={() => onForget(card)}
+        />
+      </ButtonGroup>
+    )
   }
   return (
     <ButtonGroup>
@@ -108,31 +160,11 @@ export function TaskBoardCardStartButton({
       >
         <Play className="size-3.5" />
       </IconAction>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="w-4"
-            aria-label={t('taskStart.startOptions', 'Start options for {{id}}', {
-              id: card.displayId
-            })}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <ChevronDown className="size-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={(event) => {
-              event.stopPropagation()
-              onStartAs(card)
-            }}
-          >
-            {t('taskStart.startAs', 'Start as…')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <OptionsMenu
+        label={t('taskStart.startOptions', 'Start options for {{id}}', { id: card.displayId })}
+        item={t('taskStart.startAs', 'Start as…')}
+        onSelect={() => onStartAs(card)}
+      />
     </ButtonGroup>
   )
 }

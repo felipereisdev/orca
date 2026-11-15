@@ -101,6 +101,7 @@ const runActions: TaskBoardRunActions = {
   onStart: () => {},
   onStartAs: () => {},
   onStop: () => {},
+  onForget: () => {},
   onOpenRun: () => {},
   pendingRefKeys: new Set(['jira:fixture:APP-7'])
 }
@@ -142,6 +143,9 @@ const runColumns: TaskBoardColumn[] = [
       }),
       makeCard('gitlab', '#14', 'Stop the orchestrator', {
         taskStart: run({ state: 'stopping', phase: 'qa' })
+      }),
+      makeCard('linear', 'ENG-15', 'Stop left unconfirmed', {
+        taskStart: run({ state: 'stopping', phase: 'development', failure: 'stop-unconfirmed' })
       })
     ]
   },
@@ -159,6 +163,14 @@ const runColumns: TaskBoardColumn[] = [
       }),
       makeCard('github', '#40', 'Add retry to the exporter', {
         taskStart: run({ state: 'completed', phase: 'completed' })
+      }),
+      makeCard('gitlab', '#52', 'Run forgotten after an unconfirmed stop', {
+        taskStart: run({
+          state: 'stopped',
+          phase: 'development',
+          failure: 'stop-unconfirmed',
+          note: 'stop-forced'
+        })
       })
     ]
   }
@@ -206,6 +218,42 @@ export const startAsMenu = defineFixture({
     const trigger = frame.querySelector<HTMLButtonElement>(
       'button[aria-label="Start options for APP-1"]'
     )
+    trigger?.focus()
+    trigger?.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        pointerType: 'mouse'
+      })
+    )
+    await new Promise((resolve) => setTimeout(resolve, 150))
+  }
+})
+
+/** "Forget run" open on a card whose stop stayed unconfirmed. */
+export const forgetRunMenu = defineFixture({
+  width: 980,
+  render: () => (
+    <div className="bg-background">
+      <TaskBoard
+        columns={runColumns.slice(1, 2)}
+        canDrop={() => ({ ok: true })}
+        onMove={async () => {}}
+        onOpen={() => {}}
+        onStartWorkspace={() => {}}
+        runActions={runActions}
+        updatingRefKeys={new Set()}
+        selectedRefKey={null}
+        formatUpdatedAt={(value) => value}
+      />
+    </div>
+  ),
+  interact: async (frame) => {
+    // ENG-15 is the column's last card; its stop options are its last menu, in any locale.
+    const trigger = [
+      ...frame.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="menu"]')
+    ].at(-1)
     trigger?.focus()
     trigger?.dispatchEvent(
       new PointerEvent('pointerdown', {

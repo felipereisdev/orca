@@ -8,6 +8,8 @@ import type { TaskStartWorkspaceMode } from '../../shared/task-board/task-start-
 import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 import { mintAgentSessionOperationId } from '../runtime/orchestration/mailbox/structured-pointer/structured-pointer-operation-id'
 
+const ENDED: ReadonlySet<TaskStartRunState> = new Set(['stopped', 'completed', 'failed'])
+
 export type TaskStartRunsChangedEvent = Extract<
   RuntimeClientEvent,
   { type: 'taskBoardRunsChanged' }
@@ -98,6 +100,10 @@ export function createTaskStartRunStore(deps: TaskStartRunStoreDeps): TaskStartR
         id: current.id,
         cardKey: current.cardKey,
         updatedAt: deps.now().toISOString()
+      }
+      // An ended run keeps no stale note (`prompt-unconfirmed`, a question) unless this end sets one.
+      if (fields.state && ENDED.has(fields.state) && !('note' in fields)) {
+        delete next.note
       }
       deps.write({ ...runs, [runId]: next })
       const worktreeId = next.worktreeId

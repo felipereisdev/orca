@@ -4823,7 +4823,13 @@
         "needsSignIn": "needs sign-in",
         "offline": "Starting or stopping a task needs the host.",
         "searchBranches": "Search branches",
-        "noBranches": "No branches match."
+        "noBranches": "No branches match.",
+        "forget": "Forget run",
+        "forgetConfirm": {
+          "title": "Forget the run of {{id}}?",
+          "description": "Orca could not confirm that the orchestrator and its agents stopped. They may still be running; the card is freed to start again."
+        },
+        "stopForced": "Run forgotten. Its agents may still be running."
       }
     }
   },

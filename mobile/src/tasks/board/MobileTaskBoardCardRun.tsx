@@ -32,6 +32,8 @@ export type TaskBoardRunActions = {
   pendingRefKeys: ReadonlySet<string>
   onStart: (card: TaskBoardWireCard) => void
   onStop: (card: TaskBoardWireCard) => void
+  /** "Forget run" for a stop left unconfirmed; asks first. */
+  onForget: (card: TaskBoardWireCard) => void
   onOpenRun: (card: TaskBoardWireCard) => void
 }
 

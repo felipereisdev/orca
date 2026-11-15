@@ -19,6 +19,7 @@ import {
   stopTaskStartWatcher,
   type TaskStartLifecycleDeps
 } from './task-start-lifecycle'
+import type { TaskStartRunPatch } from './task-start-run-store'
 
 export type TaskStartStopDeps = {
   lifecycle: TaskStartLifecycleDeps
@@ -43,13 +44,10 @@ const PROVEN_HELPER: ReadonlySet<HelperStopOutcome['outcome']> = new Set([
 const STOP_CONCURRENCY = 8
 
 function coordinatorKey(ref: TaskStartOrchestratorRef): OrchestrationCoordinatorKey {
-  if (ref.surface === 'chat') {
-    return {
-      terminalHandle: null,
-      paneKey: null,
-      orcaSessionId: ref.sessionId && isOrcaSessionId(ref.sessionId) ? ref.sessionId : null
-    }
+  if (ref.surface === 'chat' && ref.sessionId && isOrcaSessionId(ref.sessionId)) {
+    return { terminalHandle: null, paneKey: null, orcaSessionId: ref.sessionId }
   }
+  // A chat without an Orca session id still names its surface by handle and pane.
   return { terminalHandle: ref.handle ?? null, paneKey: ref.paneKey ?? null, orcaSessionId: null }
 }
 
@@ -145,13 +143,42 @@ function previewAgents(run: TaskStartRun, deps: TaskStartStopDeps): number {
   }
 }
 
+/** Ends what `ref` names for a run already `stopping`, then settles it: `stopped` once every
+ *  end is proven, else still `stopping` (`stop-unconfirmed`) with the ref a repeat retries. */
+export async function settleStoppingTaskStartRun(
+  run: TaskStartRun,
+  ref: TaskStartOrchestratorRef | undefined,
+  deps: TaskStartStopDeps,
+  mutation: StopMutation,
+  options: { cancelled?: boolean; patch?: TaskStartRunPatch } = {}
+): Promise<TaskStartRun | null> {
+  const { store } = deps.lifecycle
+  stopTaskStartWatcher(store, run.id)
+  // Without a ref, a start that died in this process published nothing to close.
+  const ended = ref ? await stopOrchestration(run, ref, deps, mutation) : true
+  const settled = ended
+    ? store.transition(run.id, ['stopping'], {
+        ...options.patch,
+        state: 'stopped',
+        failure: options.cancelled || !ref ? 'cancelled' : undefined
+      })
+    : store.transition(run.id, ['stopping'], {
+        ...options.patch,
+        launch: 'published',
+        orchestrator: ref,
+        failure: 'stop-unconfirmed'
+      })
+  return settled ?? store.getById(run.id)
+}
+
 /** ⏹: ends the card's orchestrator and its workers; never the worktree, branch or commits.
- *  An unproven end leaves the run `stopping` (`stop-unconfirmed`), and a repeat retries it. */
+ *  An unproven end leaves the run `stopping` (`stop-unconfirmed`), and a repeat retries it;
+ *  `force` then lets the card go (`stopped`, note `stop-forced`), though agents may live on. */
 export async function stopTaskStartRun(
   cardKey: string,
   deps: TaskStartStopDeps,
   mutation: StopMutation,
-  options: { preview?: boolean } = {}
+  options: { preview?: boolean; force?: boolean } = {}
 ): Promise<TaskStopResult> {
   const { store } = deps.lifecycle
   const run = store.get(cardKey)
@@ -174,16 +201,14 @@ export async function stopTaskStartRun(
     const current = stopping ?? store.getById(run.id)
     return { ok: true, run: current ? summarizeTaskStartRun(current) : null }
   }
-  stopTaskStartWatcher(store, run.id)
-  const ref = stopping.orchestrator
-  // Without a ref, a start that died in this process published nothing to close.
-  const ended = ref ? await stopOrchestration(stopping, ref, deps, mutation) : true
-  const settled = ended
-    ? store.transition(run.id, ['stopping'], {
+  let current = await settleStoppingTaskStartRun(stopping, stopping.orchestrator, deps, mutation)
+  if (options.force && current?.state === 'stopping') {
+    current =
+      store.transition(run.id, ['stopping'], {
         state: 'stopped',
-        failure: ref ? undefined : 'cancelled'
-      })
-    : store.transition(run.id, ['stopping'], { failure: 'stop-unconfirmed' })
-  const current = settled ?? store.getById(run.id)
+        failure: 'stop-unconfirmed',
+        note: 'stop-forced'
+      }) ?? store.getById(run.id)
+  }
   return { ok: true, run: current ? summarizeTaskStartRun(current) : null }
 }

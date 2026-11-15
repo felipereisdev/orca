@@ -208,6 +208,7 @@ export function TaskBoardCardView({
                 onStart={runActions.onStart}
                 onStartAs={runActions.onStartAs}
                 onStop={runActions.onStop}
+                onForget={runActions.onForget}
               />
             </div>
           ) : null}

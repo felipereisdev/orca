@@ -80,7 +80,7 @@ export function TaskBoardStartDialogs({
   hostId: ExecutionHostId
 }): React.JSX.Element {
   const t = useTranslate()
-  const { primaryConfirm, stopConfirm } = start
+  const { primaryConfirm, stopConfirm, forgetConfirm } = start
   return (
     <>
       <TaskStartDialog
@@ -114,6 +114,20 @@ export function TaskBoardStartDialogs({
         destructive
         onConfirm={start.confirmStop}
         onCancel={start.cancelStop}
+      />
+      <ConfirmDialog
+        open={forgetConfirm !== null}
+        title={t('taskStart.forgetConfirm.title', 'Forget the run of {{id}}?', {
+          id: forgetConfirm?.displayId
+        })}
+        description={t(
+          'taskStart.forgetConfirm.description',
+          'Orca could not confirm that the orchestrator and its agents stopped. They may still be running; the card is freed to start again.'
+        )}
+        confirmLabel={t('taskStart.forget', 'Forget run')}
+        destructive
+        onConfirm={start.confirmForget}
+        onCancel={start.cancelForget}
       />
     </>
   )

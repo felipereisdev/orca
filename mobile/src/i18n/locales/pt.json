@@ -4768,7 +4768,13 @@
         "needsSignIn": "precisa de login",
         "offline": "Iniciar ou parar uma tarefa precisa do host.",
         "searchBranches": "Buscar ramos",
-        "noBranches": "Nenhum ramo corresponde."
+        "noBranches": "Nenhum ramo corresponde.",
+        "stopForced": "Execução esquecida. Os agentes dela podem continuar rodando.",
+        "forget": "Esquecer execução",
+        "forgetConfirm": {
+          "title": "Esquecer a execução de {{id}}?",
+          "description": "O Orca não conseguiu confirmar que o orquestrador e os agentes dele pararam. Eles podem continuar rodando; o card fica livre para iniciar de novo."
+        }
       }
     }
   },

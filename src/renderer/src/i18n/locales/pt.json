@@ -25011,6 +25011,13 @@
       "uncommitted": "Há alterações não commitadas.",
       "otherBranch": "Está em um ramo diferente do ramo base."
     },
-    "waitingNotification": "{{title}} está aguardando você"
+    "waitingNotification": "{{title}} está aguardando você",
+    "stopForced": "Execução esquecida. Os agentes dela podem continuar rodando.",
+    "stopOptions": "Opções de parada de {{id}}",
+    "forget": "Esquecer execução",
+    "forgetConfirm": {
+      "title": "Esquecer a execução de {{id}}?",
+      "description": "O Orca não conseguiu confirmar que o orquestrador e os agentes dele pararam. Eles podem continuar rodando; o card fica livre para iniciar de novo."
+    }
   }
 }

@@ -214,10 +214,10 @@ export async function startTask(
   return taskBoardStartRun.interpret(reply)
 }
 
-/** ⏹; `preview` only counts the agents a stop would end. */
+/** ⏹; `preview` only counts the agents a stop would end; `force` forgets an unconfirmed stop. */
 export async function stopTask(
   client: RpcClient,
-  params: { ref: TaskBoardCardRef; preview?: boolean }
+  params: { ref: TaskBoardCardRef; preview?: boolean; force?: boolean }
 ): Promise<TaskStopResult> {
   const reply = await taskBoardStopRun.request(client, params, { timeoutMs: WRITE_TIMEOUT_MS })
   return taskBoardStopRun.interpret(reply)

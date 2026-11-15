@@ -123,6 +123,23 @@ function serviceDeps(
     }),
     terminalIdentity: () => ({ ptyId: 'pty-1' }),
     closeOrchestrator: vi.fn(async () => {}),
+    orchestration: {
+      fence: () => {},
+      liveWorkers: () => [],
+      stopWorker: async (dispatchId) => ({
+        dispatchId,
+        state: 'stopped',
+        alreadySettled: false,
+        processAction: 'none'
+      }),
+      pendingStarts: () => 0
+    },
+    stopMutation: () => ({
+      callerFingerprint: 'test',
+      requestId: 'req-1',
+      method: 'taskBoard.stopTask',
+      payloadHash: ''
+    }),
     ...overrides
   }
 }
@@ -161,6 +178,30 @@ describe('startTaskFromCard', () => {
     expect(await start).toMatchObject({ ok: false, error: 'cancelled' })
     expect(deps.launchAgent).not.toHaveBeenCalled()
     expect(store.getById(run.id)?.state).toBe('stopped')
+  })
+
+  it('keeps a cancelled start stopping when its published orchestrator fails to close', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      launchAgent: vi.fn(async (params, onSurfacePublished) => {
+        const result = launched()
+        onSurfacePublished(result)
+        // ⏹ lands while the prompt is being delivered.
+        store.transition(params.operationId ?? '', ['running', 'waiting'], { state: 'stopping' })
+        return result
+      }),
+      closeOrchestrator: vi.fn(async () => {
+        throw new Error('terminal close failed')
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result).toMatchObject({ ok: false, error: 'cancelled' })
+    const runId = vi.mocked(deps.launchAgent).mock.calls[0][0].operationId ?? ''
+    expect(store.getById(runId)).toMatchObject({
+      state: 'stopping',
+      failure: 'stop-unconfirmed',
+      orchestrator: { handle: 'term-1' }
+    })
   })
 
   it('refuses a role whose Claude account needs sign-in before claiming anything', async () => {

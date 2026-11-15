@@ -117,6 +117,9 @@ function runHint(run: TaskStartRunSummary, t: Translate): string | null {
   if (run.note === 'prompt-unconfirmed') {
     return t('taskStart.openOrchestrator', 'Open the orchestrator session')
   }
+  if (run.note === 'stop-forced') {
+    return t('taskStart.stopForced', 'Run forgotten. Its agents may still be running.')
+  }
   return run.note ?? null
 }
 

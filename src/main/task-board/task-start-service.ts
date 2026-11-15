@@ -16,6 +16,7 @@ import {
   resolveTaskStartWorkspaceMode,
   TASK_START_ROLES
 } from '../../shared/task-board/task-start-settings'
+import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
 import type { TaskStartCard } from './task-start-context'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
 import {
@@ -31,11 +32,15 @@ import {
   type TaskStartRunGuard
 } from './task-start-service-guard'
 import { launchTaskStartOrchestrator, type TaskStartLaunchDeps } from './task-start-service-launch'
+import type { TaskStartStopDeps } from './task-start-stop'
 
 export type TaskStartParams = z.infer<typeof TaskBoardStartTaskParams>
 
 export type TaskStartServiceDeps = TaskStartLaunchDeps & {
   options: TaskStartOptionsDeps
+  /** What ⏹ ends, for a start a stop cancels after its orchestrator was published. */
+  orchestration: TaskStartStopDeps['orchestration']
+  stopMutation(): StopMutation
   lifecycle: TaskStartLifecycleDeps
   /** The card's board key; throws when its repo left this host. */
   cardKey(ref: TaskBoardCardRef): string

@@ -107,18 +107,22 @@ function start(overrides: Partial<TaskBoardStart>): TaskBoardStart {
       onStart: noop,
       onStartAs: noop,
       onStop: noop,
+      onForget: noop,
       onOpenRun: noop,
       pendingRefKeys: new Set()
     },
     dialog: null,
     primaryConfirm: null,
     stopConfirm: null,
+    forgetConfirm: null,
     submitDialog: noop,
     closeDialog: noop,
     confirmPrimary: noop,
     cancelPrimary: noop,
     confirmStop: noop,
     cancelStop: noop,
+    confirmForget: noop,
+    cancelForget: noop,
     ...overrides
   }
 }
@@ -140,4 +144,9 @@ export const primaryConfirm = defineFixture({
       hostId="local"
     />
   )
+})
+
+export const forgetConfirm = defineFixture({
+  width: 720,
+  render: () => <TaskBoardStartDialogs start={start({ forgetConfirm: card })} hostId="local" />
 })

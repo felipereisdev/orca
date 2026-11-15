@@ -32,6 +32,8 @@ type Props = {
   onMove: () => void
   /** "Start as…" for this card; null on a host without task start. */
   onStartAs: (() => void) | null
+  /** "Forget run" for a stop left unconfirmed; null on a host without task start. */
+  onForgetRun: (() => void) | null
   onClose: () => void
 }
 
@@ -115,6 +117,7 @@ export function MobileTaskBoardDetailDrawer({
   onSeen,
   onMove,
   onStartAs,
+  onForgetRun,
   onClose
 }: Props) {
   useMobileColorScheme()
@@ -144,6 +147,17 @@ export function MobileTaskBoardDetailDrawer({
             title={t('tasks.board.start.startAs', 'Start as…')}
             navigates
             onPress={onStartAs}
+          />
+        </ListGroup>
+      ) : null}
+      {onForgetRun &&
+      card.taskStart?.state === 'stopping' &&
+      card.taskStart.failure === 'stop-unconfirmed' ? (
+        <ListGroup style={styles.actions}>
+          <ListRow
+            title={t('tasks.board.start.forget', 'Forget run')}
+            navigates
+            onPress={onForgetRun}
           />
         </ListGroup>
       ) : null}

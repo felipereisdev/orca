@@ -23,7 +23,11 @@ import {
 import { writeTaskStartImages } from './task-start-context-images'
 import { createTaskStartOptionsDeps } from './task-start-options-deps'
 import type { TaskStartServiceDeps } from './task-start-service'
-import { closeTaskStartOrchestrator } from './task-start-stop-deps'
+import {
+  closeTaskStartOrchestrator,
+  createTaskStartStopDeps,
+  taskStartStopMutation
+} from './task-start-stop-deps'
 import { taskStartWorktreeCreateFields } from './task-start-worktree-link'
 
 // In-process like automations: the host launches the orchestrator for whichever client asked.
@@ -40,6 +44,8 @@ export function createTaskStartServiceDeps(
   const fetchDeps = createTaskStartFetchDeps((repoId) => board.repo(repoId), jiraAttachments)
   return {
     options: createTaskStartOptionsDeps(runtime),
+    orchestration: createTaskStartStopDeps(runtime).orchestration,
+    stopMutation: taskStartStopMutation,
     lifecycle: board.taskStart,
     cardKey: (ref) => taskBoardRefKeyForRef(ref, board),
     readContext: async (ref) => {

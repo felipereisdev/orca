@@ -39,12 +39,16 @@ export type TaskBoardStart = {
   dialog: TaskStartDialogState | null
   primaryConfirm: TaskStartPrimaryConfirm | null
   stopConfirm: TaskStopConfirm | null
+  /** "Forget run" asked for a stop left unconfirmed. */
+  forgetConfirm: TaskBoardWireCard | null
   submitDialog: (params: Omit<TaskStartParams, 'ref' | 'confirmPrimary'>) => void
   closeDialog: () => void
   confirmPrimary: () => void
   cancelPrimary: () => void
   confirmStop: () => void
   cancelStop: () => void
+  confirmForget: () => void
+  cancelForget: () => void
 }
 
 /** `finally` lives here because the React compiler cannot compile it inside a hook. */
@@ -72,6 +76,7 @@ export function useTaskBoardStart(args: {
   const [dialog, setDialog] = useState<TaskStartDialogState | null>(null)
   const [primaryConfirm, setPrimaryConfirm] = useState<TaskStartPrimaryConfirm | null>(null)
   const [stopConfirm, setStopConfirm] = useState<TaskStopConfirm | null>(null)
+  const [forgetConfirm, setForgetConfirm] = useState<TaskBoardWireCard | null>(null)
   const pendingRef = useRef(new Set<string>())
 
   const setPending = (refKey: string, pending: boolean): void => {
@@ -168,7 +173,7 @@ export function useTaskBoardStart(args: {
     )
   }
 
-  const stop = async (card: TaskBoardWireCard): Promise<void> => {
+  const stop = async (card: TaskBoardWireCard, force = false): Promise<void> => {
     const target = targetOrToast()
     if (!target || pendingRef.current.has(card.refKey)) {
       return
@@ -177,7 +182,7 @@ export function useTaskBoardStart(args: {
     await settleAfter(
       async () => {
         try {
-          await stopTask(target, { ref: card.ref })
+          await stopTask(target, { ref: card.ref, ...(force ? { force } : {}) })
         } catch (cause) {
           toast.error(
             taskStartFailureMessage(
@@ -225,6 +230,7 @@ export function useTaskBoardStart(args: {
       onStart: (card) => void start(card, {}, false),
       onStartAs: (card) => setDialog({ card, repoRequired: false, pending: false, error: null }),
       onStop: (card) => void askStop(card),
+      onForget: (card) => setForgetConfirm(card),
       onOpenRun: (card) => {
         if (card.taskStart) {
           openRun(card.taskStart)
@@ -235,6 +241,7 @@ export function useTaskBoardStart(args: {
     dialog,
     primaryConfirm,
     stopConfirm,
+    forgetConfirm,
     submitDialog: (params) => {
       if (dialog) {
         void start(dialog.card, params, true)
@@ -254,6 +261,13 @@ export function useTaskBoardStart(args: {
         void stop(stopConfirm.card)
       }
     },
-    cancelStop: () => setStopConfirm(null)
+    cancelStop: () => setStopConfirm(null),
+    confirmForget: () => {
+      if (forgetConfirm) {
+        setForgetConfirm(null)
+        void stop(forgetConfirm, true)
+      }
+    },
+    cancelForget: () => setForgetConfirm(null)
   }
 }

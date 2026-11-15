@@ -25796,6 +25796,13 @@
       "uncommitted": "It has uncommitted changes.",
       "otherBranch": "It is on a branch other than the base branch."
     },
-    "waitingNotification": "{{title}} is waiting for you"
+    "waitingNotification": "{{title}} is waiting for you",
+    "stopForced": "Run forgotten. Its agents may still be running.",
+    "stopOptions": "Stop options for {{id}}",
+    "forget": "Forget run",
+    "forgetConfirm": {
+      "title": "Forget the run of {{id}}?",
+      "description": "Orca could not confirm that the orchestrator and its agents stopped. They may still be running; the card is freed to start again."
+    }
   }
 }

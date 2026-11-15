@@ -106,6 +106,22 @@ describe('stopTaskStartRun', () => {
     })
   })
 
+  it('forgets a run whose stop stays unconfirmed only when forced, freeing the card', async () => {
+    const { store, deps, run } = stopHarness({
+      liveWorkers: () => {
+        throw new Error('database is locked')
+      }
+    })
+
+    await stopTaskStartRun(CARD, deps, undefined)
+    expect(store.getById(run.id)).toMatchObject({ state: 'stopping', failure: 'stop-unconfirmed' })
+
+    await expect(stopTaskStartRun(CARD, deps, undefined, { force: true })).resolves.toMatchObject({
+      run: { state: 'stopped', failure: 'stop-unconfirmed', note: 'stop-forced' }
+    })
+    expect(store.claim({ cardKey: CARD, repoId: 'r', workspaceMode: 'worktree' }).ok).toBe(true)
+  })
+
   it('previews the orchestrator and the workers it created without stopping anything', async () => {
     const { store, deps, calls, run } = stopHarness()
 

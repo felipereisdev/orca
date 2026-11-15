@@ -86,10 +86,12 @@ export const TaskBoardStartTaskParams = z.strictObject({
   confirmPrimary: z.boolean().optional()
 })
 
-// `preview` only counts the agents a stop would end, for the confirmation.
+// `preview` only counts the agents a stop would end, for the confirmation; `force` lets a run
+// whose stop stays unconfirmed go after one more attempt ("Forget run").
 export const TaskBoardStopTaskParams = z.strictObject({
   ref: TaskBoardCardRefParam,
-  preview: z.boolean().optional()
+  preview: z.boolean().optional(),
+  force: z.boolean().optional()
 })
 
 // The caller's own session names the run; `starting` is Orca's alone to report.

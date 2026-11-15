@@ -211,6 +211,13 @@ export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
           }
     )
   }
+  if (runControls && !pending && run?.state === 'stopping' && run.failure === 'stop-unconfirmed') {
+    actions.push({
+      name: 'forget',
+      label: t('tasks.board.start.forget', 'Forget run'),
+      run: () => runControls.onForget(card)
+    })
+  }
   if (runControls && run && (run.orchestrator?.worktreeId ?? run.worktreeId)) {
     actions.push({
       name: 'openRun',

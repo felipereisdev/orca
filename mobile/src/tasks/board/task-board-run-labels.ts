@@ -122,6 +122,9 @@ export function taskStartRunHint(run: TaskStartRunSummary, t: Translate): string
   if (run.note === 'prompt-unconfirmed') {
     return t('tasks.board.start.openOrchestrator', 'Open the orchestrator session')
   }
+  if (run.note === 'stop-forced') {
+    return t('tasks.board.start.stopForced', 'Run forgotten. Its agents may still be running.')
+  }
   return run.note ?? null
 }
 

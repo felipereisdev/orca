@@ -86,6 +86,10 @@ export const TASK_BOARD_METHODS = [
     requires: ['orchestration'],
     permission: 'workspace',
     params: TaskBoardStopTaskParams,
-    handler: (params, { runtime }) => stopTaskFromCard(runtime, params.ref, params.preview === true)
+    handler: (params, { runtime }) =>
+      stopTaskFromCard(runtime, params.ref, {
+        preview: params.preview === true,
+        force: params.force === true
+      })
   })
 ]

@@ -143,10 +143,10 @@ export function startTask(
   })
 }
 
-/** ⏹; `preview` only counts the agents a stop would end. */
+/** ⏹; `preview` only counts the agents a stop would end; `force` forgets an unconfirmed stop. */
 export function stopTask(
   target: RuntimeClientTarget,
-  params: { ref: TaskBoardCardRef; preview?: boolean }
+  params: { ref: TaskBoardCardRef; preview?: boolean; force?: boolean }
 ): Promise<TaskStopResult> {
   return callTaskBoard(target, 'taskBoard.stopTask', params, {
     timeoutMs: WRITE_TIMEOUT_MS,

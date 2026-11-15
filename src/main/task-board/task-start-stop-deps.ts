@@ -130,7 +130,7 @@ export function taskStartStopMutation(): StopMutation {
 export async function stopTaskFromCard(
   runtime: OrcaRuntimeService,
   ref: TaskBoardCardRef,
-  preview: boolean
+  options: { preview: boolean; force: boolean }
 ): Promise<TaskStopResult> {
   let cardKey: string
   try {
@@ -138,7 +138,10 @@ export async function stopTaskFromCard(
   } catch {
     return { ok: true, run: null }
   }
-  return stopTaskStartRun(cardKey, createTaskStartStopDeps(runtime), taskStartStopMutation(), {
-    preview
-  })
+  return stopTaskStartRun(
+    cardKey,
+    createTaskStartStopDeps(runtime),
+    taskStartStopMutation(),
+    options
+  )
 }

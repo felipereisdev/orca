@@ -30,6 +30,8 @@ export type TaskBoardSheet =
     }
   /** `workers` is null when the preview could not count them. */
   | { kind: 'confirm-stop'; card: TaskBoardWireCard; workers: number | null }
+  /** "Forget run" for a stop left unconfirmed. */
+  | { kind: 'confirm-forget'; card: TaskBoardWireCard }
 
 const sheetKey = (sheet: TaskBoardSheet) => `${sheet.kind}:${sheet.card.refKey}`
 
@@ -84,6 +86,7 @@ export function MobileTaskBoardCardSheets({
               onSeen={() => clearTaskBoardUnread(queryClient, hostId, card.refKey)}
               onMove={() => onSheet({ kind: 'move', card })}
               onStartAs={start.actions ? () => start.openStartAs(card) : null}
+              onForgetRun={start.actions ? () => start.askForget(card) : null}
               onClose={() => onSheet(null)}
             />
           )
@@ -130,6 +133,22 @@ export function MobileTaskBoardCardSheets({
               )}
               confirmLabel={t('tasks.board.start.stopAction', 'Stop')}
               onConfirm={() => start.confirmStop(card)}
+              onClose={() => onSheet(null)}
+            />
+          )
+        }
+        if (presented.kind === 'confirm-forget') {
+          return (
+            <MobileTaskStartConfirmSheet
+              title={t('tasks.board.start.forgetConfirm.title', 'Forget the run of {{id}}?', {
+                id: card.displayId
+              })}
+              description={t(
+                'tasks.board.start.forgetConfirm.description',
+                'Orca could not confirm that the orchestrator and its agents stopped. They may still be running; the card is freed to start again.'
+              )}
+              confirmLabel={t('tasks.board.start.forget', 'Forget run')}
+              onConfirm={() => start.confirmForget(card)}
               onClose={() => onSheet(null)}
             />
           )

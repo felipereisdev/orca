@@ -25,6 +25,8 @@ export type TaskBoardRunActions = {
   onStart: (card: TaskBoardWireCard) => void
   onStartAs: (card: TaskBoardWireCard) => void
   onStop: (card: TaskBoardWireCard) => void
+  /** "Forget run" for a stop left unconfirmed; asks first. */
+  onForget: (card: TaskBoardWireCard) => void
   onOpenRun: (card: TaskBoardWireCard) => void
   /** Cards whose start or stop request is in flight. */
   pendingRefKeys: ReadonlySet<string>

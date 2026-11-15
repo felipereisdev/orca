@@ -178,14 +178,14 @@ export function useTaskBoardStart(args: {
   )
 
   const stop = useCallback(
-    async (card: TaskBoardWireCard) => {
+    async (card: TaskBoardWireCard, force = false) => {
       const live = reachable()
       if (!live || pendingRef.current.has(card.refKey)) {
         return
       }
       setPending(card.refKey, true)
       try {
-        await stopTask(live, { ref: card.ref })
+        await stopTask(live, { ref: card.ref, ...(force ? { force } : {}) })
       } catch (cause) {
         notify(
           cause instanceof Error && cause.message
@@ -236,6 +236,7 @@ export function useTaskBoardStart(args: {
             pendingRefKeys,
             onStart: (card) => void start(card, {}, false),
             onStop: (card) => void askStop(card),
+            onForget: (card) => onSheet({ kind: 'confirm-forget', card }),
             onOpenRun: (card) => {
               if (card.taskStart) {
                 openRun(card.taskStart)
@@ -243,7 +244,7 @@ export function useTaskBoardStart(args: {
             }
           }
         : null,
-    [askStop, openRun, pendingRefKeys, start, supported]
+    [askStop, onSheet, openRun, pendingRefKeys, start, supported]
   )
 
   return {
@@ -262,6 +263,11 @@ export function useTaskBoardStart(args: {
     confirmStop: (card: TaskBoardWireCard) => {
       onSheet(null)
       void stop(card)
+    },
+    askForget: (card: TaskBoardWireCard) => onSheet({ kind: 'confirm-forget', card }),
+    confirmForget: (card: TaskBoardWireCard) => {
+      onSheet(null)
+      void stop(card, true)
     }
   }
 }

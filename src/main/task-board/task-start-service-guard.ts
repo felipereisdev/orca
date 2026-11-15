@@ -9,8 +9,9 @@ import {
   type TaskStartOrchestratorRef,
   type TaskStartRun
 } from '../../shared/task-board/task-start-run'
-import { stopTaskStartWatcher, type TaskStartLifecycleDeps } from './task-start-lifecycle'
+import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
 import type { TaskStartRunPatch } from './task-start-run-store'
+import { settleStoppingTaskStartRun, type TaskStartStopDeps } from './task-start-stop'
 
 /** The start's view of its own run; every write is conditional on the run still being live. */
 export type TaskStartRunGuard = {
@@ -20,14 +21,14 @@ export type TaskStartRunGuard = {
   alive(): boolean
   patch(patch: TaskStartRunPatch): TaskStartRun | null
   fail(failure: TaskStartFailure, error: TaskStartError): Promise<TaskStartResult>
-  /** The run left running/waiting: a stop cancels the start (closing `published`); any other
-   *  end (the watcher's `orchestrator-exited`, say) is reported as it is, closing nothing. */
+  /** The run left running/waiting: a stop cancels the start (ending `published` as ⏹ does);
+   *  any other end (the watcher's `orchestrator-exited`, say) is reported as is, closing nothing. */
   settle(published?: TaskStartOrchestratorRef): Promise<TaskStartResult>
 }
 
-type GuardDeps = {
-  lifecycle: TaskStartLifecycleDeps
-  closeOrchestrator(ref: TaskStartOrchestratorRef): Promise<void>
+type GuardDeps = TaskStartStopDeps & {
+  /** A fresh worker-stop request id for each stop. */
+  stopMutation(): StopMutation
 }
 
 const LIVE = ['running', 'waiting'] as const
@@ -72,19 +73,12 @@ export function createTaskStartRunGuard(runId: string, deps: GuardDeps): TaskSta
           run
         )
       }
-      // A stop arrived mid-start: close what this start opened (never the worktree).
-      if (published) {
-        await deps.closeOrchestrator(published).catch((error: unknown) => {
-          console.warn('[task-start] closing a cancelled orchestrator failed', error)
-        })
-      }
-      stopTaskStartWatcher(store, runId)
-      const stopped = store.transition(runId, ['stopping'], {
-        state: 'stopped',
-        failure: 'cancelled',
-        ...(guard.worktreeId ? { worktreeId: guard.worktreeId } : {})
+      // A stop arrived mid-start: end what this start opened (never the worktree), proven as ⏹.
+      const settled = await settleStoppingTaskStartRun(run, published, deps, deps.stopMutation(), {
+        cancelled: true,
+        patch: guard.worktreeId ? { worktreeId: guard.worktreeId } : {}
       })
-      return refuseTaskStart('cancelled', stopped ?? store.getById(runId))
+      return refuseTaskStart('cancelled', settled)
     }
   }
   return guard
