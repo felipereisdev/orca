@@ -27,6 +27,15 @@ export const getTaskBoardSettingsSearchKeywords = createLocalizedCatalog(() => [
   ...translateSearchKeyword('taskBoard.settings.search.done', 'done column')
 ])
 
+export const getTaskStartSettingsSearchKeywords = createLocalizedCatalog(() => [
+  ...translateSearchKeyword('taskStart.settings.search.start', 'start task'),
+  ...translateSearchKeyword('taskStart.settings.search.agent', 'agent'),
+  ...translateSearchKeyword('taskStart.settings.search.model', 'model'),
+  ...translateSearchKeyword('taskStart.settings.search.effort', 'effort'),
+  ...translateSearchKeyword('taskStart.settings.search.roles', 'roles'),
+  ...translateSearchKeyword('taskStart.settings.search.orchestrator', 'orchestrator')
+])
+
 export const getTasksPaneSearchEntries = createLocalizedCatalog(() => [
   {
     title: translate('auto.components.settings.tasks.search.12d2fdff3c', 'Task providers'),
@@ -43,5 +52,13 @@ export const getTasksPaneSearchEntries = createLocalizedCatalog(() => [
       'Board columns and status mapping for issues across providers.'
     ),
     keywords: getTaskBoardSettingsSearchKeywords()
+  },
+  {
+    title: translate('taskStart.settings.title', 'Start task'),
+    description: translate(
+      'taskStart.settings.searchDescription',
+      'Default agents, models and effort for the roles that run a task from the board.'
+    ),
+    keywords: getTaskStartSettingsSearchKeywords()
   }
 ])

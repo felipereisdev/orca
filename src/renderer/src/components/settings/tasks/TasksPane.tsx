@@ -32,6 +32,7 @@ import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { TaskBoardSettingsGroup } from './TaskBoardSettingsGroup'
+import { TaskStartSettingsGroup } from './TaskStartSettingsGroup'
 
 type TasksPaneProps = {
   settings: GlobalSettings
@@ -263,6 +264,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
         </p>
       </SettingsGroup>
       <TaskBoardSettingsGroup />
+      <TaskStartSettingsGroup />
     </>
   )
 }

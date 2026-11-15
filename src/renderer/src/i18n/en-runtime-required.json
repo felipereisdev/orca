@@ -2700,6 +2700,17 @@
       }
     }
   },
+  "taskStart": {
+    "repository": {
+      "search": {
+        "agent": "agent model effort roles",
+        "base": "base branch",
+        "mode": "workspace mode",
+        "start": "start task",
+        "worktree": "worktree"
+      }
+    }
+  },
   "terminal": {
     "newerDaemonBanner": {
       "reopenTerminal": "Reopen {{count}} terminals",

@@ -38,6 +38,7 @@ import { RepositoryWindowsRuntimeSection } from './runtime/RepositoryWindowsRunt
 import { matchesRepositoryIdentitySearch } from './identity/repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './worktrees/RepositoryWorktreeDefaultsSection'
 import { RepositoryJiraProjectSection } from './RepositoryJiraProjectSection'
+import { RepositoryTaskStartSection } from './RepositoryTaskStartSection'
 import { getProjectRuntimeSessionSummary } from './runtime/repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../store/slices/worktrees/listing/worktree-visibility-defaults-by-host'
 import {
@@ -47,8 +48,9 @@ import {
 
 type RepositoryPaneRepoUpdate = Omit<
   Partial<Repo>,
-  'sourceControlAi' | 'externalWorktreeVisibility' | 'ghAccount'
+  'sourceControlAi' | 'externalWorktreeVisibility' | 'ghAccount' | 'taskStart'
 > & {
+  taskStart?: Repo['taskStart'] | null
   sourceControlAi?: Repo['sourceControlAi'] | null
   externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
   ghAccount?: GhAccountBinding | null
@@ -367,6 +369,12 @@ export function RepositoryPane({
         forceVisible={forceFullPaneForRepoMatch}
       />
     ) : null,
+    <RepositoryTaskStartSection
+      key={`task-start-${repo.id}-${selectedHostId}`}
+      repo={repo}
+      updateRepo={updateSelectedRepo}
+      forceVisible={forceFullPaneForRepoMatch}
+    />,
     !isFolder &&
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, sourceControlAiEntries)) ? (
       <RepositorySourceControlAiSection

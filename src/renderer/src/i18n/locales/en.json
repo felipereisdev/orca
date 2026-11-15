@@ -25677,6 +25677,41 @@
       "implementer": "Implementer",
       "reviewer": "Reviewer",
       "qa": "QA"
+    },
+    "settings": {
+      "title": "Start task",
+      "description": "Default agent, model and effort for each role when you start a task from the board. Projects can override them.",
+      "searchDescription": "Default agents, models and effort for the roles that run a task from the board.",
+      "loading": "Loading agents…",
+      "noDefaultAgent": "No default agent",
+      "search": {
+        "start": "start task",
+        "agent": "agent",
+        "model": "model",
+        "effort": "effort",
+        "roles": "roles",
+        "orchestrator": "orchestrator"
+      }
+    },
+    "repository": {
+      "title": "Start task",
+      "description": "How tasks start in this project, and which agents run each role. Roles left on inherit use the global defaults.",
+      "searchDescription": "Workspace mode, base branch and agents used when a task starts in this project.",
+      "mode": "Workspace mode",
+      "baseBranch": "Base branch for new worktrees",
+      "agents": "Agents",
+      "modeWorktree": "New worktree",
+      "modePrimary": "Primary branch",
+      "modeWorktreeHint": "Every start creates a new worktree from the base branch.",
+      "modePrimaryHint": "Agents work in the primary checkout. You confirm first if it has changes or another task is running.",
+      "noDefault": "No default agent",
+      "search": {
+        "start": "start task",
+        "mode": "workspace mode",
+        "worktree": "worktree",
+        "base": "base branch",
+        "agent": "agent model effort roles"
+      }
     }
   }
 }

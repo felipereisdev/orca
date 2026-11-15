@@ -18,6 +18,7 @@ import {
 } from './worktrees/repository-git-worktree-search-entries'
 import { getRepositoryFormatterSearchEntry } from './RepositoryFormatterSection'
 import { getRepositoryAgentTrustSearchEntry } from './RepositoryAgentTrustSection'
+import { getRepositoryTaskStartSearchEntry } from './RepositoryTaskStartSection'
 
 type RepositoryPaneSearchOptions = {
   isLocalWindowsProject?: boolean
@@ -228,6 +229,7 @@ export function getRepositoryPaneSearchEntries(
   const parts = getRepositorySearchParts(repo, options, t)
   const entries = [
     getRepositoryFormatterSearchEntry(t),
+    getRepositoryTaskStartSearchEntry(t),
     parts.agentTrust,
     parts.jira,
     parts.displayName,
