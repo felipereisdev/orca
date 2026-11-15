@@ -32,6 +32,7 @@ import type {
 import { readTerminalTail } from '../output/tail/terminal-tail-read'
 import { structuredWorkerTerminalRefusal } from '../../orchestration/terminal-authority/structured-sessions/structured-worker-terminal-refusal'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import { workspaceSessionListsTerminalTab } from '../../../../shared/workspace-session/workspace-session-terminal-tab-close'
 
 export abstract class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntimeWithMailboxTerminalIdentity {
   protected abstract bindPtyIncarnationHandle(
@@ -284,6 +285,35 @@ export abstract class OrcaRuntimeWithBuildPtyTerminalSummary extends OrcaRuntime
       limit: opts.limit
     })
   }
+  /** The PTY a pane holds: `unknown` while the graph reloads or the layout is unread; `gone` once nothing holds the pane. */
+  getTerminalPaneBinding(
+    paneKey: string,
+    worktreeId: string
+  ): 'unknown' | 'gone' | { ptyId: string | null } {
+    const parsed = parsePaneKey(paneKey)
+    try {
+      this.assertGraphReady()
+    } catch {
+      return 'unknown'
+    }
+    if (!parsed) {
+      return 'unknown'
+    }
+    const leaf = this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
+    const ptyId = leaf?.ptyId ?? this.getPtyRecordForPaneKey(paneKey)?.ptyId ?? null
+    if (leaf || ptyId) {
+      return { ptyId }
+    }
+    const session = this.getWorkspaceSessionForWorktree(worktreeId)
+    if (!session?.tabsByWorktree[worktreeId]) {
+      return 'unknown'
+    }
+    // A saved tab main restores later still holds the pane.
+    return workspaceSessionListsTerminalTab(session, worktreeId, parsed.tabId)
+      ? { ptyId: null }
+      : 'gone'
+  }
+
   getTerminalHandleForPaneKey(
     paneKey: string,
     context?: TerminalIdentityReadContext

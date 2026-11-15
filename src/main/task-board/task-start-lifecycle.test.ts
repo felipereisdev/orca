@@ -40,13 +40,21 @@ function lifecycleDeps(
     store,
     hostReachable: overrides.hostReachable ?? (() => true),
     terminal: {
-      show: notUsed,
-      handleForPaneKey: notUsed,
-      liveness: notUsed,
-      waitForExit: notUsed,
+      ptyIdForHandle: notUsed,
+      paneBinding: notUsed,
+      ptyLiveness: notUsed,
+      agentPresence: notUsed,
+      subscribeExit: notUsed,
+      subscribeAgentExited: notUsed,
       ...overrides.terminal
     },
-    chat: { liveness: notUsed, subscribeStatus: notUsed, ...overrides.chat }
+    chat: {
+      liveness: notUsed,
+      liveSessionId: notUsed,
+      subscribeTabHidden: notUsed,
+      subscribeStatus: notUsed,
+      ...overrides.chat
+    }
   }
 }
 
@@ -56,7 +64,16 @@ const terminalRef: TaskStartOrchestratorRef = {
   worktreeId: 'wt-1',
   surface: 'terminal',
   handle: 'term_1',
-  paneKey: 'tab-1:leaf-1'
+  paneKey: 'tab-1:leaf-1',
+  ptyId: 'pty-1'
+}
+
+const chatRef: TaskStartOrchestratorRef = {
+  hostId: 'local',
+  agent: 'claude',
+  worktreeId: 'wt-1',
+  surface: 'chat',
+  sessionId: 'session-1'
 }
 
 function publishedRun(
@@ -79,26 +96,33 @@ function publishedRun(
   return run
 }
 
-function deferred(): { promise: Promise<unknown>; resolve: () => void } {
-  let resolve = (): void => {}
-  const promise = new Promise<unknown>((done) => {
-    resolve = () => done({ status: 'exited' })
-  })
-  return { promise, resolve }
+/** Terminal deps whose PTY exit the test fires by hand. */
+function exitableTerminal(): {
+  terminal: Partial<TaskStartLifecycleDeps['terminal']>
+  exit: () => void
+  watching: () => number
+} {
+  const listeners = new Set<() => void>()
+  return {
+    terminal: {
+      subscribeExit: (_ptyId, listener) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      subscribeAgentExited: () => () => {}
+    },
+    exit: () => listeners.forEach((listener) => listener()),
+    watching: () => listeners.size
+  }
 }
 
 describe('task start orchestrator watcher', () => {
-  it('fails a running run when its orchestrator terminal exits', async () => {
+  it('fails a running run when its orchestrator terminal exits', () => {
     const store = memoryStore()
     const run = publishedRun(store, terminalRef)
-    const exit = deferred()
-    watchTaskStartOrchestrator(
-      run,
-      lifecycleDeps(store, { terminal: { waitForExit: () => exit.promise } })
-    )
-    exit.resolve()
-    await exit.promise
-    await Promise.resolve()
+    const pty = exitableTerminal()
+    watchTaskStartOrchestrator(run, lifecycleDeps(store, { terminal: pty.terminal }))
+    pty.exit()
 
     expect(store.getById(run.id)).toMatchObject({
       state: 'failed',
@@ -106,37 +130,38 @@ describe('task start orchestrator watcher', () => {
     })
   })
 
-  it('leaves a stopping run stopping when its orchestrator terminal exits', async () => {
+  it('leaves a stopping run stopping when its orchestrator terminal exits', () => {
     const store = memoryStore()
     const run = publishedRun(store, terminalRef, 'stopping')
-    const exit = deferred()
-    watchTaskStartOrchestrator(
-      run,
-      lifecycleDeps(store, { terminal: { waitForExit: () => exit.promise } })
-    )
-    exit.resolve()
-    await exit.promise
-    await Promise.resolve()
+    const pty = exitableTerminal()
+    watchTaskStartOrchestrator(run, lifecycleDeps(store, { terminal: pty.terminal }))
+    pty.exit()
 
     expect(store.getById(run.id)).toMatchObject({ state: 'stopping' })
     expect(store.getById(run.id)?.failure).toBeUndefined()
   })
 
+  it('installs one watcher however often a run is watched', () => {
+    const store = memoryStore()
+    const run = publishedRun(store, terminalRef)
+    const pty = exitableTerminal()
+    const deps = lifecycleDeps(store, { terminal: pty.terminal })
+    watchTaskStartOrchestrator(run, deps)
+    watchTaskStartOrchestrator(run, deps)
+
+    expect(pty.watching()).toBe(1)
+  })
+
   it('keeps a chat run when only the status subscription ends', () => {
     const store = memoryStore()
-    const run = publishedRun(store, {
-      hostId: 'local',
-      agent: 'claude',
-      worktreeId: 'wt-1',
-      surface: 'chat',
-      sessionId: 'session-1'
-    })
+    const run = publishedRun(store, chatRef)
     let emit: (event: AgentSessionStatusEvent) => void = () => {}
     watchTaskStartOrchestrator(
       run,
       lifecycleDeps(store, {
         chat: {
-          liveness: () => 'alive',
+          liveness: () => 'gone',
+          subscribeTabHidden: () => () => {},
           subscribeStatus: (listener) => {
             emit = listener
             return () => {}
@@ -147,6 +172,32 @@ describe('task start orchestrator watcher', () => {
     emit({ type: 'end' })
 
     expect(store.getById(run.id)).toMatchObject({ state: 'running' })
+  })
+
+  it('fails a chat run when the tab of the session continuing it closes', () => {
+    const store = memoryStore()
+    const run = publishedRun(store, chatRef)
+    let hide: (sessionId: string) => void = () => {}
+    watchTaskStartOrchestrator(
+      run,
+      lifecycleDeps(store, {
+        chat: {
+          liveness: () => 'gone',
+          liveSessionId: () => 'session-2',
+          subscribeTabHidden: (listener) => {
+            hide = listener
+            return () => {}
+          },
+          subscribeStatus: () => null
+        }
+      })
+    )
+    hide('session-2')
+
+    expect(store.getById(run.id)).toMatchObject({
+      state: 'failed',
+      failure: 'orchestrator-exited'
+    })
   })
 })
 
@@ -164,16 +215,31 @@ describe('task start reconciliation', () => {
     expect(store.getById(claimed.run.id)).toEqual(claimed.run)
   })
 
-  it('fails a running run whose orchestrator terminal is gone', async () => {
+  it('fails a running run whose orchestrator pane is gone', async () => {
     const store = memoryStore()
-    const run = publishedRun(store, { ...terminalRef, paneKey: undefined })
+    const run = publishedRun(store, { ...terminalRef, ptyId: undefined })
+
+    await reconcileTaskStartRuns(
+      lifecycleDeps(store, {
+        terminal: { ptyIdForHandle: () => null, paneBinding: () => 'gone' }
+      })
+    )
+
+    expect(store.getById(run.id)).toMatchObject({
+      state: 'failed',
+      failure: 'orchestrator-exited'
+    })
+  })
+
+  it('fails a run whose agent exited back to a live shell', async () => {
+    const store = memoryStore()
+    const run = publishedRun(store, terminalRef)
 
     await reconcileTaskStartRuns(
       lifecycleDeps(store, {
         terminal: {
-          show: async () => {
-            throw new Error('terminal_handle_stale')
-          }
+          ptyLiveness: () => ({ status: 'live', ptyIds: ['pty-1'] }),
+          agentPresence: async () => 'exited'
         }
       })
     )
@@ -184,18 +250,27 @@ describe('task start reconciliation', () => {
     })
   })
 
+  it('keeps a run whose restored pane has no terminal bound yet', async () => {
+    const store = memoryStore()
+    const run = publishedRun(store, { ...terminalRef, ptyId: undefined })
+
+    await reconcileTaskStartRuns(
+      lifecycleDeps(store, {
+        terminal: { ptyIdForHandle: () => null, paneBinding: () => ({ ptyId: null }) }
+      })
+    )
+
+    expect(store.getById(run.id)).toEqual(run)
+  })
+
   it('keeps a run whose orchestrator host cannot be reached', async () => {
     const store = memoryStore()
-    const run = publishedRun(store, { ...terminalRef, hostId: 'ssh:box', paneKey: undefined })
+    const run = publishedRun(store, { ...terminalRef, hostId: 'ssh:box', ptyId: undefined })
 
     await reconcileTaskStartRuns(
       lifecycleDeps(store, {
         hostReachable: () => false,
-        terminal: {
-          show: async () => {
-            throw new Error('terminal_handle_stale')
-          }
-        }
+        terminal: { ptyIdForHandle: () => null, paneBinding: () => 'gone' }
       })
     )
 

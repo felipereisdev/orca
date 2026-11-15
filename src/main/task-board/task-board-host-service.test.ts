@@ -79,12 +79,19 @@ function setup(writeResult: { ok: true; id: string } | { ok: false; error: strin
       }),
       hostReachable: unused,
       terminal: {
-        show: unused,
-        handleForPaneKey: unused,
-        liveness: unused,
-        waitForExit: unused
+        ptyIdForHandle: unused,
+        paneBinding: unused,
+        ptyLiveness: unused,
+        agentPresence: unused,
+        subscribeExit: unused,
+        subscribeAgentExited: unused
       },
-      chat: { liveness: unused, subscribeStatus: unused }
+      chat: {
+        liveness: unused,
+        liveSessionId: unused,
+        subscribeTabHidden: unused,
+        subscribeStatus: unused
+      }
     },
     caches: createTaskBoardEnrichCaches(),
     workspaces: async () => [],

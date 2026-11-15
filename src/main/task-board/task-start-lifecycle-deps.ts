@@ -2,6 +2,10 @@ import { parseExecutionHostId } from '../../shared/execution-host'
 import { isOrcaSessionId } from '../../shared/orca-session-address'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import {
+  lineageLiveSession,
+  readAgentSessionRecordStore
+} from '../runtime/orchestration/addressing/session-lineage/structured-session-lineage'
 import { observeChatAssignee } from '../runtime/orchestration/workers/lifecycle/chat-assignee'
 import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
@@ -16,10 +20,13 @@ export type TaskStartLifecycleRuntime = Pick<
   | 'getUIState'
   | 'updateUIState'
   | 'notifyTaskBoardRunsChanged'
-  | 'showTerminal'
-  | 'getTerminalHandleForPaneKey'
-  | 'getTerminalLivenessVerdict'
-  | 'waitForTerminal'
+  | 'getTerminalPtyIdForHandle'
+  | 'getTerminalPaneBinding'
+  | 'getPtyLivenessVerdict'
+  | 'checkTerminalAgentPresence'
+  | 'subscribeToPtyExit'
+  | 'subscribeTerminalSideEffects'
+  | 'subscribeStructuredSessionTabHidden'
   | 'getExistingOrchestrationDb'
 >
 
@@ -73,17 +80,22 @@ export function createTaskStartLifecycleDeps(
     store: getTaskStartRunStore(runtime),
     hostReachable: isExecutionHostReachable,
     terminal: {
-      show: (handle) => runtime.showTerminal(handle),
-      handleForPaneKey: (paneKey) => runtime.getTerminalHandleForPaneKey(paneKey),
-      liveness: (handle) => runtime.getTerminalLivenessVerdict(handle),
-      waitForExit: async (handle, signal) => {
-        const wait = await runtime.waitForTerminal(handle, { condition: 'exit', signal })
-        if (wait.status !== 'exited') {
-          // Not a proven exit; the next reconcile probes again.
-          throw new Error('terminal_exit_unconfirmed')
-        }
-        return wait
-      }
+      ptyIdForHandle: (handle) => runtime.getTerminalPtyIdForHandle(handle),
+      paneBinding: (paneKey, worktreeId) => runtime.getTerminalPaneBinding(paneKey, worktreeId),
+      ptyLiveness: (ptyId) => runtime.getPtyLivenessVerdict(ptyId),
+      agentPresence: (handle, exitedSince) =>
+        runtime.checkTerminalAgentPresence(handle, exitedSince),
+      subscribeExit: (ptyId, listener) => runtime.subscribeToPtyExit(ptyId, listener),
+      subscribeAgentExited: (ptyId, listener) =>
+        runtime.subscribeTerminalSideEffects((batch) => {
+          if (
+            batch.ptyId === ptyId &&
+            !batch.replay &&
+            batch.facts.some((fact) => fact.kind === 'agent-exited')
+          ) {
+            listener()
+          }
+        })
     },
     chat: {
       liveness: (sessionId) => {
@@ -97,6 +109,11 @@ export function createTaskStartLifecycleDeps(
             ? 'gone'
             : 'unverifiable'
       },
+      liveSessionId: (sessionId) => {
+        const store = readAgentSessionRecordStore()
+        return store ? (lineageLiveSession(store, sessionId)?.sessionId ?? null) : null
+      },
+      subscribeTabHidden: (listener) => runtime.subscribeStructuredSessionTabHidden(listener),
       subscribeStatus: (listener) =>
         getStructuredAgentSessionHost()?.subscribeStatus({
           id: `task-start-watch:${crypto.randomUUID()}`,

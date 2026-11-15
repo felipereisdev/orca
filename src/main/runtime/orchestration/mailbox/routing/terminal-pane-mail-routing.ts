@@ -213,6 +213,14 @@ export abstract class OrcaRuntimeWithGetPtyRecordForPaneKey extends OrcaRuntimeW
     }
   }
 
+  private readonly structuredSessionTabHiddenListeners = new Set<(sessionId: string) => void>()
+
+  /** Told after each chat tab close is settled; returns the unsubscribe. */
+  subscribeStructuredSessionTabHidden(listener: (sessionId: string) => void): () => void {
+    this.structuredSessionTabHiddenListeners.add(listener)
+    return () => this.structuredSessionTabHiddenListeners.delete(listener)
+  }
+
   /** Settle ended chat Dispatches on tab hide; /clear successors retain their work. */
   onStructuredSessionTabHidden(sessionId: string): void {
     closeRuntimeDatabaseSession(this, sessionId)
@@ -225,6 +233,13 @@ export abstract class OrcaRuntimeWithGetPtyRecordForPaneKey extends OrcaRuntimeW
       console.warn('[orchestration] settling a closed chat worker failed', {
         error: error instanceof Error ? error.message : String(error)
       })
+    }
+    for (const listener of this.structuredSessionTabHiddenListeners) {
+      try {
+        listener(sessionId)
+      } catch (error) {
+        console.warn('[orchestration] a chat tab close listener threw', error)
+      }
     }
   }
 

@@ -73,6 +73,14 @@ export abstract class OrcaRuntimeWithEmitDaemonPtyTransientFact extends OrcaRunt
     this.disposeHeadlessTerminal(ptyId)
   }
 
+  private readonly terminalSideEffectListeners = new Set<(batch: TerminalSideEffectBatch) => void>()
+
+  /** In-process observers beside the host's single side-effect consumer; returns the unsubscribe. */
+  subscribeTerminalSideEffects(listener: (batch: TerminalSideEffectBatch) => void): () => void {
+    this.terminalSideEffectListeners.add(listener)
+    return () => this.terminalSideEffectListeners.delete(listener)
+  }
+
   /** Record one derived side-effect fact: batched per chunk while applying
    *  bytes, emitted immediately for between-chunk facts (stale-title timer). */
   protected recordTerminalSideEffectFact(ptyId: string, fact: TerminalSideEffectFact): void {
@@ -107,6 +115,13 @@ export abstract class OrcaRuntimeWithEmitDaemonPtyTransientFact extends OrcaRunt
         this.onTerminalSideEffects?.(batch)
       } catch (err) {
         console.error('[runtime] terminal side-effect listener threw', { ptyId, err })
+      }
+    }
+    for (const listener of this.terminalSideEffectListeners) {
+      try {
+        listener(batch)
+      } catch (err) {
+        console.error('[runtime] terminal side-effect observer threw', { ptyId, err })
       }
     }
     if (this.countTerminalSideEffectConsumingClientEventListeners() > 0) {

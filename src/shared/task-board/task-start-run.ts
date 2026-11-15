@@ -37,6 +37,8 @@ export type TaskStartOrchestratorRef = {
   paneKey?: string
   tabId?: string
   sessionId?: string
+  /** The orchestrator's PTY; its liveness verdict survives handle re-mints and restarts. */
+  ptyId?: string
 }
 
 export type TaskStartFailure =
@@ -198,7 +200,7 @@ function normalizeOrchestrator(value: unknown): TaskStartOrchestratorRef | undef
     worktreeId,
     surface: value.surface
   }
-  for (const key of ['handle', 'paneKey', 'tabId', 'sessionId'] as const) {
+  for (const key of ['handle', 'paneKey', 'tabId', 'sessionId', 'ptyId'] as const) {
     const v = str(value[key])
     if (v) {
       ref[key] = v
