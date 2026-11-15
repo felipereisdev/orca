@@ -130,16 +130,15 @@ export function isTaskStartRunExclusive(run: Pick<TaskStartRun, 'state'>): boole
   return run.state === 'running' || run.state === 'waiting' || run.state === 'stopping'
 }
 
-const STATES: ReadonlySet<string> = new Set([
+const STATES = [
   'running',
   'waiting',
   'stopping',
   'stopped',
   'completed',
   'failed'
-])
-const PHASES: ReadonlySet<string> = new Set(TASK_START_PHASES)
-const FAILURES: ReadonlySet<string> = new Set([
+] as const satisfies readonly TaskStartRunState[]
+const FAILURES = [
   'orchestrator-exited',
   'launch-failed',
   'context-fetch-failed',
@@ -147,8 +146,11 @@ const FAILURES: ReadonlySet<string> = new Set([
   'prompt-unconfirmed',
   'stop-unconfirmed',
   'cancelled'
-])
-const AGENTS: ReadonlySet<string> = new Set(ALL_TUI_AGENTS)
+] as const satisfies readonly TaskStartFailure[]
+
+function isOneOf<T extends string>(options: readonly T[], value: unknown): value is T {
+  return typeof value === 'string' && options.some((option) => option === value)
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -186,19 +188,18 @@ function normalizeOrchestrator(value: unknown): TaskStartOrchestratorRef | undef
   }
   const hostId = str(value.hostId)
   const worktreeId = str(value.worktreeId)
-  const agent = str(value.agent)
+  const agent = value.agent
   if (
     !hostId ||
     !worktreeId ||
-    !agent ||
-    !AGENTS.has(agent) ||
+    !isOneOf(ALL_TUI_AGENTS, agent) ||
     (value.surface !== 'terminal' && value.surface !== 'chat')
   ) {
     return undefined
   }
   const ref: TaskStartOrchestratorRef = {
     hostId,
-    agent: agent as TuiAgent,
+    agent,
     worktreeId,
     surface: value.surface
   }
@@ -228,10 +229,8 @@ function normalizeRun(value: unknown): TaskStartRun | undefined {
     !updatedAt ||
     (value.workspaceMode !== 'worktree' && value.workspaceMode !== 'primary') ||
     (value.launch !== 'pending' && value.launch !== 'published') ||
-    typeof value.state !== 'string' ||
-    !STATES.has(value.state) ||
-    typeof value.phase !== 'string' ||
-    !PHASES.has(value.phase)
+    !isOneOf(STATES, value.state) ||
+    !isOneOf(TASK_START_PHASES, value.phase)
   ) {
     return undefined
   }
@@ -241,8 +240,8 @@ function normalizeRun(value: unknown): TaskStartRun | undefined {
     repoId,
     workspaceMode: value.workspaceMode,
     launch: value.launch,
-    state: value.state as TaskStartRunState,
-    phase: value.phase as TaskStartPhase,
+    state: value.state,
+    phase: value.phase,
     startedAt,
     updatedAt
   }
@@ -270,8 +269,8 @@ function normalizeRun(value: unknown): TaskStartRun | undefined {
   if (note) {
     run.note = note
   }
-  if (typeof value.failure === 'string' && FAILURES.has(value.failure)) {
-    run.failure = value.failure as TaskStartFailure
+  if (isOneOf(FAILURES, value.failure)) {
+    run.failure = value.failure
   }
   if (run.launch === 'pending') {
     // A pending launch loaded from disk means the previous process died mid-start.
@@ -291,14 +290,23 @@ export function normalizeTaskStartRuns(value: unknown): Record<string, TaskStart
       }
     }
   }
-  if (entries.length > MAX_TASK_START_RUNS) {
-    const evictable = entries
-      .filter(([, run]) => !isTaskStartRunExclusive(run))
-      .sort((a, b) => Date.parse(a[1].updatedAt) - Date.parse(b[1].updatedAt))
-    const drop = new Set(
-      evictable.slice(0, entries.length - MAX_TASK_START_RUNS).map(([key]) => key)
-    )
-    return Object.fromEntries(entries.filter(([key]) => !drop.has(key)))
+  return trimTaskStartRunsToLimit(Object.fromEntries(entries))
+}
+
+/** Drops the oldest non-exclusive runs past the cap; an unparseable `updatedAt` counts as oldest. */
+export function trimTaskStartRunsToLimit(
+  runs: Record<string, TaskStartRun>
+): Record<string, TaskStartRun> {
+  const entries = Object.entries(runs)
+  if (entries.length <= MAX_TASK_START_RUNS) {
+    return runs
   }
-  return Object.fromEntries(entries)
+  const drop = new Set(
+    entries
+      .filter(([, run]) => !isTaskStartRunExclusive(run))
+      .sort((a, b) => (Date.parse(a[1].updatedAt) || 0) - (Date.parse(b[1].updatedAt) || 0))
+      .slice(0, entries.length - MAX_TASK_START_RUNS)
+      .map(([key]) => key)
+  )
+  return Object.fromEntries(entries.filter(([key]) => !drop.has(key)))
 }

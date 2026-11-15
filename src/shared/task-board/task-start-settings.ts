@@ -28,7 +28,6 @@ export type RepoTaskStartSettings = {
 
 const MAX_VALUE_LENGTH = 200
 const ACCOUNT_AGENT: TuiAgent = 'claude'
-const VALID_AGENTS: ReadonlySet<string> = new Set(ALL_TUI_AGENTS)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -42,11 +41,11 @@ function normalizeChoice(value: unknown): TaskStartAgentChoice | undefined {
   if (!isRecord(value)) {
     return undefined
   }
-  const agent = cleanString(value.agent)
-  if (!VALID_AGENTS.has(agent)) {
+  const agent = ALL_TUI_AGENTS.find((candidate) => candidate === cleanString(value.agent))
+  if (!agent) {
     return undefined
   }
-  const choice: TaskStartAgentChoice = { agent: agent as TuiAgent }
+  const choice: TaskStartAgentChoice = { agent }
   const accountId = cleanString(value.accountId)
   if (accountId && agent === ACCOUNT_AGENT) {
     choice.accountId = accountId
@@ -116,11 +115,16 @@ export function resolveTaskStartRoles(args: {
     }
     orchestrator = { agent: defaultAgent }
   }
-  const resolved = {} as Record<TaskStartRole, TaskStartAgentChoice>
-  for (const role of TASK_START_ROLES) {
-    resolved[role] = role === 'orchestrator' ? orchestrator : (pick(role) ?? orchestrator)
+  const fallback = orchestrator
+  const choiceFor = (role: TaskStartRole): TaskStartAgentChoice => pick(role) ?? fallback
+  return {
+    orchestrator: fallback,
+    planner: choiceFor('planner'),
+    planReviewer: choiceFor('planReviewer'),
+    implementer: choiceFor('implementer'),
+    reviewer: choiceFor('reviewer'),
+    qa: choiceFor('qa')
   }
-  return resolved
 }
 
 export function resolveTaskStartWorkspaceMode(

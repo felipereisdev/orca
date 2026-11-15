@@ -1,6 +1,6 @@
 import {
   isTaskStartRunExclusive,
-  MAX_TASK_START_RUNS,
+  trimTaskStartRunsToLimit,
   type TaskStartRun,
   type TaskStartRunState
 } from '../../shared/task-board/task-start-run'
@@ -32,7 +32,9 @@ export type TaskStartClaimResult =
   | { ok: false; reason: 'already_running' | 'primary_busy' }
 
 /** `title` only feeds the `waiting` event; it is not persisted on the run. */
-export type TaskStartRunPatch = Partial<TaskStartRun> & { title?: string }
+export type TaskStartRunPatch = Partial<
+  Omit<TaskStartRun, 'id' | 'cardKey' | 'repoId' | 'primaryKey' | 'startedAt' | 'workspaceMode'>
+> & { title?: string }
 
 export type TaskStartOrchestratorMatch = { sessionId?: string; handle?: string; paneKey?: string }
 
@@ -49,21 +51,6 @@ export type TaskStartRunStore = {
   listExclusive(): TaskStartRun[]
   /** runIds with a start alive in this process. */
   inFlight: Set<string>
-}
-
-function trimToLimit(runs: Record<string, TaskStartRun>): Record<string, TaskStartRun> {
-  const entries = Object.entries(runs)
-  if (entries.length <= MAX_TASK_START_RUNS) {
-    return runs
-  }
-  const drop = new Set(
-    entries
-      .filter(([, run]) => !isTaskStartRunExclusive(run))
-      .sort((a, b) => Date.parse(a[1].updatedAt) - Date.parse(b[1].updatedAt))
-      .slice(0, entries.length - MAX_TASK_START_RUNS)
-      .map(([id]) => id)
-  )
-  return Object.fromEntries(entries.filter(([id]) => !drop.has(id)))
 }
 
 export function createTaskStartRunStore(deps: TaskStartRunStoreDeps): TaskStartRunStore {
@@ -93,7 +80,7 @@ export function createTaskStartRunStore(deps: TaskStartRunStoreDeps): TaskStartR
         startedAt: at,
         updatedAt: at
       }
-      deps.write(trimToLimit({ ...deps.read(), [run.id]: run }))
+      deps.write(trimTaskStartRunsToLimit({ ...deps.read(), [run.id]: run }))
       deps.emit({ type: 'taskBoardRunsChanged', cardKeys: [run.cardKey] })
       return { ok: true, run }
     },

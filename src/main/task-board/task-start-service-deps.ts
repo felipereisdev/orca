@@ -15,6 +15,7 @@ import {
   type TaskStartCard
 } from './task-start-context'
 import {
+  createJiraAttachmentRegistry,
   createTaskStartContextDeps,
   createTaskStartFetchDeps,
   createTaskStartSshAccess
@@ -34,8 +35,9 @@ export function createTaskStartServiceDeps(
   context: RpcContext
 ): TaskStartServiceDeps {
   const board = createTaskBoardServiceDeps(runtime)
-  const readers = createTaskStartContextDeps(board)
-  const fetchDeps = createTaskStartFetchDeps((repoId) => board.repo(repoId))
+  const jiraAttachments = createJiraAttachmentRegistry()
+  const readers = createTaskStartContextDeps(board, jiraAttachments)
+  const fetchDeps = createTaskStartFetchDeps((repoId) => board.repo(repoId), jiraAttachments)
   return {
     options: createTaskStartOptionsDeps(runtime),
     lifecycle: board.taskStart,

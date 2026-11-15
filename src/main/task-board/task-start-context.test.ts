@@ -9,7 +9,7 @@ import {
   type TaskStartCard,
   type TaskStartContextDeps
 } from './task-start-context'
-import { createTaskStartFetchDeps } from './task-start-context-deps'
+import { createJiraAttachmentRegistry, createTaskStartFetchDeps } from './task-start-context-deps'
 import { writeTaskStartImages } from './task-start-context-images'
 
 function card(ref: TaskStartCard['ref'], provider: TaskStartCard['provider']): TaskStartCard {
@@ -114,7 +114,7 @@ describe('createTaskStartFetchDeps', () => {
     const glabExec = vi.fn(async (_args: string[], _options: object) => ({
       stdout: Buffer.from([0x89, 0x50])
     }))
-    const fetchDeps = createTaskStartFetchDeps(() => null, glabExec)
+    const fetchDeps = createTaskStartFetchDeps(() => null, createJiraAttachmentRegistry(), glabExec)
     const bytes = await fetchDeps.gitlabUpload(
       card({ provider: 'gitlab', repoId: 'r', number: 1, projectRef: null }, 'gitlab'),
       'abc',

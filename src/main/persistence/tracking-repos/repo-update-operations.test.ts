@@ -54,7 +54,8 @@ describe('updateRepo taskStart', () => {
     // Why: the RPC schema turns invalid input into an explicit undefined key.
     operations.updateRepo({ id: 'repo-1' }, { taskStart: undefined })
     operations.updateRepo({ id: 'repo-1' }, { taskStart: {} })
-    operations.updateRepo({ id: 'repo-1' }, { taskStart: 'x' as never })
+    // @ts-expect-error -- untyped RPC input can carry a non-object taskStart
+    operations.updateRepo({ id: 'repo-1' }, { taskStart: 'x' })
 
     expect(state.repos[0].taskStart).toEqual({ workspaceMode: 'primary' })
   })

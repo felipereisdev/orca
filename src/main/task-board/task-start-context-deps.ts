@@ -27,10 +27,43 @@ type IssueDeps = {
   ): Promise<{ description?: string; descriptionImageUrls?: Record<string, string> } | null>
 }
 
-const jiraAttachments = new Map<string, { client: JiraClientForSite; meta: AttachmentMeta }>()
+type JiraAttachment = { client: JiraClientForSite; meta: AttachmentMeta }
+
+const MAX_JIRA_ATTACHMENTS = 200
+
+/** Download handles for one service's Jira images; entries drop on use or past the cap. */
+export type JiraAttachmentRegistry = {
+  register(url: string, attachment: JiraAttachment): void
+  take(url: string): JiraAttachment | undefined
+}
+
+export function createJiraAttachmentRegistry(): JiraAttachmentRegistry {
+  const byUrl = new Map<string, JiraAttachment>()
+  return {
+    register(url, attachment) {
+      byUrl.set(url, attachment)
+      while (byUrl.size > MAX_JIRA_ATTACHMENTS) {
+        const oldest = byUrl.keys().next().value
+        if (oldest === undefined) {
+          break
+        }
+        byUrl.delete(oldest)
+      }
+    },
+    take(url) {
+      const found = byUrl.get(url)
+      byUrl.delete(url)
+      return found
+    }
+  }
+}
 
 /** The issue's image attachments (never the base64 media in descriptions) registered for download. */
-async function readJiraImageUrls(key: string, siteId: string | null): Promise<string[]> {
+async function readJiraImageUrls(
+  registry: JiraAttachmentRegistry,
+  key: string,
+  siteId: string | null
+): Promise<string[]> {
   const [client] = getJiraClients(siteId)
   if (!client) {
     throw new Error('Jira site unavailable')
@@ -43,7 +76,7 @@ async function readJiraImageUrls(key: string, siteId: string | null): Promise<st
   for (const meta of parseImageAttachmentMetas(issue.fields?.attachment)) {
     const url = attachmentContentUrl(client.site, meta)?.toString()
     if (url) {
-      jiraAttachments.set(url, { client, meta })
+      registry.register(url, { client, meta })
       urls.push(url)
     }
   }
@@ -52,7 +85,8 @@ async function readJiraImageUrls(key: string, siteId: string | null): Promise<st
 
 /** Real readers for the card context, reusing the board's own provider deps. */
 export function createTaskStartContextDeps(
-  deps: TaskBoardCommentDeps & IssueDeps
+  deps: TaskBoardCommentDeps & IssueDeps,
+  registry: JiraAttachmentRegistry
 ): TaskStartContextDeps {
   return {
     github: async (ref) => (await readTaskBoardGitHubIssue(ref, deps)).details,
@@ -61,7 +95,13 @@ export function createTaskStartContextDeps(
       const [issue, comments, attachmentUrls] = await Promise.all([
         deps.jiraIssue(ref.key, ref.siteId),
         deps.jiraComments(ref.key, ref.siteId),
-        readJiraImageUrls(ref.key, ref.siteId)
+        readJiraImageUrls(registry, ref.key, ref.siteId).catch((error: unknown) => {
+          console.warn(
+            '[task-start] Jira attachment list unavailable; continuing without images',
+            error
+          )
+          return []
+        })
       ])
       if (!issue) {
         throw new Error(`Jira issue ${ref.key} could not be read`)
@@ -90,11 +130,12 @@ type GlabExec = (args: string[], options: GlabExecOptions) => Promise<{ stdout: 
 
 export function createTaskStartFetchDeps(
   repo: (repoId: string) => Repo | null,
+  registry: JiraAttachmentRegistry,
   glabExec: GlabExec = defaultGlabExec
 ): TaskStartFetchDeps {
   return {
     fetchUrl: async (_card, url) => {
-      const attachment = jiraAttachments.get(url)
+      const attachment = registry.take(url)
       if (attachment) {
         const image = await readAttachmentImageBytes(attachment.client, attachment.meta)
         if (!image) {

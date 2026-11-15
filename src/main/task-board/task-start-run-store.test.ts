@@ -79,6 +79,30 @@ describe('task start run store', () => {
     })
   })
 
+  it('finds a published exclusive run by orchestrator but not a pending launch', () => {
+    const deps = memoryDeps()
+    const store = createTaskStartRunStore(deps)
+    const pending = store.claim({ cardKey: 'c1', repoId: 'r', workspaceMode: 'worktree' })
+    if (!pending.ok) {
+      throw new Error('claim failed')
+    }
+    const orchestrator = {
+      hostId: 'h',
+      agent: 'claude' as const,
+      worktreeId: 'w',
+      surface: 'terminal' as const,
+      handle: 'term_1'
+    }
+    store.transition(pending.run.id, ['running'], { orchestrator })
+    expect(store.findByOrchestrator({ handle: 'term_1' })).toBeNull()
+
+    deps.write({
+      ...deps.read(),
+      [pending.run.id]: { ...pending.run, orchestrator, launch: 'published' }
+    })
+    expect(store.findByOrchestrator({ handle: 'term_1' })?.id).toBe(pending.run.id)
+  })
+
   it('keeps a persisted run across a store reload', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'orca-task-start-runs-'))
     setSecretStore({
