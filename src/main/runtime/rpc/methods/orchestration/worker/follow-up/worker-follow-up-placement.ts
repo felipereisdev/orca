@@ -47,16 +47,21 @@ export async function reopenWorkerTerminal(
   runtime: Pick<OrcaRuntimeService, 'resumeAgentSessionInWorkspace'>,
   worktreeId: string,
   session: WorkerResumeSession,
-  dispatchId: string
+  dispatchId: string,
+  claudeAccountId?: string
 ): Promise<ReopenedWorker | null> {
+  // Why always a recipe: without its own note the worker resumes unrecorded, never with another pane's.
+  const recipe = resolveResumeLaunchRecipe(
+    session.launchConfig,
+    session.agent,
+    session.providerSession
+  )
   const resumed = await runtime.resumeAgentSessionInWorkspace(worktreeId, {
     ...session,
-    // Why always a recipe: without its own note the worker resumes unrecorded, never with another pane's.
-    launchConfig: resolveResumeLaunchRecipe(
-      session.launchConfig,
-      session.agent,
-      session.providerSession
-    ),
+    // The pinned id makes the resumed pane prepare that account's login, even without a held recipe.
+    launchConfig: claudeAccountId
+      ? { ...recipe, agentEnv: { ...recipe.agentEnv, ORCA_CLAUDE_ACCOUNT_ID: claudeAccountId } }
+      : recipe,
     // A retry of this follow-up reconciles the pane it may have started.
     mutationId: dispatchId
   })

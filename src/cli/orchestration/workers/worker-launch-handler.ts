@@ -35,6 +35,13 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
     const model = getOptionalStringFlag(flags, 'model')
     const effort = getOptionalStringFlag(flags, 'effort')
     const account = getOptionalStringFlag(flags, 'account')?.trim()
+    // Why before any lookup: these accounts are this host's, and a reused terminal keeps its own.
+    if (account && (terminal || getOptionalStringFlag(flags, 'on'))) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--account cannot be combined with --terminal or --on; it picks an account for a new Claude worker on this host.'
+      )
+    }
     const capabilities =
       model || effort || account
         ? ((await client.call<RuntimeStatus>('status.get')).result.capabilities ?? [])

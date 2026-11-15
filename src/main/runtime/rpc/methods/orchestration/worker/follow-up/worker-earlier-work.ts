@@ -7,6 +7,7 @@ const EARLIER_WORK_CLIP = 2_000
 
 const StartOptions = z.looseObject({
   agent: z.string().nullish(),
+  claudeAccountId: z.string().nullish(),
   launch: z
     .looseObject({
       requested: z
@@ -35,6 +36,7 @@ export function parseStartOptions(raw: string): {
   agent?: string
   model?: string
   effort?: string
+  claudeAccountId?: string
 } {
   const parsed = StartOptions.safeParse(parseJson(raw))
   if (!parsed.success) {
@@ -44,7 +46,8 @@ export function parseStartOptions(raw: string): {
   return {
     agent: isTuiAgent(parsed.data.agent) ? parsed.data.agent : undefined,
     model: requested?.model ?? undefined,
-    effort: requested?.effort ?? undefined
+    effort: requested?.effort ?? undefined,
+    claudeAccountId: parsed.data.claudeAccountId ?? undefined
   }
 }
 

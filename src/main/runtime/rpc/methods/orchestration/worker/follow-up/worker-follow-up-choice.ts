@@ -39,6 +39,8 @@ export type WorkerFollowUpPlacement = {
   agent?: string
   model?: string
   effort?: string
+  /** The account the worker first started on; a follow-up that starts its agent again uses it too. */
+  claudeAccountId?: string
   /** Earlier task and report, for a fresh agent that cannot reopen the conversation. */
   earlierWork?: string
   reopen?: WorkerFollowUp['reopen']
@@ -65,6 +67,7 @@ export async function chooseWorkerFollowUpPlacement(
     )
   }
   const options = parseStartOptions(worker.start_options)
+  const account = options.claudeAccountId ? { claudeAccountId: options.claudeAccountId } : {}
   const resource = found && (await settledRelease(db, found))
   if (resource && isStructuredWorkerHandle(resource.terminal_handle)) {
     const handle = resource.terminal_handle
@@ -74,6 +77,7 @@ export async function chooseWorkerFollowUpPlacement(
           delivery: 'reopened',
           worktreeId,
           ...(options.agent ? { agent: options.agent } : {}),
+          ...account,
           reopen: () => reopenWorkerChat(runtime, db, handle)
         }
   }
@@ -94,8 +98,10 @@ export async function chooseWorkerFollowUpPlacement(
           delivery: 'reopened',
           worktreeId,
           agent: session.agent,
+          ...account,
           earlierWork: earlierWork(db, latest),
-          reopen: (dispatchId) => reopenWorkerTerminal(runtime, worktreeId, session, dispatchId)
+          reopen: (dispatchId) =>
+            reopenWorkerTerminal(runtime, worktreeId, session, dispatchId, options.claudeAccountId)
         }
   }
   if (!options.agent) {
@@ -107,6 +113,7 @@ export async function chooseWorkerFollowUpPlacement(
     agent: options.agent,
     ...(options.model ? { model: options.model } : {}),
     ...(options.effort ? { effort: options.effort } : {}),
+    ...account,
     earlierWork: earlierWork(db, latest)
   }
 }

@@ -60,6 +60,40 @@ describe('a follow-up to a finished terminal worker', () => {
     )
   })
 
+  it('starts a closed worker again on the account it was started with', async () => {
+    h.setup()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: worker-start reads only these fields of the stubbed record.
+    vi.spyOn(h.runtime, 'showTerminalWorkspaceLaunchScope').mockResolvedValue({
+      id: 'repo::worktree',
+      path: '/work/repo',
+      connectionId: null
+    } as never)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: worker-start reads only these fields of the stubbed record.
+    vi.spyOn(h.runtime, 'getAccountsSnapshot').mockReturnValue({
+      claude: { accounts: [{ id: 'acct-1', email: 'dev@example.com' }], activeAccountId: null }
+    } as never)
+    const task = h.db.createTask({ spec: 'review the change', runId: h.activeRunId })
+    await h.call('orchestration.workerStart', {
+      task: task.id,
+      from: 'term_coord',
+      agent: 'claude',
+      claudeAccountId: 'acct-1'
+    })
+    const dispatchId = h.db.getDispatchContext(task.id)!.id
+    h.settle(task.id, dispatchId, 'succeeded')
+    await h.call('orchestration.workerRelease', { dispatch: dispatchId })
+    vi.mocked(h.runtime.createTerminal).mockClear()
+
+    await send(dispatchId, 'and the docs')
+
+    await vi.waitFor(() =>
+      expect(h.runtime.createTerminal).toHaveBeenCalledWith(
+        'id:repo::worktree',
+        expect.objectContaining({ startupAgent: 'claude', claudeAccountId: 'acct-1' })
+      )
+    )
+  })
+
   it('keeps the mail a stopped follow-up never read for the next send, without restarting it', async () => {
     h.setup()
     const { taskId, dispatchId } = await h.startWorker()

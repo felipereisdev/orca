@@ -50,6 +50,8 @@ export function createLocalWorkerStartDispatch(
     terminal: params.terminal ?? null,
     agent: agent ?? null,
     launch: launchReceipt,
+    // A follow-up that starts the agent again starts it on the same account.
+    claudeAccountId: params.claudeAccountId ?? null,
     timeoutMs: params.timeoutMs ?? 60_000,
     setup: createsWorktree ? (params.setup ?? 'run') : 'not_applicable',
     setupSource: createsWorktree
