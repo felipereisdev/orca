@@ -3,7 +3,8 @@ import {
   TaskBoardDetailParams,
   TaskBoardListParams,
   TaskBoardMarkSeenParams,
-  TaskBoardMoveParams
+  TaskBoardMoveParams,
+  TaskBoardStartOptionsParams
 } from '../../../../../shared/rpc-contract/task-board-params'
 import { createTaskBoardServiceDeps } from '../../../../task-board/task-board-host-deps'
 import { moveTaskBoardCard } from '../../../../task-board/task-board-host-move'
@@ -13,6 +14,8 @@ import {
   listTaskBoard,
   markTaskBoardSeen
 } from '../../../../task-board/task-board-host-service'
+import { getTaskStartOptions } from '../../../../task-board/task-start-options'
+import { createTaskStartOptionsDeps } from '../../../../task-board/task-start-options-deps'
 import { defineMethod } from '../../core'
 
 // The board is the called host's: its accounts, repos, columns and read markers.
@@ -58,5 +61,12 @@ export const TASK_BOARD_METHODS = [
     permission: 'workspace',
     params: TaskBoardMoveParams,
     handler: (params, { runtime }) => moveTaskBoardCard(params, createTaskBoardServiceDeps(runtime))
+  }),
+  defineMethod({
+    name: 'taskBoard.startOptions',
+    permission: 'workspace',
+    params: TaskBoardStartOptionsParams,
+    handler: (params, { runtime }) =>
+      getTaskStartOptions(params, createTaskStartOptionsDeps(runtime))
   })
 ]

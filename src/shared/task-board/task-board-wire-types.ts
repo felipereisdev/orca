@@ -3,6 +3,12 @@ import type { TaskProvider } from '../work-items/task-providers'
 import type { TaskBoardCard } from './task-board-card'
 import type { TaskBoardProject } from './task-board-project-filter'
 import type { TaskBoardProviderState } from './task-board-provider-results'
+import type { TuiAgent } from '../agent-launch/catalog/tui-agent'
+import type {
+  TaskStartAgentChoice,
+  TaskStartRole,
+  TaskStartWorkspaceMode
+} from './task-start-settings'
 
 // gitlab/github carry the canonical issue source; reads/writes use it, never re-resolve the checkout.
 export type TaskBoardCardRef =
@@ -108,3 +114,24 @@ export type TaskBoardMoveResult =
 export type TaskBoardAddCommentResult =
   | { status: 'added'; commentId: string }
   | { status: 'failed'; error: string }
+
+/** One launchable agent (or Claude account) of the host, with the models/efforts its picker offers. */
+export type TaskStartAgentCatalogEntry = {
+  agent: TuiAgent
+  accountId?: string
+  label: string
+  needsSignIn?: true
+  models: { id: string; label: string; efforts: { id: string; label: string }[] }[]
+}
+
+export type TaskStartOptionsResult = {
+  repoId: string | null
+  repos: { id: string; label: string; kind: 'git' | 'folder' }[]
+  workspaceMode: TaskStartWorkspaceMode
+  baseRef: string | null
+  roles: Record<TaskStartRole, TaskStartAgentChoice> | null
+  labels: Record<TaskStartRole, string> | null
+  catalog: TaskStartAgentCatalogEntry[]
+  /** Roles whose choice is not in this repo's catalog. */
+  invalidRoles: TaskStartRole[]
+}

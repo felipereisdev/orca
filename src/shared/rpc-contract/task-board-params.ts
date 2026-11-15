@@ -51,3 +51,9 @@ export const TaskBoardMoveParams = z.strictObject({
   choiceId: Id.optional(),
   fields: TaskBoardMoveFieldsParam.optional()
 })
+
+// Without ref (the settings screens) only an explicit repoId or the repo list is answered.
+export const TaskBoardStartOptionsParams = z.strictObject({
+  ref: TaskBoardCardRefParam.optional(),
+  repoId: Id.optional()
+})

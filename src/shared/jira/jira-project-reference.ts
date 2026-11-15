@@ -42,12 +42,13 @@ export function matchesJiraProject(project: JiraProject, reference: JiraProjectR
   return project.siteId === reference.siteId && project.id === reference.id
 }
 
-export function findJiraIssueDefaultRepo(
+/** Every repo on `hostId` whose default Jira project is the issue's. */
+export function findJiraIssueRepoCandidates(
   repos: readonly Repo[],
-  issue: JiraIssue,
+  issue: Pick<JiraIssue, 'project' | 'siteId'>,
   hostId: ExecutionHostId
-): Repo | null {
-  const matches = repos.filter(
+): Repo[] {
+  return repos.filter(
     (repo) =>
       resolveJiraSourceHostId({ workspaceHostId: getRepoExecutionHostId(repo) }) === hostId &&
       repo.defaultJiraProject &&
@@ -56,6 +57,14 @@ export function findJiraIssueDefaultRepo(
         repo.defaultJiraProject
       )
   )
+}
+
+export function findJiraIssueDefaultRepo(
+  repos: readonly Repo[],
+  issue: JiraIssue,
+  hostId: ExecutionHostId
+): Repo | null {
+  const matches = findJiraIssueRepoCandidates(repos, issue, hostId)
   return matches.length === 1 ? matches[0] : null
 }
 
