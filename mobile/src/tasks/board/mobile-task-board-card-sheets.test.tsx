@@ -592,6 +592,18 @@ describe('starting a card on My board', () => {
       paneKey: 'tab-1:leaf-1'
     }
   }
+  // A chat orchestrator has no pane; its session's tab opens it.
+  const chatRun: TaskStartRunSummary = {
+    ...running,
+    orchestrator: {
+      hostId: 'local',
+      agent: 'claude',
+      worktreeId: RUN_WORKTREE,
+      surface: 'chat',
+      tabId: 'tab-chat',
+      sessionId: 'chat-1'
+    }
+  }
   const startParams = z.object({ confirmPrimary: z.boolean().optional() })
 
   function status(capabilities: string[]): RpcResponse {
@@ -621,46 +633,60 @@ describe('starting a card on My board', () => {
     expect(controls(root, 'Start ORCA-12')).toEqual([])
   })
 
-  it('starts in the primary checkout once the user confirms it, then opens the orchestrator', async () => {
-    const starts: unknown[] = []
-    pushed.length = 0
-    link.hostId = 'host-primary'
-    link.state = 'connected'
-    link.client = stubRpcClient({
-      sendRequest: async (method, params) => {
-        switch (method) {
-          case 'status.get':
-            return status([
-              MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
-              MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
-            ])
-          case 'taskBoard.list':
-            return reply(board('in-progress', undefined, null))
-          case 'taskBoard.startTask':
-            starts.push(params)
-            return startParams.parse(params).confirmPrimary
-              ? reply({ ok: true, run: running })
-              : reply({ ok: false, error: 'primary_needs_confirmation', reasons: ['uncommitted'] })
-          default:
-            throw new Error(`unscripted request: ${method}`)
+  it.each([
+    { surface: 'terminal', run: running, paneKey: 'tab-1:leaf-1' },
+    {
+      surface: 'chat',
+      run: chatRun,
+      paneKey: 'structured-agent-session-chat-1:eaeb9111-b1c6-4442-a8e8-03977dbf25fb'
+    }
+  ])(
+    'starts in the primary checkout once the user confirms it, then opens the $surface orchestrator',
+    async ({ surface, run, paneKey }) => {
+      const starts: unknown[] = []
+      pushed.length = 0
+      link.hostId = `host-primary-${surface}`
+      link.state = 'connected'
+      link.client = stubRpcClient({
+        sendRequest: async (method, params) => {
+          switch (method) {
+            case 'status.get':
+              return status([
+                MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+                MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
+              ])
+            case 'taskBoard.list':
+              return reply(board('in-progress', undefined, null))
+            case 'taskBoard.startTask':
+              starts.push(params)
+              return startParams.parse(params).confirmPrimary
+                ? reply({ ok: true, run })
+                : reply({
+                    ok: false,
+                    error: 'primary_needs_confirmation',
+                    reasons: ['uncommitted']
+                  })
+            default:
+              throw new Error(`unscripted request: ${method}`)
+          }
         }
-      }
-    })
-    const root = (await renderBoard(null)).root
+      })
+      const root = (await renderBoard(null)).root
 
-    await showStage(root, 'in-progress')
-    await press(root, 'Start ORCA-12')
-    await press(root, 'Start anyway')
+      await showStage(root, 'in-progress')
+      await press(root, 'Start ORCA-12')
+      await press(root, 'Start anyway')
 
-    const ref = { provider: 'jira', siteId: 'site-1', key: 'ORCA-12' }
-    expect(starts).toEqual([{ ref }, { ref, confirmPrimary: true }])
-    expect(pushed).toEqual([
-      {
-        pathname: '/h/[hostId]/session/[worktreeId]',
-        params: { hostId: 'host-primary', worktreeId: RUN_WORKTREE, paneKey: 'tab-1:leaf-1' }
-      }
-    ])
-  })
+      const ref = { provider: 'jira', siteId: 'site-1', key: 'ORCA-12' }
+      expect(starts).toEqual([{ ref }, { ref, confirmPrimary: true }])
+      expect(pushed).toEqual([
+        {
+          pathname: '/h/[hostId]/session/[worktreeId]',
+          params: { hostId: `host-primary-${surface}`, worktreeId: RUN_WORKTREE, paneKey }
+        }
+      ])
+    }
+  )
 
   it("re-reads the board when the host says a card's run changed", async () => {
     let run: TaskStartRunSummary | null = null

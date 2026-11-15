@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Text, View } from 'react-native'
+import { branchRefLabel } from '../../../../src/shared/git/refs/branch-ref-label'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
 import {
   TASK_START_ROLES,
@@ -7,7 +8,6 @@ import {
   type TaskStartRoles,
   type TaskStartWorkspaceMode
 } from '../../../../src/shared/task-board/task-start-settings'
-import { TextField } from '../../components/composer-input/TextField'
 import { ListGroup, ListRow, SectionHeader } from '../../components/list/ListGroup'
 import { MobileSegmentedControl } from '../../components/MobileSegmentedControl'
 import { SheetHeader } from '../../components/nav-bar/SheetHeader'
@@ -18,6 +18,7 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { colors, spacing, typography } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
+import { MobileTaskStartBaseRefPicker } from './MobileTaskStartBaseRefPicker'
 import {
   pickRoleField,
   readRoleChoice,
@@ -34,7 +35,7 @@ const PICKER_Z_INDEX = 1100
 
 /** This start's choices on top of the repository's configuration; none of them is saved. */
 type Edits = { mode?: TaskStartWorkspaceMode; baseRef?: string; roles: TaskStartRoles }
-type Picker = { kind: 'repo' } | { kind: RoleField; role: TaskStartRole } | null
+type Picker = { kind: 'repo' } | { kind: 'base' } | { kind: RoleField; role: TaskStartRole } | null
 
 type Props = {
   card: TaskBoardWireCard
@@ -74,13 +75,13 @@ export function MobileTaskStartSheet(props: Props) {
       repoId,
       ...(edits.mode ? { workspaceMode: edits.mode } : {}),
       // The primary checkout has no base branch to start from.
-      ...(edits.baseRef?.trim() && mode !== 'primary' ? { baseRef: edits.baseRef.trim() } : {}),
+      ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
       ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {})
     })
   }
 
   const pickerProps = ((): { title: string; options: PickerOption[]; selected: string } | null => {
-    if (!picker || !data) {
+    if (!picker || !data || picker.kind === 'base') {
       return null
     }
     if (picker.kind === 'repo') {
@@ -149,21 +150,19 @@ export function MobileTaskStartSheet(props: Props) {
         </>
       ) : null}
       {repoId && data && !isFolder && mode === 'worktree' ? (
-        <>
-          <SectionHeader title={t('tasks.board.start.baseBranch', 'Base branch')} />
-          <TextField
-            value={edits.baseRef ?? ''}
-            onChangeText={(baseRef) => setEdits({ ...edits, baseRef })}
-            placeholder={
-              data.baseRef ??
-              t('tasks.board.start.baseBranchDefault', 'Default for this repository')
+        <ListGroup style={styles.base}>
+          <ListRow
+            title={t('tasks.board.start.baseBranch', 'Base branch')}
+            value={
+              edits.baseRef
+                ? branchRefLabel(edits.baseRef)
+                : (data.baseRef ??
+                  t('tasks.board.start.baseBranchDefault', 'Default for this repository'))
             }
-            accessibilityLabel={t('tasks.board.start.baseBranch', 'Base branch')}
-            autoCapitalize="none"
-            autoCorrect={false}
-            monospace
+            navigates
+            onPress={() => setPicker({ kind: 'base' })}
           />
-        </>
+        </ListGroup>
       ) : null}
       <SectionHeader title={t('tasks.board.start.agents', 'Agents')} />
       {options.error ? (
@@ -235,7 +234,7 @@ export function MobileTaskStartSheet(props: Props) {
             // Another repository has its own mode, base branch and roles.
             setChosenRepoId(value)
             setEdits({ roles: {} })
-          } else if (picker) {
+          } else if (picker && picker.kind !== 'base') {
             setEdits({
               ...edits,
               roles: pickRoleField(edits.roles, picker.role, picker.kind, value, catalog)
@@ -244,6 +243,19 @@ export function MobileTaskStartSheet(props: Props) {
         }}
         onClose={() => setPicker(null)}
       />
+      {repoId && data ? (
+        <MobileTaskStartBaseRefPicker
+          key={repoId}
+          visible={picker?.kind === 'base'}
+          client={props.client}
+          repoId={repoId}
+          defaultRef={data.baseRef}
+          selected={edits.baseRef}
+          zIndex={PICKER_Z_INDEX}
+          onSelect={(baseRef) => setEdits({ ...edits, baseRef })}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
     </>
   )
 }
@@ -258,6 +270,9 @@ const styles = themedStyleSheet(() => ({
     paddingTop: spacing.sm,
     fontSize: typography.metaSize,
     color: colors.statusRed
+  },
+  base: {
+    marginTop: spacing.md
   },
   footer: {
     gap: spacing.sm,

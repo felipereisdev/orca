@@ -59,9 +59,15 @@ export function MobileTaskBoardCardSheets({
   const queryClient = useQueryClient()
   const { refresh, relist } = view
   const openRefKey = sheet?.kind === 'detail' ? sheet.card.refKey : null
+  // A start from "Start as…" keeps its sheet until it settles, so its error is never lost.
+  const close = (): void => {
+    if (!(sheet?.kind === 'start-as' && start.startAs.pending)) {
+      onSheet(null)
+    }
+  }
 
   return (
-    <KeyedBottomDrawer sheet={sheet} sheetKey={sheetKey} onClose={() => onSheet(null)}>
+    <KeyedBottomDrawer sheet={sheet} sheetKey={sheetKey} onClose={close}>
       {(presented) => {
         // The board's latest copy of the card, or the one opened if a list has since dropped it.
         const card =
@@ -91,7 +97,7 @@ export function MobileTaskBoardCardSheets({
               repoRequired={presented.repoRequired}
               status={start.startAs}
               onSubmit={(choices) => start.submitStartAs(card, choices)}
-              onClose={() => onSheet(null)}
+              onClose={close}
             />
           )
         }

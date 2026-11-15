@@ -63,6 +63,7 @@ export function MobileTaskBoardScreen() {
     hostId,
     client,
     connected: !view.isOffline,
+    sheet,
     onSheet: setSheet,
     rereadRuns: view.relist,
     notify: toast.showToast,

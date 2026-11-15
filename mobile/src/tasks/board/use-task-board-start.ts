@@ -1,44 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { parseExecutionHostId } from '../../../../src/shared/execution-host'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
 import type { TaskStartRunSummary } from '../../../../src/shared/task-board/task-start-run'
 import { useOptionalHostProtocolGates } from '../../components/host-protocol-gates-context'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
-import { hostStackRouteHref, type HostStackRouteHref } from '../../navigation/host-stack-navigation'
+import type { HostStackRouteHref } from '../../navigation/host-stack-navigation'
 import { readHostStatusReply } from '../../query/host-status-query'
 import { readProbedHostCapabilities } from '../../transport/connection/host-status-probe-operations'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
-import { mobileSessionRouteTarget } from '../../session/mobile-session-route'
 import type { TaskBoardSheet } from './MobileTaskBoardCardSheets'
 import type { TaskBoardRunActions } from './MobileTaskBoardCardRun'
 import { hostServesTaskStart } from './task-board-capability'
 import { startTask, stopTask, type TaskStartParams } from './task-board-operations'
 import { taskStartErrorMessage } from './task-board-run-labels'
+import { taskStartRunSessionHref } from './task-start-run-session'
 
 /** "Start as…" choices for one start; the confirmation sheet keeps them for its retry. */
 export type TaskStartChoices = Omit<TaskStartParams, 'ref' | 'confirmPrimary'>
 
 export type TaskStartAsStatus = { pending: boolean; error: string | null }
-
-/** The orchestrator's session: its pane on the host, or a `runtime:` server's own workspace. */
-export function taskStartRunSessionHref(
-  hostId: string,
-  run: TaskStartRunSummary
-): HostStackRouteHref | null {
-  const worktreeId = run.orchestrator?.worktreeId ?? run.worktreeId
-  if (!worktreeId) {
-    return null
-  }
-  const server = parseExecutionHostId(run.orchestrator?.hostId)
-  return hostStackRouteHref(
-    mobileSessionRouteTarget({
-      hostId,
-      worktreeId,
-      ...(run.orchestrator?.paneKey ? { paneKey: run.orchestrator.paneKey } : {}),
-      ...(server?.kind === 'runtime' ? { executionHost: server.id } : {})
-    })
-  )
-}
 
 /** The host announced task start; until a status reads, older hosts keep ▶︎/⏹ hidden. */
 function useHostServesTaskStart(client: RpcClient | null, connected: boolean): boolean {
@@ -69,18 +48,24 @@ export function useTaskBoardStart(args: {
   hostId: string
   client: RpcClient | null
   connected: boolean
+  /** The sheet shown now; a start or stop that settles later replaces only its own. */
+  sheet: TaskBoardSheet | null
   onSheet: (sheet: TaskBoardSheet | null) => void
   /** The host's list again, so the card shows the run's current state. */
   rereadRuns: () => void
   notify: (message: string) => void
   openHref: (href: HostStackRouteHref) => void
 }) {
-  const { hostId, client, connected, onSheet, rereadRuns, notify, openHref } = args
+  const { hostId, client, connected, sheet, onSheet, rereadRuns, notify, openHref } = args
   const t = useMobileTranslation()
   const supported = useHostServesTaskStart(client, connected)
   const [pendingRefKeys, setPendingRefKeys] = useState<ReadonlySet<string>>(new Set())
   const [startAs, setStartAs] = useState<TaskStartAsStatus>({ pending: false, error: null })
   const pendingRef = useRef(new Set<string>())
+  const sheetRef = useRef(sheet)
+  useEffect(() => {
+    sheetRef.current = sheet
+  }, [sheet])
 
   const setPending = useCallback((refKey: string, pending: boolean): void => {
     if (pending) {
@@ -125,6 +110,19 @@ export function useTaskBoardStart(args: {
       if (fromSheet) {
         setStartAs({ pending: true, error: null })
       }
+      // A start replaces only its own sheet: the "Start as…" it came from, or none for ▶︎.
+      const owns = (current: TaskBoardSheet | null): boolean =>
+        fromSheet
+          ? current?.kind === 'start-as' && current.card.refKey === card.refKey
+          : current === null
+      // A sheet the user opened meanwhile stays; what this one would have asked becomes a message.
+      const settle = (next: TaskBoardSheet | null, otherwise: string | null): void => {
+        if (owns(sheetRef.current)) {
+          onSheet(next)
+        } else if (otherwise) {
+          notify(otherwise)
+        }
+      }
       const fail = (message: string): void => {
         if (fromSheet) {
           setStartAs({ pending: false, error: message })
@@ -136,25 +134,31 @@ export function useTaskBoardStart(args: {
         const result = await startTask(live, { ref: card.ref, ...choices })
         if (result.ok) {
           setStartAs({ pending: false, error: null })
-          onSheet(null)
+          settle(null, null)
           openRun(result.run)
           return
         }
         if (result.error === 'repo_unresolved') {
           setStartAs({ pending: false, error: null })
-          onSheet({ kind: 'start-as', card, repoRequired: true })
+          settle(
+            { kind: 'start-as', card, repoRequired: true },
+            taskStartErrorMessage(result.error, t)
+          )
           return
         }
         if (result.error === 'primary_needs_confirmation') {
           const { confirmPrimary: _confirmed, ...rest } = choices
           setStartAs({ pending: false, error: null })
-          onSheet({ kind: 'confirm-primary', card, choices: rest, reasons: result.reasons ?? [] })
+          settle(
+            { kind: 'confirm-primary', card, choices: rest, reasons: result.reasons ?? [] },
+            taskStartErrorMessage(result.error, t)
+          )
           return
         }
         const message = taskStartErrorMessage(result.error, t)
         if (result.error === 'already_running' || result.error === 'primary_busy') {
           setStartAs({ pending: false, error: null })
-          onSheet(null)
+          settle(null, null)
           notify(message)
           return
         }
@@ -217,7 +221,10 @@ export function useTaskBoardStart(args: {
       } finally {
         setPending(card.refKey, false)
       }
-      onSheet({ kind: 'confirm-stop', card, workers })
+      // Another sheet opened meanwhile wins; ⏹ asks again on the next tap.
+      if (sheetRef.current === null) {
+        onSheet({ kind: 'confirm-stop', card, workers })
+      }
     },
     [onSheet, reachable, setPending, stop]
   )

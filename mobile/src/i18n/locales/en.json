@@ -4821,7 +4821,9 @@
         "chooseAgent": "Choose an agent",
         "inherit": "Inherit ({{value}})",
         "needsSignIn": "needs sign-in",
-        "offline": "Starting or stopping a task needs the host."
+        "offline": "Starting or stopping a task needs the host.",
+        "searchBranches": "Search branches",
+        "noBranches": "No branches match."
       }
     }
   },
