@@ -5,6 +5,7 @@ import type {
   TaskStartRun,
   TaskStartRunState
 } from '../../shared/task-board/task-start-run'
+import type { PtyLivenessVerdict } from '../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
 import {
   reconcileTaskStartRuns,
   watchTaskStartOrchestrator,
@@ -96,22 +97,27 @@ function publishedRun(
   return run
 }
 
-/** Terminal deps whose PTY exit the test fires by hand. */
+/** Terminal deps whose PTY exit the test fires by hand, leaving the host's verdict behind. */
 function exitableTerminal(): {
   terminal: Partial<TaskStartLifecycleDeps['terminal']>
-  exit: () => void
+  exit: (verdict: PtyLivenessVerdict) => void
   watching: () => number
 } {
   const listeners = new Set<() => void>()
+  let current: PtyLivenessVerdict | null = null
   return {
     terminal: {
+      ptyLiveness: () => current,
       subscribeExit: (_ptyId, listener) => {
         listeners.add(listener)
         return () => listeners.delete(listener)
       },
       subscribeAgentExited: () => () => {}
     },
-    exit: () => listeners.forEach((listener) => listener()),
+    exit: (verdict) => {
+      current = verdict
+      listeners.forEach((listener) => listener())
+    },
     watching: () => listeners.size
   }
 }
@@ -122,7 +128,7 @@ describe('task start orchestrator watcher', () => {
     const run = publishedRun(store, terminalRef)
     const pty = exitableTerminal()
     watchTaskStartOrchestrator(run, lifecycleDeps(store, { terminal: pty.terminal }))
-    pty.exit()
+    pty.exit({ status: 'exited' })
 
     expect(store.getById(run.id)).toMatchObject({
       state: 'failed',
@@ -135,10 +141,20 @@ describe('task start orchestrator watcher', () => {
     const run = publishedRun(store, terminalRef, 'stopping')
     const pty = exitableTerminal()
     watchTaskStartOrchestrator(run, lifecycleDeps(store, { terminal: pty.terminal }))
-    pty.exit()
+    pty.exit({ status: 'exited' })
 
     expect(store.getById(run.id)).toMatchObject({ state: 'stopping' })
     expect(store.getById(run.id)?.failure).toBeUndefined()
+  })
+
+  it('keeps a running run when its terminal exit is not certified', () => {
+    const store = memoryStore()
+    const run = publishedRun(store, terminalRef)
+    const pty = exitableTerminal()
+    watchTaskStartOrchestrator(run, lifecycleDeps(store, { terminal: pty.terminal }))
+    pty.exit({ status: 'unverifiable', reason: 'the owning SSH host did not confirm the PTY exit' })
+
+    expect(store.getById(run.id)).toMatchObject({ state: 'running' })
   })
 
   it('installs one watcher however often a run is watched', () => {
@@ -241,6 +257,42 @@ describe('task start reconciliation', () => {
           ptyLiveness: () => ({ status: 'live', ptyIds: ['pty-1'] }),
           agentPresence: async () => 'exited'
         }
+      })
+    )
+
+    expect(store.getById(run.id)).toMatchObject({
+      state: 'failed',
+      failure: 'orchestrator-exited'
+    })
+  })
+
+  it('fails a run whose agent exited before its PTY has any verdict', async () => {
+    const store = memoryStore()
+    const run = publishedRun(store, terminalRef)
+
+    await reconcileTaskStartRuns(
+      lifecycleDeps(store, {
+        terminal: {
+          ptyLiveness: () => null,
+          paneBinding: () => ({ ptyId: 'pty-1' }),
+          agentPresence: async () => 'exited'
+        }
+      })
+    )
+
+    expect(store.getById(run.id)).toMatchObject({
+      state: 'failed',
+      failure: 'orchestrator-exited'
+    })
+  })
+
+  it('fails a run whose recorded PTY has no verdict and whose pane is gone', async () => {
+    const store = memoryStore()
+    const run = publishedRun(store, terminalRef)
+
+    await reconcileTaskStartRuns(
+      lifecycleDeps(store, {
+        terminal: { ptyLiveness: () => null, paneBinding: () => 'gone' }
       })
     )
 

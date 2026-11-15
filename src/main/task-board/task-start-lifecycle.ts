@@ -9,41 +9,9 @@ import {
 } from '../../shared/task-board/task-start-run'
 import type { PtyLivenessVerdict } from '../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
 import type { TaskStartRunStore } from './task-start-run-store'
+import type { OrchestratorLiveness, TaskStartLifecycleDeps } from './task-start-lifecycle-contract'
 
-export type OrchestratorLiveness = 'alive' | 'gone' | 'unverifiable'
-
-export type TaskStartLifecycleDeps = {
-  store: TaskStartRunStore
-  /** False for an SSH host that is not connected, or a host this process cannot observe. */
-  hostReachable(hostId: string): boolean
-  terminal: {
-    /** Null when the handle names no PTY; throws while the graph reloads. */
-    ptyIdForHandle(handle: string): string | null
-    /** `gone` only once the graph is ready and nothing (leaf, PTY or saved tab) holds the pane. */
-    paneBinding(paneKey: string, worktreeId: string): 'unknown' | 'gone' | { ptyId: string | null }
-    /** The owning host's verdict; null makes no claim. */
-    ptyLiveness(ptyId: string): PtyLivenessVerdict | null
-    /** The agent's own presence in a live PTY; null when nothing identifies it. */
-    agentPresence(
-      handle: string,
-      exitedSince: number
-    ): Promise<'live' | 'unverifiable' | 'exited' | null>
-    subscribeExit(ptyId: string, listener: () => void): () => void
-    /** Confirmed agent exits in this PTY (the shell may live on). */
-    subscribeAgentExited(ptyId: string, listener: () => void): () => void
-  }
-  chat: {
-    /** From the structured-session authority: an idle chat is alive, a closed one gone. */
-    liveness(sessionId: string): OrchestratorLiveness
-    /** The session continuing this chat, its `/clear` successor included; null when unknown. */
-    liveSessionId(sessionId: string): string | null
-    subscribeTabHidden(listener: (sessionId: string) => void): () => void
-    /** Null when no structured-session host is installed. */
-    subscribeStatus(listener: (event: AgentSessionStatusEvent) => void): (() => void) | null
-  }
-  /** Bounds one reconcile; past it, runs are left as they are. */
-  reconcileTimeoutMs?: number
-}
+export type { OrchestratorLiveness, TaskStartLifecycleDeps } from './task-start-lifecycle-contract'
 
 const ORCHESTRATOR_EXITED = { state: 'failed', failure: 'orchestrator-exited' } as const
 const RECONCILE_TIMEOUT_MS = 2000
@@ -62,30 +30,32 @@ function watchersOf(store: TaskStartRunStore): Map<string, () => void> {
 
 type TerminalTarget = { liveness: OrchestratorLiveness; ptyId?: string }
 
+type PtyVerdict = PtyLivenessVerdict['status'] | undefined
+
+function ptyVerdict(ptyId: string | undefined, deps: TaskStartLifecycleDeps): PtyVerdict {
+  return ptyId ? deps.terminal.ptyLiveness(ptyId)?.status : undefined
+}
+
+/** The orchestrator's PTY and its verdict; `gone` when the pane no longer holds any terminal. */
 function resolveTerminalPty(
   ref: TaskStartOrchestratorRef,
   deps: TaskStartLifecycleDeps
-): TerminalTarget {
-  if (ref.ptyId) {
-    return { liveness: 'alive', ptyId: ref.ptyId }
+): 'gone' | { ptyId?: string; verdict: PtyVerdict } {
+  const ptyId =
+    ref.ptyId ?? (ref.handle ? deps.terminal.ptyIdForHandle(ref.handle) : null) ?? undefined
+  const verdict = ptyVerdict(ptyId, deps)
+  if (verdict) {
+    return { ptyId, verdict }
   }
-  const byHandle = ref.handle ? deps.terminal.ptyIdForHandle(ref.handle) : null
-  if (byHandle) {
-    return { liveness: 'alive', ptyId: byHandle }
-  }
-  // A restart re-mints handles; the pane key still names the pane.
+  // Verdicts live in memory: after a restart, or before a sweep, the pane says what still holds it.
   const binding = ref.paneKey ? deps.terminal.paneBinding(ref.paneKey, ref.worktreeId) : 'unknown'
   if (binding === 'gone') {
-    return { liveness: 'gone' }
+    return 'gone'
   }
-  return binding !== 'unknown' && binding.ptyId
-    ? { liveness: 'alive', ptyId: binding.ptyId }
-    : { liveness: 'unverifiable' }
-}
-
-function ptyLiveness(ptyId: string, deps: TaskStartLifecycleDeps): OrchestratorLiveness {
-  const verdict = deps.terminal.ptyLiveness(ptyId)?.status
-  return verdict === 'live' ? 'alive' : verdict === 'exited' ? 'gone' : 'unverifiable'
+  const bound = binding === 'unknown' ? null : binding.ptyId
+  return bound && bound !== ptyId
+    ? { ptyId: bound, verdict: ptyVerdict(bound, deps) }
+    : { ptyId, verdict }
 }
 
 async function probeTerminal(
@@ -94,17 +64,23 @@ async function probeTerminal(
   startedAt: string | undefined
 ): Promise<TerminalTarget> {
   const target = resolveTerminalPty(ref, deps)
-  if (!target.ptyId) {
-    return target
+  if (target === 'gone' || target.verdict === 'exited') {
+    return { liveness: 'gone' }
   }
-  const liveness = ptyLiveness(target.ptyId, deps)
+  const { ptyId, verdict } = target
+  if (!ptyId || verdict === 'unverifiable') {
+    return { liveness: 'unverifiable', ...(ptyId ? { ptyId } : {}) }
+  }
+  // A live (or not yet swept) PTY can hold the shell the agent exited back to.
   const since = startedAt ? Date.parse(startedAt) : Number.NaN
-  if (liveness !== 'alive' || !ref.handle || !Number.isFinite(since)) {
-    return { liveness, ptyId: target.ptyId }
+  const agent =
+    ref.handle && Number.isFinite(since)
+      ? await deps.terminal.agentPresence(ref.handle, since)
+      : null
+  if (agent === 'exited') {
+    return { liveness: 'gone' }
   }
-  // A live PTY can hold the shell the agent exited back to.
-  const agent = await deps.terminal.agentPresence(ref.handle, since)
-  return { liveness: agent === 'exited' ? 'gone' : liveness, ptyId: target.ptyId }
+  return { liveness: verdict === 'live' ? 'alive' : 'unverifiable', ptyId }
 }
 
 function chatLiveness(sessionId: string, deps: TaskStartLifecycleDeps): OrchestratorLiveness {
@@ -156,18 +132,31 @@ function watchTerminal(
   deps: TaskStartLifecycleDeps,
   unwatched: () => void
 ): () => void {
-  const stops = [
-    deps.terminal.subscribeExit(ptyId, () => {
-      unwatched()
+  let ended = false
+  const onExit = (): void => {
+    if (ended) {
+      return
+    }
+    ended = true
+    unwatched()
+    // Exit listeners also fire for a dropped SSH relay; only a certified exit ends the run.
+    if (ptyVerdict(ptyId, deps) === 'exited') {
       failExited(run.id, deps)
-    }),
+    }
+  }
+  const stops = [
+    deps.terminal.subscribeExit(ptyId, onExit),
     deps.terminal.subscribeAgentExited(ptyId, () => {
-      // A dropped SSH relay can read as an agent exit; only act on what the host can still see.
-      if (deps.hostReachable(ref.hostId) && ptyLiveness(ptyId, deps) !== 'unverifiable') {
+      // A dropped SSH relay can read as an agent exit; no verdict yet is still the host's word.
+      if (deps.hostReachable(ref.hostId) && ptyVerdict(ptyId, deps) !== 'unverifiable') {
         failExited(run.id, deps)
       }
     })
   ]
+  // An exit between the probe and these subscriptions has already been certified.
+  if (ptyVerdict(ptyId, deps) === 'exited') {
+    onExit()
+  }
   return () => stops.forEach((stop) => stop())
 }
 
@@ -216,9 +205,10 @@ function startWatch(
   if (ref?.surface !== 'terminal') {
     return null
   }
-  let pty = ptyId
+  let pty = ptyId ?? ref.ptyId
   try {
-    pty ??= resolveTerminalPty(ref, deps).ptyId
+    const resolved = pty ? null : resolveTerminalPty(ref, deps)
+    pty ??= resolved && resolved !== 'gone' ? resolved.ptyId : undefined
   } catch {
     // The graph is reloading; the next reconcile resolves it.
   }
@@ -226,7 +216,8 @@ function startWatch(
 }
 
 /** One watcher per run in this process: fails the run when its orchestrator ends while it is
- *  running or waiting. Repeated calls keep the installed watcher. Returns its stop. */
+ *  running or waiting. Repeated calls keep the installed watcher.
+ *  The returned stop tears down that shared registered watcher, whoever installed it. */
 export function watchTaskStartOrchestrator(
   run: TaskStartRun,
   deps: TaskStartLifecycleDeps,
@@ -279,7 +270,8 @@ async function reconcileRun(
   }
   if (liveness === 'gone') {
     failExited(run.id, deps)
-  } else if (liveness === 'alive') {
+  } else if (liveness === 'alive' || ptyId) {
+    // A terminal without a verdict yet is still watched: only certified exits fail it.
     watchTaskStartOrchestrator(run, deps, { ptyId })
   }
 }
