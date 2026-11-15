@@ -18,6 +18,7 @@ import { applyNativeChatSessionOptionSettingsMutation } from '../../../../shared
 import type { NativeChatSessionOptionSettingsMutation } from '../../../../shared/native-chat/input/native-chat-session-options'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import { normalizeTaskBoardSettings } from '../../../../shared/task-board/task-board-settings'
+import { normalizeGlobalTaskStartSettings } from '../../../../shared/task-board/task-start-settings'
 import { getDefaultWorkspaceCleanupRules } from '../../../../shared/workspace-cleanup/workspace-cleanup-policy'
 import { nativeChatQueueFollowUps } from '../../../../shared/native-chat/input/native-chat-follow-up-behavior'
 import { nativeChatShowsCiResultLines } from '../../../../shared/native-chat/native-chat-appearance-settings'
@@ -109,6 +110,7 @@ export class RuntimeClientSettingsController {
       worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
       workspaceCleanupPolicy: settings.workspaceCleanupPolicy ?? getDefaultWorkspaceCleanupRules(),
       taskBoard: normalizeTaskBoardSettings(settings.taskBoard),
+      taskStart: normalizeGlobalTaskStartSettings(settings.taskStart),
       ...(this.sharingServices?.skills() === false
         ? {}
         : { agentSkillSharingEnabled: isAgentSkillSharingEnabled(settings) }),

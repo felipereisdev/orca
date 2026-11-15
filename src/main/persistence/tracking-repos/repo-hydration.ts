@@ -8,6 +8,7 @@ import { normalizeJiraProjectReference } from '../../../shared/jira/jira-project
 import { normalizeRepoSourceControlAiOverrides } from '../../../shared/source-control/ai/settings/source-control-ai-repo-settings'
 import { normalizeOrcadRetainedMarker } from '../../../shared/orcad-retained-marker'
 import { normalizeRepoWorkspaceCleanupPolicy } from '../../../shared/workspace-cleanup/workspace-cleanup-policy'
+import { normalizeRepoTaskStartSettings } from '../../../shared/task-board/task-start-settings'
 import { sanitizeAgentWorkspaceTrustDecision } from '../../../shared/agent-launch/permissions/agent-workspace-trust-decision'
 import {
   sanitizeForkSyncMode,
@@ -35,6 +36,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
     gitRemoteIdentity: rawGitRemoteIdentity,
     sourceControlAi: rawSourceControlAi,
     workspaceCleanupPolicy: rawWorkspaceCleanupPolicy,
+    taskStart: rawTaskStart,
     projectHostSetupMethod: rawProjectHostSetupMethod,
     forkSyncMode: rawForkSyncMode,
     agentWorkspaceTrust: rawAgentWorkspaceTrust,
@@ -50,6 +52,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
   const gitRemoteIdentity = sanitizeGitRemoteIdentity(rawGitRemoteIdentity)
   const sourceControlAi = normalizeRepoSourceControlAiOverrides(rawSourceControlAi)
   const workspaceCleanupPolicy = normalizeRepoWorkspaceCleanupPolicy(rawWorkspaceCleanupPolicy)
+  const taskStart = normalizeRepoTaskStartSettings(rawTaskStart)
   const projectHostSetupMethod = sanitizeRepoProjectHostSetupMethod(rawProjectHostSetupMethod)
   const forkSyncMode = sanitizeForkSyncMode(rawForkSyncMode)
   const agentWorkspaceTrust = sanitizeAgentWorkspaceTrustDecision(rawAgentWorkspaceTrust)
@@ -77,6 +80,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
     ...(gitRemoteIdentity !== undefined ? { gitRemoteIdentity } : {}),
     ...(sourceControlAi !== undefined ? { sourceControlAi } : {}),
     ...(workspaceCleanupPolicy !== undefined ? { workspaceCleanupPolicy } : {}),
+    ...(taskStart !== undefined ? { taskStart } : {}),
     ...(projectHostSetupMethod !== undefined ? { projectHostSetupMethod } : {}),
     ...(forkSyncMode !== undefined ? { forkSyncMode } : {}),
     ...(agentWorkspaceTrust !== undefined ? { agentWorkspaceTrust } : {}),

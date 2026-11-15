@@ -5,6 +5,7 @@ import type { RepoHostTarget } from '../../../shared/repo-host-identity'
 
 import { isLegacyRepoForExternalWorktreeVisibility } from '../../../shared/external-worktree-visibility'
 import { normalizeRepoSourceControlAiOverrides } from '../../../shared/source-control/ai/settings/source-control-ai-repo-settings'
+import { normalizeRepoTaskStartSettings } from '../../../shared/task-board/task-start-settings'
 import { normalizeRepoWorkspaceCleanupPolicy } from '../../../shared/workspace-cleanup/workspace-cleanup-policy'
 import { normalizeWorktreeVisibilitySourcePreferences } from '../../../shared/worktree/visibility-sources'
 import type { GhAccountBinding } from '../../../shared/github/accounts/account-binding'
@@ -121,6 +122,7 @@ export class RepoUpdatePersistenceOperations {
       agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       workspaceCleanupPolicy?: Repo['workspaceCleanupPolicy'] | null
+      taskStart?: Repo['taskStart'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
       hiddenAt?: Repo['hiddenAt'] | null
       ghAccount?: GhAccountBinding | null
@@ -272,6 +274,17 @@ export class RepoUpdatePersistenceOperations {
         delete sanitizedUpdates.workspaceCleanupPolicy
       } else {
         sanitizedUpdates.workspaceCleanupPolicy = workspaceCleanupPolicy
+      }
+    }
+    if ('taskStart' in sanitizedUpdates && !sanitizedUpdates.taskStart) {
+      delete repo.taskStart
+      delete sanitizedUpdates.taskStart
+    } else if ('taskStart' in sanitizedUpdates) {
+      const taskStart = normalizeRepoTaskStartSettings(sanitizedUpdates.taskStart)
+      if (taskStart === undefined) {
+        delete sanitizedUpdates.taskStart
+      } else {
+        sanitizedUpdates.taskStart = taskStart
       }
     }
     if ('ghAccount' in updates) {

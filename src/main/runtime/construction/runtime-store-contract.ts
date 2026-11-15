@@ -203,6 +203,7 @@ export type RuntimeStore = {
     worktreeVisibilityDefaults?: GlobalSettings['worktreeVisibilityDefaults']
     workspaceCleanupPolicy?: GlobalSettings['workspaceCleanupPolicy']
     taskBoard?: GlobalSettings['taskBoard']
+    taskStart?: GlobalSettings['taskStart']
     hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
     activeRuntimeEnvironmentId?: GlobalSettings['activeRuntimeEnvironmentId']
     showPinnedWorktreesInGroups?: GlobalSettings['showPinnedWorktreesInGroups']

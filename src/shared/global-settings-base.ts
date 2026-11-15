@@ -25,6 +25,7 @@ import type { AgentWorkspaceTrustSettings } from './agent-launch/permissions/age
 import type { KeybindingGlobalSettings } from './keybindings/global-settings'
 import type { WorkspaceCleanupPolicySettings } from './workspace-cleanup/workspace-cleanup-policy'
 import type { TaskBoardSettingsField } from './task-board/task-board-settings'
+import type { GlobalTaskStartSettings } from './task-board/task-start-settings'
 
 /** Settings groups owned by their feature modules and composed into GlobalSettings. */
 export type GlobalSettingsBase = AntigravityChatAuthSettings &
@@ -53,4 +54,4 @@ export type GlobalSettingsBase = AntigravityChatAuthSettings &
   AgentWorkspaceTrustSettings &
   KeybindingGlobalSettings &
   WorkspaceCleanupPolicySettings &
-  TaskBoardSettingsField
+  TaskBoardSettingsField & { taskStart?: GlobalTaskStartSettings }

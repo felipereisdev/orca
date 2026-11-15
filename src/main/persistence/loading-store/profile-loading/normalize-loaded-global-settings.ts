@@ -25,6 +25,7 @@ import { readLegacySidekickFlag } from '../../applying-settings/onboarding-norma
 import { normalizeMachineName } from '../../../../shared/machine-name'
 import { normalizeWorkspaceCleanupRules } from '../../../../shared/workspace-cleanup/workspace-cleanup-policy'
 import { normalizeTaskBoardSettings } from '../../../../shared/task-board/task-board-settings'
+import { normalizeGlobalTaskStartSettings } from '../../../../shared/task-board/task-start-settings'
 import { replaceRetiredSpeechModelId } from '../../../speech/model-catalog'
 import type { PersistedState } from '../../../../shared/persisted-state-types'
 import type { VoiceSettings } from '../../../../shared/speech-types'
@@ -102,6 +103,7 @@ export function normalizeLoadedGlobalSettings(
     worktreeVisibilityDefaults: migratedExternalVisibility.defaults,
     workspaceCleanupPolicy: normalizeWorkspaceCleanupRules(parsed.settings?.workspaceCleanupPolicy),
     taskBoard: normalizeTaskBoardSettings(parsed.settings?.taskBoard),
+    taskStart: normalizeGlobalTaskStartSettings(parsed.settings?.taskStart),
     prBotAuthorOverrides: normalizePRBotAuthorOverrides(parsed.settings?.prBotAuthorOverrides),
     // Only fresh profiles take the on default; a stored profile saved before the key existed was off.
     artifactSharingEnabled: parsed.settings?.artifactSharingEnabled === true,

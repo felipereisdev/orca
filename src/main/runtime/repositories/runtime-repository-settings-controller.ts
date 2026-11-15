@@ -58,6 +58,7 @@ type RepositoryUpdates = Partial<
   projectGroupOrder?: number | null
   sourceControlAi?: Repo['sourceControlAi'] | null
   workspaceCleanupPolicy?: Repo['workspaceCleanupPolicy'] | null
+  taskStart?: Repo['taskStart'] | null
   externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
   hiddenAt?: Repo['hiddenAt'] | null
   /** Only `null` clears; `omitUndefined` drops a stripped (undefined) field so it never unbinds. */

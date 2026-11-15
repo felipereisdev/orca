@@ -11,6 +11,7 @@ import {
 import { OptionalFiniteNumber, OptionalString } from './rpc-param-primitives'
 import { editorFormatterSchema } from '../editor-formatter'
 import { normalizeDictationTerms } from '../dictation-dictionary'
+import { normalizeRepoTaskStartSettings } from '../task-board/task-start-settings'
 import { RepoWorkspaceCleanupPolicyParam } from './workspace-cleanup-policy-params'
 
 export const RepoSourceControlAiOverrides = z
@@ -95,7 +96,8 @@ export function createRepoUpdateSchema<T extends Readonly<Record<string, z.ZodTy
       projectGroupId: OptionalString.nullable().optional(),
       projectGroupOrder: OptionalFiniteNumber.nullable().optional(),
       sourceControlAi: RepoSourceControlAiOverrides,
-      workspaceCleanupPolicy: RepoWorkspaceCleanupPolicyParam.optional()
+      workspaceCleanupPolicy: RepoWorkspaceCleanupPolicyParam.optional(),
+      taskStart: z.unknown().transform(normalizeRepoTaskStartSettings).nullable().optional()
     })
   })
 }

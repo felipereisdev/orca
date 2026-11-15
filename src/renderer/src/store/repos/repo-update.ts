@@ -195,6 +195,7 @@ export function createRepoUpdateActions(
               const {
                 projectGroupOrder: _projectGroupOrder,
                 sourceControlAi,
+                taskStart,
                 externalWorktreeDiscoverySuppressedAt,
                 hiddenAt,
                 ghAccount,
@@ -209,6 +210,12 @@ export function createRepoUpdateActions(
                 mergedRepo = repoWithoutSourceControlAi
               } else if (sourceControlAi !== undefined) {
                 mergedRepo = { ...mergedRepo, sourceControlAi }
+              }
+              if (taskStart === null) {
+                const { taskStart: _taskStart, ...repoWithoutTaskStart } = mergedRepo
+                mergedRepo = repoWithoutTaskStart
+              } else if (taskStart !== undefined) {
+                mergedRepo = { ...mergedRepo, taskStart }
               }
               if (externalWorktreeVisibility === null) {
                 const { externalWorktreeVisibility: _visibility, ...repoWithoutVisibility } =

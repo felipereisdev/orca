@@ -66,6 +66,7 @@ export type RepoUpdate = Partial<
   externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
   agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
   sourceControlAi?: Repo['sourceControlAi'] | null
+  taskStart?: Repo['taskStart'] | null
   externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
   hiddenAt?: Repo['hiddenAt'] | null
   ghAccount?: GhAccountBinding | null

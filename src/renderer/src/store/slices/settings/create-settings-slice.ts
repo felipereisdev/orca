@@ -24,6 +24,7 @@ import { normalizeUiLanguage } from '../../../../../shared/ui-language'
 import { normalizeDesktopTerminalScrollbackRows } from '../../../../../shared/terminal/replay/terminal-scrollback-policy'
 import { translate } from '@/i18n/i18n'
 import { normalizeTaskBoardSettings } from '../../../../../shared/task-board/task-board-settings'
+import { normalizeGlobalTaskStartSettings } from '../../../../../shared/task-board/task-start-settings'
 import {
   normalizeMobilePairingCustomAddress,
   normalizeMobilePairingCustomAddresses
@@ -82,6 +83,9 @@ function normalizeSettingsUpdates(
   }
   if ('taskBoard' in updates) {
     sanitizedUpdates.taskBoard = normalizeTaskBoardSettings(updates.taskBoard)
+  }
+  if ('taskStart' in updates) {
+    sanitizedUpdates.taskStart = normalizeGlobalTaskStartSettings(updates.taskStart)
   }
   if ('visibleTaskProviders' in updates || 'defaultTaskSource' in updates) {
     const taskProviderSettings = normalizeTaskProviderSettings({

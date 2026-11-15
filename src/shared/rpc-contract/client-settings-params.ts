@@ -13,6 +13,7 @@ import { normalizePRBotAuthorOverrides } from '../source-control/review-comments
 import { WorktreeVisibilityDefaultsUpdate } from './worktree-visibility-defaults-params'
 import { WorkspaceCleanupRulesParam } from './workspace-cleanup-policy-params'
 import { normalizeTaskBoardSettings } from '../task-board/task-board-settings'
+import { normalizeGlobalTaskStartSettings } from '../task-board/task-start-settings'
 import { AGENT_CHAT_PERMISSION_MODES } from '../agent-launch/permissions/agent-chat-permission-mode'
 
 export const TaskSourceParam = z.custom<TaskSource>(isTaskSource, {
@@ -142,6 +143,10 @@ export const SettingsUpdate = z
     taskBoard: z
       .unknown()
       .transform((value) => normalizeTaskBoardSettings(value))
+      .optional(),
+    taskStart: z
+      .unknown()
+      .transform((value) => normalizeGlobalTaskStartSettings(value))
       .optional()
   })
   .strict()

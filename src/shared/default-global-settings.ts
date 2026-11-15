@@ -19,6 +19,7 @@ import { DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT } from './terminal/replay/term
 import { NESTED_WORKER_MAX_DEPTH_DEFAULT } from './orchestration/workers/nested-worker-depth'
 import { getDefaultWorkspaceCleanupRules } from './workspace-cleanup/workspace-cleanup-policy'
 import { getDefaultTaskBoardSettings } from './task-board/task-board-settings'
+import { getDefaultGlobalTaskStartSettings } from './task-board/task-start-settings'
 
 export function buildDefaultSettings(args: {
   workspaceDir: string
@@ -39,6 +40,7 @@ export function buildDefaultSettings(args: {
     worktreeVisibilityDefaults: { external: 'hide' },
     workspaceCleanupPolicy: getDefaultWorkspaceCleanupRules(),
     taskBoard: getDefaultTaskBoardSettings(),
+    taskStart: getDefaultGlobalTaskStartSettings(),
     nestWorkspaces: true,
     workspaceDirHistory: [],
     refreshLocalBaseRefOnWorktreeCreate: false,

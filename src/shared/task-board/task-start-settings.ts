@@ -124,7 +124,7 @@ export function resolveTaskStartRoles(args: {
 }
 
 export function resolveTaskStartWorkspaceMode(
-  repo: Pick<Repo, 'kind'> & { taskStart?: RepoTaskStartSettings },
+  repo: Pick<Repo, 'kind' | 'taskStart'>,
   override?: TaskStartWorkspaceMode
 ): TaskStartWorkspaceMode {
   if (repo.kind === 'folder') {
