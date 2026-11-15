@@ -3,6 +3,7 @@ import type { JiraComment, JiraIssue } from '../../shared/jira/jira-types'
 import { toJiraTaskBoardCard } from '../../shared/task-board/task-board-provider-cards'
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
+import { createTaskStartRunStore } from './task-start-run-store'
 import {
   addTaskBoardComment,
   listTaskBoard,
@@ -68,6 +69,22 @@ function setup(writeResult: { ok: true; id: string } | { ok: false; error: strin
         gitlab: unused,
         github: unused
       }
+    },
+    taskStart: {
+      store: createTaskStartRunStore({
+        read: () => ({}),
+        write: unused,
+        now: () => new Date(),
+        emit: unused
+      }),
+      hostReachable: unused,
+      terminal: {
+        show: unused,
+        handleForPaneKey: unused,
+        liveness: unused,
+        waitForExit: unused
+      },
+      chat: { liveness: unused, subscribeStatus: unused }
     },
     caches: createTaskBoardEnrichCaches(),
     workspaces: async () => [],

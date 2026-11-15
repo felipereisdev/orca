@@ -32,6 +32,7 @@ import {
   type TaskBoardListOptions
 } from './task-board-host-list'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
+import { reconcileTaskStartRuns, type TaskStartLifecycleDeps } from './task-start-lifecycle'
 
 type ProviderWrite = { ok: true; id: string } | { ok: false; error: string }
 
@@ -50,6 +51,7 @@ export type TaskBoardServiceDeps = TaskBoardEnrichDeps &
   TaskBoardCardReadDeps &
   TaskBoardCommentWriteDeps & {
     host: TaskBoardHostDeps
+    taskStart: TaskStartLifecycleDeps
     readSeen(): TaskBoardSeenComments
     writeSeen(next: TaskBoardSeenComments): void
   }
@@ -58,6 +60,10 @@ export async function listTaskBoard(
   deps: TaskBoardServiceDeps,
   options: TaskBoardListOptions
 ): Promise<TaskBoardListResult> {
+  // A failed reconcile leaves runs as they were; the board still lists.
+  await reconcileTaskStartRuns(deps.taskStart).catch((error: unknown) => {
+    console.warn('[task-board] reconciling task-start runs failed', error)
+  })
   const list = await buildTaskBoardList(deps.host, options)
   const cards = await enrichTaskBoardCards(list.cards, {
     todoColumnId: resolveCategoryColumnId('todo', list.columns, deps.host.settings().taskBoard),
