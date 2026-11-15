@@ -3,8 +3,15 @@ import type {
   TaskBoardCardRef,
   TaskBoardDetailResult,
   TaskBoardListResult,
-  TaskBoardMoveFields
+  TaskBoardMoveFields,
+  TaskStartOptionsResult,
+  TaskStartResult,
+  TaskStopResult
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import type {
+  TaskStartRoles,
+  TaskStartWorkspaceMode
+} from '../../../../src/shared/task-board/task-start-settings'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { bindDeferredRpcOperation, defineRpcOperation } from '../../transport/rpc/rpc-operation'
 import { rpcResultVariant } from '../../transport/rpc/rpc-operation-result-reader'
@@ -17,6 +24,11 @@ import {
   taskBoardSeenSchema,
   type MobileTaskBoardMoveResult
 } from './task-board-reply-schema'
+import {
+  taskStartOptionsSchema,
+  taskStartResultSchema,
+  taskStopResultSchema
+} from './task-start-reply-schema'
 
 // The board is the host's: every read and write goes through taskBoard.*, never a provider method.
 
@@ -71,10 +83,42 @@ export const taskBoardCardMove = bindDeferredRpcOperation(
   })
 )
 
+export const taskBoardStartOptionsRead = bindDeferredRpcOperation(
+  defineRpcOperation({
+    name: 'taskBoard.start-options',
+    method: 'taskBoard.startOptions',
+    acceptance: 'require-result-or-throw-message',
+    barrier: 'after-caller-barrier',
+    read: rpcResultVariant('task-start-options', taskStartOptionsSchema)
+  })
+)
+
+export const taskBoardStartRun = bindDeferredRpcOperation(
+  defineRpcOperation({
+    name: 'taskBoard.start-task',
+    method: 'taskBoard.startTask',
+    acceptance: 'require-result-or-throw-message',
+    barrier: 'after-caller-barrier',
+    read: rpcResultVariant('task-start', taskStartResultSchema)
+  })
+)
+
+export const taskBoardStopRun = bindDeferredRpcOperation(
+  defineRpcOperation({
+    name: 'taskBoard.stop-task',
+    method: 'taskBoard.stopTask',
+    acceptance: 'require-result-or-throw-message',
+    barrier: 'after-caller-barrier',
+    read: rpcResultVariant('task-stop', taskStopResultSchema)
+  })
+)
+
 // A fresh list reads every provider and enriches each card on the host.
 const LIST_TIMEOUT_MS = 120_000
 const WRITE_TIMEOUT_MS = 60_000
 const READ_TIMEOUT_MS = 30_000
+// A start creates the worktree, reads the issue and launches the orchestrator before it answers.
+const START_TIMEOUT_MS = 120_000
 
 /** The host's board; `fresh` bypasses the host's provider caches (Refresh, after a move). */
 export async function readTaskBoardList(
@@ -139,4 +183,42 @@ export async function moveTaskBoardCard(
 ): Promise<MobileTaskBoardMoveResult> {
   const reply = await taskBoardCardMove.request(client, params, { timeoutMs: WRITE_TIMEOUT_MS })
   return taskBoardCardMove.interpret(reply)
+}
+
+/** The host's choices for "Start as…": repositories, mode, base branch and the agents of each role. */
+export async function getTaskStartOptions(
+  client: RpcClient,
+  params: { ref?: TaskBoardCardRef; repoId?: string }
+): Promise<TaskStartOptionsResult> {
+  const reply = await taskBoardStartOptionsRead.request(client, params, {
+    timeoutMs: READ_TIMEOUT_MS
+  })
+  return taskBoardStartOptionsRead.interpret(reply)
+}
+
+export type TaskStartParams = {
+  ref: TaskBoardCardRef
+  repoId?: string
+  workspaceMode?: TaskStartWorkspaceMode
+  baseRef?: string
+  roles?: TaskStartRoles
+  confirmPrimary?: boolean
+}
+
+/** ▶︎ / "Start as…": the host creates the workspace and launches the card's orchestrator. */
+export async function startTask(
+  client: RpcClient,
+  params: TaskStartParams
+): Promise<TaskStartResult> {
+  const reply = await taskBoardStartRun.request(client, params, { timeoutMs: START_TIMEOUT_MS })
+  return taskBoardStartRun.interpret(reply)
+}
+
+/** ⏹; `preview` only counts the agents a stop would end. */
+export async function stopTask(
+  client: RpcClient,
+  params: { ref: TaskBoardCardRef; preview?: boolean }
+): Promise<TaskStopResult> {
+  const reply = await taskBoardStopRun.request(client, params, { timeoutMs: WRITE_TIMEOUT_MS })
+  return taskBoardStopRun.interpret(reply)
 }

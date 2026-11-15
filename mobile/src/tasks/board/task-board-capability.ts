@@ -1,4 +1,7 @@
-import { MOBILE_TASK_BOARD_RUNTIME_CAPABILITY } from '../../../../src/shared/mobile-runtime-capabilities'
+import {
+  MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+  MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
+} from '../../../../src/shared/mobile-runtime-capabilities'
 import { readHostStatusReply } from '../../query/host-status-query'
 import { readProbedHostCapabilities } from '../../transport/connection/host-status-probe-operations'
 import { isMobileMethodUnavailableError } from '../../transport/rpc/mobile-method-unavailable'
@@ -24,4 +27,9 @@ export async function assertTaskBoardSupported(client: RpcClient): Promise<void>
 // Old hosts may refuse at the mobile allowlist before dispatch; either refusal means no board.
 export function isTaskBoardUnavailableReply(reply: RpcResponse): boolean {
   return !reply.ok && isMobileMethodUnavailableError(reply.error.code, reply.error.message)
+}
+
+/** ▶︎/⏹ and "Start as…" need a host that announced task start; older hosts hide them. */
+export function hostServesTaskStart(capabilities: readonly string[] | null): boolean {
+  return capabilities?.includes(MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY) ?? false
 }

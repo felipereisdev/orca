@@ -23,8 +23,10 @@ export const taskBoardCardsQuery = defineHostQuery<typeof NO_TASK_BOARD_INPUT, T
       return readTaskBoardList(client, read.live)
     },
     gcTime: 30 * 60_000,
-    // The host signals no board changes; coming back to the app reads it again.
-    refetchOnWindowFocus: true
+    // Provider changes are not signalled; coming back to the app reads them again.
+    refetchOnWindowFocus: true,
+    // A run's phase or state changed; the host's cached list carries it, so the read stays cheap.
+    signal: { events: ['taskBoardRunsChanged'] }
   }
 )
 

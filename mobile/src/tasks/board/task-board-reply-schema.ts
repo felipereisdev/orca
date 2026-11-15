@@ -107,7 +107,7 @@ const orchestratorRef = z.custom<TaskStartOrchestratorRef>(
       .safeParse(value).success
 )
 
-const taskStartSummary: z.ZodType<TaskStartRunSummary, unknown> = z.looseObject({
+export const taskStartSummarySchema: z.ZodType<TaskStartRunSummary, unknown> = z.looseObject({
   id: z.string(),
   state: openEnum(['running', 'waiting', 'stopping', 'stopped', 'completed', 'failed'], 'running'),
   phase: openEnum(TASK_START_PHASES, 'starting'),
@@ -153,7 +153,7 @@ const taskBoardCardSchema: z.ZodType<TaskBoardWireCard, unknown> = z.object({
   progress: salvagedOptional('progress', progress.nullable()),
   latestComment: salvagedOptional('latestComment', commentSummary.nullable()),
   unreadComments: salvagedOptional('unreadComments', z.number().int().nonnegative()),
-  taskStart: salvagedOptional('taskStart', taskStartSummary.nullable())
+  taskStart: salvagedOptional('taskStart', taskStartSummarySchema.nullable())
 })
 
 const column: z.ZodType<WorkspaceStatusDefinition, unknown> = z.object({

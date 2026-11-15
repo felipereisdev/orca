@@ -1,8 +1,9 @@
 import { Text, View } from 'react-native'
 import { WifiOff } from 'lucide-react-native'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
+import { isTaskStartRunExclusive } from '../../../../src/shared/task-board/task-start-run'
 import { MessageBox } from '../../components/composer-input/MessageBox'
-import { SectionHeader } from '../../components/list/ListGroup'
+import { ListGroup, ListRow, SectionHeader } from '../../components/list/ListGroup'
 import { MobileMarkdown } from '../../components/MobileMarkdown'
 import { MobileLoadErrorState, MobileStateView } from '../../components/MobileStateView'
 import { SheetHeader } from '../../components/nav-bar/SheetHeader'
@@ -29,6 +30,8 @@ type Props = {
   open: boolean
   onSeen: () => void
   onMove: () => void
+  /** "Start as…" for this card; null on a host without task start. */
+  onStartAs: (() => void) | null
   onClose: () => void
 }
 
@@ -111,6 +114,7 @@ export function MobileTaskBoardDetailDrawer({
   open,
   onSeen,
   onMove,
+  onStartAs,
   onClose
 }: Props) {
   useMobileColorScheme()
@@ -134,6 +138,15 @@ export function MobileTaskBoardDetailDrawer({
           {card.projectLabel}
         </Text>
       </View>
+      {onStartAs && !(card.taskStart && isTaskStartRunExclusive(card.taskStart)) ? (
+        <ListGroup style={styles.actions}>
+          <ListRow
+            title={t('tasks.board.start.startAs', 'Start as…')}
+            navigates
+            onPress={onStartAs}
+          />
+        </ListGroup>
+      ) : null}
       {started ? (
         <MobileTaskBoardProgressTimeline
           provider={card.provider}
@@ -176,6 +189,9 @@ const styles = themedStyleSheet(() => ({
   muted: {
     fontSize: typography.metaSize,
     color: colors.textMuted
+  },
+  actions: {
+    marginBottom: spacing.md
   },
   comments: {
     gap: spacing.md

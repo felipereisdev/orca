@@ -15,6 +15,7 @@ import { themedStyleSheet } from '../../theme/themed-styles'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
 import { PROVIDER_LABELS } from '../task-list/mobile-task-view-options'
 import { MobileTaskBoardCard } from './MobileTaskBoardCard'
+import type { TaskBoardRunActions } from './MobileTaskBoardCardRun'
 import { MobileTaskBoardSummary } from './MobileTaskBoardSummary'
 import { taskBoardAllDisconnected, type TaskBoardStage } from './task-board-stages'
 import type { TaskBoardView } from './use-task-board'
@@ -34,6 +35,7 @@ type Props = {
   bottomInset: number
   onOpenCard: (card: TaskBoardWireCard) => void
   onMoveCard: (card: TaskBoardWireCard) => void
+  runActions: TaskBoardRunActions | null
 }
 
 /** The board's body: a state while there is no board to draw, else the chosen stage's cards. */
@@ -98,7 +100,8 @@ function MobileTaskBoardList({
   banner,
   bottomInset,
   onOpenCard,
-  onMoveCard
+  onMoveCard,
+  runActions
 }: Props) {
   const t = useMobileTranslation()
   const [pulling, setPulling] = useState(false)
@@ -156,6 +159,7 @@ function MobileTaskBoardList({
           started={started}
           onOpen={onOpenCard}
           onMove={onMoveCard}
+          runActions={runActions}
         />
       )}
       ItemSeparatorComponent={CardGap}

@@ -424,6 +424,12 @@
         "show_one": "Show {{count}} task",
         "show_other": "Show {{count}} tasks"
       },
+      "start": {
+        "stopConfirm": {
+          "title_one": "Stop the orchestrator and {{count}} agent?",
+          "title_other": "Stop the orchestrator and {{count}} agents?"
+        }
+      },
       "summary": {
         "newComments_one": "{{count}} with new comments",
         "newComments_other": "{{count}} with new comments"

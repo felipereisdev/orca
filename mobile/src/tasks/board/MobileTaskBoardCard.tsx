@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { GitBranch } from 'lucide-react-native'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
+import { isTaskStartRunExclusive } from '../../../../src/shared/task-board/task-start-run'
 import { TaskProviderLogo } from '../../components/TaskProviderLogo'
 import type { Translate } from '../../i18n/mobile-i18n'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
@@ -10,6 +11,8 @@ import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
 import { getLinearPriorityLabel } from '../hosted-review/mobile-tasks-hosted-review'
 import { formatUpdatedAt } from '../item-detail/mobile-tasks-item-mapping'
 import { cardStyles as styles } from './mobile-task-board-card-styles'
+import { CardRunButton, CardRunProgress, type TaskBoardRunActions } from './MobileTaskBoardCardRun'
+import { taskStartStatusText } from './task-board-run-labels'
 import {
   taskBoardChecksLabel,
   taskBoardProgressSteps,
@@ -138,6 +141,9 @@ function CardComment({ card }: { card: TaskBoardWireCard }) {
 // The card is one button to a screen reader, so its label carries what the drawn progress shows.
 function cardAccessibilityLabel(card: TaskBoardWireCard, started: boolean, t: Translate): string {
   const parts = [card.displayId, card.title]
+  if (card.taskStart) {
+    parts.push(`${taskStartStatusText(card.taskStart, t)} ${card.taskStart.percent}%`)
+  }
   if (started) {
     const steps = taskBoardProgressSteps(card.progress)
     parts.push(
@@ -163,19 +169,55 @@ type Props = {
   started: boolean
   onOpen: (card: TaskBoardWireCard) => void
   onMove: (card: TaskBoardWireCard) => void
+  /** ▶︎/⏹ and the run's progress; null on a host without task start. */
+  runActions: TaskBoardRunActions | null
 }
 
-/** One board card: tap opens it, a long press moves it. */
+type CardAction = { name: string; label: string; run: () => void }
+
+/** One board card: tap opens it, a long press moves it, ▶︎/⏹ start or stop its orchestrator. */
 export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
   card,
   started,
   onOpen,
-  onMove
+  onMove,
+  runActions
 }: Props) {
   useMobileColorScheme()
   const t = useMobileTranslation()
   const priority = cardPriorityLabel(card)
   const updated = formatUpdatedAt(card.updatedAt)
+  // Hosts without task start send no `taskStart` at all.
+  const runControls = runActions && card.taskStart !== undefined ? runActions : null
+  const pending = runControls?.pendingRefKeys.has(card.refKey) ?? false
+  const run = card.taskStart ?? null
+  const running = run !== null && isTaskStartRunExclusive(run)
+  // The card is one button to a screen reader; its inner buttons are reached as actions.
+  const actions: CardAction[] = [
+    { name: 'move', label: t('tasks.board.card.move', 'Move'), run: () => onMove(card) }
+  ]
+  if (runControls && !pending) {
+    actions.push(
+      running
+        ? {
+            name: 'stop',
+            label: t('tasks.board.start.stopAction', 'Stop'),
+            run: () => runControls.onStop(card)
+          }
+        : {
+            name: 'start',
+            label: t('tasks.board.start.startAction', 'Start'),
+            run: () => runControls.onStart(card)
+          }
+    )
+  }
+  if (runControls && run && (run.orchestrator?.worktreeId ?? run.worktreeId)) {
+    actions.push({
+      name: 'openRun',
+      label: t('tasks.board.start.openRunAction', 'Open the orchestrator'),
+      run: () => runControls.onOpenRun(card)
+    })
+  }
   return (
     <Pressable
       onPress={() => onOpen(card)}
@@ -183,11 +225,9 @@ export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
       accessibilityRole="button"
       accessibilityLabel={cardAccessibilityLabel(card, started, t)}
       // A long press is out of reach for a screen reader; the move is its own action.
-      accessibilityActions={[{ name: 'move', label: t('tasks.board.card.move', 'Move') }]}
+      accessibilityActions={actions.map(({ name, label }) => ({ name, label }))}
       onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === 'move') {
-          onMove(card)
-        }
+        actions.find((action) => action.name === event.nativeEvent.actionName)?.run()
       }}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
@@ -203,10 +243,21 @@ export const MobileTaskBoardCard = memo(function MobileTaskBoardCard({
         ) : null}
         <View style={styles.headerSpacer} />
         {started && updated ? <Text style={styles.updatedAt}>{updated}</Text> : null}
+        {runControls ? (
+          <CardRunButton
+            card={card}
+            pending={pending}
+            onStart={() => runControls.onStart(card)}
+            onStop={() => runControls.onStop(card)}
+          />
+        ) : null}
       </View>
       <Text style={styles.title} numberOfLines={2}>
         {card.title}
       </Text>
+      {runControls && run ? (
+        <CardRunProgress run={run} onOpen={() => runControls.onOpenRun(card)} />
+      ) : null}
       {started ? (
         <>
           <CardProgress card={card} />

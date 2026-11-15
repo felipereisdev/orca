@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams } from 'expo-router'
@@ -9,9 +9,11 @@ import { FilterChip } from '../../components/nav-bar/FilterChip'
 import { NavBar } from '../../components/nav-bar/NavBar'
 import { NavBarButton } from '../../components/nav-bar/NavBarButton'
 import { StatusDot } from '../../components/StatusDot'
+import { TransientToast, useTransientToast } from '../../components/TransientToast'
 import { useHostProfile } from '../../host-catalog/use-host-profile'
 import { useHostDisplay } from '../../host-descriptors/use-host-display'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
+import type { HostStackRouteHref } from '../../navigation/host-stack-navigation'
 import { useRouteHandoff } from '../../navigation/route-handoff'
 import { useRefreshHint } from '../../query/refresh-hint'
 import { saveTasksSurface } from '../../storage/tasks-surface-preference'
@@ -36,6 +38,7 @@ import {
   type TaskBoardFilter
 } from './task-board-stages'
 import { useTaskBoard } from './use-task-board'
+import { useTaskBoardStart } from './use-task-board-start'
 
 /** My board: the host's Kanban of issues assigned to the user, one stage at a time. */
 export function MobileTaskBoardScreen() {
@@ -54,6 +57,17 @@ export function MobileTaskBoardScreen() {
   const [stageId, setStageId] = useState<string | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [sheet, setSheet] = useState<TaskBoardSheet | null>(null)
+  const toast = useTransientToast()
+  const openHref = useCallback((href: HostStackRouteHref) => router.push(href), [router])
+  const start = useTaskBoardStart({
+    hostId,
+    client,
+    connected: !view.isOffline,
+    onSheet: setSheet,
+    rereadRuns: view.relist,
+    notify: toast.showToast,
+    openHref
+  })
 
   const verdict = classifyConnection({ state: connState, ...connectionInputs })
   const reconnect = hostId && forceReconnect ? () => void forceReconnect(hostId) : null
@@ -180,6 +194,7 @@ export function MobileTaskBoardScreen() {
         bottomInset={insets.bottom}
         onOpenCard={(card) => setSheet({ kind: 'detail', card })}
         onMoveCard={(card) => setSheet({ kind: 'move', card })}
+        runActions={start.actions}
       />
       {board ? (
         <>
@@ -198,9 +213,11 @@ export function MobileTaskBoardScreen() {
             stages={stages}
             sheet={sheet}
             onSheet={setSheet}
+            start={start}
           />
         </>
       ) : null}
+      <TransientToast message={toast.message} bottomInset={insets.bottom} />
     </SafeAreaView>
   )
 }

@@ -4724,6 +4724,104 @@
         "noNewComments": "No new comments",
         "newComments_one": "{{count}} with new comments",
         "newComments_other": "{{count}} with new comments"
+      },
+      "start": {
+        "stopAction": "Stop",
+        "startAction": "Start",
+        "openRunAction": "Open the orchestrator",
+        "pending": "Working on {{id}}…",
+        "stopAgain": "Stop {{id}} again",
+        "stop": "Stop {{id}}",
+        "start": "Start {{id}}",
+        "openRun": "Open the orchestrator: {{status}}, {{percent}}%",
+        "primaryConfirm": {
+          "title": "Start {{id}} in the primary checkout?",
+          "description": "The agents will work directly in the primary checkout.",
+          "action": "Start anyway"
+        },
+        "stopConfirm": {
+          "description": "The worktree, its branch and commits stay as they are.",
+          "titleNoAgents": "Stop the orchestrator?",
+          "title_one": "Stop the orchestrator and {{count}} agent?",
+          "title_other": "Stop the orchestrator and {{count}} agents?"
+        },
+        "startAs": "Start as…",
+        "repository": "Repository",
+        "sheetTitle": "Start {{id}} as…",
+        "sheetNote": "Choices here apply to this start only; saved settings stay as they are.",
+        "chooseRepository": "Choose a repository",
+        "repositoryRequired": "Orca could not tell which repository this issue belongs to. Choose one.",
+        "mode": "Workspace mode",
+        "modeWorktree": "New worktree",
+        "modePrimary": "Primary branch",
+        "baseBranch": "Base branch",
+        "baseBranchDefault": "Default for this repository",
+        "agents": "Agents",
+        "loadingAgents": "Loading agents…",
+        "roleModel": "{{role}} · model",
+        "default": "Default",
+        "roleEffort": "{{role}} · effort",
+        "submit": "Start",
+        "phase": {
+          "starting": "Starting",
+          "planning": "Planning",
+          "planReview": "Plan review",
+          "qaScript": "QA script",
+          "development": "Development",
+          "finalReview": "Final review",
+          "qa": "QA",
+          "completed": "Completed"
+        },
+        "state": {
+          "waiting": "Waiting for you",
+          "stopping": "Stopping…",
+          "stopped": "Stopped",
+          "failed": "Error"
+        },
+        "progress": {
+          "reviewing": "{{current}}/{{total}} · reviewing",
+          "implementing": "{{current}}/{{total}} · implementing"
+        },
+        "failure": {
+          "orchestratorExited": "The orchestrator session ended",
+          "launchFailed": "The orchestrator did not start",
+          "contextFetchFailed": "Could not read the issue",
+          "worktreeCreateFailed": "Could not create the worktree",
+          "stopUnconfirmed": "Stop not confirmed. Stop again.",
+          "cancelled": "Start cancelled"
+        },
+        "openOrchestrator": "Open the orchestrator session",
+        "error": {
+          "alreadyRunning": "This task is already running.",
+          "primaryBusy": "Another task is running in the primary checkout.",
+          "agentUnavailable": "The orchestrator's agent is not available on this host.",
+          "accountNeedsSignIn": "Sign in to the orchestrator's account, then start again.",
+          "worktreeCreateFailed": "Could not create the worktree.",
+          "contextFetchFailed": "Could not read the issue.",
+          "launchFailed": "The orchestrator did not start.",
+          "cancelled": "The start was cancelled.",
+          "repoUnresolved": "Choose a repository for this task.",
+          "primaryNeedsConfirmation": "The primary checkout needs your confirmation.",
+          "startFailed": "Could not start the task.",
+          "stopFailed": "Could not stop the task."
+        },
+        "primaryReason": {
+          "uncommitted": "It has uncommitted changes.",
+          "otherBranch": "It is on a branch other than the base branch."
+        },
+        "role": {
+          "orchestrator": "Orchestrator",
+          "planner": "Planner",
+          "planReviewer": "Plan reviewer",
+          "implementer": "Implementer",
+          "reviewer": "Reviewer",
+          "qa": "QA"
+        },
+        "unavailable": "Unavailable · {{name}}",
+        "chooseAgent": "Choose an agent",
+        "inherit": "Inherit ({{value}})",
+        "needsSignIn": "needs sign-in",
+        "offline": "Starting or stopping a task needs the host."
       }
     }
   },

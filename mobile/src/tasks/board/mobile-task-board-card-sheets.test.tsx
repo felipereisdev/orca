@@ -7,6 +7,11 @@ import type {
   TaskBoardListResult,
   TaskBoardWireCard
 } from '../../../../src/shared/task-board/task-board-wire-types'
+import type { TaskStartRunSummary } from '../../../../src/shared/task-board/task-start-run'
+import {
+  MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+  MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
+} from '../../../../src/shared/mobile-runtime-capabilities'
 import {
   markTaskBoardCommentsSeen,
   type TaskBoardSeenComments
@@ -46,6 +51,7 @@ vi.mock('react-native', async () => {
           ? data.map((item) => h('Row', { key: item.refKey }, renderItem({ item })))
           : ListEmptyComponent
       ),
+    AccessibilityInfo: { announceForAccessibility: () => undefined },
     Platform: { OS: 'ios', select: (options: Record<string, unknown>) => options.ios },
     Pressable: 'Pressable',
     RefreshControl: 'RefreshControl',
@@ -62,13 +68,19 @@ vi.mock('lucide-react-native', () => ({
   ChevronLeft: 'Icon',
   ChevronRight: 'Icon',
   CircleAlert: 'Icon',
+  CircleCheck: 'Icon',
+  CircleStop: 'Icon',
   GitBranch: 'Icon',
   Inbox: 'Icon',
   List: 'Icon',
+  LoaderCircle: 'Icon',
+  MessageCircleQuestion: 'Icon',
   Monitor: 'Icon',
+  Play: 'Icon',
   RefreshCw: 'Icon',
   SearchX: 'Icon',
   SlidersHorizontal: 'Icon',
+  Square: 'Icon',
   Unplug: 'Icon',
   WifiOff: 'Icon',
   X: 'Icon'
@@ -78,8 +90,13 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 })
 }))
 vi.mock('expo-router', () => ({ useLocalSearchParams: () => ({ hostId: link.hostId }) }))
+const pushed = vi.hoisted((): unknown[] => [])
 vi.mock('../../navigation/route-handoff', () => ({
-  useRouteHandoff: () => ({ back: () => undefined, replace: () => undefined })
+  useRouteHandoff: () => ({
+    back: () => undefined,
+    replace: () => undefined,
+    push: (href: unknown) => pushed.push(href)
+  })
 }))
 // The chrome around the board: the stage tabs stay reachable through the accessory.
 vi.mock('../../components/nav-bar/NavBar', () => ({
@@ -150,7 +167,11 @@ import { MobileTaskBoardScreen } from './MobileTaskBoardScreen'
 
 const REF_KEY = 'jira:site-1:ORCA-12'
 
-function boardCard(columnId: string, unreadComments?: number): TaskBoardWireCard {
+function boardCard(
+  columnId: string,
+  unreadComments?: number,
+  taskStart?: TaskStartRunSummary | null
+): TaskBoardWireCard {
   return {
     refKey: REF_KEY,
     provider: 'jira',
@@ -189,11 +210,16 @@ function boardCard(columnId: string, unreadComments?: number): TaskBoardWireCard
     moveTargets: ['todo', 'in-progress', 'done']
       .filter((target) => target !== columnId)
       .map((target) => ({ columnId: target, allowed: true })),
-    ...(unreadComments === undefined ? {} : { unreadComments })
+    ...(unreadComments === undefined ? {} : { unreadComments }),
+    ...(taskStart === undefined ? {} : { taskStart })
   }
 }
 
-function board(columnId: string, unreadComments?: number): TaskBoardListResult {
+function board(
+  columnId: string,
+  unreadComments?: number,
+  taskStart?: TaskStartRunSummary | null
+): TaskBoardListResult {
   return {
     columns: [
       { id: 'todo', label: 'To do' },
@@ -201,7 +227,7 @@ function board(columnId: string, unreadComments?: number): TaskBoardListResult {
       { id: 'done', label: 'Done' }
     ],
     doneColumnId: 'done',
-    cards: [boardCard(columnId, unreadComments)],
+    cards: [boardCard(columnId, unreadComments, taskStart)],
     providers: {
       github: { status: 'disconnected' },
       gitlab: { status: 'disconnected' },
@@ -265,10 +291,14 @@ async function renderBoard(stored: TaskBoardListResult | null): Promise<ReactTes
   return tree
 }
 
-function pressable(root: ReactTestInstance, label: string): ReactTestInstance {
-  const matches = findAllByHostType(root, 'Pressable').filter(
+function controls(root: ReactTestInstance, label: string): ReactTestInstance[] {
+  return findAllByHostType(root, 'Pressable').filter(
     (node) => node.props.accessibilityLabel === label
   )
+}
+
+function pressable(root: ReactTestInstance, label: string): ReactTestInstance {
+  const matches = controls(root, label)
   if (matches.length !== 1) {
     throw new Error(`expected one "${label}" control, found ${String(matches.length)}`)
   }
@@ -542,5 +572,132 @@ describe('reading a card on My board', () => {
     await settleQueryNotifications()
 
     expect(shownCardLabel(root)).toContain('2 new')
+  })
+})
+
+describe('starting a card on My board', () => {
+  const RUN_WORKTREE = 'repo-1::/work/orca-12'
+  const running: TaskStartRunSummary = {
+    id: 'run-1',
+    state: 'running',
+    phase: 'starting',
+    updatedAt: '2026-11-15T10:00:00.000Z',
+    percent: 0,
+    worktreeId: RUN_WORKTREE,
+    orchestrator: {
+      hostId: 'local',
+      agent: 'claude',
+      worktreeId: RUN_WORKTREE,
+      surface: 'terminal',
+      paneKey: 'tab-1:leaf-1'
+    }
+  }
+  const startParams = z.object({ confirmPrimary: z.boolean().optional() })
+
+  function status(capabilities: string[]): RpcResponse {
+    return reply({ capabilities })
+  }
+
+  it('offers no start on a host that never announced task start', async () => {
+    link.hostId = 'host-without-start'
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      sendRequest: async (method) => {
+        switch (method) {
+          case 'status.get':
+            return status([MOBILE_TASK_BOARD_RUNTIME_CAPABILITY])
+          case 'taskBoard.list':
+            return reply(board('in-progress', undefined, null))
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+
+    expect(shownCardIds(root)).toEqual(['ORCA-12'])
+    expect(controls(root, 'Start ORCA-12')).toEqual([])
+  })
+
+  it('starts in the primary checkout once the user confirms it, then opens the orchestrator', async () => {
+    const starts: unknown[] = []
+    pushed.length = 0
+    link.hostId = 'host-primary'
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      sendRequest: async (method, params) => {
+        switch (method) {
+          case 'status.get':
+            return status([
+              MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+              MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
+            ])
+          case 'taskBoard.list':
+            return reply(board('in-progress', undefined, null))
+          case 'taskBoard.startTask':
+            starts.push(params)
+            return startParams.parse(params).confirmPrimary
+              ? reply({ ok: true, run: running })
+              : reply({ ok: false, error: 'primary_needs_confirmation', reasons: ['uncommitted'] })
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    const root = (await renderBoard(null)).root
+
+    await showStage(root, 'in-progress')
+    await press(root, 'Start ORCA-12')
+    await press(root, 'Start anyway')
+
+    const ref = { provider: 'jira', siteId: 'site-1', key: 'ORCA-12' }
+    expect(starts).toEqual([{ ref }, { ref, confirmPrimary: true }])
+    expect(pushed).toEqual([
+      {
+        pathname: '/h/[hostId]/session/[worktreeId]',
+        params: { hostId: 'host-primary', worktreeId: RUN_WORKTREE, paneKey: 'tab-1:leaf-1' }
+      }
+    ])
+  })
+
+  it("re-reads the board when the host says a card's run changed", async () => {
+    let run: TaskStartRunSummary | null = null
+    const stream: { emit: (payload: unknown) => void } = { emit: () => undefined }
+    link.hostId = 'host-runs-changed'
+    link.state = 'connected'
+    link.client = stubRpcClient({
+      subscribe: (method, _params, onData) => {
+        if (method === 'runtime.clientEvents.subscribe') {
+          stream.emit = onData
+        }
+        return () => undefined
+      },
+      sendRequest: async (method) => {
+        switch (method) {
+          case 'status.get':
+            return status([
+              MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+              MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
+            ])
+          case 'taskBoard.list':
+            return reply(board('in-progress', undefined, run))
+          default:
+            throw new Error(`unscripted request: ${method}`)
+        }
+      }
+    })
+    const root = (await renderBoard(null)).root
+    await showStage(root, 'in-progress')
+    await act(async () => stream.emit({ type: 'ready' }))
+    expect(controls(root, 'Stop ORCA-12')).toEqual([])
+
+    // Another client started the card; only the event tells this phone.
+    run = running
+    await act(async () => stream.emit({ type: 'taskBoardRunsChanged', cardKeys: [REF_KEY] }))
+    await settleQueryNotifications()
+
+    expect(controls(root, 'Stop ORCA-12')).toHaveLength(1)
   })
 })
