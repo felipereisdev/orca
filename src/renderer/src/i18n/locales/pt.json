@@ -24873,5 +24873,144 @@
     "noColumnMapping": "Mapeie um status para {{column}} em Configurações → Origens de Tarefas.",
     "choiceExpired": "Essa mudança de status não está mais disponível. Tente mover novamente.",
     "hostUnavailable": "Este host não está disponível."
+  },
+  "taskStart": {
+    "optionsLoadFailed": "Não foi possível carregar as opções de agente.",
+    "provider": "Agente",
+    "model": "Modelo",
+    "effort": "Esforço",
+    "chooseAgent": "Escolha um agente",
+    "inherit": "Herdar ({{value}})",
+    "defaultOption": "Padrão",
+    "unavailable": "Indisponível · {{name}}",
+    "needsSignIn": "precisa de login",
+    "roles": {
+      "orchestrator": "Orquestrador",
+      "planner": "Planejador",
+      "planReviewer": "Revisor do plano",
+      "implementer": "Implementador",
+      "reviewer": "Revisor",
+      "qa": "QA"
+    },
+    "settings": {
+      "title": "Iniciar tarefa",
+      "description": "Agente, modelo e esforço padrão para cada função ao iniciar uma tarefa pelo quadro. Os projetos podem substituí-los.",
+      "searchDescription": "Agentes, modelos e esforço padrão das funções que executam uma tarefa do quadro.",
+      "loading": "Carregando agentes…",
+      "noDefaultAgent": "Sem agente padrão",
+      "search": {
+        "start": "iniciar tarefa",
+        "agent": "agente",
+        "model": "modelo",
+        "effort": "esforço",
+        "roles": "funções",
+        "orchestrator": "orquestrador"
+      }
+    },
+    "repository": {
+      "title": "Iniciar tarefa",
+      "description": "Como as tarefas começam neste projeto e quais agentes executam cada função. As funções deixadas em herdar usam os padrões globais.",
+      "searchDescription": "Modo de workspace, ramo base e agentes usados quando uma tarefa inicia neste projeto.",
+      "mode": "Modo de workspace",
+      "baseBranch": "Ramo base para novos worktrees",
+      "agents": "Agentes",
+      "modeWorktree": "Novo worktree",
+      "modePrimary": "Ramo principal",
+      "modeWorktreeHint": "Cada início cria um novo worktree a partir do ramo base.",
+      "modePrimaryHint": "Os agentes trabalham no checkout principal. Você confirma antes se ele tiver alterações ou se outra tarefa estiver em execução.",
+      "noDefault": "Sem agente padrão",
+      "search": {
+        "start": "iniciar tarefa",
+        "mode": "modo de workspace",
+        "worktree": "worktree",
+        "base": "ramo base",
+        "agent": "agente modelo esforço funções"
+      },
+      "inheritGlobal": "global"
+    },
+    "phase": {
+      "starting": "Iniciando",
+      "planning": "Planejamento",
+      "planReview": "Revisão do plano",
+      "qaScript": "Roteiro de QA",
+      "development": "Desenvolvimento",
+      "finalReview": "Revisão final",
+      "qa": "QA",
+      "completed": "Concluído"
+    },
+    "state": {
+      "waiting": "Aguardando você",
+      "stopping": "Parando…",
+      "stopped": "Parado",
+      "failed": "Erro"
+    },
+    "progress": {
+      "reviewing": "{{current}}/{{total}} · revisando",
+      "implementing": "{{current}}/{{total}} · implementando"
+    },
+    "failure": {
+      "orchestratorExited": "A sessão do orquestrador terminou",
+      "launchFailed": "O orquestrador não iniciou",
+      "contextFetchFailed": "Não foi possível ler a issue",
+      "worktreeCreateFailed": "Não foi possível criar o worktree",
+      "stopUnconfirmed": "Parada não confirmada. Pare novamente.",
+      "cancelled": "Início cancelado"
+    },
+    "openOrchestrator": "Abrir a sessão do orquestrador",
+    "openRun": "Abrir o orquestrador: {{status}}, {{percent}}%",
+    "pending": "Trabalhando em {{id}}…",
+    "stopAgainCard": "Parar {{id}} novamente",
+    "stopCard": "Parar {{id}}",
+    "stopAgain": "Parar novamente",
+    "stop": "Parar",
+    "startCard": "Iniciar {{id}}",
+    "start": "Iniciar tarefa",
+    "startOptions": "Opções de início para {{id}}",
+    "startAs": "Iniciar como…",
+    "dialog": {
+      "title": "Iniciar {{id}} como…",
+      "description": "As escolhas aqui valem só para este início; as configurações salvas permanecem como estão.",
+      "repository": "Repositório",
+      "chooseRepository": "Escolha um repositório",
+      "repositoryRequired": "O Orca não conseguiu identificar a qual repositório esta issue pertence. Escolha um.",
+      "baseBranch": "Ramo base",
+      "cancel": "Cancelar",
+      "starting": "Iniciando…",
+      "start": "Iniciar",
+      "baseBranchThisStart": "Só para este início",
+      "baseBranchRepository": "Padrão do repositório"
+    },
+    "stopConfirm": {
+      "titleNoAgents": "Parar o orquestrador?",
+      "title_one": "Parar o orquestrador e {{count}} agente?",
+      "title_other": "Parar o orquestrador e {{count}} agentes?",
+      "title_many": "Parar o orquestrador e {{count}} agentes?",
+      "description": "O worktree, seu ramo e os commits permanecem como estão."
+    },
+    "primaryConfirm": {
+      "title": "Iniciar {{id}} no checkout principal?",
+      "description": "Os agentes trabalharão diretamente no checkout principal.",
+      "action": "Iniciar mesmo assim"
+    },
+    "openRunFailed": "O workspace da tarefa não está disponível nesta janela.",
+    "error": {
+      "startFailed": "Não foi possível iniciar a tarefa.",
+      "stopFailed": "Não foi possível parar a tarefa.",
+      "alreadyRunning": "Esta tarefa já está em execução.",
+      "primaryBusy": "Outra tarefa está em execução no checkout principal.",
+      "agentUnavailable": "O agente do orquestrador não está disponível neste host.",
+      "accountNeedsSignIn": "Entre na conta do orquestrador e inicie novamente.",
+      "worktreeCreateFailed": "Não foi possível criar o worktree.",
+      "contextFetchFailed": "Não foi possível ler a issue.",
+      "launchFailed": "O orquestrador não iniciou.",
+      "cancelled": "O início foi cancelado.",
+      "repoUnresolved": "Escolha um repositório para esta tarefa.",
+      "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação."
+    },
+    "primaryReason": {
+      "uncommitted": "Há alterações não commitadas.",
+      "otherBranch": "Está em um ramo diferente do ramo base."
+    },
+    "waitingNotification": "{{title}} está aguardando você"
   }
 }

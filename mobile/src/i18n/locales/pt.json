@@ -4668,6 +4668,107 @@
         "newComments_one": "{{count}} com comentários novos",
         "newComments_other": "{{count}} com comentários novos",
         "newComments_many": "{{count}} com comentários novos"
+      },
+      "start": {
+        "stopAction": "Parar",
+        "startAction": "Iniciar",
+        "openRunAction": "Abrir o orquestrador",
+        "pending": "Trabalhando em {{id}}…",
+        "stopAgain": "Parar {{id}} novamente",
+        "stop": "Parar {{id}}",
+        "start": "Iniciar {{id}}",
+        "openRun": "Abrir o orquestrador: {{status}}, {{percent}}%",
+        "primaryConfirm": {
+          "title": "Iniciar {{id}} no checkout principal?",
+          "description": "Os agentes trabalharão diretamente no checkout principal.",
+          "action": "Iniciar mesmo assim"
+        },
+        "stopConfirm": {
+          "description": "O worktree, seu ramo e os commits permanecem como estão.",
+          "titleNoAgents": "Parar o orquestrador?",
+          "title_one": "Parar o orquestrador e {{count}} agente?",
+          "title_other": "Parar o orquestrador e {{count}} agentes?",
+          "title_many": "Parar o orquestrador e {{count}} agentes?"
+        },
+        "startAs": "Iniciar como…",
+        "repository": "Repositório",
+        "sheetTitle": "Iniciar {{id}} como…",
+        "sheetNote": "As escolhas aqui valem só para este início; as configurações salvas permanecem como estão.",
+        "chooseRepository": "Escolha um repositório",
+        "repositoryRequired": "O Orca não conseguiu identificar a qual repositório esta issue pertence. Escolha um.",
+        "mode": "Modo de workspace",
+        "modeWorktree": "Novo worktree",
+        "modePrimary": "Ramo principal",
+        "baseBranch": "Ramo base",
+        "baseBranchDefault": "Padrão do repositório",
+        "agents": "Agentes",
+        "loadingAgents": "Carregando agentes…",
+        "roleModel": "{{role}} · modelo",
+        "default": "Padrão",
+        "roleEffort": "{{role}} · esforço",
+        "submit": "Iniciar",
+        "phase": {
+          "starting": "Iniciando",
+          "planning": "Planejamento",
+          "planReview": "Revisão do plano",
+          "qaScript": "Roteiro de QA",
+          "development": "Desenvolvimento",
+          "finalReview": "Revisão final",
+          "qa": "QA",
+          "completed": "Concluído"
+        },
+        "state": {
+          "waiting": "Aguardando você",
+          "stopping": "Parando…",
+          "stopped": "Parado",
+          "failed": "Erro"
+        },
+        "progress": {
+          "reviewing": "{{current}}/{{total}} · revisando",
+          "implementing": "{{current}}/{{total}} · implementando"
+        },
+        "failure": {
+          "orchestratorExited": "A sessão do orquestrador terminou",
+          "launchFailed": "O orquestrador não iniciou",
+          "contextFetchFailed": "Não foi possível ler a issue",
+          "worktreeCreateFailed": "Não foi possível criar o worktree",
+          "stopUnconfirmed": "Parada não confirmada. Pare novamente.",
+          "cancelled": "Início cancelado"
+        },
+        "openOrchestrator": "Abrir a sessão do orquestrador",
+        "error": {
+          "alreadyRunning": "Esta tarefa já está em execução.",
+          "primaryBusy": "Outra tarefa está em execução no checkout principal.",
+          "agentUnavailable": "O agente do orquestrador não está disponível neste host.",
+          "accountNeedsSignIn": "Entre na conta do orquestrador e inicie novamente.",
+          "worktreeCreateFailed": "Não foi possível criar o worktree.",
+          "contextFetchFailed": "Não foi possível ler a issue.",
+          "launchFailed": "O orquestrador não iniciou.",
+          "cancelled": "O início foi cancelado.",
+          "repoUnresolved": "Escolha um repositório para esta tarefa.",
+          "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação.",
+          "startFailed": "Não foi possível iniciar a tarefa.",
+          "stopFailed": "Não foi possível parar a tarefa."
+        },
+        "primaryReason": {
+          "uncommitted": "Há alterações não commitadas.",
+          "otherBranch": "Está em um ramo diferente do ramo base."
+        },
+        "role": {
+          "orchestrator": "Orquestrador",
+          "planner": "Planejador",
+          "planReviewer": "Revisor do plano",
+          "implementer": "Implementador",
+          "reviewer": "Revisor",
+          "qa": "QA"
+        },
+        "unavailable": "Indisponível · {{name}}",
+        "chooseAgent": "Escolha um agente",
+        "inherit": "Herdar ({{value}})",
+        "needsSignIn": "precisa de login",
+        "offline": "Iniciar ou parar uma tarefa precisa do host.",
+        "searchBranches": "Buscar ramos",
+        "noBranches": "Nenhum ramo corresponde."
       }
     }
   },
