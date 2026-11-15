@@ -85,12 +85,12 @@ export const MAX_TASK_START_RUNS = 500
 const MAX_STRING_LENGTH = 2000
 
 const PHASE_PERCENT: Record<Exclude<TaskStartPhase, 'development'>, number> = {
-  starting: 2,
+  starting: 0,
   planning: 10,
   'plan-review': 20,
   'qa-script': 25,
-  'final-review': 90,
-  qa: 95,
+  'final-review': 85,
+  qa: 92,
   completed: 100
 }
 const DEVELOPMENT_START = 30
