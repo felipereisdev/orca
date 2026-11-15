@@ -1,3 +1,4 @@
+import type { RuntimeClientEvent } from '../../../shared/runtime-client-events'
 import { OrcaRuntimeWithStateFields } from '../construction/runtime-construction'
 import {
   persistClientHostedBrowserPages,
@@ -193,6 +194,13 @@ export abstract class OrcaRuntimeWithPtyForegroundProcessReads extends OrcaRunti
     }
     this.store.updateUI(updates)
     return this.store.getUI()
+  }
+
+  /** Task-start run changes the board's clients refetch on. */
+  notifyTaskBoardRunsChanged(
+    event: Extract<RuntimeClientEvent, { type: 'taskBoardRunsChanged' }>
+  ): void {
+    this.emitClientEvent(event)
   }
 
   /** The live desktop window's Agents-list verdicts; null with no window, so worktree.ps claims none. */

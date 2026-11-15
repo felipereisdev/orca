@@ -3,6 +3,7 @@ import type { JiraQuickFilterState } from './jira/jira-quick-filters'
 import type { BrowserDevToolsDockLayout } from './browser/devtools/browser-devtools-dock'
 import type { JiraSavedFilterState } from './jira/jira-saved-filters'
 import type { TaskBoardSeenComments } from './task-board/task-board-seen-comments'
+import type { TaskStartRun } from './task-board/task-start-run'
 import type { ReleaseChannel } from './release-channel'
 import type { WorkspaceCleanupUIState } from './workspace-cleanup/workspace-cleanup'
 import type { FeatureTipSeenId } from './feature-tips'
@@ -42,6 +43,8 @@ export type PersistedUIState = {
   jiraQuickFilterState?: JiraQuickFilterState
   /** Host-owned read markers for My board comments, keyed by card refKey; shared by every client. */
   taskBoardSeenComments?: TaskBoardSeenComments
+  /** Host-owned task-start runs keyed by run id; one exclusive run per board card. */
+  taskStartRuns?: Record<string, TaskStartRun>
   lastActiveRepoId: string | null
   lastActiveWorktreeId: string | null
   /** Active top-level view at save time, restored on relaunch; sanitized to 'terminal' if unknown or now-gated. */

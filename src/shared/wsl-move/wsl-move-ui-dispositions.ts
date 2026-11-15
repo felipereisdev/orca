@@ -77,6 +77,10 @@ export const UI_STATE_DISPOSITIONS = {
     38,
     'Read markers belong to the account host, not a moved workspace.'
   ),
+  taskStartRuns: notApplicableDisposition(
+    38,
+    'Runs belong to the host that started them; a move does not carry a live orchestrator.'
+  ),
   taskResumeState: notApplicableDisposition(38)
 } as const satisfies Partial<Record<keyof PersistedUIState, WslMoveFieldDisposition>>
 

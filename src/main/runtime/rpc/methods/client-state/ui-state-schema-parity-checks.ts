@@ -9,6 +9,7 @@ type MainOwnedUIState =
   | 'jiraSavedFilterState'
   | 'jiraQuickFilterState'
   | 'taskBoardSeenComments'
+  | 'taskStartRuns'
   | '_explorerDisplayRootMigrated'
   | 'trayMinimizeNoticeShown'
   | 'dashboardPopoutBounds'

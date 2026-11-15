@@ -21,6 +21,12 @@ export type RuntimeClientEvent =
       acknowledgement: NotificationAttentionAcknowledgement
     }
   | { type: 'reposChanged' }
+  /** Task-start runs changed for these board cards; `waiting` lists runs that just began waiting on the user. */
+  | {
+      type: 'taskBoardRunsChanged'
+      cardKeys: string[]
+      waiting?: { cardKey: string; worktreeId: string; title: string }[]
+    }
   | { type: 'nativeChatQueueFollowUpsChanged'; queueFollowUps: boolean }
   | { type: 'nativeChatCiResultLinesChanged'; ciResultLines: boolean }
   /** The Workspace options UI state changed; a mirroring phone re-reads it. */

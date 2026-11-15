@@ -11,6 +11,7 @@ import {
 import { isExistingPersistedProfile } from '../../../../shared/project-order-manual-default-notice'
 import { resolveUsagePercentageDisplayChangeNoticeDismissed } from '../../../../shared/usage-percentage-display-change-notice'
 import { normalizeTaskBoardSeenComments } from '../../../../shared/task-board/task-board-seen-comments'
+import { normalizeTaskStartRuns } from '../../../../shared/task-board/task-start-run'
 import { normalizePersistedWorkspaceStatuses } from '../../../../shared/workspace-statuses'
 import {
   normalizeRightSidebarExplorerView,
@@ -229,6 +230,9 @@ export function normalizeLoadedUiState(
     showDotfilesByWorktree: normalizeShowDotfilesByWorktree(parsed.ui?.showDotfilesByWorktree),
     ...(parsed.ui?.taskBoardSeenComments !== undefined
       ? { taskBoardSeenComments: normalizeTaskBoardSeenComments(parsed.ui.taskBoardSeenComments) }
+      : {}),
+    ...(parsed.ui?.taskStartRuns !== undefined
+      ? { taskStartRuns: normalizeTaskStartRuns(parsed.ui.taskStartRuns) }
       : {}),
     workspaceStatuses,
     _workspaceStatusesDefaultOrderMigrated: true,

@@ -9,6 +9,7 @@ import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
 import type { Repo } from '../../shared/repo-types'
 import type { RuntimeWorktreeListResult } from '../../shared/runtime-worktree-contracts'
 import { resolveSourceControlBaseRef } from '../../shared/source-control/decisions/source-control-base-ref-resolution'
+import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 import { normalizeTaskBoardSeenComments } from '../../shared/task-board/task-board-seen-comments'
 import type { TaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { normalizeVisibleTaskProviders } from '../../shared/work-items/task-providers'
@@ -44,6 +45,7 @@ import { runPreflightCheck } from '../preflight/agent-detection'
 import { readHostedReviewForBranch } from '../source-control/hosted-review'
 import { getStoredRepoExecutionHostId } from '../workspaces/execution-host/repo-execution-host'
 import type { LocalProjectGhExecOptions } from '../workspaces/execution-host/project-runtime-git-options'
+import type { TaskStartRunStoreDeps } from './task-start-run-store'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
 import { findTaskBoardHostRepo, isTaskBoardHostExecuted } from './task-board-host-repos'
 import { createTaskBoardHostSources } from './task-board-host-sources'
@@ -62,6 +64,9 @@ export type TaskBoardRuntime = {
   listRepos(): Repo[]
   getClientSettings(): { taskBoard: TaskBoardSettings; visibleTaskProviders: unknown }
   getUIState(): PersistedUIState
+  notifyTaskBoardRunsChanged(
+    event: Extract<RuntimeClientEvent, { type: 'taskBoardRunsChanged' }>
+  ): void
   updateUIState(updates: Partial<PersistedUIState>): unknown
   getLocalGitExecutionOptionArgs(repo: Repo): [] | [LocalProjectGhExecOptions]
   listManagedWorktrees(repoSelector?: string, limit?: number): Promise<RuntimeWorktreeListResult>
@@ -227,5 +232,18 @@ export function createTaskBoardServiceDeps(
     updateGitHubIssue,
     readSeen: () => normalizeTaskBoardSeenComments(runtime.getUIState().taskBoardSeenComments),
     writeSeen: (next) => runtime.updateUIState({ taskBoardSeenComments: next })
+  }
+}
+
+/** Persistence and change-event wiring for the task-start run store. */
+export function createTaskStartRunStoreDeps(runtime: TaskBoardRuntime): TaskStartRunStoreDeps {
+  return {
+    // Already normalized at load; re-normalizing here would fail runs still pending in this process.
+    read: () => runtime.getUIState().taskStartRuns ?? {},
+    write: (next) => {
+      runtime.updateUIState({ taskStartRuns: next })
+    },
+    now: () => new Date(),
+    emit: (event) => runtime.notifyTaskBoardRunsChanged(event)
   }
 }
