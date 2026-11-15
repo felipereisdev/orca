@@ -2,11 +2,16 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { WorkerStopReceipt } from '../../shared/orchestration/workers/orchestration-worker-stop-receipt'
 import type { TaskStartOrchestratorRef, TaskStartRun } from '../../shared/task-board/task-start-run'
 import type { PtyLivenessVerdict } from '../../shared/terminal/pty/lifecycle/pty-liveness-verdict'
+import { WorkerStartParams } from '../../shared/rpc-contract/orchestration-worker-start-params'
+import { ensureRemoteDispatchRecord } from '../runtime/orchestration/db/remote-owned/remote-dispatch-records'
+import { openRemoteRunLink } from '../runtime/orchestration/db/remote-owned/remote-run-links'
+import { startRemoteOwnedWorker } from '../runtime/orchestration/federation/remote-owned/remote-owned-start'
 import { fenceCoordinator } from '../runtime/orchestration/workers/launch/coordinator-start-fence'
 import { createOrchestrationWorkerReleaseHarness } from '../runtime/rpc/methods/orchestration/worker/testing/worker-release.test-support'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
 import { createTaskStartRunStore, type TaskStartRunStore } from './task-start-run-store'
 import { stopTaskStartRun, type TaskStartStopDeps } from './task-start-stop'
+import { listTaskStartWorkers } from './task-start-stop-deps'
 
 const CARD = 'jira:a:APP-1'
 const OTHER_PANE = 'tab_other:cccccccc-cccc-4ccc-8ccc-cccccccccccc'
@@ -54,6 +59,7 @@ function harness(
     receipt?: (dispatchId: string) => WorkerStopReceipt
     onClose?: () => Promise<void>
     onProbe?: () => void
+    orchestrator?: TaskStartOrchestratorRef
     liveWorkers?: TaskStartStopDeps['orchestration']['liveWorkers']
   } = {}
 ) {
@@ -74,7 +80,7 @@ function harness(
   })
   workers.push(createWorker(secondRun))
   createWorker(secondRun, 'term_other', OTHER_PANE)
-  const orchestrator: TaskStartOrchestratorRef = {
+  const orchestrator: TaskStartOrchestratorRef = hooks.orchestrator ?? {
     hostId: 'local',
     agent: 'claude',
     worktreeId: 'wt-1',
@@ -99,7 +105,7 @@ function harness(
       subscribeAgentExited: () => () => {}
     },
     chat: {
-      liveness: () => 'unverifiable',
+      liveness: () => (pty.status === 'exited' ? 'gone' : 'alive'),
       liveSessionId: () => null,
       subscribeTabHidden: () => () => {},
       subscribeStatus: () => null
@@ -114,9 +120,7 @@ function harness(
     },
     orchestration: {
       fence: (coordinator) => fenceCoordinator(h.runtime, coordinator),
-      liveWorkers:
-        hooks.liveWorkers ??
-        ((coordinator) => h.db.listLiveWorkerDispatchIdsCreatedBy(coordinator)),
+      liveWorkers: hooks.liveWorkers ?? ((coordinator) => listTaskStartWorkers(h.db, coordinator)),
       stopWorker: async (dispatchId) => {
         calls.push(dispatchId)
         const receipt = (hooks.receipt ?? stopped)(dispatchId)
@@ -137,7 +141,7 @@ function harness(
     orchestrator,
     phase: 'development'
   })!
-  return { store, deps, calls, run, workers, secondRun }
+  return { store, deps, calls, run, workers, firstRun, secondRun }
 }
 
 describe('stopTaskStartRun', () => {
@@ -181,6 +185,53 @@ describe('stopTaskStartRun', () => {
     expect(calls.slice(1).sort()).toEqual([...workers].sort())
   })
 
+  it('refuses a start on a server that owns its workers once the stop has begun', async () => {
+    let refusal: unknown
+    const { deps } = harness({
+      onClose: async () => {
+        refusal = await startRemoteOwnedWorker(
+          h.runtime,
+          WorkerStartParams.parse({ spec: 'remote subtask', from: 'term_coord', on: 'linux-box' }),
+          { runtime: h.runtime },
+          undefined
+        )
+          .then(() => 'started')
+          .catch((error: unknown) => error)
+      }
+    })
+
+    await stopTaskStartRun(CARD, deps, undefined)
+
+    expect(refusal).toMatchObject({ code: 'coordinator_stopped' })
+  })
+
+  it('keeps the run stopping while a server-owned worker of an earlier Run is unproven', async () => {
+    const remoteDispatch = 'ctx_remote_1'
+    const { store, deps, calls, run, firstRun } = harness({
+      receipt: (dispatchId) =>
+        dispatchId === remoteDispatch
+          ? {
+              dispatchId,
+              state: 'stop_requested',
+              alreadySettled: false,
+              processAction: 'none'
+            }
+          : stopped(dispatchId)
+    })
+    const link = openRemoteRunLink(h.db, firstRun, {
+      environmentId: 'env_linux',
+      name: 'linux-box',
+      peerFingerprint: 'linux_fingerprint'
+    })
+    const task = h.db.createTask({ runId: firstRun, spec: 'remote subtask' })
+    ensureRemoteDispatchRecord(h.db, link, { dispatchId: remoteDispatch, taskId: task.id })
+
+    await stopTaskStartRun(CARD, deps, undefined)
+
+    expect(calls).toContain(remoteDispatch)
+    expect(store.getById(run.id)).toMatchObject({ state: 'stopping', failure: 'stop-unconfirmed' })
+  })
+
   it('stops a worker that appears after the first listing', async () => {
     let late: string | undefined
     const { store, deps, calls, run, secondRun } = harness({
@@ -193,6 +244,22 @@ describe('stopTaskStartRun', () => {
 
     expect(calls).toContain(late)
     expect(store.getById(run.id)?.state).toBe('stopped')
+  })
+
+  it('keeps the run stopping when the orchestrator names no coordinator to list', async () => {
+    const { store, deps, run } = harness({
+      orchestrator: {
+        hostId: 'local',
+        agent: 'claude',
+        worktreeId: 'wt-1',
+        surface: 'chat',
+        sessionId: 'not a session id'
+      }
+    })
+
+    await stopTaskStartRun(CARD, deps, undefined)
+
+    expect(store.getById(run.id)).toMatchObject({ state: 'stopping', failure: 'stop-unconfirmed' })
   })
 
   it('keeps the run stopping when the workers cannot be listed', async () => {

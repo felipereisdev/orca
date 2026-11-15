@@ -26,7 +26,7 @@ export type TaskStartStopDeps = {
   orchestration: {
     /** Refuses the coordinator's later worker starts in this process. */
     fence(coordinator: OrchestrationCoordinatorKey): void
-    /** Unsettled workers the coordinator created, in any of its Runs. */
+    /** Unsettled workers the coordinator created, in any of its Runs, here or on a server. */
     liveWorkers(coordinator: OrchestrationCoordinatorKey): string[]
     stopWorker(dispatchId: string, mutation: StopMutation): Promise<WorkerStopReceipt>
   }
@@ -104,7 +104,13 @@ async function stopOrchestration(
   const gone = (await probeOrchestrator(ref, deps.lifecycle, run.startedAt)) === 'gone'
   // Once more after the probe: a start inserted before the fence may have listed late.
   const second = await stopLiveWorkers(coordinator, attempted, deps, mutation)
-  return first && gone && second
+  // A key naming nobody lists no workers, which proves nothing.
+  const identified = !!(
+    coordinator.terminalHandle ||
+    coordinator.paneKey ||
+    coordinator.orcaSessionId
+  )
+  return identified && first && gone && second
 }
 
 function previewAgents(run: TaskStartRun, deps: TaskStartStopDeps): number {

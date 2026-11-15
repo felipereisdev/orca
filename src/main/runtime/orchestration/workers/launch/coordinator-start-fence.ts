@@ -21,7 +21,13 @@ export function fenceCoordinator(runtime: object, coordinator: OrchestrationCoor
   if (!coordinator.terminalHandle && !coordinator.paneKey && !coordinator.orcaSessionId) {
     return
   }
-  const fences = fencesByRuntime.get(runtime) ?? []
+  // A repeated ⏹ moves its fence to the newest slot instead of pushing others out of the window.
+  const fences = (fencesByRuntime.get(runtime) ?? []).filter(
+    (fence) =>
+      fence.terminalHandle !== coordinator.terminalHandle ||
+      fence.paneKey !== coordinator.paneKey ||
+      fence.orcaSessionId !== coordinator.orcaSessionId
+  )
   fences.push(coordinator)
   fencesByRuntime.set(runtime, fences.slice(-MAX_FENCES))
 }

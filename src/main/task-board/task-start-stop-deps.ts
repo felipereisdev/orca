@@ -9,6 +9,15 @@ import {
   retireCapturedStructuredSessionSurface
 } from '../runtime/agent-session/structured-agent-session-close'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { OrchestrationCoordinatorKey } from '../runtime/orchestration/addressing/orchestration-caller-identity'
+import type { OrchestrationDb } from '../runtime/orchestration/db/orchestration-db'
+import type { WorkerStopReceipt } from '../../shared/orchestration/workers/orchestration-worker-stop-receipt'
+import {
+  getRemoteDispatch,
+  isRemoteDispatchTerminal
+} from '../runtime/orchestration/db/remote-owned/remote-dispatch-records'
+import { getOpenRemoteRunLink } from '../runtime/orchestration/db/remote-owned/remote-run-links'
+import { stopRemoteWorker } from '../runtime/orchestration/federation/remote-owned/remote-owned-stop'
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
 import { fenceCoordinator } from '../runtime/orchestration/workers/launch/coordinator-start-fence'
 import { stopWorkerAndHelpers } from '../runtime/rpc/methods/orchestration/worker/worker-stop'
@@ -40,6 +49,45 @@ export async function closeTaskStartOrchestrator(
   }
 }
 
+/** Every unsettled worker the coordinator started: here, and on servers that own their workers. */
+export function listTaskStartWorkers(
+  db: OrchestrationDb,
+  coordinator: OrchestrationCoordinatorKey
+): string[] {
+  return [
+    ...db.listLiveWorkerDispatchIdsCreatedBy(coordinator),
+    ...db.listLiveRemoteOwnedDispatchIdsCoordinatedBy(coordinator)
+  ]
+}
+
+/** A worker a server owns is stopped through its owed-stop route, and proven only once the
+ *  server's queue says it ended; any other goes through worker-stop. */
+async function stopTaskStartWorker(
+  runtime: OrcaRuntimeService,
+  dispatchId: string,
+  mutation: StopMutation
+): Promise<WorkerStopReceipt> {
+  const db = runtime.getOrchestrationDb()
+  const remote = getRemoteDispatch(db, dispatchId)
+  if (!remote) {
+    return stopWorkerAndHelpers(runtime, dispatchId, mutation)
+  }
+  const link = getOpenRemoteRunLink(db, remote.conversation_id)
+  if (link) {
+    await stopRemoteWorker(runtime, link, dispatchId, undefined).catch((error: unknown) => {
+      console.warn('[task-start] stopping a server-owned worker failed', error)
+    })
+  }
+  const record = getRemoteDispatch(db, dispatchId) ?? remote
+  const ended = isRemoteDispatchTerminal(record)
+  return {
+    dispatchId,
+    state: ended ? 'stopped' : (record.worker_state ?? 'stop_requested'),
+    alreadySettled: false,
+    processAction: 'none'
+  }
+}
+
 /** This host's orchestration database behind ⏹; no database means no workers. */
 export function createTaskStartStopDeps(runtime: OrcaRuntimeService): TaskStartStopDeps {
   const db = () => runtime.getExistingOrchestrationDb()
@@ -48,8 +96,11 @@ export function createTaskStartStopDeps(runtime: OrcaRuntimeService): TaskStartS
     closeOrchestrator: (ref) => closeTaskStartOrchestrator(runtime, ref),
     orchestration: {
       fence: (coordinator) => fenceCoordinator(runtime, coordinator),
-      liveWorkers: (coordinator) => db()?.listLiveWorkerDispatchIdsCreatedBy(coordinator) ?? [],
-      stopWorker: (dispatchId, mutation) => stopWorkerAndHelpers(runtime, dispatchId, mutation)
+      liveWorkers: (coordinator) => {
+        const current = db()
+        return current ? listTaskStartWorkers(current, coordinator) : []
+      },
+      stopWorker: (dispatchId, mutation) => stopTaskStartWorker(runtime, dispatchId, mutation)
     }
   }
 }

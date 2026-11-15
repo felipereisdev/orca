@@ -10,6 +10,7 @@ import { prepareWorkerStart } from '../../../rpc/methods/orchestration/worker/wo
 import { resolveFederatedWorkerStartBudgets } from '../../../rpc/methods/orchestration/worker/start/launch/worker-start-budgets'
 import { OrchestrationError } from '../../orchestration-error'
 import { prepareWorkerStartCard } from '../../workers/launch/worker-start-card'
+import { refuseFencedCoordinator } from '../../workers/launch/coordinator-start-fence'
 import { getOrchestrationPeerCapabilityCache } from '../orchestration-peer-capability-cache'
 import type { OrchestrationWorkerServer } from '../environment-transport'
 import {
@@ -86,6 +87,8 @@ export async function startRemoteOwnedWorker(
     params,
     ctx
   )
+  // Synchronous from here through the placement insert, as a local start's Dispatch insert is.
+  refuseFencedCoordinator(runtime, coordinator)
   const db = runtime.getOrchestrationDb()
   const server = runtime.resolveOrchestrationWorkerServer(params.on!)
   const { run } = bindRun()
