@@ -714,7 +714,8 @@ import {
   TaskBoardListParams,
   TaskBoardMarkSeenParams,
   TaskBoardMoveParams,
-  TaskBoardStartOptionsParams
+  TaskBoardStartOptionsParams,
+  TaskBoardStartTaskParams
 } from './task-board-params'
 import { TerminalInferCodexQuestionSkip } from './terminal-codex-question-params'
 import { TerminalDaemonRestartSeveredParams } from './terminal-daemon-params'
@@ -1650,6 +1651,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'taskBoard.markSeen': TaskBoardMarkSeenParams,
   'taskBoard.move': TaskBoardMoveParams,
   'taskBoard.startOptions': TaskBoardStartOptionsParams,
+  'taskBoard.startTask': TaskBoardStartTaskParams,
   'terminal.ackOutput': TerminalAckOutput,
   'terminal.adoptOrphans': TerminalAdoptOrphans,
   'terminal.agentId': TerminalAgentId,

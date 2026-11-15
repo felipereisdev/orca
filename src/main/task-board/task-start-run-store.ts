@@ -6,6 +6,7 @@ import {
 } from '../../shared/task-board/task-start-run'
 import type { TaskStartWorkspaceMode } from '../../shared/task-board/task-start-settings'
 import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
+import { mintAgentSessionOperationId } from '../runtime/orchestration/mailbox/structured-pointer/structured-pointer-operation-id'
 
 export type TaskStartRunsChangedEvent = Extract<
   RuntimeClientEvent,
@@ -77,9 +78,11 @@ export function createTaskStartRunStore(deps: TaskStartRunStoreDeps): TaskStartR
       if (input.primaryKey && live.some((run) => run.primaryKey === input.primaryKey)) {
         return { ok: false, reason: 'primary_busy' }
       }
-      const at = deps.now().toISOString()
+      const now = deps.now()
+      const at = now.toISOString()
       const run: TaskStartRun = {
-        id: crypto.randomUUID(),
+        // Operation-shaped, so the orchestrator launch replays under the run's own id.
+        id: mintAgentSessionOperationId(now.getTime()),
         cardKey: input.cardKey,
         repoId: input.repoId,
         workspaceMode: input.workspaceMode,

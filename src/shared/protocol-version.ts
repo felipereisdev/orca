@@ -33,7 +33,10 @@ import {
 } from './session-tabs-runtime-capabilities'
 import { SKILL_RUNTIME_CAPABILITIES } from './skill-install-capability'
 import { SOURCE_CONTROL_RUNTIME_CAPABILITIES } from './source-control/runtime/source-control-runtime-capabilities'
-import { TASK_BOARD_RUNTIME_CAPABILITY } from './task-board/task-board-runtime-capability'
+import {
+  TASK_BOARD_RUNTIME_CAPABILITY,
+  TASK_BOARD_START_RUNTIME_CAPABILITY
+} from './task-board/task-board-runtime-capability'
 import { TASK_SOURCE_RUNTIME_CAPABILITIES } from './work-items/task-source-runtime-capabilities'
 import { TERMINAL_RUNTIME_CAPABILITIES } from './terminal/runtime-policy/terminal-runtime-capabilities'
 import { WORKSPACE_PORTS_RUNTIME_CAPABILITIES } from './workspace-ports-runtime-capabilities'
@@ -119,6 +122,7 @@ export const RUNTIME_CAPABILITIES = /* @__PURE__ */ (() =>
     ...SOURCE_CONTROL_RUNTIME_CAPABILITIES,
     ...TASK_SOURCE_RUNTIME_CAPABILITIES,
     TASK_BOARD_RUNTIME_CAPABILITY,
+    TASK_BOARD_START_RUNTIME_CAPABILITY,
     ...AI_VAULT_RUNTIME_CAPABILITIES
   ] as const)()
 

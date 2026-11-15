@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { isTuiAgent } from '../agent-launch/catalog/tui-agent-config'
+import type { TuiAgent } from '../agent-launch/catalog/tui-agent'
 
 const Str = (max: number) => z.string().min(1).max(max)
 const Id = Str(512)
@@ -56,4 +58,30 @@ export const TaskBoardMoveParams = z.strictObject({
 export const TaskBoardStartOptionsParams = z.strictObject({
   ref: TaskBoardCardRefParam.optional(),
   repoId: Id.optional()
+})
+
+const TaskStartAgentChoiceParam = z.strictObject({
+  agent: z.custom<TuiAgent>(isTuiAgent, { message: 'Unknown TUI agent' }),
+  accountId: Id.optional(),
+  model: Str(200).optional(),
+  effort: Str(200).optional()
+})
+
+// Each role overrides the repo/global choice for this start only ("Iniciar como…").
+export const TaskBoardStartTaskParams = z.strictObject({
+  ref: TaskBoardCardRefParam,
+  repoId: Id.optional(),
+  workspaceMode: z.enum(['worktree', 'primary']).optional(),
+  baseRef: Str(512).optional(),
+  roles: z
+    .strictObject({
+      orchestrator: TaskStartAgentChoiceParam.optional(),
+      planner: TaskStartAgentChoiceParam.optional(),
+      planReviewer: TaskStartAgentChoiceParam.optional(),
+      implementer: TaskStartAgentChoiceParam.optional(),
+      reviewer: TaskStartAgentChoiceParam.optional(),
+      qa: TaskStartAgentChoiceParam.optional()
+    })
+    .optional(),
+  confirmPrimary: z.boolean().optional()
 })

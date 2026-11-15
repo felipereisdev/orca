@@ -150,7 +150,8 @@ export async function buildTaskStartAgentCatalog(
   return entries.flat()
 }
 
-async function resolveRepo(
+/** An explicit `repoId` wins; otherwise the card's own mapping. */
+export async function resolveTaskStartRepoForParams(
   params: { ref?: TaskBoardCardRef; repoId?: string },
   repos: readonly Repo[],
   deps: TaskStartOptionsDeps
@@ -191,7 +192,15 @@ function isChoiceInCatalog(
   return !choice.effort || model.efforts.some((effort) => effort.id === choice.effort)
 }
 
-function roleLabels(
+/** Roles whose agent/account, model or effort the repo's catalog does not offer. */
+export function invalidTaskStartRoles(
+  roles: Record<TaskStartRole, TaskStartAgentChoice>,
+  catalog: readonly TaskStartAgentCatalogEntry[]
+): TaskStartRole[] {
+  return TASK_START_ROLES.filter((role) => !isChoiceInCatalog(roles[role], catalog))
+}
+
+export function taskStartRoleLabels(
   roles: Record<TaskStartRole, TaskStartAgentChoice>,
   accounts: ReadonlyMap<string, ClaudeManagedAccountSummary>
 ): Record<TaskStartRole, string> {
@@ -221,7 +230,7 @@ export async function getTaskStartOptions(
     label: repo.displayName,
     kind: repo.kind === 'folder' ? ('folder' as const) : ('git' as const)
   }))
-  const resolution = await resolveRepo(params, repos, deps)
+  const resolution = await resolveTaskStartRepoForParams(params, repos, deps)
   const repo = repos.find((candidate) => candidate.id === resolution.repoId)
   if (!repo) {
     return {
@@ -249,10 +258,8 @@ export async function getTaskStartOptions(
       : (repo.worktreeBaseRef ?? (await deps.baseRefDefault(repo).catch(() => null)))
   const catalog = await buildTaskStartAgentCatalog(repo, deps)
   const accounts = new Map(deps.claudeAccounts().map((account) => [account.id, account]))
-  const labels = roles ? roleLabels(roles, accounts) : null
-  const invalidRoles = roles
-    ? TASK_START_ROLES.filter((role) => !isChoiceInCatalog(roles[role], catalog))
-    : []
+  const labels = roles ? taskStartRoleLabels(roles, accounts) : null
+  const invalidRoles = roles ? invalidTaskStartRoles(roles, catalog) : []
   return {
     repoId: repo.id,
     repoCandidates: [],

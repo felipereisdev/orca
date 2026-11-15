@@ -4,6 +4,7 @@ import type { TaskBoardCard } from './task-board-card'
 import type { TaskBoardProject } from './task-board-project-filter'
 import type { TaskBoardProviderState } from './task-board-provider-results'
 import type { TuiAgent } from '../agent-launch/catalog/tui-agent'
+import type { TaskStartRunSummary } from './task-start-run'
 import type {
   TaskStartAgentChoice,
   TaskStartRole,
@@ -137,3 +138,26 @@ export type TaskStartOptionsResult = {
   /** Roles whose choice is not in this repo's catalog. */
   invalidRoles: TaskStartRole[]
 }
+
+export type TaskStartError =
+  | 'repo_unresolved'
+  | 'already_running'
+  | 'primary_busy'
+  | 'primary_needs_confirmation'
+  | 'agent_unavailable'
+  | 'account_needs_sign_in'
+  | 'worktree_create_failed'
+  | 'context_fetch_failed'
+  | 'launch_failed'
+  | 'cancelled'
+
+export type TaskStartPrimaryReason = 'uncommitted' | 'other-branch'
+
+export type TaskStartResult =
+  | { ok: true; run: TaskStartRunSummary }
+  | {
+      ok: false
+      error: TaskStartError
+      reasons?: TaskStartPrimaryReason[]
+      run?: TaskStartRunSummary
+    }

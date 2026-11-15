@@ -234,6 +234,7 @@ export const EXECUTION_HOST_METHODS = [
   'taskBoard.markSeen',
   'taskBoard.move',
   'taskBoard.startOptions',
+  'taskBoard.startTask',
   'terminal.ackOutput',
   'terminal.adoptOrphans',
   'terminal.agentStatus',

@@ -7,9 +7,13 @@ export const NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY = 'notifications.remot
 // Hosts without this capability lack one of the five taskBoard.* methods the mobile board calls.
 export const MOBILE_TASK_BOARD_RUNTIME_CAPABILITY = 'mobile.task-board.v1' as const
 
+// Hosts without this capability cannot start a card's orchestrator from the phone.
+export const MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY = 'mobile.task-board-start.v1' as const
+
 export const MOBILE_RUNTIME_CAPABILITIES = [
   'mobile.tasks.v1',
   MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
+  MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY,
   NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY,
   NOTIFICATIONS_DESKTOP_PRESENCE_RUNTIME_CAPABILITY,
   ...MOBILE_RELAY_RUNTIME_CAPABILITIES
