@@ -240,6 +240,31 @@ describe('startTaskFromCard', () => {
     })
   })
 
+  it('reports an orchestrator that exits during prompt delivery as failed, not cancelled', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      launchAgent: vi.fn(async (params, onSurfacePublished) => {
+        const result = launched()
+        onSurfacePublished(result)
+        // The watcher certifies the exit while the prompt is still being delivered.
+        store.transition(params.operationId ?? '', ['running', 'waiting'], {
+          state: 'failed',
+          failure: 'orchestrator-exited'
+        })
+        return result
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result).toMatchObject({ ok: false, error: 'launch_failed' })
+    expect(deps.closeOrchestrator).not.toHaveBeenCalled()
+    expect(store.listExclusive()).toEqual([])
+    const runId = vi.mocked(deps.launchAgent).mock.calls[0][0].operationId ?? ''
+    expect(store.getById(runId)).toMatchObject({
+      state: 'failed',
+      failure: 'orchestrator-exited'
+    })
+  })
+
   it('keeps a published orchestrator running when its prompt is not confirmed', async () => {
     const store = memoryStore()
     const deps = serviceDeps(store, {

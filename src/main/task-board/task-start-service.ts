@@ -3,7 +3,6 @@ import type { Repo } from '../../shared/repo-types'
 import type { TaskBoardStartTaskParams } from '../../shared/rpc-contract/task-board-params'
 import type {
   TaskBoardCardRef,
-  TaskStartError,
   TaskStartPrimaryReason,
   TaskStartResult
 } from '../../shared/task-board/task-board-wire-types'
@@ -13,17 +12,12 @@ import type {
 } from '../../shared/task-board/task-start-context-types'
 import { buildTaskStartPrompt } from '../../shared/task-board/task-start-prompt'
 import {
-  summarizeTaskStartRun,
-  type TaskStartFailure,
-  type TaskStartRun
-} from '../../shared/task-board/task-start-run'
-import {
   resolveTaskStartRoles,
   resolveTaskStartWorkspaceMode,
   TASK_START_ROLES
 } from '../../shared/task-board/task-start-settings'
 import type { TaskStartCard } from './task-start-context'
-import { stopTaskStartWatcher, type TaskStartLifecycleDeps } from './task-start-lifecycle'
+import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
 import {
   buildTaskStartAgentCatalog,
   invalidTaskStartRoles,
@@ -32,10 +26,11 @@ import {
   type TaskStartOptionsDeps
 } from './task-start-options'
 import {
-  launchTaskStartOrchestrator,
-  type TaskStartLaunchDeps,
+  createTaskStartRunGuard,
+  refuseTaskStart as refuse,
   type TaskStartRunGuard
-} from './task-start-service-launch'
+} from './task-start-service-guard'
+import { launchTaskStartOrchestrator, type TaskStartLaunchDeps } from './task-start-service-launch'
 
 export type TaskStartParams = z.infer<typeof TaskBoardStartTaskParams>
 
@@ -63,25 +58,14 @@ export type TaskStartServiceDeps = TaskStartLaunchDeps & {
   }): Promise<{ worktreeId: string }>
 }
 
-const LIVE = ['running', 'waiting'] as const
-
-function refuse(
-  error: TaskStartError,
-  run?: TaskStartRun | null,
-  reasons?: TaskStartPrimaryReason[]
-): TaskStartResult {
-  return {
-    ok: false,
-    error,
-    ...(reasons ? { reasons } : {}),
-    ...(run ? { run: summarizeTaskStartRun(run) } : {})
-  }
-}
+// Remotes a configured base usually names; anything else must match the branch exactly.
+const BASE_REMOTE = /^(?:refs\/remotes\/)?(?:origin|upstream)\//
 
 /** A base like `origin/main` names the branch `main`. */
 function isBaseBranch(branch: string, base: string): boolean {
   const name = branch.replace(/^refs\/heads\//, '')
-  return name === base || base.endsWith(`/${name}`)
+  const baseName = base.replace(/^refs\/heads\//, '')
+  return name === baseName || name === baseName.replace(BASE_REMOTE, '')
 }
 
 async function primaryReasons(
@@ -168,7 +152,10 @@ async function prepare(
   }
   // Folder repos never consult git.
   if (workspaceMode === 'primary' && repo.kind !== 'folder') {
-    const primary = await primaryReasons(repo, params, deps).catch(() => null)
+    const primary = await primaryReasons(repo, params, deps).catch((error: unknown) => {
+      console.warn('[task-start] reading the primary checkout failed', error)
+      return null
+    })
     if (!primary) {
       return refuse('worktree_create_failed')
     }
@@ -178,40 +165,6 @@ async function prepare(
     prepared.primaryWorktreeId = primary.worktreeId
   }
   return prepared
-}
-
-function createGuard(runId: string, deps: TaskStartServiceDeps): TaskStartRunGuard {
-  const { store } = deps.lifecycle
-  return {
-    runId,
-    alive: () => {
-      const state = store.getById(runId)?.state
-      return state === 'running' || state === 'waiting'
-    },
-    patch: (patch) => store.transition(runId, [...LIVE], patch),
-    fail: async (failure: TaskStartFailure, error: TaskStartError) => {
-      const failed = store.transition(runId, [...LIVE], { state: 'failed', failure })
-      return failed ? refuse(error, failed) : cancel(runId, deps)
-    },
-    cancel: (published) => cancel(runId, deps, published)
-  }
-}
-
-/** A stop arrived mid-start: close what this start opened (never the worktree) and settle the stop. */
-async function cancel(
-  runId: string,
-  deps: TaskStartServiceDeps,
-  published?: Parameters<TaskStartRunGuard['cancel']>[0]
-): Promise<TaskStartResult> {
-  if (published) {
-    await deps.closeOrchestrator(published).catch((error: unknown) => {
-      console.warn('[task-start] closing a cancelled orchestrator failed', error)
-    })
-  }
-  const { store } = deps.lifecycle
-  stopTaskStartWatcher(store, runId)
-  const stopped = store.transition(runId, ['stopping'], { state: 'stopped', failure: 'cancelled' })
-  return refuse('cancelled', stopped ?? store.getById(runId))
 }
 
 async function runStart(
@@ -225,6 +178,9 @@ async function runStart(
   let context: TaskStartContext
   try {
     ;({ card, context } = await deps.readContext(params.ref))
+    if (!guard.alive()) {
+      return await guard.settle()
+    }
     const images = await deps.writeImages({
       card,
       repo,
@@ -232,11 +188,12 @@ async function runStart(
       images: context.images
     })
     context = { ...context, images }
-  } catch {
+  } catch (error) {
+    console.warn('[task-start] reading the card context failed', error)
     return guard.fail('context-fetch-failed', 'context_fetch_failed')
   }
   if (!guard.alive()) {
-    return guard.cancel()
+    return guard.settle()
   }
   let worktreeId: string
   try {
@@ -252,11 +209,13 @@ async function runStart(
                 : {})
             })
           ).worktreeId
-  } catch {
+  } catch (error) {
+    console.warn('[task-start] preparing the workspace failed', error)
     return guard.fail('worktree-create-failed', 'worktree_create_failed')
   }
+  guard.worktreeId = worktreeId
   if (!guard.alive() || !guard.patch({ worktreeId })) {
-    return guard.cancel()
+    return guard.settle()
   }
   const prompt = buildTaskStartPrompt({ context, roles: prepared.roles, labels: prepared.labels })
   return launchTaskStartOrchestrator(
@@ -288,7 +247,7 @@ export async function startTaskFromCard(
   const runId = claimed.run.id
   // Keeps listings from failing this pending run while the start is alive here.
   store.inFlight.add(runId)
-  const guard = createGuard(runId, deps)
+  const guard = createTaskStartRunGuard(runId, deps)
   try {
     return await runStart(prepared, params, guard, deps)
   } catch (error) {

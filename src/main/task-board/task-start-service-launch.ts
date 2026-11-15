@@ -2,17 +2,16 @@ import type { AgentLaunchResult } from '../../shared/agent-launch/contracts/agen
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
 import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch-params'
-import type { TaskStartError, TaskStartResult } from '../../shared/task-board/task-board-wire-types'
+import type { TaskStartResult } from '../../shared/task-board/task-board-wire-types'
 import {
   summarizeTaskStartRun,
-  type TaskStartFailure,
   type TaskStartOrchestratorRef,
   type TaskStartRun
 } from '../../shared/task-board/task-start-run'
 import type { TaskStartAgentChoice } from '../../shared/task-board/task-start-settings'
 import { parsePaneKey } from '../../shared/workspace-layout/stable-pane-id'
 import { watchTaskStartOrchestrator, type TaskStartLifecycleDeps } from './task-start-lifecycle'
-import type { TaskStartRunPatch } from './task-start-run-store'
+import type { TaskStartRunGuard } from './task-start-service-guard'
 
 export type TaskStartLaunchDeps = {
   lifecycle: TaskStartLifecycleDeps
@@ -24,15 +23,6 @@ export type TaskStartLaunchDeps = {
   /** The published terminal's pane and PTY, when the host can tell. */
   terminalIdentity(handle: string): { paneKey?: string; ptyId?: string }
   closeOrchestrator(ref: TaskStartOrchestratorRef): Promise<void>
-}
-
-/** The start's view of its own run; every write is conditional on the run still being live. */
-export type TaskStartRunGuard = {
-  runId: string
-  alive(): boolean
-  patch(patch: TaskStartRunPatch): TaskStartRun | null
-  fail(failure: TaskStartFailure, error: TaskStartError): Promise<TaskStartResult>
-  cancel(published?: TaskStartOrchestratorRef): Promise<TaskStartResult>
 }
 
 const CONFIRMED_PROMPT = new Set(['journaled', 'handed-to-terminal'])
@@ -121,7 +111,7 @@ export async function launchTaskStartOrchestrator(
       return
     }
     published = orchestratorRef(surface, input.repo, input.choice, deps)
-    // A stopping run keeps `published` so the cancel closes it.
+    // A stopping run keeps `published` so the start's cancel closes it.
     const run = guard.patch({ launch: 'published', orchestrator: published })
     if (run) {
       watchTaskStartOrchestrator(run, deps.lifecycle, { ptyId: published.ptyId })
@@ -139,15 +129,20 @@ export async function launchTaskStartOrchestrator(
       return guard.fail('launch-failed', 'launch_failed')
     }
     if (!guard.alive()) {
-      return guard.cancel(published)
+      return guard.settle(published)
     }
     // The surface exists: the card says to open the session; stop stays available.
     return started(guard.patch({ note: 'prompt-unconfirmed' }), guard)
   }
-  // Hosts that answer without the callback still published this surface.
-  onSurfacePublished(result)
+  try {
+    // Hosts that answer without the callback still published this surface.
+    onSurfacePublished(result)
+  } catch (error) {
+    // The orchestrator is live; a watcher that failed to install is the next reconcile's job.
+    console.warn('[task-start] recording the published orchestrator failed', error)
+  }
   if (!guard.alive()) {
-    return guard.cancel(published)
+    return guard.settle(published)
   }
   const outcome = result.prompt?.outcome
   if (outcome && CONFIRMED_PROMPT.has(outcome)) {
