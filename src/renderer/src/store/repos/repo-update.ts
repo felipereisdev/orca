@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand'
+import { normalizeRepoTaskStartSettings } from '../../../../shared/task-board/task-start-settings'
 import type { AppState } from '../types'
 import type { Repo } from '../../../../shared/repo-types'
 import { sanitizeRepoIcon } from '../../../../shared/repo-icon'
@@ -215,7 +216,11 @@ export function createRepoUpdateActions(
                 const { taskStart: _taskStart, ...repoWithoutTaskStart } = mergedRepo
                 mergedRepo = repoWithoutTaskStart
               } else if (taskStart !== undefined) {
-                mergedRepo = { ...mergedRepo, taskStart }
+                // Why: mirrors the host, where an update that normalizes to nothing is a no-op.
+                const normalizedTaskStart = normalizeRepoTaskStartSettings(taskStart)
+                if (normalizedTaskStart !== undefined) {
+                  mergedRepo = { ...mergedRepo, taskStart: normalizedTaskStart }
+                }
               }
               if (externalWorktreeVisibility === null) {
                 const { externalWorktreeVisibility: _visibility, ...repoWithoutVisibility } =

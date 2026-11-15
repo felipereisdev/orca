@@ -276,7 +276,7 @@ export class RepoUpdatePersistenceOperations {
         sanitizedUpdates.workspaceCleanupPolicy = workspaceCleanupPolicy
       }
     }
-    if ('taskStart' in sanitizedUpdates && !sanitizedUpdates.taskStart) {
+    if ('taskStart' in sanitizedUpdates && sanitizedUpdates.taskStart === null) {
       delete repo.taskStart
       delete sanitizedUpdates.taskStart
     } else if ('taskStart' in sanitizedUpdates) {

@@ -39,4 +39,23 @@ describe('updateRepo taskStart', () => {
     operations.updateRepo({ id: 'repo-1' }, { taskStart: null })
     expect('taskStart' in state.repos[0]).toBe(false)
   })
+
+  it('keeps an existing override when the update normalizes to nothing', () => {
+    const { operations, state } = makeOperations({
+      id: 'repo-1',
+      path: '/repos/example',
+      displayName: 'Example',
+      badgeColor: '#000000',
+      addedAt: 0,
+      kind: 'git',
+      taskStart: { workspaceMode: 'primary' }
+    })
+
+    // Why: the RPC schema turns invalid input into an explicit undefined key.
+    operations.updateRepo({ id: 'repo-1' }, { taskStart: undefined })
+    operations.updateRepo({ id: 'repo-1' }, { taskStart: {} })
+    operations.updateRepo({ id: 'repo-1' }, { taskStart: 'x' as never })
+
+    expect(state.repos[0].taskStart).toEqual({ workspaceMode: 'primary' })
+  })
 })
