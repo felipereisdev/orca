@@ -25659,5 +25659,24 @@
     "noColumnMapping": "Map a status to {{column}} in Settings → Task Sources.",
     "choiceExpired": "That status change is no longer available. Try the move again.",
     "hostUnavailable": "This host is not available."
+  },
+  "taskStart": {
+    "optionsLoadFailed": "Could not load agent options.",
+    "provider": "Agent",
+    "model": "Model",
+    "effort": "Effort",
+    "chooseAgent": "Choose an agent",
+    "inherit": "Inherit ({{value}})",
+    "defaultOption": "Default",
+    "unavailable": "{{name}} (unavailable)",
+    "needsSignIn": "needs sign-in",
+    "roles": {
+      "orchestrator": "Orchestrator",
+      "planner": "Planner",
+      "planReviewer": "Plan reviewer",
+      "implementer": "Implementer",
+      "reviewer": "Reviewer",
+      "qa": "QA"
+    }
   }
 }

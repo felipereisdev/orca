@@ -2,6 +2,7 @@ import { translate } from '@/i18n/i18n'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import {
   TASK_BOARD_RUNTIME_CAPABILITY,
+  TASK_BOARD_START_RUNTIME_CAPABILITY,
   TASK_BOARD_UPDATE_REQUIRED
 } from '../../../../shared/task-board/task-board-runtime-capability'
 import type {
@@ -10,7 +11,8 @@ import type {
   TaskBoardDetailResult,
   TaskBoardListResult,
   TaskBoardMoveFields,
-  TaskBoardMoveResult
+  TaskBoardMoveResult,
+  TaskStartOptionsResult
 } from '../../../../shared/task-board/task-board-wire-types'
 import { assertRuntimeEnvironmentCapability } from '../rpc/compatibility/runtime-capability-proof'
 import { callRuntimeRpc } from '../rpc/calls/runtime-rpc-call'
@@ -26,17 +28,22 @@ async function callTaskBoard<TResult>(
   target: RuntimeClientTarget,
   method: string,
   params: unknown,
-  options: { timeoutMs: number; signal?: AbortSignal }
+  options: {
+    timeoutMs: number
+    signal?: AbortSignal
+    capability?: typeof TASK_BOARD_RUNTIME_CAPABILITY | typeof TASK_BOARD_START_RUNTIME_CAPABILITY
+  }
 ): Promise<TResult> {
   if (target.kind === 'environment') {
     await assertRuntimeEnvironmentCapability(
       target.environmentId,
-      TASK_BOARD_RUNTIME_CAPABILITY,
+      options.capability ?? TASK_BOARD_RUNTIME_CAPABILITY,
       translate('taskBoard.hostUpdateRequired', TASK_BOARD_UPDATE_REQUIRED),
       CAPABILITY_TIMEOUT_MS
     )
   }
-  return callRuntimeRpc<TResult>(target, method, params, options)
+  const { capability: _capability, ...rpcOptions } = options
+  return callRuntimeRpc<TResult>(target, method, params, rpcOptions)
 }
 
 export function listTaskBoard(
@@ -93,4 +100,17 @@ export function moveTaskBoardCard(
   }
 ): Promise<TaskBoardMoveResult> {
   return callTaskBoard(target, 'taskBoard.move', params, { timeoutMs: WRITE_TIMEOUT_MS })
+}
+
+/** Start-task options (catalog, saved roles) for a card or repo; needs a host with the start capability. */
+export function getTaskStartOptions(
+  target: RuntimeClientTarget,
+  params: { ref?: TaskBoardCardRef; repoId?: string },
+  options: { signal?: AbortSignal } = {}
+): Promise<TaskStartOptionsResult> {
+  return callTaskBoard(target, 'taskBoard.startOptions', params, {
+    timeoutMs: READ_TIMEOUT_MS,
+    capability: TASK_BOARD_START_RUNTIME_CAPABILITY,
+    ...(options.signal ? { signal: options.signal } : {})
+  })
 }
