@@ -25711,7 +25711,8 @@
         "worktree": "worktree",
         "base": "base branch",
         "agent": "agent model effort roles"
-      }
+      },
+      "inheritGlobal": "global"
     }
   }
 }

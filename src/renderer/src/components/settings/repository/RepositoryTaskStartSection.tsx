@@ -1,11 +1,16 @@
 import type React from 'react'
-import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../../../../shared/execution-host'
 import { isFolderRepo } from '../../../../../shared/repo-kind'
 import type { Repo } from '../../../../../shared/repo-types'
+import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import {
   getDefaultGlobalTaskStartSettings,
   resolveTaskStartRoles,
   resolveTaskStartWorkspaceMode,
+  type GlobalTaskStartSettings,
   type RepoTaskStartSettings,
   type TaskStartRole,
   type TaskStartRoles,
@@ -149,13 +154,18 @@ export function RepositoryTaskStartView({
         {isFolder ? null : (
           <div className="space-y-2">
             <Label variant="settings">{baseLabel}</Label>
-            <BaseRefPicker
-              repoId={repo.id}
-              hostId={getRepoExecutionHostId(repo)}
-              currentBaseRef={repo.worktreeBaseRef}
-              onSelect={(ref) => updateRepo(repo.id, { worktreeBaseRef: ref })}
-              onUsePrimary={() => updateRepo(repo.id, { worktreeBaseRef: undefined })}
-            />
+            <div
+              inert={mode === 'primary'}
+              className={mode === 'primary' ? 'opacity-50' : undefined}
+            >
+              <BaseRefPicker
+                repoId={repo.id}
+                hostId={getRepoExecutionHostId(repo)}
+                currentBaseRef={repo.worktreeBaseRef}
+                onSelect={(ref) => updateRepo(repo.id, { worktreeBaseRef: ref })}
+                onUsePrimary={() => updateRepo(repo.id, { worktreeBaseRef: undefined })}
+              />
+            </div>
           </div>
         )}
         <div className="space-y-2">
@@ -184,6 +194,26 @@ export function RepositoryTaskStartView({
   )
 }
 
+/** Label each role shows for "inherit": what the real resolver picks when only that role's own repo choice is removed. */
+export function repoInheritedLabels(args: {
+  global: GlobalTaskStartSettings
+  repoTaskStart: RepoTaskStartSettings | undefined
+  defaultAgent: TuiAgent | 'blank' | null
+  catalog: TaskStartAgentCatalogEntry[]
+  fallback: string
+}): Record<TaskStartRole, string> {
+  const { global, repoTaskStart, defaultAgent, catalog, fallback } = args
+  return mapTaskStartRoles((role) => {
+    const { [role]: _own, ...roles } = repoTaskStart?.roles ?? {}
+    const resolved = resolveTaskStartRoles({
+      global,
+      repo: { ...repoTaskStart, roles },
+      defaultAgent
+    })
+    return resolved ? taskStartChoiceLabel(resolved[role], catalog) : fallback
+  })
+}
+
 export function RepositoryTaskStartSection({
   repo,
   updateRepo,
@@ -195,22 +225,45 @@ export function RepositoryTaskStartSection({
 }): React.JSX.Element | null {
   const t = useTranslate()
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
-  // Why: the repo's own host serves its catalog and runs the start, as for the pane's other RPCs.
-  const options = useTaskStartOptions({ repoId: repo.id }, getRepoExecutionHostId(repo))
-  const global = useAppStore((s) => s.settings?.taskStart) ?? getDefaultGlobalTaskStartSettings()
-  const defaultAgent = useAppStore((s) => s.settings?.defaultTuiAgent ?? null)
-  const catalog = options.data?.catalog ?? []
-  const resolved = resolveTaskStartRoles({ global, defaultAgent })
-  const none = t('taskStart.repository.noDefault', 'No default agent')
-  const inherited = mapTaskStartRoles((role) =>
-    resolved ? taskStartChoiceLabel(resolved[role], catalog) : none
-  )
   if (
     !forceVisible &&
     !matchesSettingsSearch(searchQuery, [getRepositoryTaskStartSearchEntry(t)])
   ) {
     return null
   }
+  return (
+    <ConnectedRepositoryTaskStart repo={repo} updateRepo={updateRepo} forceVisible={forceVisible} />
+  )
+}
+
+// Why: split from the visibility check so a search-filtered section does not fetch options.
+function ConnectedRepositoryTaskStart({
+  repo,
+  updateRepo,
+  forceVisible
+}: {
+  repo: Repo
+  updateRepo: RepositoryTaskStartViewProps['updateRepo']
+  forceVisible: boolean
+}): React.JSX.Element {
+  const t = useTranslate()
+  const hostId = getRepoExecutionHostId(repo)
+  // Why: the repo's own host serves its catalog and runs the start, as for the pane's other RPCs.
+  const options = useTaskStartOptions({ repoId: repo.id }, hostId)
+  const global = useAppStore((s) => s.settings?.taskStart) ?? getDefaultGlobalTaskStartSettings()
+  const defaultAgent = useAppStore((s) => s.settings?.defaultTuiAgent ?? null)
+  const catalog = options.data?.catalog ?? []
+  const labels = repoInheritedLabels({
+    global,
+    repoTaskStart: repo.taskStart,
+    defaultAgent,
+    catalog,
+    fallback: t('taskStart.repository.noDefault', 'No default agent')
+  })
+  // Why: a remote host resolves with its own global settings, which this machine cannot see.
+  const globalLabel = t('taskStart.repository.inheritGlobal', 'global')
+  const inherited =
+    hostId === LOCAL_EXECUTION_HOST_ID ? labels : mapTaskStartRoles(() => globalLabel)
   return (
     <RepositoryTaskStartView
       repo={repo}

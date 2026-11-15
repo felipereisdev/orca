@@ -1,9 +1,12 @@
 import { getDefaultSettings } from '../../../../../shared/constants'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { TaskStartAgentCatalogEntry } from '../../../../../shared/task-board/task-board-wire-types'
-import type { TaskStartRole } from '../../../../../shared/task-board/task-start-settings'
+import type {
+  GlobalTaskStartSettings,
+  TaskStartRole
+} from '../../../../../shared/task-board/task-start-settings'
 import { defineFixture } from '../../../component-fixtures/component-fixture'
-import { RepositoryTaskStartView } from './RepositoryTaskStartSection'
+import { RepositoryTaskStartView, repoInheritedLabels } from './RepositoryTaskStartSection'
 
 const efforts = [
   { id: 'low', label: 'Low' },
@@ -19,13 +22,11 @@ const catalog: TaskStartAgentCatalogEntry[] = [
   },
   { agent: 'codex', label: 'Codex', models: [{ id: 'gpt-5', label: 'GPT-5', efforts }] }
 ]
-const inherited: Record<TaskStartRole, string> = {
-  orchestrator: 'Claude (Ucloud) · opus · high',
-  planner: 'Claude (Ucloud) · opus · high',
-  planReviewer: 'Codex',
-  implementer: 'Claude · sonnet',
-  reviewer: 'Codex',
-  qa: 'Claude · sonnet'
+const global: GlobalTaskStartSettings = {
+  roles: {
+    orchestrator: { agent: 'claude' },
+    reviewer: { agent: 'codex', model: 'gpt-5' }
+  }
 }
 
 function repo(overrides: Partial<Repo> = {}): Repo {
@@ -40,6 +41,13 @@ function repo(overrides: Partial<Repo> = {}): Repo {
 }
 
 function fixture(r: Repo, invalidRoles?: TaskStartRole[]) {
+  const inherited = repoInheritedLabels({
+    global,
+    repoTaskStart: r.taskStart,
+    defaultAgent: 'claude',
+    catalog,
+    fallback: 'No default agent'
+  })
   return defineFixture({
     width: 640,
     store: { settings: getDefaultSettings('/home/fixture') },
