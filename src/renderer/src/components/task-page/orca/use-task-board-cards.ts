@@ -42,8 +42,8 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   refresh: () => void
   /** A fresh list; resolves once its result reached the board (or was superseded). */
   reread: () => Promise<void>
-  /** The host's cached list without the reload indicator, for task-start run changes. */
-  rereadRuns: () => Promise<void>
+  /** The host's cached list without the reload indicator, for task-start run changes; coalesced, after any list in flight. */
+  rereadRuns: () => void
 } {
   // The last board for this host shows at once; the mount load then updates it.
   const [stateHostId, setStateHostId] = useState(accountHostId)
@@ -82,6 +82,9 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
       try {
         const target = ipcOrRuntimeTargetForHostId(accountHostId)
         if (!target) {
+          if (options.quiet) {
+            return
+          }
           update((current) =>
             failTaskBoardList(
               current,
@@ -97,9 +100,15 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         markTaskBoardLoaded(accountHostId, { at: Date.now(), scopeKey: loadScopeKey })
         update(() => applyTaskBoardList(result))
       } catch (cause) {
-        if (!controller.signal.aborted) {
-          update((current) => failTaskBoardList(current, listErrorMessage(cause)))
+        if (controller.signal.aborted) {
+          return
         }
+        // A background run re-read keeps the board as it was; only a read the user asked for reports.
+        if (options.quiet) {
+          console.warn('[task-board] re-reading task-start runs failed', cause)
+          return
+        }
+        update((current) => failTaskBoardList(current, listErrorMessage(cause)))
       } finally {
         if (controllerRef.current === controller) {
           controllerRef.current = null
@@ -112,7 +121,6 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   // Refresh and post-move reads are explicit, so they bypass the host's and providers' caches.
   const reread = useCallback(() => load(true), [load])
   const refresh = useCallback(() => void load(true), [load])
-  const rereadRuns = useCallback(() => load(false, { quiet: true }), [load])
 
   useEffect(() => {
     mountedRef.current = true
@@ -137,14 +145,14 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
   }, [accountHostId, load])
 
   // Run changes re-read the host's cached list quietly; a list already in flight is let finish first.
-  useEffect(() => {
-    let timer: number | null = null
+  const runsTimerRef = useRef<number | null>(null)
+  const rereadRuns = useCallback((): void => {
     const schedule = (): void => {
-      if (timer !== null) {
+      if (runsTimerRef.current !== null) {
         return
       }
-      timer = window.setTimeout(() => {
-        timer = null
+      runsTimerRef.current = window.setTimeout(() => {
+        runsTimerRef.current = null
         if (controllerRef.current) {
           schedule()
           return
@@ -152,14 +160,18 @@ export function useTaskBoardCards(accountHostId: ExecutionHostId): {
         void load(false, { quiet: true })
       }, RUNS_REREAD_DELAY_MS)
     }
-    const unsubscribe = subscribeTaskBoardRunsChanged(accountHostId, schedule)
+    schedule()
+  }, [load])
+  useEffect(() => {
+    const unsubscribe = subscribeTaskBoardRunsChanged(accountHostId, rereadRuns)
     return () => {
       unsubscribe()
-      if (timer !== null) {
-        window.clearTimeout(timer)
+      if (runsTimerRef.current !== null) {
+        window.clearTimeout(runsTimerRef.current)
+        runsTimerRef.current = null
       }
     }
-  }, [accountHostId, load])
+  }, [accountHostId, rereadRuns])
 
   // The mount load covers the first key; afterwards a settings change re-lists.
   useEffect(() => {

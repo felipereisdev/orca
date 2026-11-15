@@ -141,6 +141,12 @@ export function TaskStartDialogView(props: TaskStartDialogViewProps): React.JSX.
                 repoId={repoId}
                 hostId={props.baseRefHostId}
                 currentBaseRef={edits.baseRef ?? data.baseRef ?? undefined}
+                currentBaseRefLabel={
+                  edits.baseRef
+                    ? t('taskStart.dialog.baseBranchThisStart', 'For this start only')
+                    : t('taskStart.dialog.baseBranchRepository', 'Default for this repository')
+                }
+                fullWidth
                 onSelect={(baseRef) => props.onEditsChange({ ...edits, baseRef })}
               />
             </div>
@@ -203,6 +209,7 @@ function TaskStartDialogBody({
   const [edits, setEdits] = useState<TaskStartDialogEdits>({ roles: {} })
   const options = useTaskStartOptions({ ref: state.card.ref, repoId: chosenRepoId }, hostId)
   const repoId = chosenRepoId ?? options.data?.repoId ?? null
+  const mode = edits.mode ?? options.data?.workspaceMode
   const runtimeHost = parseExecutionHostId(hostId)?.kind === 'runtime' ? hostId : undefined
   return (
     <TaskStartDialogView
@@ -227,7 +234,8 @@ function TaskStartDialogBody({
         onSubmit({
           repoId,
           ...(edits.mode ? { workspaceMode: edits.mode } : {}),
-          ...(edits.baseRef ? { baseRef: edits.baseRef } : {}),
+          // The primary checkout has no base branch to start from.
+          ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
           ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {})
         })
       }}

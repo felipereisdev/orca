@@ -22,9 +22,10 @@ import { TaskBoardCardActivity } from './TaskBoardCardActivity'
 import { TaskBoardCardRunProgress } from './TaskBoardCardRunProgress'
 import { TaskBoardCardStartButton } from './TaskBoardCardStartButton'
 
-// Card actions show on hover; a card with a run keeps its ▶︎/⏹ visible so the status reads at a glance.
+// Card actions show on hover or focus and take no room otherwise, so a run's ▶︎/⏹ sits at the edge.
+// An open menu keeps them shown: its trigger anchors the menu.
 const HOVER_ACTIONS =
-  'flex shrink-0 items-center gap-1 md:opacity-0 md:transition-opacity md:group-hover/card:opacity-100 md:group-focus-within/card:opacity-100'
+  'flex shrink-0 items-center gap-1 md:hidden md:group-hover/card:flex md:group-focus-within/card:flex md:has-[[data-state=open]]:flex'
 
 const PROVIDER_ICONS: Record<TaskProvider, (props: { className?: string }) => React.JSX.Element> = {
   github: ({ className }) => <GitHubIcon className={className} />,

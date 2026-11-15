@@ -54,7 +54,7 @@ function hostUnavailable(): string {
 export function useTaskBoardStart(args: {
   accountHostId: ExecutionHostId
   /** The host's list again, so the card shows the run's current state. */
-  rereadRuns: () => Promise<void>
+  rereadRuns: () => void
 }): TaskBoardStart {
   const { accountHostId, rereadRuns } = args
   const [pendingRefKeys, setPendingRefKeys] = useState<ReadonlySet<string>>(new Set())
@@ -147,7 +147,7 @@ export function useTaskBoardStart(args: {
       toast.error(message)
     } finally {
       setPending(card.refKey, false)
-      void rereadRuns()
+      rereadRuns()
     }
   }
 
@@ -168,7 +168,7 @@ export function useTaskBoardStart(args: {
       )
     } finally {
       setPending(card.refKey, false)
-      void rereadRuns()
+      rereadRuns()
     }
   }
 

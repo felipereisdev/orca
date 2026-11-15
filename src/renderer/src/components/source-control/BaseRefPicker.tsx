@@ -22,6 +22,10 @@ type BaseRefPickerProps = {
   currentBaseRef?: string
   onSelect: (ref: string) => void
   onUsePrimary?: () => void
+  /** Replaces "Pinned for this repo" where the choice is not saved on the repo. */
+  currentBaseRefLabel?: string
+  /** The search input spans its container, as in a dialog's form column. */
+  fullWidth?: boolean
 }
 
 export function BaseRefPicker({
@@ -29,7 +33,9 @@ export function BaseRefPicker({
   hostId,
   currentBaseRef,
   onSelect,
-  onUsePrimary
+  onUsePrimary,
+  currentBaseRefLabel,
+  fullWidth = false
 }: BaseRefPickerProps): React.JSX.Element {
   const t = useTranslate()
   // Resolve refs on the explicit host or the repo row’s owner.
@@ -150,7 +156,8 @@ export function BaseRefPicker({
           </div>
           <p className="text-xs text-muted-foreground">
             {currentBaseRef
-              ? t('auto.components.settings.BaseRefPicker.2f3cda96f5', 'Pinned for this repo')
+              ? (currentBaseRefLabel ??
+                t('auto.components.settings.BaseRefPicker.2f3cda96f5', 'Pinned for this repo'))
               : defaultBaseRef
                 ? t(
                     'auto.components.settings.BaseRefPicker.086ce7f369',
@@ -191,7 +198,7 @@ export function BaseRefPicker({
           'auto.components.settings.BaseRefPicker.7db7fb87e5',
           'Search branches by name...'
         )}
-        className="max-w-md"
+        className={fullWidth ? 'w-full' : 'max-w-md'}
       />
 
       {isSearchingBaseRefs ? (

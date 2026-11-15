@@ -25762,7 +25762,9 @@
       "baseBranch": "Base branch",
       "cancel": "Cancel",
       "starting": "Starting…",
-      "start": "Start"
+      "start": "Start",
+      "baseBranchThisStart": "For this start only",
+      "baseBranchRepository": "Default for this repository"
     },
     "stopConfirm": {
       "titleNoAgents": "Stop the orchestrator?",
