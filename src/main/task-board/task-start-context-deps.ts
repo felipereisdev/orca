@@ -18,6 +18,7 @@ import {
 } from './task-board-comments'
 import type { TaskStartContextDeps, TaskStartFetchDeps } from './task-start-context'
 import type { TaskStartSshAccess } from './task-start-context-images'
+import { fetchTaskStartImage } from './task-start-image-fetch'
 
 type IssueDeps = {
   jiraIssue(key: string, siteId: string | null): Promise<{ description?: string } | null>
@@ -143,11 +144,8 @@ export function createTaskStartFetchDeps(
         }
         return Buffer.from(image.data)
       }
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error(`Image download failed: ${response.status}`)
-      }
-      return Buffer.from(await response.arrayBuffer())
+      // Card text names these URLs: only public https images, capped in size.
+      return fetchTaskStartImage(url)
     },
     gitlabUpload: async (card, secret, fileName) => {
       if (card.ref.provider !== 'gitlab') {

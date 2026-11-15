@@ -8,6 +8,7 @@ import {
 } from '../runtime/orchestration/addressing/session-lineage/structured-session-lineage'
 import { observeChatAssignee } from '../runtime/orchestration/workers/lifecycle/chat-assignee'
 import { getSshConnectionManager } from '../ssh/targets/ssh-target-registry'
+import { cleanUpEvictedTaskStartRuns } from './task-start-image-cleanup'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
 import {
   createTaskStartRunStore,
@@ -28,13 +29,14 @@ export type TaskStartLifecycleRuntime = Pick<
   | 'subscribeTerminalSideEffects'
   | 'subscribeStructuredSessionTabHidden'
   | 'getExistingOrchestrationDb'
+  | 'listRepos'
 >
 
 /** Persistence and change-event wiring for the task-start run store. */
 export function createTaskStartRunStoreDeps(
   runtime: Pick<
     TaskStartLifecycleRuntime,
-    'getUIState' | 'updateUIState' | 'notifyTaskBoardRunsChanged'
+    'getUIState' | 'updateUIState' | 'notifyTaskBoardRunsChanged' | 'listRepos'
   >
 ): TaskStartRunStoreDeps {
   return {
@@ -44,7 +46,8 @@ export function createTaskStartRunStoreDeps(
       runtime.updateUIState({ taskStartRuns: next })
     },
     now: () => new Date(),
-    emit: (event) => runtime.notifyTaskBoardRunsChanged(event)
+    emit: (event) => runtime.notifyTaskBoardRunsChanged(event),
+    evicted: cleanUpEvictedTaskStartRuns(() => runtime.listRepos())
   }
 }
 

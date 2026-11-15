@@ -20,6 +20,8 @@ export type TaskStartRunStoreDeps = {
   write(next: Record<string, TaskStartRun>): void
   now(): Date
   emit(event: TaskStartRunsChangedEvent): void
+  /** Runs the cap dropped from the store; their leftovers (images) are cleaned best-effort. */
+  evicted?(runs: TaskStartRun[]): void
 }
 
 export type TaskStartClaimInput = {
@@ -82,7 +84,13 @@ export function createTaskStartRunStore(deps: TaskStartRunStoreDeps): TaskStartR
         startedAt: at,
         updatedAt: at
       }
-      deps.write(trimTaskStartRunsToLimit({ ...deps.read(), [run.id]: run }))
+      const before = { ...deps.read(), [run.id]: run }
+      const kept = trimTaskStartRunsToLimit(before)
+      deps.write(kept)
+      const dropped = Object.entries(before).filter(([key]) => !(key in kept))
+      if (dropped.length > 0) {
+        deps.evicted?.(dropped.map(([, evicted]) => evicted))
+      }
       deps.emit({ type: 'taskBoardRunsChanged', cardKeys: [run.cardKey] })
       return { ok: true, run }
     },
