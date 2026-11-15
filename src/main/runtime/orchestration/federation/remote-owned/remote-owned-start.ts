@@ -10,7 +10,14 @@ import { prepareWorkerStart } from '../../../rpc/methods/orchestration/worker/wo
 import { resolveFederatedWorkerStartBudgets } from '../../../rpc/methods/orchestration/worker/start/launch/worker-start-budgets'
 import { OrchestrationError } from '../../orchestration-error'
 import { prepareWorkerStartCard } from '../../workers/launch/worker-start-card'
-import { refuseFencedCoordinator } from '../../workers/launch/coordinator-start-fence'
+import {
+  isCoordinatorFenced,
+  refuseFencedCoordinator
+} from '../../workers/launch/coordinator-start-fence'
+import type { OrchestrationCoordinatorKey } from '../../addressing/orchestration-caller-identity'
+import { getRemoteDispatch } from '../../db/remote-owned/remote-dispatch-records'
+import { getOpenRemoteRunLink, openRemoteRunLink } from '../../db/remote-owned/remote-run-links'
+import { stopRemoteWorker } from './remote-owned-stop'
 import { getOrchestrationPeerCapabilityCache } from '../orchestration-peer-capability-cache'
 import type { OrchestrationWorkerServer } from '../environment-transport'
 import {
@@ -19,7 +26,6 @@ import {
   reserveRemotePlacement
 } from '../../db/remote-owned/remote-placements'
 import { refuseTaskOfClosedPairing } from '../../db/remote-owned/remote-placement-hold'
-import { openRemoteRunLink } from '../../db/remote-owned/remote-run-links'
 import { callRemoteOwnedServer } from './remote-owned-calls'
 import { remoteForwardKey } from './remote-forward-caller'
 import { errorData, inServerTerms, serverNeverAnswered } from './remote-owned-answers'
@@ -87,7 +93,7 @@ export async function startRemoteOwnedWorker(
     params,
     ctx
   )
-  // Synchronous from here through the placement insert, as a local start's Dispatch insert is.
+  // Refused before the placement is reserved; an answer that arrives after a stop began is stopped below.
   refuseFencedCoordinator(runtime, coordinator)
   const db = runtime.getOrchestrationDb()
   const server = runtime.resolveOrchestrationWorkerServer(params.on!)
@@ -153,6 +159,10 @@ export async function startRemoteOwnedWorker(
       key: forward.key,
       createdByStart: !existingTask
     })
+    const named = errorData(error)?.dispatchId
+    if (typeof named === 'string') {
+      await stopIfCoordinatorStopped(runtime, coordinator, link.conversation_id, named)
+    }
     throw inServerTerms(error, { server: server.name, forward })
   }
   const started = StartedOnServer.safeParse(receipt)
@@ -171,6 +181,20 @@ export async function startRemoteOwnedWorker(
         'run_not_found',
         `Run ${run.id} was reset, or its pairing with ${server.name} re-made, while this start was waiting, so this Orca records nothing for the worker it started there (Dispatch ${started.data.dispatchId}).`,
         { server: server.name }
+      )
+    }
+    if (
+      await stopIfCoordinatorStopped(
+        runtime,
+        coordinator,
+        link.conversation_id,
+        started.data.dispatchId
+      )
+    ) {
+      throw new OrchestrationError(
+        'coordinator_stopped',
+        `This coordinator was stopped from the task board while ${server.name} started its worker, so Orca stopped that worker there (Dispatch ${started.data.dispatchId}).`,
+        { server: server.name, dispatchId: started.data.dispatchId }
       )
     }
     // As local and attached starts do: a start the server could not ready leaves no card.
@@ -199,6 +223,29 @@ export async function startRemoteOwnedWorker(
         }
       : answer
   )
+}
+
+/** A stop began while the server was starting this worker: stop it there rather than keep it. */
+async function stopIfCoordinatorStopped(
+  runtime: OrcaRuntimeService,
+  coordinator: OrchestrationCoordinatorKey | null,
+  conversationId: string,
+  dispatchId: string
+): Promise<boolean> {
+  if (!isCoordinatorFenced(runtime, coordinator)) {
+    return false
+  }
+  const db = runtime.getOrchestrationDb()
+  const link = getOpenRemoteRunLink(db, conversationId)
+  if (link && getRemoteDispatch(db, dispatchId)) {
+    await stopRemoteWorker(runtime, link, dispatchId, undefined).catch((error: unknown) => {
+      console.warn(
+        '[orchestration] stopping a worker started for a stopped coordinator failed',
+        error
+      )
+    })
+  }
+  return true
 }
 
 /** What a start's failure says about its reservation: adopt the Dispatch it names, keep it for the server's queue to answer, or free it. */

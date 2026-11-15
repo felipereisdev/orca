@@ -29,6 +29,8 @@ export type TaskStartStopDeps = {
     /** Unsettled workers the coordinator created, in any of its Runs, here or on a server. */
     liveWorkers(coordinator: OrchestrationCoordinatorKey): string[]
     stopWorker(dispatchId: string, mutation: StopMutation): Promise<WorkerStopReceipt>
+    /** Starts sent to a server that has not answered: nothing to stop yet, nothing proven. */
+    pendingStarts(coordinator: OrchestrationCoordinatorKey): number
   }
 }
 
@@ -104,13 +106,26 @@ async function stopOrchestration(
   const gone = (await probeOrchestrator(ref, deps.lifecycle, run.startedAt)) === 'gone'
   // Once more after the probe: a start inserted before the fence may have listed late.
   const second = await stopLiveWorkers(coordinator, attempted, deps, mutation)
+  const settled = noPendingStarts(coordinator, deps)
   // A key naming nobody lists no workers, which proves nothing.
   const identified = !!(
     coordinator.terminalHandle ||
     coordinator.paneKey ||
     coordinator.orcaSessionId
   )
-  return identified && first && gone && second
+  return identified && first && gone && second && settled
+}
+
+function noPendingStarts(
+  coordinator: OrchestrationCoordinatorKey,
+  deps: TaskStartStopDeps
+): boolean {
+  try {
+    return deps.orchestration.pendingStarts(coordinator) === 0
+  } catch (error) {
+    console.warn('[task-start] listing the orchestrator pending starts failed', error)
+    return false
+  }
 }
 
 function previewAgents(run: TaskStartRun, deps: TaskStartStopDeps): number {
@@ -118,7 +133,12 @@ function previewAgents(run: TaskStartRun, deps: TaskStartStopDeps): number {
     return 1
   }
   try {
-    return 1 + deps.orchestration.liveWorkers(coordinatorKey(run.orchestrator)).length
+    const coordinator = coordinatorKey(run.orchestrator)
+    return (
+      1 +
+      deps.orchestration.liveWorkers(coordinator).length +
+      deps.orchestration.pendingStarts(coordinator)
+    )
   } catch {
     return 1
   }

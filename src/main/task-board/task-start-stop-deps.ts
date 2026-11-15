@@ -16,6 +16,10 @@ import {
   getRemoteDispatch,
   isRemoteDispatchTerminal
 } from '../runtime/orchestration/db/remote-owned/remote-dispatch-records'
+import {
+  countReservedRemoteStartsCreatedBy,
+  listLiveRemoteOwnedDispatchIdsCreatedBy
+} from '../runtime/orchestration/db/remote-owned/remote-owned-creator-listing'
 import { getOpenRemoteRunLink } from '../runtime/orchestration/db/remote-owned/remote-run-links'
 import { stopRemoteWorker } from '../runtime/orchestration/federation/remote-owned/remote-owned-stop'
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
@@ -56,13 +60,13 @@ export function listTaskStartWorkers(
 ): string[] {
   return [
     ...db.listLiveWorkerDispatchIdsCreatedBy(coordinator),
-    ...db.listLiveRemoteOwnedDispatchIdsCoordinatedBy(coordinator)
+    ...listLiveRemoteOwnedDispatchIdsCreatedBy(db, coordinator)
   ]
 }
 
 /** A worker a server owns is stopped through its owed-stop route, and proven only once the
  *  server's queue says it ended; any other goes through worker-stop. */
-async function stopTaskStartWorker(
+export async function stopTaskStartWorker(
   runtime: OrcaRuntimeService,
   dispatchId: string,
   mutation: StopMutation
@@ -73,7 +77,8 @@ async function stopTaskStartWorker(
     return stopWorkerAndHelpers(runtime, dispatchId, mutation)
   }
   const link = getOpenRemoteRunLink(db, remote.conversation_id)
-  if (link) {
+  // A worker the server already reported ended needs no stop.
+  if (link && !isRemoteDispatchTerminal(remote)) {
     await stopRemoteWorker(runtime, link, dispatchId, undefined).catch((error: unknown) => {
       console.warn('[task-start] stopping a server-owned worker failed', error)
     })
@@ -100,7 +105,11 @@ export function createTaskStartStopDeps(runtime: OrcaRuntimeService): TaskStartS
         const current = db()
         return current ? listTaskStartWorkers(current, coordinator) : []
       },
-      stopWorker: (dispatchId, mutation) => stopTaskStartWorker(runtime, dispatchId, mutation)
+      stopWorker: (dispatchId, mutation) => stopTaskStartWorker(runtime, dispatchId, mutation),
+      pendingStarts: (coordinator) => {
+        const current = db()
+        return current ? countReservedRemoteStartsCreatedBy(current, coordinator) : 0
+      }
     }
   }
 }
