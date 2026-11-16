@@ -219,6 +219,21 @@ describe('startTaskFromCard', () => {
     expect(deps.createWorktree).not.toHaveBeenCalled()
   })
 
+  it('refuses a managed Claude account on an SSH project before claiming anything', async () => {
+    const store = memoryStore()
+    const claim = vi.spyOn(store, 'claim')
+    const deps = serviceDeps(store, {
+      options: options({ repos: () => [{ ...REPO, connectionId: 'box' }] })
+    })
+    const result = await startTaskFromCard(
+      { ref: ref(7), roles: { qa: { agent: 'claude', accountId: 'acc-1' } } },
+      deps
+    )
+    expect(result).toMatchObject({ ok: false, error: 'remote_account_unsupported', role: 'qa' })
+    expect(claim).not.toHaveBeenCalled()
+    expect(deps.createWorktree).not.toHaveBeenCalled()
+  })
+
   it('keeps the primary checkout to one card and asks before using a dirty one', async () => {
     const store = memoryStore()
     const deps = serviceDeps(store)

@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { getRepoSshConnectionId } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
 import type { TaskBoardStartTaskParams } from '../../shared/rpc-contract/task-board-params'
 import type {
@@ -131,6 +132,13 @@ async function prepare(
   if (!roles) {
     // Only the orchestrator has no fallback: every other role falls back to it.
     return refuse('agent_unavailable', null, { role: 'orchestrator' })
+  }
+  // The settings list this machine's providers; an SSH project runs the remote's own login.
+  if (getRepoSshConnectionId(repo) !== null) {
+    const remoteAccount = TASK_START_ROLES.find((role) => roles[role].accountId !== undefined)
+    if (remoteAccount) {
+      return refuse('remote_account_unsupported', null, { role: remoteAccount })
+    }
   }
   const catalog = await buildTaskStartAgentCatalog(repo, options)
   const [unavailable] = invalidTaskStartRoles(roles, catalog)

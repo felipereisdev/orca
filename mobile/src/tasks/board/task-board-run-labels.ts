@@ -169,6 +169,12 @@ export function taskStartErrorMessage(
         'tasks.board.start.error.accountNeedsSignIn',
         "Sign in to the orchestrator's account, then start again."
       )
+    case 'remote_account_unsupported':
+      return t(
+        'tasks.board.start.error.remoteAccountUnsupported',
+        'Managed Claude accounts do not run on SSH projects. For {{role}}, choose “Claude” to use the server’s own login.',
+        { role: roleLabel(role ?? 'orchestrator', t) }
+      )
     case 'worktree_create_failed':
       return t('tasks.board.start.error.worktreeCreateFailed', 'Could not create the worktree.')
     case 'primary_status_failed':

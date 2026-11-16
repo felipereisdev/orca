@@ -260,7 +260,8 @@ export async function getTaskStartOptions(
     repo.kind === 'folder'
       ? null
       : (repo.worktreeBaseRef ?? (await deps.baseRefDefault(repo).catch(() => null)))
-  const catalog = await buildTaskStartAgentCatalog(repo, deps)
+  // The pickers list this machine's providers; a remote project's limits are checked at ▶︎.
+  const catalog = await buildTaskStartAgentCatalog(null, deps)
   const accounts = new Map(deps.claudeAccounts().map((account) => [account.id, account]))
   const labels = roles ? taskStartRoleLabels(roles, accounts) : null
   const invalidRoles = roles ? invalidTaskStartRoles(roles, catalog) : []

@@ -24997,6 +24997,7 @@
       "primaryBusy": "Outra tarefa está em execução no checkout principal.",
       "agentUnavailable": "O agente do orquestrador não está disponível neste host.",
       "accountNeedsSignIn": "Entre na conta do orquestrador e inicie novamente.",
+      "remoteAccountUnsupported": "Contas Claude gerenciadas não funcionam em projetos SSH. Em {{role}}, escolha “Claude” para usar o login do próprio servidor.",
       "worktreeCreateFailed": "Não foi possível criar o worktree.",
       "contextFetchFailed": "Não foi possível ler a issue.",
       "launchFailed": "O orquestrador não iniciou.",

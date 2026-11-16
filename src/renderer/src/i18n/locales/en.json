@@ -25782,6 +25782,7 @@
       "primaryBusy": "Another task is running in the primary checkout.",
       "agentUnavailable": "The orchestrator's agent is not available on this host.",
       "accountNeedsSignIn": "Sign in to the orchestrator's account, then start again.",
+      "remoteAccountUnsupported": "Managed Claude accounts do not run on SSH projects. For {{role}}, choose “Claude” to use the server’s own login.",
       "worktreeCreateFailed": "Could not create the worktree.",
       "contextFetchFailed": "Could not read the issue.",
       "launchFailed": "The orchestrator did not start.",

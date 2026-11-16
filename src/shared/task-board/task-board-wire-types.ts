@@ -148,6 +148,8 @@ export type TaskStartError =
   | 'primary_needs_confirmation'
   | 'agent_unavailable'
   | 'account_needs_sign_in'
+  /** A managed Claude account on an SSH project: the remote runs its own login. */
+  | 'remote_account_unsupported'
   | 'worktree_create_failed'
   | 'primary_status_failed'
   | 'context_fetch_failed'

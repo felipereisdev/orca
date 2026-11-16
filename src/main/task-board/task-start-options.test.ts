@@ -75,15 +75,19 @@ function optionsDeps(
 }
 
 describe('getTaskStartOptions', () => {
-  it('offers no Claude accounts on an SSH repo and flags a role configured with one', async () => {
+  it("lists this machine's providers for an SSH repo too, leaving its limits to the start", async () => {
     const sshRepo = repo('remote', {
       connectionId: 'box',
       taskStart: { roles: { reviewer: { agent: 'claude', accountId: 'acc-1' } } }
     })
-    const options = await getTaskStartOptions({ repoId: 'remote' }, optionsDeps(sshRepo))
-    expect(options.catalog.filter((entry) => entry.accountId !== undefined)).toEqual([])
-    expect(options.catalog.map((entry) => entry.agent)).toEqual(['claude'])
-    expect(options.invalidRoles).toEqual(['reviewer'])
+    const launchHost = vi.fn(optionsDeps(sshRepo).launchHost)
+    const options = await getTaskStartOptions(
+      { repoId: 'remote' },
+      optionsDeps(sshRepo, { launchHost })
+    )
+    expect(launchHost).toHaveBeenCalledWith(null)
+    expect(options.catalog.map((entry) => entry.accountId)).toEqual([undefined, 'acc-1'])
+    expect(options.invalidRoles).toEqual([])
   })
 
   it('builds the host catalog for the global settings, which name no repo', async () => {
