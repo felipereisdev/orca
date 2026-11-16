@@ -4974,7 +4974,8 @@
           "title": "Forget the run of {{id}}?",
           "description": "Orca could not confirm that the orchestrator and its agents stopped. They may still be running; the card is freed to start again."
         },
-        "stopForced": "Run forgotten. Its agents may still be running."
+        "stopForced": "Run forgotten. Its agents may still be running.",
+        "moveSkipped": "Couldn't move the card to In progress — move it manually."
       }
     }
   },

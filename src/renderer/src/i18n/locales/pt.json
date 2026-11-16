@@ -25024,6 +25024,7 @@
     },
     "waitingNotification": "{{title}} está aguardando você",
     "stopForced": "Execução esquecida. Os agentes dela podem continuar rodando.",
+    "moveSkipped": "Não foi possível mover o card para In progress — mova manualmente.",
     "stopOptions": "Opções de parada de {{id}}",
     "forget": "Esquecer execução",
     "forgetConfirm": {

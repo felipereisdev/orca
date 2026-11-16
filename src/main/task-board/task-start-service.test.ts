@@ -133,6 +133,7 @@ function serviceDeps(
     terminalIdentity: () => ({ ptyId: 'pty-1' }),
     closeOrchestrator: vi.fn(async () => {}),
     renameOrchestrator: vi.fn(async () => {}),
+    moveCard: vi.fn(async () => 'moved' as const),
     orchestration: {
       fence: () => {},
       liveWorkers: () => [],
@@ -540,5 +541,74 @@ describe('startTaskFromCard', () => {
     expect(deps.fetchBase).not.toHaveBeenCalled()
     expect(vi.mocked(deps.createPrimaryBranch).mock.calls[0][0]).not.toHaveProperty('startPoint')
     expect(deps.launchAgent).toHaveBeenCalled()
+  })
+
+  it('moves a started card to In progress', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store)
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result.ok).toBe(true)
+    expect(deps.moveCard).toHaveBeenCalledExactlyOnceWith(ref(7), 'in-progress')
+    expect(store.getById(result.ok ? result.run.id : '')?.note).toBeUndefined()
+  })
+
+  it('still starts when the card cannot move, marking the run move-skipped', async () => {
+    const outcomes = [
+      async () => 'skipped' as const,
+      async () => {
+        throw new Error('Jira is unreachable')
+      }
+    ]
+    for (const moveCard of outcomes) {
+      const store = memoryStore()
+      const deps = serviceDeps(store, { moveCard: vi.fn(moveCard) })
+      const result = await startTaskFromCard({ ref: ref(7) }, deps)
+      expect(result).toMatchObject({ ok: true, run: { note: 'move-skipped' } })
+      expect(store.getById(result.ok ? result.run.id : '')).toMatchObject({
+        state: 'running',
+        launch: 'published',
+        note: 'move-skipped'
+      })
+      expect(deps.closeOrchestrator).not.toHaveBeenCalled()
+    }
+  })
+
+  it('keeps an earlier note when the card cannot move', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      moveCard: vi.fn(async () => 'skipped' as const),
+      launchAgent: vi.fn(async (_params, onSurfacePublished) => {
+        const result = launched('not-delivered')
+        onSurfacePublished(result)
+        return result
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(store.getById(result.ok ? result.run.id : '')?.note).toBe('prompt-unconfirmed')
+  })
+
+  it('moves no card for a failed or cancelled start', async () => {
+    const failed = serviceDeps(memoryStore(), {
+      launchAgent: vi.fn(async () => {
+        throw new Error('agent missing')
+      })
+    })
+    expect(await startTaskFromCard({ ref: ref(7) }, failed)).toMatchObject({ ok: false })
+    expect(failed.moveCard).not.toHaveBeenCalled()
+
+    const store = memoryStore()
+    const cancelled = serviceDeps(store, {
+      launchAgent: vi.fn(async (params, onSurfacePublished) => {
+        const result = launched()
+        onSurfacePublished(result)
+        store.transition(params.operationId ?? '', ['running', 'waiting'], { state: 'stopping' })
+        return result
+      })
+    })
+    expect(await startTaskFromCard({ ref: ref(7) }, cancelled)).toMatchObject({
+      ok: false,
+      error: 'cancelled'
+    })
+    expect(cancelled.moveCard).not.toHaveBeenCalled()
   })
 })

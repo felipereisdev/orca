@@ -26370,6 +26370,7 @@
     },
     "waitingNotification": "{{title}} is waiting for you",
     "stopForced": "Run forgotten. Its agents may still be running.",
+    "moveSkipped": "Couldn't move the card to In progress — move it manually.",
     "stopOptions": "Stop options for {{id}}",
     "forget": "Forget run",
     "forgetConfirm": {

@@ -118,6 +118,9 @@ const runColumns: TaskBoardColumn[] = [
       makeCard('jira', 'APP-7', 'Starting request in flight', { taskStart: null }),
       makeCard('gitlab', '#9', 'Run that was stopped', {
         taskStart: run({ state: 'stopped', phase: 'planning' })
+      }),
+      makeCard('jira', 'APP-8', 'Started, but its move needs a choice', {
+        taskStart: run({ state: 'running', phase: 'planning', note: 'move-skipped' })
       })
     ]
   },

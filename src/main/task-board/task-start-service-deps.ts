@@ -20,6 +20,7 @@ import {
   createTaskStartFetchDeps,
   createTaskStartSshAccess
 } from './task-start-context-deps'
+import { moveStartedTaskBoardCard } from './task-start-card-move'
 import { writeTaskStartImages } from './task-start-context-images'
 import { createTaskStartOptionsDeps } from './task-start-options-deps'
 import type { TaskStartServiceDeps } from './task-start-service'
@@ -88,6 +89,7 @@ export function createTaskStartServiceDeps(
       return main.id
     },
     gitStatus: (selector) => runtime.getRuntimeGitStatus(selector),
+    moveCard: (ref, columnId) => moveStartedTaskBoardCard(ref, columnId, board),
     ...createTaskStartBranchDeps(runtime, context),
     createWorktree: async ({ repo, card, baseBranch }) => {
       const created = await createWorktreeWithStartupAgent(

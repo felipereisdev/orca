@@ -127,6 +127,12 @@ export function taskStartRunHint(run: TaskStartRunSummary, t: Translate): string
   if (run.note === 'stop-forced') {
     return t('tasks.board.start.stopForced', 'Run forgotten. Its agents may still be running.')
   }
+  if (run.note === 'move-skipped') {
+    return t(
+      'tasks.board.start.moveSkipped',
+      "Couldn't move the card to In progress — move it manually."
+    )
+  }
   return run.note ?? null
 }
 

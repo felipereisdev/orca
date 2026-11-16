@@ -66,6 +66,7 @@ export type TaskStartRun = {
   state: TaskStartRunState
   phase: TaskStartPhase
   progress?: TaskStartProgress
+  /** The orchestrator's note, or a host marker: `prompt-unconfirmed`, `stop-forced`, `move-skipped`. */
   note?: string
   failure?: TaskStartFailure
   startedAt: string

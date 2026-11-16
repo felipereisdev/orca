@@ -120,6 +120,9 @@ function runHint(run: TaskStartRunSummary, t: Translate): string | null {
   if (run.note === 'stop-forced') {
     return t('taskStart.stopForced', 'Run forgotten. Its agents may still be running.')
   }
+  if (run.note === 'move-skipped') {
+    return t('taskStart.moveSkipped', "Couldn't move the card to In progress — move it manually.")
+  }
   return run.note ?? null
 }
 

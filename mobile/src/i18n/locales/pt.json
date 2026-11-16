@@ -4804,6 +4804,7 @@
         "searchBranches": "Buscar ramos",
         "noBranches": "Nenhum ramo corresponde.",
         "stopForced": "Execução esquecida. Os agentes dela podem continuar rodando.",
+        "moveSkipped": "Não foi possível mover o card para In progress — mova manualmente.",
         "forget": "Esquecer execução",
         "forgetConfirm": {
           "title": "Esquecer a execução de {{id}}?",
