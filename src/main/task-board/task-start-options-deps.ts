@@ -87,7 +87,9 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
         // No read-only home (WSL account, or a host without profiles): the picker's seeds apply.
         return { origin: 'unknown' }
       }
-      return catalog.read({
+      // `read` answers only a scope this process already bound; startup binds Claude's and Codex's
+      // (prewarm) but never OpenCode's, whose saved list then read as unknown with no seed models.
+      return catalog.prepareSaved({
         agent,
         savedOnly: true,
         ...(accountHome
