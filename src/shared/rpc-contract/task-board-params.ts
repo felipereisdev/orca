@@ -83,7 +83,9 @@ export const TaskBoardStartTaskParams = z.strictObject({
       qa: TaskStartAgentChoiceParam.optional()
     })
     .optional(),
-  confirmPrimary: z.boolean().optional()
+  confirmPrimary: z.boolean().optional(),
+  /** Extra instructions typed in "Start as…", for this start only. */
+  userPrompt: Str(8000).optional()
 })
 
 // `preview` only counts the agents a stop would end, for the confirmation; `force` lets a run

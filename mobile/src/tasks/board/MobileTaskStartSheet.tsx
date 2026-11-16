@@ -8,12 +8,14 @@ import {
   type TaskStartRoles,
   type TaskStartWorkspaceMode
 } from '../../../../src/shared/task-board/task-start-settings'
+import { FieldTextInput } from '../../components/composer-input/FieldTextInput'
 import { ListGroup, ListRow, SectionHeader } from '../../components/list/ListGroup'
 import { MobileSegmentedControl } from '../../components/MobileSegmentedControl'
 import { SheetHeader } from '../../components/nav-bar/SheetHeader'
 import { PickerModal, type PickerOption } from '../../components/PickerModal'
 import { SheetPrimaryButton } from '../../components/SheetPrimaryButton'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
+import { TEXT_INPUT_FONT_SIZE } from '../../platform/text-input-font-size'
 import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import { colors, spacing, typography } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'
@@ -56,6 +58,8 @@ export function MobileTaskStartSheet(props: Props) {
   // The user's repository; until they pick one, the host resolves it from the card.
   const [chosenRepoId, setChosenRepoId] = useState<string | undefined>(undefined)
   const [edits, setEdits] = useState<Edits>({ roles: {} })
+  // Kept when the repository changes: it is about the task, not the repository.
+  const [userPrompt, setUserPrompt] = useState('')
   const [picker, setPicker] = useState<Picker>(null)
   const options = useTaskStartOptions(props.client, props.connected, card.ref, chosenRepoId)
   const data = options.data
@@ -76,7 +80,8 @@ export function MobileTaskStartSheet(props: Props) {
       ...(edits.mode ? { workspaceMode: edits.mode } : {}),
       // The primary checkout has no base branch to start from.
       ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
-      ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {})
+      ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {}),
+      ...(userPrompt.trim() ? { userPrompt: userPrompt.trim() } : {})
     })
   }
 
@@ -214,6 +219,20 @@ export function MobileTaskStartSheet(props: Props) {
           })}
         </ListGroup>
       )}
+      <SectionHeader title={t('tasks.board.start.userPrompt', 'Additional instructions')} />
+      <FieldTextInput
+        value={userPrompt}
+        onChangeText={setUserPrompt}
+        editable={!status.pending}
+        multiline
+        maxLength={8000}
+        placeholder={t(
+          'tasks.board.start.userPromptPlaceholder',
+          'Optional. Sent to the orchestrator with the card and the flow.'
+        )}
+        style={styles.userPrompt}
+        accessibilityLabel={t('tasks.board.start.userPrompt', 'Additional instructions')}
+      />
       <View style={styles.footer}>
         {status.error ? <Text style={styles.problem}>{status.error}</Text> : null}
         <SheetPrimaryButton
@@ -273,6 +292,14 @@ const styles = themedStyleSheet(() => ({
   },
   base: {
     marginTop: spacing.md
+  },
+  userPrompt: {
+    fontSize: TEXT_INPUT_FONT_SIZE,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 96,
+    maxHeight: 240,
+    textAlignVertical: 'top'
   },
   footer: {
     gap: spacing.sm,

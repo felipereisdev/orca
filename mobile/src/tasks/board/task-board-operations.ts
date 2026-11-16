@@ -203,6 +203,8 @@ export type TaskStartParams = {
   baseRef?: string
   roles?: TaskStartRoles
   confirmPrimary?: boolean
+  /** Extra instructions typed in "Start as…", for this start only. */
+  userPrompt?: string
 }
 
 /** ▶︎ / "Start as…": the host creates the workspace and launches the card's orchestrator. */

@@ -74,6 +74,21 @@ function taughtPhaseCalls(prompt: string): Record<string, unknown>[] {
 describe('task-start prompt status', () => {
   const prompt = buildTaskStartPrompt({ context, roles: {}, labels: {} })
 
+  it("places the user's extra instructions after the card data and before the flow", () => {
+    const prompt = buildTaskStartPrompt({
+      context,
+      roles: {},
+      labels: {},
+      userPrompt: '  Foque no backend primeiro.  '
+    })
+    const section = prompt.indexOf('## Instruções do usuário\nFoque no backend primeiro.')
+    expect(section).toBeGreaterThan(prompt.indexOf('Use `$reviewer` e $qa aqui'))
+    expect(section).toBeLessThan(prompt.indexOf('## Fluxo'))
+    expect(
+      buildTaskStartPrompt({ context, roles: {}, labels: {}, userPrompt: '  ' })
+    ).not.toContain('## Instruções do usuário')
+  })
+
   it('teaches the development step as implementing|reviewing, never a subtask name', () => {
     const status = statusSection(prompt)
     expect(status).toContain('--current <n> --total <m> --step implementing|reviewing')

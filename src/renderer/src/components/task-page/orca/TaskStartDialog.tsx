@@ -10,6 +10,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -47,10 +48,13 @@ export type TaskStartDialogViewProps = {
   /** Where base branches are read; undefined resolves from the repo row. */
   baseRefHostId?: ExecutionHostId
   edits: TaskStartDialogEdits
+  /** Extra instructions for the orchestrator, kept when the repository changes. */
+  userPrompt: string
   pending: boolean
   error: string | null
   onRepoChange: (repoId: string) => void
   onEditsChange: (edits: TaskStartDialogEdits) => void
+  onUserPromptChange: (userPrompt: string) => void
   onSubmit: () => void
   onClose: () => void
 }
@@ -171,6 +175,22 @@ export function TaskStartDialogView(props: TaskStartDialogViewProps): React.JSX.
               />
             )}
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="task-start-user-prompt">
+              {t('taskStart.dialog.userPrompt', 'Additional instructions')}
+            </Label>
+            <Textarea
+              id="task-start-user-prompt"
+              value={props.userPrompt}
+              maxLength={8000}
+              rows={3}
+              placeholder={t(
+                'taskStart.dialog.userPromptPlaceholder',
+                'Optional. Sent to the orchestrator with the card and the flow.'
+              )}
+              onChange={(event) => props.onUserPromptChange(event.target.value)}
+            />
+          </div>
           {props.error ? (
             <p role="alert" className="text-xs text-destructive">
               {props.error}
@@ -207,6 +227,7 @@ function TaskStartDialogBody({
   // The user's repository; until they pick one, the host resolves it from the card.
   const [chosenRepoId, setChosenRepoId] = useState<string | undefined>(undefined)
   const [edits, setEdits] = useState<TaskStartDialogEdits>({ roles: {} })
+  const [userPrompt, setUserPrompt] = useState('')
   const options = useTaskStartOptions({ ref: state.card.ref, repoId: chosenRepoId }, hostId)
   const repoId = chosenRepoId ?? options.data?.repoId ?? null
   const mode = edits.mode ?? options.data?.workspaceMode
@@ -219,6 +240,7 @@ function TaskStartDialogBody({
       repoId={repoId}
       baseRefHostId={runtimeHost}
       edits={edits}
+      userPrompt={userPrompt}
       pending={state.pending}
       error={state.error}
       onRepoChange={(next) => {
@@ -227,6 +249,7 @@ function TaskStartDialogBody({
         setEdits({ roles: {} })
       }}
       onEditsChange={setEdits}
+      onUserPromptChange={setUserPrompt}
       onSubmit={() => {
         if (!repoId) {
           return
@@ -236,7 +259,8 @@ function TaskStartDialogBody({
           ...(edits.mode ? { workspaceMode: edits.mode } : {}),
           // The primary checkout has no base branch to start from.
           ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
-          ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {})
+          ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {}),
+          ...(userPrompt.trim() ? { userPrompt: userPrompt.trim() } : {})
         })
       }}
       onClose={onClose}

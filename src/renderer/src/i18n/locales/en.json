@@ -25757,6 +25757,8 @@
       "chooseRepository": "Choose a repository",
       "repositoryRequired": "Orca could not tell which repository this issue belongs to. Choose one.",
       "baseBranch": "Base branch",
+      "userPrompt": "Additional instructions",
+      "userPromptPlaceholder": "Optional. Sent to the orchestrator with the card and the flow.",
       "cancel": "Cancel",
       "starting": "Starting…",
       "start": "Start",

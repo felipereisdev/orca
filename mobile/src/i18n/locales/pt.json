@@ -4707,6 +4707,8 @@
         "default": "Padrão",
         "roleEffort": "{{role}} · esforço",
         "submit": "Iniciar",
+        "userPrompt": "Instruções adicionais",
+        "userPromptPlaceholder": "Opcional. Vai para o orquestrador junto com o card e o fluxo.",
         "phase": {
           "starting": "Iniciando",
           "planning": "Planejamento",

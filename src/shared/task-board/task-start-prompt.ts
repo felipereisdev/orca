@@ -129,8 +129,11 @@ export function buildTaskStartPrompt(args: {
   context: TaskStartContext
   roles: Partial<Record<TaskStartRole, TaskStartAgentChoice>>
   labels: Partial<Record<TaskStartRole, string>>
+  /** Typed by the user in "Start as…": trusted, so it stays outside the card data block. */
+  userPrompt?: string
 }): string {
   const { context, roles, labels } = args
+  const userPrompt = args.userPrompt?.trim()
   const agentLines = AGENT_SECTION.flatMap(([token, role, purpose]) => {
     const choice = roles[role]
     if (!choice) {
@@ -159,6 +162,7 @@ export function buildTaskStartPrompt(args: {
     '',
     STATUS_SECTION,
     '',
+    ...(userPrompt ? [`## Instruções do usuário\n${userPrompt}`, ''] : []),
     `## Fluxo\n${renderFlow(roleLabels)}`,
     ''
   ].join('\n')

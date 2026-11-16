@@ -4762,6 +4762,8 @@
         "default": "Default",
         "roleEffort": "{{role}} · effort",
         "submit": "Start",
+        "userPrompt": "Additional instructions",
+        "userPromptPlaceholder": "Optional. Sent to the orchestrator with the card and the flow.",
         "phase": {
           "starting": "Starting",
           "planning": "Planning",

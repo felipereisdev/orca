@@ -24971,6 +24971,8 @@
       "chooseRepository": "Escolha um repositório",
       "repositoryRequired": "O Orca não conseguiu identificar a qual repositório esta issue pertence. Escolha um.",
       "baseBranch": "Ramo base",
+      "userPrompt": "Instruções adicionais",
+      "userPromptPlaceholder": "Opcional. Vai para o orquestrador junto com o card e o fluxo.",
       "cancel": "Cancelar",
       "starting": "Iniciando…",
       "start": "Iniciar",

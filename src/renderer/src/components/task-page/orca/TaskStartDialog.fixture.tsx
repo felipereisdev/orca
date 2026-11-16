@@ -54,6 +54,7 @@ function Harness({
 }): React.JSX.Element {
   const [repoId, setRepoId] = useState<string | null>(repoRequired ? null : 'repo-1')
   const [edits, setEdits] = useState<TaskStartDialogEdits>({ roles: {} })
+  const [userPrompt, setUserPrompt] = useState('Foque primeiro no endpoint de faturas.')
   return (
     <TaskStartDialogView
       displayId="APP-12"
@@ -61,10 +62,12 @@ function Harness({
       repoRequired={repoRequired}
       repoId={repoId}
       edits={edits}
+      userPrompt={userPrompt}
       pending={false}
       error={error}
       onRepoChange={setRepoId}
       onEditsChange={setEdits}
+      onUserPromptChange={setUserPrompt}
       onSubmit={() => {}}
       onClose={() => {}}
     />

@@ -232,7 +232,12 @@ async function runStart(
   if (!guard.alive() || !guard.patch({ worktreeId, cardTitle: card.title })) {
     return guard.settle()
   }
-  const prompt = buildTaskStartPrompt({ context, roles: prepared.roles, labels: prepared.labels })
+  const prompt = buildTaskStartPrompt({
+    context,
+    roles: prepared.roles,
+    labels: prepared.labels,
+    userPrompt: params.userPrompt
+  })
   return launchTaskStartOrchestrator(
     { repo, worktreeId, choice: prepared.roles.orchestrator, prompt },
     guard,
