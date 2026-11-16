@@ -1,6 +1,7 @@
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { Repo } from '../../shared/repo-types'
 import { WorktreeCreate } from '../../shared/rpc-contract/worktree-create-params'
+import { getTrackedUpstreamBranch } from '../github/client/lookup/tracked-upstream-branch'
 import { requireReachableGitRoute } from '../providers/execution-host-provider-dispatch'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { resolveRpcWorkspaceCreatorProvenance } from '../runtime/rpc/callers/workspace-creator-context'
@@ -46,16 +47,34 @@ function localGitOptions(runtime: OrcaRuntimeService, repo: Repo) {
 export function createTaskStartBranchDeps(
   runtime: OrcaRuntimeService,
   context: RpcContext
-): Pick<TaskStartServiceDeps, 'remoteBase' | 'fetchBase' | 'createPrimaryBranch'> {
+): Pick<TaskStartServiceDeps, 'remoteBase' | 'baseUpstream' | 'fetchBase' | 'createPrimaryBranch'> {
   return {
     remoteBase: (repo, base) =>
       runtime.resolveRemoteTrackingBase(repo.path, base, localGitOptions(runtime, repo)),
-    // Worktree create's exact-base refresh: its 30s freshness keeps create from fetching again.
+    baseUpstream: async (repo, base) => {
+      const upstream = await getTrackedUpstreamBranch(
+        repo.path,
+        base.replace(/^refs\/heads\//, ''),
+        null,
+        localGitOptions(runtime, repo)
+      )
+      return upstream
+        ? {
+            remote: upstream.remoteName,
+            branch: upstream.branchName,
+            ref: `refs/remotes/${upstream.remoteName}/${upstream.branchName}`,
+            base: `${upstream.remoteName}/${upstream.branchName}`
+          }
+        : null
+    },
+    // Worktree create's exact-base refresh, forced past its 30s reuse; that freshness then keeps
+    // create from fetching again.
     fetchBase: async (repo, base) => {
       const fetched = await runtime.getOrStartRemoteTrackingBaseRefresh(
         repo.path,
         base,
-        localGitOptions(runtime, repo)
+        localGitOptions(runtime, repo),
+        true
       )
       if (!fetched.ok) {
         throw new Error(`Could not fetch ${base.base} from ${base.remote}`)
@@ -67,13 +86,13 @@ export function createTaskStartBranchDeps(
         store: runtime.requireStore(),
         repo,
         request: taskStartWorktreeCreateArgs(context, repo, card, startPoint),
-        baseBranch: startPoint
+        baseBranch: startPoint ?? 'HEAD'
       })
       await runtime.switchRuntimeGitBranch(
         `id:${worktreeId}`,
         checkoutExistingBranch
           ? { kind: 'local', name: branchName }
-          : { kind: 'new', name: branchName, startPoint }
+          : { kind: 'new', name: branchName, ...(startPoint ? { startPoint } : {}) }
       )
     }
   }

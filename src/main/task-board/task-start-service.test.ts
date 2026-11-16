@@ -3,6 +3,7 @@ import type { AgentLaunchResult } from '../../shared/agent-launch/contracts/agen
 import type { Repo } from '../../shared/repo-types'
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
 import type { TaskStartRun } from '../../shared/task-board/task-start-run'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import { reconcileTaskStartRuns, type TaskStartLifecycleDeps } from './task-start-lifecycle'
 import type { TaskStartOptionsDeps } from './task-start-options'
 import { createTaskStartRunStore, type TaskStartRunStore } from './task-start-run-store'
@@ -120,6 +121,7 @@ function serviceDeps(
       const branch = /^origin\/(.+)$/.exec(base)?.[1]
       return branch ? { remote: 'origin', branch, ref: `refs/remotes/${base}`, base } : null
     }),
+    baseUpstream: vi.fn(async () => null),
     fetchBase: vi.fn(async () => {}),
     createPrimaryBranch: vi.fn(async () => {}),
     createWorktree: vi.fn(async () => ({ worktreeId: 'wt-new' })),
@@ -482,5 +484,61 @@ describe('startTaskFromCard', () => {
       kind: 'existing',
       worktree: 'id:wt-main'
     })
+  })
+
+  it("fetches a local base's upstream and starts from its remote ref", async () => {
+    const upstream = {
+      remote: 'origin',
+      branch: 'develop',
+      ref: 'refs/remotes/origin/develop',
+      base: 'origin/develop'
+    }
+    for (const workspaceMode of ['worktree', 'primary'] as const) {
+      const deps = serviceDeps(memoryStore(), {
+        baseUpstream: vi.fn(async (_repo: Repo, base: string) =>
+          base === 'develop' ? upstream : null
+        ),
+        gitStatus: async () => ({ entries: [], branch: 'develop' })
+      })
+      const result = await startTaskFromCard(
+        { ref: ref(7), workspaceMode, baseRef: 'develop' },
+        deps
+      )
+      expect(result.ok).toBe(true)
+      expect(deps.fetchBase).toHaveBeenCalledWith(REPO, upstream)
+      if (workspaceMode === 'worktree') {
+        expect(deps.createWorktree).toHaveBeenCalledWith(
+          expect.objectContaining({ baseBranch: 'origin/develop' })
+        )
+      } else {
+        expect(deps.createPrimaryBranch).toHaveBeenCalledWith(
+          expect.objectContaining({ startPoint: 'origin/develop' })
+        )
+      }
+    }
+  })
+
+  it('reports a repo whose git this host cannot run as a workspace failure, not a fetch failure', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      fetchBase: vi.fn(async () => {
+        throw new SshHostNotServedError('box')
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result).toMatchObject({ ok: false, error: 'worktree_create_failed' })
+    expect(deps.createWorktree).not.toHaveBeenCalled()
+    expect(deps.launchAgent).not.toHaveBeenCalled()
+  })
+
+  it('branches the primary checkout from HEAD when no base resolves', async () => {
+    const deps = serviceDeps(memoryStore(), {
+      options: options({ baseRefDefault: async () => null })
+    })
+    const result = await startTaskFromCard({ ref: ref(7), workspaceMode: 'primary' }, deps)
+    expect(result.ok).toBe(true)
+    expect(deps.fetchBase).not.toHaveBeenCalled()
+    expect(vi.mocked(deps.createPrimaryBranch).mock.calls[0][0]).not.toHaveProperty('startPoint')
+    expect(deps.launchAgent).toHaveBeenCalled()
   })
 })

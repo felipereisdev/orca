@@ -22,9 +22,15 @@ export abstract class RuntimeRemoteFetchOperations extends RuntimeProvisionedWor
   async getOrStartRemoteTrackingBaseRefresh(
     repoPath: string,
     base: RemoteTrackingBase,
-    gitOptions: LocalGitExecOptions = {}
+    gitOptions: LocalGitExecOptions = {},
+    force = false
   ): Promise<RemoteFetchResult> {
-    return await this.remoteFetches.getOrStartRemoteTrackingBaseRefresh(repoPath, base, gitOptions)
+    return await this.remoteFetches.getOrStartRemoteTrackingBaseRefresh(
+      repoPath,
+      base,
+      gitOptions,
+      force
+    )
   }
 
   async fetchRemoteWithCache(

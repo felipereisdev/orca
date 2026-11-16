@@ -262,3 +262,37 @@ it('does not overlay an unborn local branch over a remote branch', async () => {
   ])
 })
 installRealWorkerThreadChildProcesses()
+
+async function remoteTipAhead(): Promise<string> {
+  await git('branch', 'develop')
+  await writeFile(join(directory, 'file.txt'), 'remote tip\n')
+  await git('commit', '-qam', 'remote tip')
+  const tip = await git('rev-parse', 'HEAD')
+  await git('update-ref', 'refs/remotes/origin/develop', tip)
+  await git('reset', '-q', '--hard', initialHead)
+  return tip
+}
+
+it('creates a new branch at its start point, untracked, leaving the local base alone', async () => {
+  const tip = await remoteTipAhead()
+  await writeFile(join(directory, 'notes.txt'), 'kept\n')
+  await switchTo({ kind: 'new', name: 'task/x', startPoint: 'origin/develop' })
+  expect(await git('symbolic-ref', '--short', 'HEAD')).toBe('task/x')
+  expect(await git('rev-parse', 'HEAD')).toBe(tip)
+  expect(await git('rev-parse', 'develop')).toBe(initialHead)
+  await expect(git('rev-parse', '--abbrev-ref', 'task/x@{upstream}')).rejects.toThrow()
+  expect(await readFile(join(directory, 'notes.txt'), 'utf8')).toBe('kept\n')
+})
+
+it('refuses an option-like start point and a change that conflicts with it', async () => {
+  await remoteTipAhead()
+  await expect(switchTo({ kind: 'new', name: 'task/x', startPoint: '--orphan' })).rejects.toThrow(
+    /not a commit/
+  )
+  await writeFile(join(directory, 'file.txt'), 'local edit\n')
+  await expect(
+    switchTo({ kind: 'new', name: 'task/x', startPoint: 'origin/develop' })
+  ).rejects.toThrow()
+  expect(await git('symbolic-ref', '--short', 'HEAD')).toBe('main')
+  await expect(git('rev-parse', '--verify', '--quiet', 'refs/heads/task/x')).rejects.toThrow()
+})

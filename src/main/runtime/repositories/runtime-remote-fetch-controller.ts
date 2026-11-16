@@ -148,10 +148,12 @@ export class RuntimeRemoteFetchController {
     return promise
   }
 
+  /** `force` skips the recent-fetch reuse (an in-flight fetch is still shared); its success stays fresh for later callers. */
   async getOrStartRemoteTrackingBaseRefresh(
     repoPath: string,
     base: RemoteTrackingBase,
-    gitOptions: LocalGitExecOptions = {}
+    gitOptions: LocalGitExecOptions = {},
+    force = false
   ): Promise<RemoteFetchResult> {
     const remoteKey = await this.getCanonicalFetchKey(repoPath, base.remote, gitOptions)
     const key = await this.getCanonicalFetchKey(
@@ -159,7 +161,7 @@ export class RuntimeRemoteFetchController {
       `base:${base.remote}:${base.branch}`,
       gitOptions
     )
-    if (this.getFreshFetchCompletedAt(key) !== null) {
+    if (!force && this.getFreshFetchCompletedAt(key) !== null) {
       return { ok: true }
     }
     const existing = this.fetchInflight.get(key)
@@ -167,7 +169,7 @@ export class RuntimeRemoteFetchController {
       return existing
     }
     const promise = this.enqueueRemoteFetch(remoteKey, async () => {
-      if (this.getFreshFetchCompletedAt(key) !== null) {
+      if (!force && this.getFreshFetchCompletedAt(key) !== null) {
         return { ok: true }
       }
       return this.runExactBaseRefresh(repoPath, base, key, gitOptions)

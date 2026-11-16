@@ -1,5 +1,7 @@
 import type { Repo } from '../../shared/repo-types'
 import type { TaskStartResult } from '../../shared/task-board/task-board-wire-types'
+import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
+import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import type { RemoteTrackingBase } from '../runtime/repositories/runtime-remote-fetch-controller'
 import type { TaskStartCard } from './task-start-context'
 import type { TaskStartOptionsDeps } from './task-start-options'
@@ -10,14 +12,16 @@ export type TaskStartWorkspaceDeps = {
   primaryWorktreeId(repo: Repo): Promise<string>
   /** The base's remote-tracking branch, or null when the base has no remote. */
   remoteBase(repo: Repo, base: string): Promise<RemoteTrackingBase | null>
+  /** A local base branch's upstream on a remote, or null when it tracks none. */
+  baseUpstream(repo: Repo, base: string): Promise<RemoteTrackingBase | null>
   /** Fetches the base's branch from its remote; throws when the fetch fails. */
   fetchBase(repo: Repo, base: RemoteTrackingBase): Promise<void>
-  /** Switches the primary checkout to a new branch at `startPoint`, named as the card's worktree branch. */
+  /** Switches the primary checkout to a new branch at `startPoint` (HEAD when absent), named as the card's worktree branch. */
   createPrimaryBranch(args: {
     repo: Repo
     worktreeId: string
     card: TaskStartCard
-    startPoint: string
+    startPoint?: string
   }): Promise<void>
   /** A new worktree with the card's item linked. */
   createWorktree(args: {
@@ -38,13 +42,14 @@ export async function resolveTaskStartBase(
   )
 }
 
-/** Fetches a remote base and returns its fresh remote ref; a local-only base is used as is. */
+/** Fetches a remote base, or a local base's upstream, and returns the fresh remote ref
+ *  (a local base's unpushed commits are left out); a base with no remote is used as is. */
 async function updateTaskStartBase(
   repo: Repo,
   base: string,
   deps: TaskStartWorkspaceDeps
 ): Promise<string> {
-  const remote = await deps.remoteBase(repo, base)
+  const remote = (await deps.remoteBase(repo, base)) ?? (await deps.baseUpstream(repo, base))
   if (!remote) {
     return base
   }
@@ -72,7 +77,13 @@ export async function openTaskStartWorkspace(
       startPoint = await updateTaskStartBase(repo, prepared.base, deps)
     } catch (error) {
       console.warn('[task-start] updating the base from its remote failed', error)
-      return guard.fail('worktree-create-failed', 'base_update_failed')
+      // This process cannot run the repo's git at all: not a connection problem to report.
+      const unreachable =
+        error instanceof SshHostNotServedError || error instanceof ExecutionHostNotDispatchableError
+      return guard.fail(
+        'worktree-create-failed',
+        unreachable ? 'worktree_create_failed' : 'base_update_failed'
+      )
     }
     if (!guard.alive()) {
       return guard.settle()
@@ -102,11 +113,16 @@ export async function openTaskStartWorkspace(
   if (repo.kind === 'folder') {
     return { worktreeId }
   }
+  if (!startPoint) {
+    console.warn('[task-start] no base branch resolved; the task branch starts at HEAD')
+  }
   try {
-    if (!startPoint) {
-      throw new Error('No base branch to start the task branch from')
-    }
-    await deps.createPrimaryBranch({ repo, worktreeId, card, startPoint })
+    await deps.createPrimaryBranch({
+      repo,
+      worktreeId,
+      card,
+      ...(startPoint ? { startPoint } : {})
+    })
   } catch (error) {
     console.warn('[task-start] creating the task branch in the primary checkout failed', error)
     return guard.fail('worktree-create-failed', 'primary_branch_failed')
