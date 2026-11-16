@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { LinearProjectSummary } from '../../../../../shared/linear/project-types'
 import type { LinearProjectReference } from '../../../../../shared/linear/linear-project-reference'
-import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
+import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../../shared/execution-host'
 import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { useAppStore } from '@/store/index'
 import {
@@ -127,16 +127,58 @@ function RepositoryLinearProjectView({
   )
 }
 
+/** Saves through the repo's own host; the error to show, or null once the host echoes it back. */
+async function saveDefaultLinearProject({
+  repo,
+  hostId,
+  project,
+  updateRepo,
+  t
+}: {
+  repo: Repo
+  hostId: ExecutionHostId
+  project: LinearProjectReference | null
+  updateRepo: LinearProjectUpdateRepo
+  t: Translate
+}): Promise<string | null> {
+  let result: unknown
+  try {
+    result = await updateRepo(repo.id, { defaultLinearProject: project })
+  } catch (caught) {
+    return caught instanceof Error ? caught.message : String(caught)
+  }
+  if (result === false) {
+    return t(
+      'components.RepositoryLinearProjectSection.saveFailed',
+      'Could not save the default Linear project.'
+    )
+  }
+  const echoed = useAppStore
+    .getState()
+    .repos.find(
+      (entry) => entry.id === repo.id && getRepoExecutionHostId(entry) === hostId
+    )?.defaultLinearProject
+  // An older runtime drops the unknown field.
+  return (echoed?.id ?? null) === (project?.id ?? null)
+    ? null
+    : t(
+        'components.RepositoryLinearProjectSection.runtimeUpdate',
+        'Update this runtime to save a default Linear project.'
+      )
+}
+
+type LinearProjectUpdateRepo = (
+  id: string,
+  updates: { defaultLinearProject: LinearProjectReference | null }
+) => unknown
+
 export function RepositoryLinearProjectSection({
   repo,
   updateRepo,
   forceVisible
 }: {
   repo: Repo
-  updateRepo: (
-    id: string,
-    updates: { defaultLinearProject: LinearProjectReference | null }
-  ) => unknown
+  updateRepo: LinearProjectUpdateRepo
   forceVisible?: boolean
 }): React.JSX.Element {
   const t = useTranslate()
@@ -147,38 +189,13 @@ export function RepositoryLinearProjectSection({
   const found = useLinearProjectSearch(source, query)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const applyProject = async (project: LinearProjectReference | null) => {
+  const applyProject = (project: LinearProjectReference | null) => {
     setSaving(true)
     setError(null)
-    try {
-      const result = await updateRepo(repo.id, { defaultLinearProject: project })
-      if (result === false) {
-        throw new Error(
-          t(
-            'components.RepositoryLinearProjectSection.saveFailed',
-            'Could not save the default Linear project.'
-          )
-        )
-      }
-      const echoed = useAppStore
-        .getState()
-        .repos.find(
-          (entry) => entry.id === repo.id && getRepoExecutionHostId(entry) === hostId
-        )?.defaultLinearProject
-      // An older runtime drops the unknown field.
-      if ((echoed?.id ?? null) !== (project?.id ?? null)) {
-        throw new Error(
-          t(
-            'components.RepositoryLinearProjectSection.runtimeUpdate',
-            'Update this runtime to save a default Linear project.'
-          )
-        )
-      }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
+    void saveDefaultLinearProject({ repo, hostId, project, updateRepo, t }).then((message) => {
+      setError(message)
       setSaving(false)
-    }
+    })
   }
   return (
     <RepositoryLinearProjectView
@@ -194,7 +211,7 @@ export function RepositoryLinearProjectSection({
         loading: found.loading,
         loadingLabel: t('components.RepositoryLinearProjectSection.searching', 'Searching…')
       }}
-      onChange={(project) => void applyProject(project)}
+      onChange={applyProject}
       forceVisible={forceVisible}
     />
   )

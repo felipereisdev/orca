@@ -3,7 +3,7 @@ import type { LinearProjectSummary } from '../../../shared/linear/project-types'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { getLinearProjectSearchRequestQuery } from './linear-project-search-query'
 import { linearStatusForTarget } from '@/runtime/linear/runtime-linear-client'
-import { linearListProjects } from '@/runtime/linear/runtime-linear-project-client'
+import { linearListProjectsForTarget } from '@/runtime/linear/runtime-linear-project-client'
 import {
   useProviderProjectInventory,
   type ProviderProjectInventoryRead
@@ -20,7 +20,7 @@ async function readLinearProjects(
   return {
     connected: status.connected,
     projects: status.connected
-      ? (await linearListProjects(target, undefined, PROJECT_LIMIT, 'all')).items
+      ? (await linearListProjectsForTarget(target, undefined, PROJECT_LIMIT, 'all')).items
       : []
   }
 }
@@ -46,7 +46,7 @@ export function useLinearProjectSearch(target: RuntimeClientTarget, query: strin
     // Cleanup on the next keystroke drops both the pending timer and a stale response.
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void linearListProjects(target, requestQuery, PROJECT_LIMIT, 'all')
+      void linearListProjectsForTarget(target, requestQuery, PROJECT_LIMIT, 'all')
         .then((found) => ({ projects: found.items, error: null }))
         .catch((error: unknown) => ({
           projects: [],

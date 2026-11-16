@@ -46,10 +46,25 @@ export async function linearListProjects(
   workspaceId?: LinearWorkspaceSelection | null,
   options?: LinearReadOptions
 ): Promise<LinearCollectionResult<LinearProjectSummary>> {
+  return linearListProjectsForTarget(
+    getLinearRuntimeTarget(settings),
+    query,
+    limit,
+    workspaceId,
+    options
+  )
+}
+
+export async function linearListProjectsForTarget(
+  target: RuntimeClientTarget,
+  query?: string,
+  limit?: number,
+  workspaceId?: LinearWorkspaceSelection | null,
+  options?: LinearReadOptions
+): Promise<LinearCollectionResult<LinearProjectSummary>> {
   if (!isRuntimeProviderSearchQueryWithinLimit(query)) {
     return { items: [] }
   }
-  const target = getLinearRuntimeTarget(settings)
   return target.kind === 'environment'
     ? callRuntimeRpc<LinearCollectionResult<LinearProjectSummary>>(
         target,
