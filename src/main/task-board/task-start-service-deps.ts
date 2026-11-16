@@ -90,6 +90,8 @@ export function createTaskStartServiceDeps(
     },
     gitStatus: (selector) => runtime.getRuntimeGitStatus(selector),
     moveCard: (ref, columnId) => moveStartedTaskBoardCard(ref, columnId, board),
+    cardMoved: (cardKey) =>
+      runtime.notifyTaskBoardRunsChanged({ type: 'taskBoardRunsChanged', cardKeys: [cardKey] }),
     ...createTaskStartBranchDeps(runtime, context),
     createWorktree: async ({ repo, card, baseBranch }) => {
       const created = await createWorktreeWithStartupAgent(

@@ -5,11 +5,12 @@ import type {
   JiraStatus,
   JiraTransition
 } from '../../shared/jira/jira-types'
+import { taskBoardRefKey } from '../../shared/task-board/task-board-provider-cards'
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import type { WorkspaceStatusDefinition } from '../../shared/worktree/types'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
-import type { TaskBoardMoveDeps } from './task-board-host-move'
-import { moveStartedTaskBoardCard } from './task-start-card-move'
+import { createTaskBoardListFreshness } from './task-board-list-freshness'
+import { moveStartedTaskBoardCard, type TaskStartCardMoveDeps } from './task-start-card-move'
 
 const toDo: JiraStatus = { id: '1', name: 'To Do', categoryKey: 'new', categoryName: 'To Do' }
 const inProgress: JiraStatus = {
@@ -58,12 +59,13 @@ function jiraHost(
   const state = { issue: issue(status) }
   const settings = getDefaultTaskBoardSettings()
   settings.providers.jira.rules = [{ match: 'In Review', statusId: 'in-review' }]
-  const deps: TaskBoardMoveDeps = {
+  const deps: TaskStartCardMoveDeps = {
     host: {
       settings: () => ({ taskBoard: settings, visibleTaskProviders: ['jira'] }),
       statuses: () => columns
     },
     caches: createTaskBoardEnrichCaches(),
+    listFreshness: createTaskBoardListFreshness(),
     repo: () => null,
     getLocalGitArgs: () => [],
     jiraSites: () => [{ id: 'site-a', accountId: 'me' }],
@@ -100,6 +102,19 @@ describe('moveStartedTaskBoardCard', () => {
     const { deps, state } = jiraHost(toDo, [start])
     expect(await moveStartedTaskBoardCard(ref, 'in-progress', deps)).toBe('moved')
     expect(state.issue.status.name).toBe('In Progress')
+  })
+
+  it('clears what a drag clears and has lists skip provider list caches after a move', async () => {
+    const { deps } = jiraHost(toDo, [start])
+    const key = taskBoardRefKey(ref, null)
+    deps.caches.comments.set(key, [])
+    await moveStartedTaskBoardCard(ref, 'in-progress', deps)
+    expect(deps.caches.comments.get(key)).toBeUndefined()
+    expect(deps.listFreshness.fresh(false)).toBe(true)
+
+    const kept = jiraHost(inProgress, [start]).deps
+    await moveStartedTaskBoardCard(ref, 'in-progress', kept)
+    expect(kept.listFreshness.fresh(false)).toBe(false)
   })
 
   it('leaves a card already in In progress or a later column where it is', async () => {

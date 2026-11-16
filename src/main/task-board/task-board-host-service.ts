@@ -31,6 +31,7 @@ import {
   type TaskBoardHostDeps,
   type TaskBoardListOptions
 } from './task-board-host-list'
+import type { TaskBoardListFreshness } from './task-board-list-freshness'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
 import { summarizeTaskStartRun } from '../../shared/task-board/task-start-run'
 import { reconcileTaskStartRuns, type TaskStartLifecycleDeps } from './task-start-lifecycle'
@@ -53,6 +54,7 @@ export type TaskBoardServiceDeps = TaskBoardEnrichDeps &
   TaskBoardCommentWriteDeps & {
     host: TaskBoardHostDeps
     taskStart: TaskStartLifecycleDeps
+    listFreshness: TaskBoardListFreshness
     readSeen(): TaskBoardSeenComments
     writeSeen(next: TaskBoardSeenComments): void
   }
@@ -65,7 +67,11 @@ export async function listTaskBoard(
   await reconcileTaskStartRuns(deps.taskStart).catch((error: unknown) => {
     console.warn('[task-board] reconciling task-start runs failed', error)
   })
-  const list = await buildTaskBoardList(deps.host, options)
+  // Only provider lists go fresh after a host move; enrichment keeps its own caches.
+  const list = await buildTaskBoardList(deps.host, {
+    ...options,
+    fresh: deps.listFreshness.fresh(options.fresh)
+  })
   const cards = await enrichTaskBoardCards(list.cards, {
     todoColumnId: resolveCategoryColumnId('todo', list.columns, deps.host.settings().taskBoard),
     doneColumnId: list.doneColumnId,

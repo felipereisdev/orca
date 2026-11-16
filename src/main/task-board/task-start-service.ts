@@ -12,7 +12,7 @@ import type {
   TaskStartImage
 } from '../../shared/task-board/task-start-context-types'
 import { buildTaskStartPrompt, taskStartTabTitle } from '../../shared/task-board/task-start-prompt'
-import { summarizeTaskStartRun } from '../../shared/task-board/task-start-run'
+import { summarizeTaskStartRun, type TaskStartRun } from '../../shared/task-board/task-start-run'
 import {
   resolveTaskStartRoles,
   resolveTaskStartWorkspaceMode,
@@ -66,7 +66,14 @@ export type TaskStartServiceDeps = TaskStartLaunchDeps &
     gitStatus(worktreeId: string): Promise<{ entries: readonly unknown[]; branch?: string }>
     /** Moves the card forward to the column the way a drag does, provider status included. */
     moveCard(ref: TaskBoardCardRef, columnId: string): Promise<TaskStartCardMove>
+    /** The card moved on its provider: clients re-list the board. */
+    cardMoved(cardKey: string): void
+    /** How long the start's answer waits on the move; it finishes in the background after. */
+    moveWaitMs?: number
   }
+
+// The answer never waits on a slow provider; the move and its note still land after it.
+const MOVE_WAIT_MS = 8000
 
 // Remotes a configured base usually names; anything else must match the branch exactly.
 const BASE_REMOTE = /^(?:refs\/remotes\/)?(?:origin|upstream)\//
@@ -242,24 +249,48 @@ async function runStart(
   )
 }
 
+/** The move's outcome on the run: a refresh once moved, `move-skipped` while live and unnoted. */
+function recordCardMove(
+  moved: TaskStartCardMove,
+  cardKey: string,
+  guard: TaskStartRunGuard,
+  deps: TaskStartServiceDeps
+): TaskStartRun | null {
+  if (moved === 'moved') {
+    deps.cardMoved(cardKey)
+    return null
+  }
+  // A note already on the run (say `prompt-unconfirmed`) matters more than this hint.
+  if (moved === 'kept' || deps.lifecycle.store.getById(guard.runId)?.note) {
+    return null
+  }
+  return guard.patch({ note: 'move-skipped' })
+}
+
 /** A started card goes to In progress; a move that needs the user only marks the run. */
 async function moveStartedCard(
   ref: TaskBoardCardRef,
+  cardKey: string,
   started: Extract<TaskStartResult, { ok: true }>,
   guard: TaskStartRunGuard,
   deps: TaskStartServiceDeps
 ): Promise<TaskStartResult> {
-  const moved = await Promise.resolve()
+  const recorded = Promise.resolve()
     .then(() => deps.moveCard(ref, DEFAULT_WORKSPACE_STATUS_ID))
     .catch((error: unknown) => {
       console.warn('[task-start] moving the started card failed', error)
       return 'skipped' as const
     })
-  // A note already on the run (say `prompt-unconfirmed`) matters more than this hint.
-  if (moved !== 'skipped' || deps.lifecycle.store.getById(guard.runId)?.note) {
-    return started
-  }
-  const run = guard.patch({ note: 'move-skipped' })
+    .then((moved) => recordCardMove(moved, cardKey, guard, deps))
+    .catch((error: unknown) => {
+      console.warn('[task-start] recording the started card move failed', error)
+      return null
+    })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const bound = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), deps.moveWaitMs ?? MOVE_WAIT_MS)
+  })
+  const run = await Promise.race([recorded, bound]).finally(() => clearTimeout(timer))
   return run ? { ok: true, run: summarizeTaskStartRun(run) } : started
 }
 
@@ -288,7 +319,9 @@ export async function startTaskFromCard(
   const guard = createTaskStartRunGuard(runId, deps)
   try {
     const result = await runStart(prepared, params, guard, deps)
-    return result.ok ? await moveStartedCard(params.ref, result, guard, deps) : result
+    return result.ok
+      ? await moveStartedCard(params.ref, prepared.cardKey, result, guard, deps)
+      : result
   } catch (error) {
     console.warn('[task-start] start failed', error)
     return await guard.fail('launch-failed', 'launch_failed')

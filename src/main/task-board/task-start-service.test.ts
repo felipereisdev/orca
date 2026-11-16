@@ -134,6 +134,7 @@ function serviceDeps(
     closeOrchestrator: vi.fn(async () => {}),
     renameOrchestrator: vi.fn(async () => {}),
     moveCard: vi.fn(async () => 'moved' as const),
+    cardMoved: vi.fn(),
     orchestration: {
       fence: () => {},
       liveWorkers: () => [],
@@ -549,7 +550,20 @@ describe('startTaskFromCard', () => {
     const result = await startTaskFromCard({ ref: ref(7) }, deps)
     expect(result.ok).toBe(true)
     expect(deps.moveCard).toHaveBeenCalledExactlyOnceWith(ref(7), 'in-progress')
+    expect(deps.cardMoved).toHaveBeenCalledExactlyOnceWith('github:local:web:7')
     expect(store.getById(result.ok ? result.run.id : '')?.note).toBeUndefined()
+  })
+
+  it('answers without waiting on a slow move, which still records its outcome', async () => {
+    const store = memoryStore()
+    const move = deferred<'skipped'>()
+    const deps = serviceDeps(store, { moveCard: vi.fn(() => move.promise), moveWaitMs: 0 })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result.ok).toBe(true)
+    const runId = result.ok ? result.run.id : ''
+    expect(store.getById(runId)?.note).toBeUndefined()
+    move.resolve('skipped')
+    await vi.waitFor(() => expect(store.getById(runId)?.note).toBe('move-skipped'))
   })
 
   it('still starts when the card cannot move, marking the run move-skipped', async () => {
@@ -570,6 +584,7 @@ describe('startTaskFromCard', () => {
         note: 'move-skipped'
       })
       expect(deps.closeOrchestrator).not.toHaveBeenCalled()
+      expect(deps.cardMoved).not.toHaveBeenCalled()
     }
   })
 

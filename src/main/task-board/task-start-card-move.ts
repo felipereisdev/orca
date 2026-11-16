@@ -2,15 +2,18 @@ import { resolveTaskBoardColumnId } from '../../shared/task-board/task-board-col
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
 import { readTaskBoardCard } from './task-board-host-card'
 import { moveTaskBoardCard, type TaskBoardMoveDeps } from './task-board-host-move'
+import type { TaskBoardListFreshness } from './task-board-list-freshness'
 
 /** `kept`: already there or past it, or no such column; `skipped`: the move needs the user. */
 export type TaskStartCardMove = 'moved' | 'kept' | 'skipped'
+
+export type TaskStartCardMoveDeps = TaskBoardMoveDeps & { listFreshness: TaskBoardListFreshness }
 
 /** Moves a started card forward to `columnId` the way a drag does; never backwards. */
 export async function moveStartedTaskBoardCard(
   ref: TaskBoardCardRef,
   columnId: string,
-  deps: TaskBoardMoveDeps
+  deps: TaskStartCardMoveDeps
 ): Promise<TaskStartCardMove> {
   const columns = deps.host.statuses()
   const target = columns.findIndex((column) => column.id === columnId)
@@ -25,6 +28,8 @@ export async function moveStartedTaskBoardCard(
   }
   const result = await moveTaskBoardCard({ ref, targetColumnId: columnId }, deps)
   if (result.status === 'moved') {
+    // A drag's client lists fresh after its move; no client asked for this one.
+    deps.listFreshness.markMoved()
     return 'moved'
   }
   if (result.status === 'blocked' && result.reason === 'same-column') {
