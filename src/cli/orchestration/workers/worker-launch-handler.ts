@@ -2,14 +2,14 @@ import type { CommandHandler } from '../../dispatch/dispatch'
 import { printResult } from '../../output/command-result-output'
 import { withReceiptNext } from '../receipt-next-text'
 import { getOptionalStringFlag, getPresentStringFlag } from '../../arguments/flags'
-import { RuntimeClientError } from '../../runtime/types'
+import { RuntimeClientError } from '../../runtime/connection/types'
 import type { RuntimeClient } from '../../runtime/client'
-import type { RuntimeStatus } from '../../../shared/runtime-session-contracts'
+import type { RuntimeStatus } from '../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import {
   ORCHESTRATION_WORKER_ACCOUNT_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
 } from '../../../shared/orchestration/orchestration-runtime-capabilities'
-import type { ClaudeRateLimitAccountsState } from '../../../shared/managed-account-types'
+import type { ClaudeRateLimitAccountsState } from '../../../shared/agent-accounts/managed-account-types'
 import { resolveAccountId } from '../../accounts/account-selection'
 import { callOrchestrationMutation } from '../recovery/mutation-request'
 import { getOptionalPositiveIntegerValueFlag } from '../numeric-flags'
@@ -158,7 +158,7 @@ async function resolveWorkerClaudeAccount(client: RuntimeClient, query: string):
   })
   const choices = result.claude.accounts.map((account) => ({
     id: account.id,
-    names: [account.email, account.label]
+    names: [account.email, account.displayName]
   }))
   // Why no system: a worker pins a saved account; the provider's own sign-in is the default already.
   const accountId = resolveAccountId('Claude', choices, query, { allowSystem: false })

@@ -1,11 +1,11 @@
-import { AgentCurrentIssue } from '../../../../../../shared/rpc-contract/jira-agent-access-params'
+import { AgentCurrentIssue } from '../../../../../../shared/rpc-contract/jira/jira-agent-access-params'
 import { defineMethod } from '../../../core'
 import { jiraAgentError } from '../../../../../jira/jira-agent-request'
 import {
   getWorkspaceReferenceIdentifier,
   getWorkspaceReferenceIdentity
 } from '../../../../../../shared/workspace-attachments/workspace-reference-identity'
-import type { RuntimeReferenceListResult } from '../../../../../../shared/runtime-reference-contracts'
+import type { RuntimeReferenceListResult } from '../../../../../../shared/workspace-attachments/runtime-reference-contracts'
 import { parseJiraIssueUrl } from '../../../../../../shared/jira/jira-issue-url'
 
 export function currentJiraReference(result: RuntimeReferenceListResult) {

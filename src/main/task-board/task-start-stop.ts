@@ -1,5 +1,5 @@
-import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
-import { isOrcaSessionId } from '../../shared/orca-session-address'
+import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
+import { isOrcaSessionId } from '../../shared/agent-session/identity/orca-session-address'
 import type {
   HelperStopOutcome,
   WorkerStopReceipt

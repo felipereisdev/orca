@@ -1,9 +1,9 @@
 import { projectGroupIdFromRepoId } from '../../shared/folder-workspaces/folder-workspace-worktree'
-import type { ProjectGroup } from '../../shared/project-group-types'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import type { ProjectHostSetup } from '../../shared/project-types'
-import type { Repo } from '../../shared/repo-types'
-import type { RuntimeReferenceListResult } from '../../shared/runtime-reference-contracts'
+import type { ProjectGroup } from '../../shared/project/groups/project-group-types'
+import { getRepoExecutionHostId } from '../../shared/execution-host/execution-host'
+import type { ProjectHostSetup } from '../../shared/project/project-types'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { RuntimeReferenceListResult } from '../../shared/workspace-attachments/runtime-reference-contracts'
 import type { HandlerContext } from '../dispatch/dispatch'
 import { getOptionalStringFlag } from '../arguments/flags'
 import { resolveJiraTarget } from '../jira/jira-target'
@@ -11,7 +11,7 @@ import {
   assertReferenceWritesSupported,
   resolveReferenceInputs
 } from '../references/reference-input'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 import type { CliRepoTarget } from './worktree-project-target'
 
 export async function resolveWorktreeJiraLink(

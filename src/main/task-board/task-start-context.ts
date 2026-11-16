@@ -1,5 +1,5 @@
 import type { PRComment } from '../../shared/github/comments/comment-types'
-import type { MRComment } from '../../shared/gitlab-types'
+import type { MRComment } from '../../shared/gitlab/gitlab-types'
 import type { JiraComment } from '../../shared/jira/jira-types'
 import type { LinearComment } from '../../shared/linear/issue-types'
 import { extractLinearInlineMedia } from '../../shared/linear/inline-media'

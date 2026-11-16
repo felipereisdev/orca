@@ -9,7 +9,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import type { TaskBoardStart } from './use-task-board-start'
 import { taskStartPrimaryReasonMessage } from './task-board-start-messages'
 import { TaskStartDialog } from './TaskStartDialog'

@@ -1,4 +1,4 @@
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo } from '../../../../shared/repository/repo-types'
 import { resolveLocalGitUsername } from '../../../git/repositories/git-username'
 import { computeWorkspaceRoot, getWorktreePathSettings } from '../../../ipc/worktree-logic'
 import { openWorktreeCreatePathClaim } from '../../../workspaces/creation/worktree-create-in-flight'

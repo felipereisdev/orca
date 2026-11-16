@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GitHubWorkItemDetails } from '../../shared/github/work-items/work-item-types'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import { isValidGitHubApiRepository } from '../github/repositories/github-api-repository-validation'
 import { readTaskBoardComments, type TaskBoardCommentDeps } from './task-board-comments'
 

@@ -3,7 +3,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import {
   JiraBoardMoveDialog,
   type JiraBoardMovePrompt
-} from '@/components/task-page/jira/task-page-jira-board-move-dialog'
+} from '@/components/task-page/jira/boards/task-page-jira-board-move-dialog'
 import type { JiraTransitionFieldsSubmit } from '@/components/jira-transition-fields-form'
 import type { TaskBoardChoice } from '../../../../../shared/task-board/task-board-wire-types'
 import { TaskBoardChoiceDialog } from './TaskBoardChoiceDialog'

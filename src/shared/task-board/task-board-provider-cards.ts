@@ -1,8 +1,8 @@
 import type { GitHubWorkItem } from '../github/work-items/work-item-types'
-import type { GitLabWorkItem } from '../gitlab-types'
+import type { GitLabWorkItem } from '../gitlab/gitlab-types'
 import type { JiraIssue } from '../jira/jira-types'
 import type { LinearIssue } from '../linear/issue-types'
-import type { ExecutionHostId } from '../execution-host'
+import type { ExecutionHostId } from '../execution-host/execution-host'
 import {
   jiraStatusCategory,
   linearStatusCategory,

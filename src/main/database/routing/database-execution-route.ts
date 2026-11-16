@@ -8,7 +8,10 @@ import type {
   DatabaseConnectionRef,
   DatabaseProjectKey
 } from '../../../shared/database/database-contracts'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host/execution-host'
 import type { DatabaseActor } from '../execution/database-query-actor'
 import { sameDatabaseProject } from '../catalog/database-project-scope'
 
@@ -27,7 +30,11 @@ export type DatabaseRouteBinding = {
 export type DatabaseRoutePorts = {
   controllerRuntimeId: string
   connection(id: string, project: DatabaseProjectKey): DatabaseConnection
-  resolveServer(selector: string): { environmentId: string; pairingRevision?: number }
+  resolveServer(
+    selector: string
+  ):
+    | { environmentId: string; pairingRevision?: number }
+    | Promise<{ environmentId: string; pairingRevision?: number }>
   callServer(
     environmentId: string,
     method: string,
@@ -84,7 +91,7 @@ export class DatabaseExecutionRouter {
       throw new DatabaseOperationError('database_capability_missing')
     }
     try {
-      const server = this.ports.resolveServer(host.environmentId)
+      const server = await this.ports.resolveServer(host.environmentId)
       const raw = await this.ports.callServer(
         server.environmentId,
         'status.get',

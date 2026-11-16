@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import {
   getTaskStartOptions,
   resolveTaskStartRepo,

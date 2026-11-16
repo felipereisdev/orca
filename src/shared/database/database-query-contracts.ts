@@ -4,7 +4,7 @@ import type {
   DatabaseProjectKey,
   DatabaseQueryLimits
 } from './database-contracts'
-import type { ExecutionHostId } from '../execution-host'
+import type { ExecutionHostId } from '../execution-host/execution-host'
 
 export type DatabaseParameter = {
   name: string

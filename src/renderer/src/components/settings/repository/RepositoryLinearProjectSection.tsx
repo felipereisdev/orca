@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
-import type { Repo } from '../../../../../shared/repo-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import type { LinearProjectSummary } from '../../../../../shared/linear/project-types'
 import type { LinearProjectReference } from '../../../../../shared/linear/linear-project-reference'
-import { getRepoExecutionHostId, type ExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../shared/execution-host/execution-host'
 import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { useAppStore } from '@/store/index'
 import {

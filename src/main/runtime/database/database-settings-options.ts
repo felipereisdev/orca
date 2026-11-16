@@ -1,9 +1,9 @@
-import { getAppEnvironment } from '../../../shared/app-environment'
+import { getAppEnvironment } from '../../../shared/app-lifecycle/app-environment'
 import {
   getLocalExecutionHostLabel,
   getRepoExecutionHostId,
   toRuntimeExecutionHostId
-} from '../../../shared/execution-host'
+} from '../../../shared/execution-host/execution-host'
 import { listEnvironments } from '../../../shared/remote-runtime/host-store/runtime-environment-store'
 import type {
   DatabaseSettingsOptions,
@@ -51,7 +51,7 @@ export async function databaseSettingsOptions(
         label: getLocalExecutionHostLabel(),
         capabilities: nativeCapabilities
       },
-      ...listEnvironments(getAppEnvironment().getPath('userData')).map((environment) => ({
+      ...(await listEnvironments(getAppEnvironment().getPath('userData'))).map((environment) => ({
         executionHostId: toRuntimeExecutionHostId(environment.id),
         label: environment.name
       }))

@@ -1,4 +1,4 @@
-import type { Repo } from '../repo-types'
+import type { Repo } from '../repository/repo-types'
 
 /** A repo's Linear project: its cards start in that repo. */
 export type LinearProjectReference = { id: string; name: string; workspaceId: string | null }

@@ -1,10 +1,11 @@
 import { emitAutomationsChangedWindowEvent } from '@/components/automations/events/automations-changed-window-event'
+import { emitWorkspaceCleanupRunFinishedWindowEvent } from '@/components/workspace-cleanup/events/workspace-cleanup-run-finished-window-event'
 import { handleTaskBoardRunsChanged } from '@/runtime/task-board/task-board-runs-changed'
-import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
-import type { RuntimeClientEvent } from '../../../../shared/runtime-client-events'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import type { RuntimeClientEvent } from '../../../../shared/remote-runtime/session-graph/runtime-client-events'
 
-/** A paired host's change that pages read from window events; true when `event` was one. */
-export function dispatchRuntimeClientWindowEvent(
+/** Re-emits a server's events that renderer pages listen for as window events; true when handled. */
+export function emitRuntimeClientWindowEvent(
   environmentId: string,
   event: RuntimeClientEvent
 ): boolean {
@@ -15,6 +16,10 @@ export function dispatchRuntimeClientWindowEvent(
       ...(event.selector ? { selector: event.selector } : {}),
       ...(event.reason ? { reason: event.reason } : {})
     })
+    return true
+  }
+  if (event.type === 'workspaceCleanupRunFinished') {
+    emitWorkspaceCleanupRunFinishedWindowEvent({ environmentId, run: event.run })
     return true
   }
   if (event.type === 'taskBoardRunsChanged') {

@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  ORCA_SESSION_ADDRESS_PREFIX,
-  parseOrcaSessionAddress
-} from '../../shared/orca-session-address'
-import { WorkerStartParams } from '../../shared/rpc-contract/orchestration-worker-start-params'
+import { parseOrcaSessionAddress } from '../../shared/agent-session/identity/orca-session-address'
+import { ORCA_SESSION_ADDRESS_PREFIX } from '../../shared/agent-session/identity/orca-session-address-prefix'
+import { WorkerStartParams } from '../../shared/rpc-contract/orchestration/orchestration-worker-start-params'
 import {
   ensureRemoteDispatchRecord,
   recordRemoteDispatchState
@@ -149,7 +147,7 @@ describe('stopTaskStartRun with workers a server owns', () => {
 
   it('attributes a server-owned worker to the coordinator that started it, not the Task creator', async () => {
     const { firstRun } = stopHarness()
-    vi.spyOn(h.runtime, 'resolveOrchestrationWorkerServer').mockReturnValue(SERVER)
+    vi.spyOn(h.runtime, 'resolveOrchestrationWorkerServer').mockResolvedValue(SERVER)
     vi.spyOn(h.runtime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {})
     vi.spyOn(h.runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_coord' ? h.coordinatorPaneKey : handle === 'term_other' ? OTHER_PANE : null
@@ -244,7 +242,7 @@ describe('stopTaskStartRun with workers a server owns', () => {
       })
     )
     const { store, deps, run } = stopHarness()
-    vi.spyOn(h.runtime, 'resolveOrchestrationWorkerServer').mockReturnValue(SERVER)
+    vi.spyOn(h.runtime, 'resolveOrchestrationWorkerServer').mockResolvedValue(SERVER)
     vi.spyOn(h.runtime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {})
     const coordinator = {
       terminalHandle: 'term_coord',

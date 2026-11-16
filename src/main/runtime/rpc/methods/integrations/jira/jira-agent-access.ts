@@ -2,7 +2,7 @@ import {
   AgentIssueContext,
   AgentAttachmentRead,
   AgentSearchIssues
-} from '../../../../../../shared/rpc-contract/jira-agent-access-params'
+} from '../../../../../../shared/rpc-contract/jira/jira-agent-access-params'
 import { defineMethod } from '../../../core'
 import { jiraAgentSearchIssues } from '../../../../../jira/jira-agent-search'
 import { jiraIssueContext } from '../../../../../jira/jira-agent-context'

@@ -2,6 +2,7 @@
  * Host-originated CLI/orchestration/automation/chat/generation/bare launches use the same per-distro account environment as desktop-originated launches. */
 import { z } from 'zod'
 import { AgentLaunchAccountEnv } from './agent-launch-account-env'
+import { MANAGED_ACCOUNT_DISPLAY_NAME_MAX_LENGTH } from '../../agent-accounts/managed-account-display-names'
 
 export const HostAccountLaunchEnvParams = z
   .object({
@@ -16,7 +17,7 @@ export const HostAccountLaunchEnvParams = z
           .object({
             configDir: z.string().min(1).max(4096),
             email: z.string(),
-            label: z.string().max(80).optional(),
+            label: z.string().max(MANAGED_ACCOUNT_DISPLAY_NAME_MAX_LENGTH).optional(),
             organizationUuid: z.string().nullish(),
             organizationName: z.string().nullish(),
             needsSignIn: z.literal(true).optional()

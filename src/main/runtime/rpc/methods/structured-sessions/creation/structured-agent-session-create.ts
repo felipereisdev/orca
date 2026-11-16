@@ -1,7 +1,7 @@
-import { structuredAgentSessionCreateFingerprint } from '../../../../../../shared/agent-session/lifecycle/structured-agent-session-mutation'
+import { structuredAgentSessionCreateFingerprint } from '../../../../../../shared/agent-session/lifecycle/operations/structured-agent-session-mutation'
 import type { StructuredSessionSurface } from '../../../../agent-session/structured-agent-session-close'
 import { structuredAgentSessionTabId } from '../../../../../../shared/agent-session/view/structured-agent-session-projection'
-import { seededPermissionMode } from '../../../../../../shared/native-chat/input/native-chat-session-option-defaults'
+import { seededPermissionMode } from '../../../../../../shared/native-chat/input/session-options/native-chat-session-option-defaults'
 // Resolve the host launch identity, then commit an at-rest create or the compatible acquired path.
 
 import { assertAgentPromptRequestActive } from '../../../../terminal/input/agent-prompt-signals'
@@ -11,7 +11,7 @@ import {
   agentSessionRefusalError,
   AgentSessionRefusalError
 } from '../../../../../../shared/agent-session/failures/agent-session-wire-refusals'
-import { computeAgentSessionPayloadFingerprint } from '../../../../../../shared/agent-session/lifecycle/agent-session-mutation-envelope'
+import { computeAgentSessionPayloadFingerprint } from '../../../../../../shared/agent-session/lifecycle/operations/agent-session-mutation-envelope'
 import type {
   AgentSessionAttachResult,
   AgentSessionMutationEnvelope,
@@ -35,9 +35,9 @@ import {
   captureStructuredAgentCliSource,
   type StructuredAgentCliSourceEvidence
 } from '../../../../../native-chat/conversation-adoption/structured-agent-cli-source'
-import type { StructuredAgentId } from '../../../../../../shared/agent-session/lifecycle/agent-session-provider-handle'
+import type { StructuredAgentId } from '../../../../../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
 import { resolveUncommittedStructuredCreate } from './structured-agent-session-precommit-refusal'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../../../shared/workspace-layout/layout-owner-switch'
 import { structuredAgentSessionClosedBeforeCreate } from './structured-agent-session-close-before-create'
 import type { ChatTabPlacement } from '../../../../agent-session/agent-session-tab-layout'
 

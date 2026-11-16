@@ -1,5 +1,5 @@
-import { getRepoSshConnectionId } from '../../shared/execution-host'
-import type { Repo } from '../../shared/repo-types'
+import { getRepoSshConnectionId } from '../../shared/execution-host/execution-host'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskStartRun } from '../../shared/task-board/task-start-run'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { execCommand } from '../ssh/remote-exec/remote-exec-command'

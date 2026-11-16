@@ -6,8 +6,7 @@ import { Badge } from '../../../ui/badge'
 import { Button } from '../../../ui/button'
 import { ButtonGroup } from '../../../ui/button-group'
 import { Label } from '../../../ui/label'
-import { ClaudeAccountCard } from './claude-account-card'
-import { ClaudeIcon } from '../../../status-bar/icons'
+import { ClaudeIcon } from '../../../status-bar/accounts/provider-icons'
 import { SearchableSetting } from '../../section-layout/SearchableSetting'
 import { ClaudeOAuthUsageSetting } from './claude-oauth-usage-setting'
 import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
@@ -25,11 +24,12 @@ import {
   trackAccountAddition
 } from '../sign-in/account-add-cancel-target'
 import { SettingsGroup } from '../../section-layout/SettingsGroup'
+import { renderClaudeAccountRow } from './accounts-pane-claude-account-row'
 
 export function renderClaudeAccountsSection(
   model: AccountsPaneSectionModel,
   t: Translate = translate,
-  _intlLocale?: string
+  intlLocale?: string
 ): React.JSX.Element {
   const {
     accountRuntime,
@@ -247,9 +247,9 @@ export function renderClaudeAccountsSection(
                     )}
               </div>
             ) : (
-              visibleClaudeAccounts.map((account) => (
-                <ClaudeAccountCard key={account.id} account={account} model={model} />
-              ))
+              visibleClaudeAccounts.map((account) =>
+                renderClaudeAccountRow(account, model, t, intlLocale)
+              )
             )}
           </div>
         </SearchableSetting>

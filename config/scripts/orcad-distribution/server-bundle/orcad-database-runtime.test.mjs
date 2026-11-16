@@ -10,7 +10,7 @@ import {
   ORCAD_BUNDLE_PLUGINS,
   ORCAD_SERVER_BUILD_TARGET
 } from './orcad-entry-build.mjs'
-import { ORCAD_ARTIFACTS } from '../../../../src/shared/orcad-artifacts.ts'
+import { ORCAD_ARTIFACTS } from '../../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts'
 import { stageOrcadDatabaseParser } from './orcad-database-parser-package.mjs'
 
 const root = join(import.meta.dirname, '../../../..')

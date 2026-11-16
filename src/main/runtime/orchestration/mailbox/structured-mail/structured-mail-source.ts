@@ -15,11 +15,10 @@ import { agentMessageSender, type SenderSnapshotResolver } from '../senders/agen
 import type { OrchestrationCliCommand } from '../../workers/launch/orchestration-cli-command'
 import { completionReportFollowUp } from '../../workers/reports/report-follow-up-action'
 import {
-  formatMessageBanner,
   formatMessageBannerWithContent,
   formatMessagePointer
 } from '../formatting/message-formatting'
-import { structuredAgentSessionBlocksTooLarge } from '../../../../../shared/rpc-contract/structured-agent-session-message-params'
+import { structuredAgentSessionBlocksTooLarge } from '../../../../../shared/rpc-contract/structured-agent-session/structured-agent-session-message-params'
 
 export type MailSourceMessage = Pick<
   MessageRow,
@@ -106,9 +105,8 @@ export function structuredMailSource(input: {
   }
 }
 
-/** One orchestration message as one chat message: the whole message, with who it is from.
- *  `whole` is false when it would exceed a chat message's limit; that one then points at `check`
- *  and stays unread there. */
+/** One orchestration message as one chat card: the whole message, with who it is from, for people.
+ *  `whole` is false when it would exceed a chat message's limit; that card then shows the pointer. */
 export function structuredMailMessage(input: {
   db: OrchestrationDb
   mailboxHandle: string
@@ -148,19 +146,6 @@ export function structuredMailMessage(input: {
     body: { kind: 'message', role: 'user', blocks: [{ type: 'text', text: pointer }], from },
     whole: false
   }
-}
-
-/** Whether a message goes to a chat whole, rather than as a pointer at `check`. */
-export function structuredMailFitsWhole(
-  db: OrchestrationDb,
-  message: MessageRow,
-  cliCommand: OrchestrationCliCommand
-): boolean {
-  const text = formatMessageBanner(message, {
-    cliCommand,
-    followUp: completionReportFollowUp(db, message)
-  })
-  return !structuredAgentSessionBlocksTooLarge([{ type: 'text', text }])
 }
 
 type ReportFact = { kind: 'mail' } | { kind: 'invalid' } | { kind: 'valid'; dispatchId: string }

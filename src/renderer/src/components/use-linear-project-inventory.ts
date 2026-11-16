@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LinearProjectSummary } from '../../../shared/linear/project-types'
-import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { getLinearProjectSearchRequestQuery } from './linear-project-search-query'
 import { linearStatusForTarget } from '@/runtime/linear/runtime-linear-client'
 import { linearListProjectsForTarget } from '@/runtime/linear/runtime-linear-project-client'

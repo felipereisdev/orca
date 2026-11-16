@@ -1,4 +1,4 @@
-import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { mapWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import {
   countUnreadTaskBoardComments,
   type TaskBoardSeenComments

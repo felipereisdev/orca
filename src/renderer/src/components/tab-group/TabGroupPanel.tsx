@@ -4,30 +4,34 @@ import { useDroppable } from '@dnd-kit/core'
 import { useAppStore } from '../../store/index'
 import TabBar from '../tab-bar/TabBar'
 
-import { TabBarQuickCommandsButton } from '../tab-bar/TabBarQuickCommandsButton'
-import { TabGroupPaneActionsMenu } from './TabGroupPaneActionsMenu'
-import { useTabGroupWorkspaceModel } from './useTabGroupWorkspaceModel'
+import { TabBarQuickCommandsButton } from '../tab-bar/quick-commands/TabBarQuickCommandsButton'
+import { TabGroupPaneActionsMenu } from './panel/TabGroupPaneActionsMenu'
+import { useTabGroupWorkspaceModel } from './workspace-model/useTabGroupWorkspaceModel'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
-import { resolveGroupTabFromVisibleId } from './tab-group-visible-id'
-import { getTabPaneBodyDroppableId, type HoveredTabInsertion } from './useTabDragSplit'
-import { tabGroupBodyAnchorName } from './tab-group-body-anchor'
-import { registerTabGroupBody } from './tab-group-body-geometry'
+import { resolveGroupTabFromVisibleId } from './workspace-model/tab-group-visible-id'
+import { getTabPaneBodyDroppableId } from './drag/useTabDragSplit'
+import type { HoveredTabInsertion } from './drag/tab-insertion'
+import { tabGroupBodyAnchorName } from './retained-pane/tab-group-body-anchor'
+import { registerTabGroupBody } from './retained-pane/tab-group-body-geometry'
 import { observeTabGroupBodyGridSize } from '@/runtime/sync-runtime-graph/graph-sync-scheduler'
 import { useTranslate } from '@/i18n/use-translate'
-import { toVisibleTabType, type TabGroup } from '../../../../shared/tab-types'
+import { DatabaseTabBody } from '../database/DatabaseTabBody'
+import {
+  toVisibleTabType,
+  type TabGroup
+} from '../../../../shared/workspace-layout/tab-groups/tab-types'
 import { isStructuredTab } from '../../../../shared/agent-session/view/structured-agent-session-tab'
-import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
+import type { ClientHostedBrowserRow } from '../../../../shared/browser/client-hosting/client-hosted-browser-rows'
 import { useClientHostedBrowserRows } from '@/runtime/browser/client-hosting/client-hosted-browser-row-state'
-import { resolveClientHostedBrowserRowStripGroupId } from '../tab-bar/client-hosted-browser-row-strip-placement'
-import { useEditorGroupFileDropOwner } from '../editor/use-editor-group-file-drop-owner'
+import { resolveClientHostedBrowserRowStripGroupId } from '../tab-bar/browser-tabs/client-hosted-browser-row-strip-placement'
+import { useEditorGroupFileDropOwner } from '../editor/file-drop/use-editor-group-file-drop-owner'
 import { cn } from '@/lib/class-names'
-import { UNFOCUSED_SPLIT_GROUP_OPACITY } from './split-group-dim'
+import { UNFOCUSED_SPLIT_GROUP_OPACITY } from './panel/split-group-dim'
 import { useWindowBackdropActive } from '@/app-shell/appearance/window-backdrop'
-import { EditorRevealFlash } from './EditorRevealFlash'
-import { SplitPaneLanding } from './SplitPaneLanding'
+import { EditorRevealFlash } from './editor-reveal/EditorRevealFlash'
+import { SplitPaneLanding } from './landing/SplitPaneLanding'
 import { isSplitLandingGroup } from '@/store/slices/tabs/split-landing-groups'
 
-const WorkspaceDatabaseExplorer = lazy(() => import('../database/WorkspaceDatabaseExplorer'))
 const EditorPanel = lazy(() => import('../editor/EditorPanel'))
 const EMPTY_GROUPS: readonly TabGroup[] = []
 const EMPTY_CLIENT_HOSTED_ROWS: readonly ClientHostedBrowserRow[] = []
@@ -399,11 +403,7 @@ export default function TabGroupPanel({
           )}
 
         {activeTab?.contentType === 'database' && (
-          <div className="absolute inset-0">
-            <Suspense fallback={null}>
-              <WorkspaceDatabaseExplorer worktreeId={worktreeId} entityId={activeTab.entityId} />
-            </Suspense>
-          </div>
+          <DatabaseTabBody worktreeId={worktreeId} entityId={activeTab.entityId} />
         )}
 
         {showsSplitLanding ? (

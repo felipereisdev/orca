@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { databaseSessionQueryActor } from './database-session-query'
 import { OrcaRuntimeService } from '../orca-runtime'
-import { testOrcaSessionId } from '../../../shared/orca-session-address-test-fixture'
+import { testOrcaSessionId } from '../../../shared/agent-session/identity/orca-session-address-test-fixture'
 it('does not let a calling agent select another session to read its database results', async () => {
   const sessionId = testOrcaSessionId('11111111-1111-4111-8111-111111111111')
   await expect(

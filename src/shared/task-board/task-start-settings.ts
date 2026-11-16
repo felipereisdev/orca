@@ -1,6 +1,6 @@
 import { ALL_TUI_AGENTS } from '../agent-launch/catalog/tui-agent-display-names'
 import type { TuiAgent } from '../agent-launch/catalog/tui-agent'
-import type { Repo } from '../repo-types'
+import type { Repo } from '../repository/repo-types'
 
 export const TASK_START_ROLES = [
   'orchestrator',

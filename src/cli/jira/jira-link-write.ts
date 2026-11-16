@@ -2,7 +2,7 @@ import type { CommandHandler } from '../dispatch/dispatch'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../arguments/flags'
 import { printResult } from '../output/command-result-output'
 import { resolveJiraTarget } from './jira-target'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 import { callJiraWrite, jiraWriteFailure } from './jira-write-call'
 
 export const JIRA_LINK_WRITE_HANDLERS: Record<string, CommandHandler> = {

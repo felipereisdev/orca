@@ -8,7 +8,7 @@ import {
   MobileNoMatchState,
   MobileOfflineState,
   MobileStateView
-} from '../../components/MobileStateView'
+} from '../../components/feedback/MobileStateView'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import { colors, spacing, typography } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'

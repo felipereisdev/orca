@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { GitLabWorkItem } from '../../shared/gitlab-types'
+import type { GitLabWorkItem } from '../../shared/gitlab/gitlab-types'
 import type { JiraIssue } from '../../shared/jira/jira-types'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import {
   toGitLabTaskBoardCard,
   toJiraTaskBoardCard

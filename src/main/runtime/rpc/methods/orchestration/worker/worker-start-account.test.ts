@@ -5,7 +5,7 @@ import type { OrchestrationDb } from '../../../../orchestration/db/orchestration
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { EVERY_AGENT_CHAT } from '../../../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { createStructuredAgentSessionForWorktree } from '../../structured-sessions/creation/structured-agent-session-create'
-import '../../../../../../shared/constants'
+import '../../../../../../shared/orca-profiles/constants'
 import '../../../../orchestration/workers/launch/worker-dispatch-preamble'
 
 vi.mock('../../structured-sessions/creation/structured-agent-session-create', async (original) => ({

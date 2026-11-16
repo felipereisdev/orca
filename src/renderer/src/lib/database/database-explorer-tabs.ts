@@ -3,11 +3,11 @@ import {
   databaseExplorerReference
 } from '../../../../shared/database/database-explorer-reference'
 import { useAppStore } from '@/store'
-import { createNonSecureContextUuid } from '../../../../shared/non-secure-context-uuid'
+import { createNonSecureContextUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 import type { DatabaseConnectionRef } from '../../../../shared/database/database-contracts'
 import { openContentTabThroughLayoutOwner } from '@/runtime/workspace-layout/intents/layout-owner-content-tab-open'
 import { createDatabaseExplorerState } from '@/components/database/database-explorer-state'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
 
 const explorers = new Map<string, ReturnType<typeof createDatabaseExplorerState>>()
 export function databaseExplorerState(worktreeId: string, entityId: string) {

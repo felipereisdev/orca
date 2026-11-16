@@ -3,8 +3,11 @@ import { databaseControllerIdentity } from '../../database/catalog/database-cont
 import { requireDatabasePersistence } from './runtime-database-persistence'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { DatabaseProjectKey } from '../../../shared/database/database-contracts'
-import { getRepoExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
-import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import {
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../shared/execution-host/execution-host'
+import { parseWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
 import type { RpcContext } from '../rpc/core'
 import { rpcCallerOperationKey } from '../rpc/callers/rpc-caller-identity'
 import type { DatabaseActor } from '../../database/execution/database-query-actor'

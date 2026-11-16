@@ -6,7 +6,7 @@ import type { TaskBoardListResult } from '../../../../src/shared/task-board/task
 import type { OrcaQueryStoreBackend } from '../../device-store/query-storage'
 import { createHostQueryPersistence } from '../../query/host-query-persistence'
 import { createOrcaQueryClient } from '../../query/orca-query-client'
-import { settleQueryNotifications } from '../../test-support/rpc-recording/hook-mount'
+import { settleQueryNotifications } from '../../test-support/rpc-recording/react-mounting/hook-mount'
 import { stubRpcClient } from '../../transport/rpc/rpc-client-test-stub'
 import { taskBoardCardsKey, taskBoardCardsStorage } from './task-board-query-storage'
 import { useTaskBoard } from './use-task-board'

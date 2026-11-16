@@ -1,10 +1,10 @@
-import { getRepoRoutingConnectionId } from '../../shared/execution-host'
+import { getRepoRoutingConnectionId } from '../../shared/execution-host/execution-host'
 import type { PRComment } from '../../shared/github/comments/comment-types'
 import type { GitHubWorkItemDetails } from '../../shared/github/work-items/work-item-types'
-import type { GitLabWorkItemDetails, MRComment } from '../../shared/gitlab-types'
+import type { GitLabWorkItemDetails, MRComment } from '../../shared/gitlab/gitlab-types'
 import type { JiraComment, JiraSite } from '../../shared/jira/jira-types'
 import type { LinearComment } from '../../shared/linear/issue-types'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type {
   TaskBoardCardRef,
   TaskBoardComment,

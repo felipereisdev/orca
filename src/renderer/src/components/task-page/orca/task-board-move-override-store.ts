@@ -7,7 +7,7 @@ import {
   TASK_BOARD_MOVE_OVERRIDE_TTL_MS,
   type TaskBoardMoveOverride
 } from '../../../../../shared/task-board/task-board-move-overrides'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 
 type Overrides = ReadonlyMap<string, TaskBoardMoveOverride>
 

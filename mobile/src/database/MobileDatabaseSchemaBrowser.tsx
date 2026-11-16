@@ -9,7 +9,7 @@ import type {
 } from '../../../src/shared/database/database-contracts'
 import { buildDatabaseTablePreview } from '../../../src/shared/database/database-table-preview'
 import { ListRow } from '../components/list/ListGroup'
-import { MobileSearchField } from '../components/MobileSearchField'
+import { MobileSearchField } from '../components/controls/MobileSearchField'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { colors } from '../theme/mobile-theme'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'

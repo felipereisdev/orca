@@ -14,6 +14,10 @@ import { createDatabaseRuntimeClient } from '@/runtime/database/database-runtime
 import type { DatabaseConnectionSummary } from '../../../../shared/database/database-contracts'
 import { openDatabaseExplorer } from '@/lib/database/database-explorer-tabs'
 import { useTranslate } from '@/i18n/use-translate'
+
+// Matches the + menu's labeled create rows.
+const CREATE_MENU_ROW_CLASS = 'gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium'
+
 export function DatabaseWorkspaceMenu({
   worktreeId,
   groupId
@@ -55,7 +59,7 @@ export function DatabaseWorkspaceMenu({
   }, [open, client, worktreeId])
   return (
     <DropdownMenuSub open={open} onOpenChange={setOpen}>
-      <DropdownMenuSubTrigger disabled={!client} variant="create-row">
+      <DropdownMenuSubTrigger disabled={!client} className={CREATE_MENU_ROW_CLASS}>
         <Database className="size-4 text-muted-foreground" />
         {t('database.workspace.open', 'Database connections')}
       </DropdownMenuSubTrigger>
@@ -74,7 +78,7 @@ export function DatabaseWorkspaceMenu({
         ) : entries.length ? (
           entries.map((connection) => (
             <DropdownMenuItem
-              variant="create"
+              className={CREATE_MENU_ROW_CLASS}
               key={connection.id}
               onSelect={() => {
                 if (controllerRuntimeId) {

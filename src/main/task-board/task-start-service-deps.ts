@@ -1,4 +1,4 @@
-import { getRepoSshConnectionId } from '../../shared/execution-host'
+import { getRepoSshConnectionId } from '../../shared/execution-host/execution-host'
 import type { TaskStartOrchestratorRef } from '../../shared/task-board/task-start-run'
 import { createWorktreeWithStartupAgent } from '../agent-launch/startup-agent-worktree-create'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'

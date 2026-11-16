@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { databaseProjectIdentityKey } from '../../../../../shared/database/database-project-scope'
 import type { DatabaseSettingsOptions } from '../../../../../shared/database/database-settings-options'
 import type { DatabaseConnectionDraftController } from './use-database-connection-draft'
-import { parseExecutionHostId } from '../../../../../shared/execution-host'
+import { parseExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { useTranslate } from '@/i18n/use-translate'
 
 export function DatabaseConnectionScopeFields({

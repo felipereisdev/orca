@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { AgentLaunchRoutingInput } from '@/lib/agent-session/launch/routing/agent-launch-routing'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch/picker/agent-launch-picker'
-import { useProviderAccountList } from '../status-bar/use-provider-account-list'
+import { useProviderAccountList } from '../status-bar/accounts/use-provider-account-list'
 import { buildClaudeAccountPickerEntries } from './claude-account-picker-entries'
 
 export function useClaudeAccountPicker(

@@ -1,6 +1,10 @@
 import type { TuiAgent } from '../../../../../../../shared/agent-launch/catalog/tui-agent'
 import type { AgentLaunchModeReceipt as WorkerStartModeReceipt } from '../../../../../../../shared/agent-launch/contracts/agent-launch-intent'
-import type { OrchestrationWorkerLaunchReceipt } from './launch/worker-launch-preferences'
+import {
+  reusedWorkerLaunchReceipt,
+  type OrchestrationWorkerLaunchReceipt
+} from './launch/worker-launch-preferences'
+import { resolveDispatchAssigneeParty } from '../../../../../orchestration/addressing/orchestration-party'
 import type { WorkerStartInput } from './worker-start-input'
 import type { RunRow } from '../../../../../orchestration/db/orchestration-records'
 import type { startLocalWorker } from './local-worker-start'
@@ -49,7 +53,14 @@ export function createLocalWorkerStartDispatch(
     baseBranch: params.baseBranch ?? null,
     terminal: params.terminal ?? null,
     agent: agent ?? null,
-    launch: launchReceipt,
+    // Mail from a reuse start that never binds still names the agent already running there.
+    launch: params.terminal
+      ? reusedWorkerLaunchReceipt(
+          runtime,
+          launchReceipt,
+          resolveDispatchAssigneeParty(params.terminal, db)
+        )
+      : launchReceipt,
     // A follow-up that starts the agent again starts it on the same account, under the same tab title.
     claudeAccountId: params.claudeAccountId ?? null,
     title: params.title ?? null,

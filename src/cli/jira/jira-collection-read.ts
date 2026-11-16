@@ -20,7 +20,7 @@ import { printResult } from '../output/command-result-output'
 import { formatJiraIssueList } from './jira-format'
 import { callJiraRead } from './jira-read-call'
 import { connectedJiraSites, resolveJiraTarget } from './jira-target'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 
 function projectQuery(context: HandlerContext, jql: string): string {
   const project = getOptionalStringFlag(context.flags, 'project')?.trim()

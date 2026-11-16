@@ -1,7 +1,7 @@
 import { DatabaseOperationError } from '../../../shared/database/database-operation-error'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
-import { getSecretStore } from '../../../shared/secret-store'
+import { getSecretStore } from '../../../shared/secure-storage/secret-store'
 import { ProtectedSecretPersistence } from '../../credentials/protected-secret-persistence'
 import type { DatabaseCredentials } from '../../../shared/database/database-contracts'
 import type { DatabasePersistence } from '../../persistence/loading-store/database-persistence'

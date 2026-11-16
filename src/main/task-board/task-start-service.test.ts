@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentLaunchResult } from '../../shared/agent-launch/contracts/agent-launch-intent'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
 import type { TaskStartRun } from '../../shared/task-board/task-start-run'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'

@@ -7,7 +7,7 @@ import {
 } from '../../../../src/shared/agent-launch/contracts/agent-launch-runtime-capability'
 import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/agent-session-create-capabilities'
 import { launchNewTabAgentThroughHost } from './new-tab-agent-host-launch'
-import { requestMobileSessionTerminalCreate } from '../../terminal/session/mobile-session-terminal-create-request'
+import { requestMobileSessionTerminalCreate } from '../../terminal/session/creation/mobile-session-terminal-create-request'
 
 vi.mock('react-native', () => ({ Platform: { OS: 'web' } }))
 

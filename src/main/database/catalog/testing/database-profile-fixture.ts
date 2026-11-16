@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Store } from '../../../persistence/loading-store/store'
 import { createSqliteTestStore } from '../../../persistence/persistence-test-harness'
-import { setSecretStore } from '../../../../shared/secret-store'
+import { setSecretStore } from '../../../../shared/secure-storage/secret-store'
 
 export function createDatabaseTestProfile() {
   const directory = mkdtempSync(join(tmpdir(), 'orca-database-profile-'))

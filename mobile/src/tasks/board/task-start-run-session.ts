@@ -2,7 +2,7 @@ import {
   structuredAgentSessionPaneKey,
   structuredAgentSessionTabId
 } from '../../../../src/shared/agent-session/view/structured-agent-session-projection'
-import { parseExecutionHostId } from '../../../../src/shared/execution-host'
+import { parseExecutionHostId } from '../../../../src/shared/execution-host/execution-host'
 import type { TaskStartRunSummary } from '../../../../src/shared/task-board/task-start-run'
 import { hostStackRouteHref, type HostStackRouteHref } from '../../navigation/host-stack-navigation'
 import { mobileSessionRouteTarget } from '../../session/mobile-session-route'

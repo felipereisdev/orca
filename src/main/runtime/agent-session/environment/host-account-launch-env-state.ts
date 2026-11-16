@@ -1,4 +1,4 @@
-import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
+import { createEmptyRateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-state-factory'
 import { prepareHostClaudeAccountLaunch } from './host-claude-account-launch'
 import { retireAtRestCommandContext } from '../../../native-chat/agent-session-wire/options/at-rest-command-context'
 import { agentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
@@ -121,7 +121,7 @@ export class HostAccountLaunchEnvState {
         accounts: entries.map(([id, account]) => ({
           id,
           email: account.email,
-          label: account.label,
+          ...(account.label ? { displayName: account.label } : {}),
           organizationUuid: account.organizationUuid,
           organizationName: account.organizationName,
           needsSignIn: account.needsSignIn,

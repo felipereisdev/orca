@@ -1,4 +1,4 @@
-import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../shared/execution-host/execution-host'
 import type { DatabaseEngine } from '../../../shared/database/database-contracts'
 import type { DatabasePersistence } from '../../persistence/loading-store/database-persistence'
 import type { DatabaseAdapter } from '../adapters/database-adapter'

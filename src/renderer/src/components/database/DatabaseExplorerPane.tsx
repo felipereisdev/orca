@@ -19,7 +19,7 @@ import { databaseQueryContext } from './database-chat-context'
 import { useDatabaseExplorer } from './use-database-explorer'
 import type { DatabaseExplorerState } from './database-explorer-state'
 import type { DatabaseRuntimeClient } from '@/runtime/database/database-runtime-client'
-const MonacoEditor = lazy(() => import('../editor/MonacoEditor'))
+const MonacoEditor = lazy(() => import('../editor/monaco/MonacoEditor'))
 export function DatabaseExplorerPane({
   client,
   controller,

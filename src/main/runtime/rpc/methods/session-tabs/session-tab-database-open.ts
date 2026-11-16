@@ -1,7 +1,7 @@
 import { databaseActor } from '../../../database/database-project-context'
 import { runtimeDatabaseCommands } from '../../../database/runtime-database-service-slot'
 import { defineMethod } from '../../core'
-import { OpenDatabaseTab } from '../../../../../shared/rpc-contract/session-tabs-schemas-params'
+import { OpenDatabaseTab } from '../../../../../shared/rpc-contract/session-tabs/session-tabs-schemas-params'
 
 export const SESSION_TAB_DATABASE_OPEN_METHOD = defineMethod({
   name: 'session.tabs.openDatabase',

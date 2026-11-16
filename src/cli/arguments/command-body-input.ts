@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
+import { readStdin } from './flag-or-stdin-payload'
 import { getRequiredStringFlag, getRequiredStringFlagAllowingEmpty } from './flags'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 import { readNodeFileWithinLimit } from '../../shared/file-content/node-bounded-file-reader'
 
 type BodyOptions = {
@@ -73,18 +74,5 @@ async function readBodyFile(path: string, cwd: string, maximumBytes?: number): P
           await readNodeFileWithinLimit(absolutePath, maximumBytes, { regularFileOnly: true })
         ).buffer.toString('utf8')
   }
-  if (process.stdin.isTTY) {
-    throw new RuntimeClientError('invalid_argument', 'stdin body requested but stdin is a TTY')
-  }
-  const chunks: Buffer[] = []
-  let bytes = 0
-  for await (const chunk of process.stdin) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk))
-    bytes += buffer.length
-    if (maximumBytes !== undefined && bytes > maximumBytes) {
-      throw new RuntimeClientError('invalid_argument', 'Input exceeds its byte limit')
-    }
-    chunks.push(buffer)
-  }
-  return Buffer.concat(chunks).toString('utf8')
+  return readStdin('body', maximumBytes)
 }

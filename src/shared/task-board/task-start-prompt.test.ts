@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OrchestrationTaskStartPhaseParams } from '../rpc-contract/task-board-params'
+import { OrchestrationTaskStartPhaseParams } from '../rpc-contract/task-board/task-board-params'
 import { buildTaskStartPrompt, taskStartWorkerCommand } from './task-start-prompt'
 import type { TaskStartContext } from './task-start-context-types'
 

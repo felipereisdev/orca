@@ -1,4 +1,4 @@
-import { AddRemoteLink } from '../../../../../../shared/rpc-contract/jira-remote-link-params'
+import { AddRemoteLink } from '../../../../../../shared/rpc-contract/jira/jira-remote-link-params'
 import { addRemoteLink } from '../../../../../jira/jira-remote-link'
 import { defineMethod } from '../../../core'
 

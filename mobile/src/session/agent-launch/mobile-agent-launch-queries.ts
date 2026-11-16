@@ -3,7 +3,7 @@ import { defineRpcOperation, runRpcOperation } from '../../transport/rpc/rpc-ope
 import { rpcResultVariant } from '../../transport/rpc/rpc-operation-result-reader'
 import { useMemo } from 'react'
 import { useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { useOptionalHostProtocolGates } from '../../components/host-protocol-gates-context'
+import { useOptionalHostProtocolGates } from '../../components/host-connection/host-protocol-gates-context'
 import { useWorkspaceExecutionHost } from '../../navigation/workspace-execution-host'
 import { defineHostQuery, useHostQuery } from '../../query/host-query'
 import {

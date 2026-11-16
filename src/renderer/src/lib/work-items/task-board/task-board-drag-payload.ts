@@ -1,4 +1,4 @@
-import { measureUtf8ByteLength } from '../../../../../shared/utf8-byte-limits'
+import { measureUtf8ByteLength } from '../../../../../shared/text/utf8-byte-limits'
 
 export const TASK_BOARD_DRAG_CARD_MIME = 'application/x-orca-task-board-card'
 export const TASK_BOARD_DRAG_CARD_MAX_BYTES = 1024

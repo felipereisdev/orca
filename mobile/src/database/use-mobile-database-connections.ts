@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DatabaseConnectionSummary } from '../../../src/shared/database/database-contracts'
 import { DATABASE_RUNTIME_CAPABILITIES } from '../../../src/shared/database/database-runtime-capabilities'
-import { SESSION_TABS_DATABASE_RUNTIME_CAPABILITY } from '../../../src/shared/session-tabs-runtime-capabilities'
+import { SESSION_TABS_DATABASE_RUNTIME_CAPABILITY } from '../../../src/shared/remote-runtime/protocol/session-tabs-runtime-capabilities'
 import type { RpcClient } from '../transport/rpc/rpc-client-contract'
 import { translate } from '../i18n/mobile-i18n'
 import { createMobileDatabaseClient } from './mobile-database-rpc'

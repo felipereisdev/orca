@@ -7,7 +7,7 @@ import { JIRA_ATTACHMENT_IMAGE_METHODS } from './jira-attachment-image'
 import { JIRA_AGENT_ACCESS_METHODS } from './jira-agent-access'
 import { JIRA_CURRENT_ISSUE_METHODS } from './jira-current-issue'
 import { JIRA_REMOTE_LINK_METHODS } from './jira-remote-link'
-import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira-favourite-filter-params'
+import { JiraFavouriteFilterParams } from '../../../../../../shared/rpc-contract/jira/jira-favourite-filter-params'
 import {
   AssignableUsers,
   GenerateIssueSummary,
@@ -25,7 +25,7 @@ import {
   SelectSite,
   SiteSelection,
   UserSearch
-} from '../../../../../../shared/rpc-contract/jira-params'
+} from '../../../../../../shared/rpc-contract/jira/jira-params'
 
 /** Emits a Jira result over RPC, normalizing it to the shape clients decode. */
 function emitJiraPayload(value: unknown, emit: (result: unknown) => void): void {

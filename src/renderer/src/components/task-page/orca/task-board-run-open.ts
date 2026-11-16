@@ -6,7 +6,10 @@ import {
   activateStructuredAgentSessionTab,
   activateStructuredAgentSessionTabOnOwner
 } from '@/lib/agent-session/structured-agent-session-tab-activation'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../shared/execution-host/execution-host'
 import type { TaskStartRunSummary } from '../../../../../shared/task-board/task-start-run'
 import { getRepoIdFromWorktreeId } from '../../../../../shared/worktree/id'
 import { parsePaneKey } from '../../../../../shared/workspace-layout/stable-pane-id'

@@ -5,7 +5,7 @@ import { OrcaRuntimeService } from '../orca-runtime'
 import { registerBoundPty } from '../orca-runtime-tests/bind-first-pane.test-fixture'
 import { RpcDispatcher } from '../rpc/dispatcher'
 import { defineMethod } from '../rpc/core'
-import { DatabaseScope } from '../../../shared/rpc-contract/database-params'
+import { DatabaseScope } from '../../../shared/rpc-contract/database/database-params'
 import { databaseActor } from './database-project-context'
 import { OrchestrationRequestEvidence } from '../../../cli/orchestration/identity/orchestration-compatibility-envelope'
 

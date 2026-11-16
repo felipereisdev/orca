@@ -22,7 +22,7 @@ import {
   type LinearReadOptions
 } from './runtime-linear-client'
 import type { RowLessSource as RuntimeLinearSettings } from '../hosts/selection/default-creation-host'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 
 export async function linearListTeams(
   settings: RuntimeLinearSettings,

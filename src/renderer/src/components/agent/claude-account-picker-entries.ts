@@ -1,7 +1,8 @@
+import { getManagedAccountPrimaryLabel } from '../../../../shared/agent-accounts/managed-account-display-names'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch/picker/agent-launch-picker'
-import type { ClaudeRateLimitAccountsState } from '../../../../shared/managed-account-types'
-import type { CodexAccountSelectionTarget } from '../../../../shared/codex-selection-lane'
-import { filterClaudeAccountsForLaunchTarget } from '../../../../shared/claude-account-launch-target'
+import type { ClaudeRateLimitAccountsState } from '../../../../shared/agent-accounts/managed-account-types'
+import type { CodexAccountSelectionTarget } from '../../../../shared/agent-accounts/codex/codex-selection-lane'
+import { filterClaudeAccountsForLaunchTarget } from '../../../../shared/agent-accounts/claude/claude-account-launch-target'
 import { translate } from '@/i18n/i18n'
 
 export function buildClaudeAccountPickerEntries(
@@ -19,10 +20,10 @@ export function buildClaudeAccountPickerEntries(
       claudeAccountId: account.id,
       ...(account.needsSignIn || account.runsOnSystemDefault ? { accountNeedsSignIn: true } : {}),
       label: translate('accounts.claude.launchAccount', 'Claude ({{account}})', {
-        account: account.label || account.email
+        account: getManagedAccountPrimaryLabel(account)
       }),
-      description: account.label ? account.email : (account.organizationName ?? undefined),
-      aliases: [account.label ?? '', account.email, account.organizationName ?? ''],
+      description: account.displayName ? account.email : (account.organizationName ?? undefined),
+      aliases: [account.displayName ?? '', account.email, account.organizationName ?? ''],
       catalog: { origin: 'unknown' }
     })
   )

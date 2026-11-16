@@ -4,7 +4,7 @@ import type {
   ExpiredDatabaseResult
 } from '../../shared/database/database-query-contracts'
 import type { DatabaseConnectionSummary } from '../../shared/database/database-contracts'
-import { DatabaseParameters } from '../../shared/rpc-contract/database-params'
+import { DatabaseParameters } from '../../shared/rpc-contract/database/database-params'
 import { readTextOrFileFlag } from '../arguments/command-body-input'
 import type { CommandHandler, HandlerContext } from '../dispatch/dispatch'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../arguments/flags'
@@ -13,7 +13,7 @@ import {
   buildCurrentWorktreeSelector,
   normalizeWorktreeSelector
 } from '../workspace-selection/workspace-selector'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 
 function scope({ flags, client, cwd }: HandlerContext) {
   const project = getOptionalStringFlag(flags, 'project')

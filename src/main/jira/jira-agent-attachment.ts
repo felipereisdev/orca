@@ -6,7 +6,7 @@ import {
   type JiraAttachmentReadParams,
   type JiraAttachmentReadResult
 } from '../../shared/jira/jira-agent-access'
-import { readFetchResponseBytesWithinLimit } from '../../shared/fetch-response-body'
+import { readFetchResponseBytesWithinLimit } from '../../shared/network/fetch-response-body'
 import { apiBaseUrl, jiraFetch } from './authenticated-request'
 import { attachmentContentUrl } from './attachments/content-url'
 import { asRecord, asString } from './jira-record-pages'

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslate } from '@/i18n/use-translate'
 import type { TaskBoardDropCheck } from '@/components/task-board/TaskBoard'
-import type { JiraBoardMovePrompt } from '@/components/task-page/jira/task-page-jira-board-move-dialog'
+import type { JiraBoardMovePrompt } from '@/components/task-page/jira/boards/task-page-jira-board-move-dialog'
 import type { TaskBoardMoveOverride } from '../../../../../shared/task-board/task-board-move-overrides'
 import { moveTaskBoardCard } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type {
   TaskBoardChoice,
   TaskBoardMoveFields,

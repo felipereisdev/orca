@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const call = vi.hoisted(() => vi.fn())
 vi.mock('../runtime/client', async () => ({
-  ...(await import('../runtime/types.js')),
+  ...(await import('../runtime/connection/types.js')),
   RuntimeClient: class {
     isRemote = false
     call = call

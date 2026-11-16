@@ -1,5 +1,5 @@
 import type { DatabaseEngine, DatabaseProjectKey } from './database-contracts'
-import type { ExecutionHostId } from '../execution-host'
+import type { ExecutionHostId } from '../execution-host/execution-host'
 
 export type DatabaseHostCapabilities = {
   engines: DatabaseEngine[]

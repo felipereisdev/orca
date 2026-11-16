@@ -6,7 +6,7 @@ import {
   DatabaseBindingDescribe,
   DatabaseBindingQuery,
   DatabaseBindingStart
-} from '../../../../../shared/rpc-contract/database-params'
+} from '../../../../../shared/rpc-contract/database/database-params'
 import { rpcCallerOperationKey } from '../../callers/rpc-caller-identity'
 
 function principal(context: RpcContext): string {

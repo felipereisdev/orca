@@ -1,6 +1,6 @@
-import { getRepoRoutingConnectionId } from '../../shared/execution-host'
+import { getRepoRoutingConnectionId } from '../../shared/execution-host/execution-host'
 import type { GitHubCommentResult } from '../../shared/github/comments/comment-types'
-import type { GitLabCommentResult } from '../../shared/gitlab-types'
+import type { GitLabCommentResult } from '../../shared/gitlab/gitlab-types'
 import { resolveCategoryColumnId } from '../../shared/task-board/task-board-columns'
 import {
   markTaskBoardCommentsSeen,

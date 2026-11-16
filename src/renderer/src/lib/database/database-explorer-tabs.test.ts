@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
 import { openDatabaseExplorer } from './database-explorer-tabs'
 
 vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({

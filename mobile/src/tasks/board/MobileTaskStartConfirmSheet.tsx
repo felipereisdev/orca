@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native'
 import { SheetHeader } from '../../components/nav-bar/SheetHeader'
-import { SheetPrimaryButton } from '../../components/SheetPrimaryButton'
+import { SheetPrimaryButton } from '../../components/sheets/SheetPrimaryButton'
 import { colors, spacing, typography } from '../../theme/mobile-theme'
 import { themedStyleSheet } from '../../theme/themed-styles'
 import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'

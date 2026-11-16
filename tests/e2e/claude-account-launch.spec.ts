@@ -55,7 +55,6 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
     writeFileSync(join(home, '..', 'profile.json'), '{}')
     return {
       id,
-      label: id === 'work' ? 'Empresa' : 'Pessoal',
       email: `${id}@example.test`,
       managedAuthPath: '',
       authMethod: 'subscription-oauth' as const,
@@ -80,7 +79,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
         activeClaudeManagedAccountId: null
       })
       const group = await window.api.projectGroups.create({ name: 'Accounts', parentPath: folder })
-      const workspace = await window.api.folderWorkspaces.create({
+      const { folderWorkspace: workspace } = await window.api.folderWorkspaces.create({
         projectGroupId: group.id,
         name: 'Accounts',
         folderPath: folder
@@ -99,6 +98,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
   await page.evaluate(async (accounts) => {
     await window.__store!.getState().updateSettings({
       claudeManagedAccounts: accounts,
+      managedAccountDisplayNames: { claude: { work: 'Empresa', personal: 'Pessoal' } },
       activeClaudeManagedAccountId: 'personal'
     })
   }, accounts)
@@ -182,6 +182,7 @@ test('launches both Claude accounts in Terminal and Chat without changing their 
   await page.evaluate(async (accounts) => {
     await window.__store!.getState().updateSettings({
       claudeManagedAccounts: accounts,
+      managedAccountDisplayNames: { claude: { work: 'Empresa', personal: 'Pessoal' } },
       activeRuntimeEnvironmentId: null,
       activeClaudeManagedAccountId: 'personal',
       activeClaudeManagedAccountIdsByRuntime: { host: 'personal', wsl: {} }

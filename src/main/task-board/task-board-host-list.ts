@@ -1,5 +1,5 @@
 import { parseGitHubItemRepository } from '../../shared/github/work-items/work-item-target'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskBoardCard } from '../../shared/task-board/task-board-card'
 import {
   resolveCategoryColumnId,

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from '../../shared/jira/jira-agent-capability'
 import { reportCliError } from '../output/cli-error'
 import type { HandlerContext } from '../dispatch/dispatch'
-import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/types'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
 import { JIRA_WRITE_HANDLERS } from './jira-write'
 import { JIRA_LINK_WRITE_HANDLERS } from './jira-link-write'
 

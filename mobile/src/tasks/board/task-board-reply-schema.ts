@@ -23,7 +23,7 @@ import {
   salvagedField,
   salvagedOptional,
   salvagingArray
-} from '../../../../src/shared/zod-salvage'
+} from '../../../../src/shared/validation/zod-salvage'
 
 // Identity (ref, column, source) rejects a card; enrichment and display extras salvage older-host replies.
 

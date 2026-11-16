@@ -1,4 +1,4 @@
-import type { ExecutionHostId } from '../execution-host'
+import type { ExecutionHostId } from '../execution-host/execution-host'
 
 export type DatabaseEngine = 'postgres' | 'sql-server' | 'oracle'
 export type DatabaseAccessMode = 'read-only' | 'read-write'

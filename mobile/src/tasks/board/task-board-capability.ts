@@ -1,7 +1,7 @@
 import {
   MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
   MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
-} from '../../../../src/shared/mobile-runtime-capabilities'
+} from '../../../../src/shared/remote-runtime/protocol/mobile-runtime-capabilities'
 import { readHostStatusReply } from '../../query/host-status-query'
 import { readProbedHostCapabilities } from '../../transport/connection/host-status-probe-operations'
 import { isMobileMethodUnavailableError } from '../../transport/rpc/mobile-method-unavailable'

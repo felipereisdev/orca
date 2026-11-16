@@ -7,7 +7,7 @@ import {
   TaskBoardStartOptionsParams,
   TaskBoardStartTaskParams,
   TaskBoardStopTaskParams
-} from '../../../../../shared/rpc-contract/task-board-params'
+} from '../../../../../shared/rpc-contract/task-board/task-board-params'
 import { createTaskBoardServiceDeps } from '../../../../task-board/task-board-host-deps'
 import { moveTaskBoardCard } from '../../../../task-board/task-board-host-move'
 import {

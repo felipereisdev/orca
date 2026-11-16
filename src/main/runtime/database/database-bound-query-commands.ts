@@ -4,7 +4,7 @@ import type {
   DatabaseBindingQuery,
   DatabaseBindingStart,
   DatabaseBindingDescribe
-} from '../../../shared/rpc-contract/database-params'
+} from '../../../shared/rpc-contract/database/database-params'
 import type { DatabaseExecutionBindings } from '../../database/routing/database-execution-bindings'
 import type { DatabaseCredentialStore } from '../../database/credentials/database-credential-store'
 import type { DatabaseAdapter } from '../../database/adapters/database-adapter'

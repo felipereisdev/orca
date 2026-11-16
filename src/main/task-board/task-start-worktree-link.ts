@@ -1,5 +1,5 @@
 import type { WorkspaceLinkedItem } from '../../shared/worktree/types'
-import { getLinkedWorkItemWorkspaceName } from '../../shared/workspace-name'
+import { getLinkedWorkItemWorkspaceName } from '../../shared/workspace/naming/workspace-name'
 import type { TaskStartCard } from './task-start-context'
 
 /** The card's item as the composer links it, so the board finds the workspace from the card. */

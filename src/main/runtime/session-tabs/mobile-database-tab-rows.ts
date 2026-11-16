@@ -1,10 +1,14 @@
-import type { RuntimeMobileSessionDatabaseTab } from '../../../shared/runtime-mobile-session-tab-contracts'
+import type { RuntimeMobileSessionDatabaseTab } from '../../../shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session/workspace-session-state-types'
 
-export function buildHeadlessMobileDatabaseTabs(
+export function headlessMobileDatabaseTabs(
   worktreeId: string,
-  session: WorkspaceSessionState
+  session: WorkspaceSessionState,
+  runtimeOwnedOnly = false
 ): RuntimeMobileSessionDatabaseTab[] {
+  if (runtimeOwnedOnly) {
+    return []
+  }
   return (session.unifiedTabs?.[worktreeId] ?? []).flatMap((tab) =>
     tab.contentType === 'database'
       ? [

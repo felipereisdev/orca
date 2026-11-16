@@ -1,3 +1,4 @@
+import { getManagedAccountPrimaryLabel } from '../../shared/agent-accounts/managed-account-display-names'
 import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
 import { tuiAgentDisplayName } from '../../shared/agent-launch/catalog/tui-agent-display-names'
 import {
@@ -8,17 +9,17 @@ import type { AgentSessionModelCatalogResult } from '../../shared/agent-session/
 import {
   filterClaudeAccountsForLaunchTarget,
   type ClaudeAccountLaunchTarget
-} from '../../shared/claude-account-launch-target'
+} from '../../shared/agent-accounts/claude/claude-account-launch-target'
 import {
   getRepoExecutionHostId,
   getRepoSshConnectionId,
   LOCAL_EXECUTION_HOST_ID
-} from '../../shared/execution-host'
+} from '../../shared/execution-host/execution-host'
 import { findJiraIssueRepoCandidates } from '../../shared/jira/jira-project-reference'
 import type { JiraIssue } from '../../shared/jira/jira-types'
 import { findLinearProjectRepoCandidates } from '../../shared/linear/linear-project-reference'
-import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
-import type { Repo } from '../../shared/repo-types'
+import type { ClaudeManagedAccountSummary } from '../../shared/agent-accounts/managed-account-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type {
   TaskBoardCardRef,
   TaskStartAgentCatalogEntry,
@@ -137,7 +138,7 @@ async function catalogModels(
 }
 
 function accountName(account: ClaudeManagedAccountSummary): string {
-  return account.label || account.email
+  return getManagedAccountPrimaryLabel(account)
 }
 
 /** One source for desktop and mobile: this host's agents, accounts and saved model catalogs. */

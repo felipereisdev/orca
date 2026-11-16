@@ -1,4 +1,4 @@
-import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../shared/execution-host/execution-host'
 import type { JiraIssue } from '../../shared/jira/jira-types'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import { parseGitLabIssueOrMRLink } from '../../shared/new-workspace/gitlab-links'

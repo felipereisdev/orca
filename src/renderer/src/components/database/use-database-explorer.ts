@@ -6,7 +6,7 @@ import type {
   DatabaseTable
 } from '../../../../shared/database/database-contracts'
 import type { DatabaseRuntimeClient } from '@/runtime/database/database-runtime-client'
-import { DatabaseParameters } from '../../../../shared/rpc-contract/database-params'
+import { DatabaseParameters } from '../../../../shared/rpc-contract/database/database-params'
 import { buildDatabaseTablePreview } from '../../../../shared/database/database-table-preview'
 import type { DatabaseExplorerState } from './database-explorer-state'
 export function useDatabaseExplorer(

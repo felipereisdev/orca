@@ -18,7 +18,7 @@ import { printResult } from '../output/command-result-output'
 import { formatJiraCreate } from './jira-format'
 import { callJiraRead } from './jira-read-call'
 import { resolveJiraTarget } from './jira-target'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 import { callJiraWrite, jiraWriteFailure } from './jira-write-call'
 
 async function applyUpdate(context: HandlerContext, updates: JiraIssueUpdate): Promise<void> {

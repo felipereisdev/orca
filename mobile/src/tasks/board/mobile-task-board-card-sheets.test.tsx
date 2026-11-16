@@ -11,7 +11,7 @@ import type { TaskStartRunSummary } from '../../../../src/shared/task-board/task
 import {
   MOBILE_TASK_BOARD_RUNTIME_CAPABILITY,
   MOBILE_TASK_BOARD_START_RUNTIME_CAPABILITY
-} from '../../../../src/shared/mobile-runtime-capabilities'
+} from '../../../../src/shared/remote-runtime/protocol/mobile-runtime-capabilities'
 import {
   markTaskBoardCommentsSeen,
   type TaskBoardSeenComments
@@ -21,7 +21,7 @@ import type { RpcClient } from '../../transport/rpc/rpc-client-contract'
 import type { RpcResponse } from '../../transport/rpc/rpc-wire-types'
 import { stubRpcClient } from '../../transport/rpc/rpc-client-test-stub'
 import { createOrcaQueryClient } from '../../query/orca-query-client'
-import { settleQueryNotifications } from '../../test-support/rpc-recording/hook-mount'
+import { settleQueryNotifications } from '../../test-support/rpc-recording/react-mounting/hook-mount'
 import {
   findAllByHostType,
   findByHostType
@@ -104,17 +104,17 @@ vi.mock('../../components/nav-bar/NavBar', () => ({
 }))
 vi.mock('../../components/nav-bar/NavBarButton', () => ({ NavBarButton: () => null }))
 vi.mock('../../components/nav-bar/FilterChip', () => ({ FilterChip: () => null }))
-vi.mock('../../components/MobileSegmentedControl', async () => {
+vi.mock('../../components/controls/MobileSegmentedControl', async () => {
   const { createElement: h } = await import('react')
   return { MobileSegmentedControl: (props: Record<string, unknown>) => h('Stages', props) }
 })
-vi.mock('../../components/StatusDot', () => ({ StatusDot: () => null }))
-vi.mock('../../components/TaskProviderLogo', () => ({ TaskProviderLogo: () => null }))
-vi.mock('../../components/MobileMarkdown', async () => {
+vi.mock('../../components/feedback/StatusDot', () => ({ StatusDot: () => null }))
+vi.mock('../../components/icons/TaskProviderLogo', () => ({ TaskProviderLogo: () => null }))
+vi.mock('../../components/markdown/MobileMarkdown', async () => {
   const { createElement: h } = await import('react')
   return { MobileMarkdown: ({ content }: { content: string }) => h('Text', null, content) }
 })
-vi.mock('../../components/HostOfflineBanner', () => ({
+vi.mock('../../components/host-connection/HostOfflineBanner', () => ({
   HostOfflineBanner: () => null,
   useHostOfflineBanner: () => null
 }))
@@ -123,7 +123,7 @@ vi.mock('../../host-catalog/use-host-profile', () => ({ useHostProfile: () => nu
 vi.mock('../../host-descriptors/use-host-display', () => ({
   useHostDisplay: () => ({ title: 'Studio Mac' })
 }))
-vi.mock('../../platform/haptics', () => ({ triggerSelection: () => undefined }))
+vi.mock('../../platform/haptics/haptics', () => ({ triggerSelection: () => undefined }))
 // Drawers slide with Reanimated; a shown sheet is just its content here.
 vi.mock('../../components/bottom-drawer/BottomDrawer', () => ({
   BottomDrawer: ({ visible, children }: { visible: boolean; children: ReactNode }) =>

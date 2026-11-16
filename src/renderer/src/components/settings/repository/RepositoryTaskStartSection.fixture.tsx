@@ -1,5 +1,5 @@
-import { getDefaultSettings } from '../../../../../shared/constants'
-import type { Repo } from '../../../../../shared/repo-types'
+import { getDefaultSettings } from '../../../../../shared/orca-profiles/constants'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import type { TaskStartAgentCatalogEntry } from '../../../../../shared/task-board/task-board-wire-types'
 import type {
   GlobalTaskStartSettings,

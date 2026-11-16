@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import type { RuntimeReferenceListResult } from '../../../../../../shared/runtime-reference-contracts'
+import type { RuntimeReferenceListResult } from '../../../../../../shared/workspace-attachments/runtime-reference-contracts'
 import { currentJiraReference } from './jira-current-issue'
 
 function workspace(references: unknown[]): RuntimeReferenceListResult {

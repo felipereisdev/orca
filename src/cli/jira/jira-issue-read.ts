@@ -7,7 +7,7 @@ import { formatJiraCommentList, formatJiraIssue } from './jira-format'
 import { callJiraRead } from './jira-read-call'
 import { resolveJiraTarget } from './jira-target'
 import { buildLinearCurrentContext } from '../linear/linear-request-builders'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 
 async function issueTarget(context: HandlerContext) {
   const input = getOptionalStringFlag(context.flags, 'key')

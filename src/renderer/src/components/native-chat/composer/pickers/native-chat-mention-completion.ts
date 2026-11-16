@@ -1,6 +1,6 @@
 import type { NativeChatMentionChoice } from './native-chat-mention-items'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
-import { applyMentionSuggestion } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import { applyMentionSuggestion } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
 export function completeNativeChatMention(
   choice: NativeChatMentionChoice,
   text: string,

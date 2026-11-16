@@ -1,7 +1,7 @@
 import { build } from 'esbuild'
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { ORCAD_DATABASE_PARSER_ARTIFACTS } from '../../../../src/shared/orcad-artifacts.ts'
+import { ORCAD_DATABASE_PARSER_ARTIFACTS } from '../../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts'
 import { ORCAD_SERVER_BUILD_TARGET } from './orcad-entry-build.mjs'
 
 export async function stageOrcadDatabaseParser(root, outputDir) {

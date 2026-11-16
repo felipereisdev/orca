@@ -23,7 +23,10 @@ import { BaseRefPicker } from '@/components/source-control/BaseRefPicker'
 import { TaskStartRolesEditor } from '@/components/task-start/TaskStartRolesEditor'
 import { useTaskStartOptions } from '@/components/task-start/use-task-start-options'
 import { useTranslate } from '@/i18n/use-translate'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../shared/execution-host/execution-host'
 import type { TaskStartOptionsResult } from '../../../../../shared/task-board/task-board-wire-types'
 import type {
   TaskStartRoles,

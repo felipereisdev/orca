@@ -10,7 +10,7 @@ import { installWslOrcadAccountEnvDependencies } from '../../wsl/orcad/wsl-orcad
 import {
   WSL_ORCAD_ACCOUNT_NOT_APPLIED_CHANNEL,
   type WslOrcadAccountNotAppliedEvent
-} from '../../../shared/wsl-orcad-account-notice'
+} from '../../../shared/remote-runtime/wsl-hosts/wsl-orcad-account-notice'
 import { mainProcessState as state } from '../main-process-state'
 
 /** Calls `send` once per distro (case-insensitive) for the life of this process. */
@@ -68,7 +68,7 @@ export function installWslOrcadAccountShim(store: Pick<Store, 'getSettings'>): v
               {
                 configDir: folder.configDir,
                 email: account.email,
-                ...(account.label ? { label: account.label } : {}),
+                ...(account.displayName ? { label: account.displayName } : {}),
                 ...(account.organizationUuid ? { organizationUuid: account.organizationUuid } : {}),
                 ...(account.needsSignIn ? { needsSignIn: true as const } : {})
               }

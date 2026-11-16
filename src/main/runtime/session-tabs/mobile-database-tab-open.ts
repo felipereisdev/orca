@@ -1,7 +1,7 @@
 import { randomUUID as databaseTabUuid } from 'node:crypto'
 import type { BrowserWindow } from 'electron'
 import { requestDatabaseTabOpenFromRenderer } from '../../window/renderer-relays/database-tab-open-relay'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/workspace-layout/layout-owner-switch'
 import type { OrcaRuntimeService } from '../orca-runtime'
 
 type Host = Pick<

@@ -1,5 +1,5 @@
-import { parseExecutionHostId } from '../../shared/execution-host'
-import { isOrcaSessionId } from '../../shared/orca-session-address'
+import { parseExecutionHostId } from '../../shared/execution-host/execution-host'
+import { isOrcaSessionId } from '../../shared/agent-session/identity/orca-session-address'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {

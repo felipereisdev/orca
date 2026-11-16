@@ -15,7 +15,7 @@ import {
   DatabaseSave,
   DatabaseConfigurationId,
   DatabaseRemove
-} from '../../../../../shared/rpc-contract/database-params'
+} from '../../../../../shared/rpc-contract/database/database-params'
 import { runtimeDatabaseCommands } from '../../../database/runtime-database-service-slot'
 import { databaseActor } from '../../../database/database-project-context'
 

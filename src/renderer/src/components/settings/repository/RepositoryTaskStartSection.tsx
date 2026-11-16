@@ -2,9 +2,9 @@ import type React from 'react'
 import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID
-} from '../../../../../shared/execution-host'
-import { isFolderRepo } from '../../../../../shared/repo-kind'
-import type { Repo } from '../../../../../shared/repo-types'
+} from '../../../../../shared/execution-host/execution-host'
+import { isFolderRepo } from '../../../../../shared/repository/repo-kind'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import type { TuiAgent } from '../../../../../shared/agent-launch/catalog/tui-agent'
 import {
   getDefaultGlobalTaskStartSettings,

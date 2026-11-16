@@ -1,4 +1,4 @@
-import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
+import { waitForPromiseWithSignal } from '../../../shared/concurrency/abort-signal-reason'
 import type { Worker } from 'node:worker_threads'
 import { databaseQueryPolicyWorkerPath } from '@orca/sql-read-query-parser/worker-path'
 import type { ValidatedDatabaseReadQuery } from './database-query-policy'

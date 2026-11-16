@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { HandlerContext } from '../dispatch/dispatch'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 import { callJiraRead } from './jira-read-call'
 
 it('does not expose a credential-bearing provider error', async () => {

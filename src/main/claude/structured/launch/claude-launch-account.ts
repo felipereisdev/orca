@@ -1,5 +1,5 @@
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
-import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/agent-session-acquired-account'
+import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
 import type { ClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-router'
 import {
   explicitClaudeAccountEnv,

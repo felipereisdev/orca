@@ -4,8 +4,8 @@ import {
   CALLER,
   envelope,
   hostTestState
-} from './structured-agent-session-host-test-harness'
-import { hostTestMessage } from './structured-agent-session-host-test-data'
+} from './structured-agent-session-host.test-fixture'
+import { hostTestMessage } from './structured-agent-session-host-test-data.test-fixture'
 it('refuses stale selected databases before delivery while replaying an already accepted send', async () => {
   const { host } = hostTestState()
   await attach()

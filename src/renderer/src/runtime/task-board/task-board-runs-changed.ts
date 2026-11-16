@@ -1,5 +1,5 @@
-import type { ExecutionHostId } from '../../../../shared/execution-host'
-import type { TaskBoardRunsChangedEvent } from '../../../../shared/runtime-client-events'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import type { TaskBoardRunsChangedEvent } from '../../../../shared/remote-runtime/session-graph/runtime-client-events'
 import {
   notifyTaskStartWaiting,
   type TaskStartWaitingItem

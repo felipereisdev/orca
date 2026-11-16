@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useMemo } from 'react'
-import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host'
+import { LOCAL_EXECUTION_HOST_ID } from '../../../../../shared/execution-host/execution-host'
 import {
   getDefaultGlobalTaskStartSettings,
   normalizeGlobalTaskStartSettings,

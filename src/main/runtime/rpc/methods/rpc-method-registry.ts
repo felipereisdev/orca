@@ -1,6 +1,7 @@
 import { STATUS_METHODS } from './host-management/status'
 import { DATABASE_METHODS } from './database/database'
 import { DATABASE_BINDING_METHODS } from './database/database-bindings'
+import { DESKTOP_WINDOW_METHODS } from './host-management/desktop-window'
 import { SIDEBAR_INPUT_METHODS } from './sidebar-inputs/sidebar-inputs'
 import { ORCAD_TERMINAL_CENSUS_METHODS } from './orcad/orcad-terminal-census'
 import { ORCAD_MIGRATION_METHODS } from './orcad/orcad-migration'
@@ -10,6 +11,7 @@ import { AUTOMATION_METHODS } from './automations/automations'
 import { REPO_METHODS } from './projects/repo'
 import { WORKTREE_METHODS } from './workspaces/worktree'
 import { WORKSPACE_CLEANUP_RUNNER_METHODS } from './workspaces/workspace-cleanup-runner-methods'
+import { WORKTREE_ARCHIVE_METHODS } from './workspaces/worktree-archive-methods'
 import { AGENT_ACTIVITY_METHODS } from './workspaces/agent-activity-methods'
 import { REFERENCE_METHODS } from './reference/reference'
 import { TERMINAL_METHODS } from './terminal/terminal'
@@ -83,14 +85,15 @@ import {
   LAYOUT_VIEW_REPORT_METHODS,
   WORKSPACE_LAYOUT_METHODS
 } from './workspace-layout/workspace-layout'
-import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
-import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../shared/sidebar-inputs-switch'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
+import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../shared/sidebar-list/feed/sidebar-inputs-switch'
 
 // Keep registration order and the full RPC/security surface visible in one manifest.
 export const ALL_RPC_METHODS = [
   ...DATABASE_METHODS,
   ...DATABASE_BINDING_METHODS,
   ...STATUS_METHODS,
+  ...DESKTOP_WINDOW_METHODS,
   ...ORCAD_TERMINAL_CENSUS_METHODS,
   ...ORCAD_MIGRATION_METHODS,
   ...SESSION_TERMINAL_SCROLLBACK_METHODS,
@@ -101,6 +104,7 @@ export const ALL_RPC_METHODS = [
   ...REPO_METHODS,
   ...WORKTREE_METHODS,
   ...WORKSPACE_CLEANUP_RUNNER_METHODS,
+  ...WORKTREE_ARCHIVE_METHODS,
   ...AGENT_ACTIVITY_METHODS,
   ...REFERENCE_METHODS,
   ...AGENT_SESSION_METHODS,

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { createDatabaseRuntimeClient } from '@/runtime/database/database-runtime-client'
 import { DatabaseConnectionsPane } from './DatabaseConnectionsPane'
 

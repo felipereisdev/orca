@@ -11,7 +11,7 @@ import { getOptionalStringFlag, getRequiredStringFlag } from '../arguments/flags
 import { printResult } from '../output/command-result-output'
 import { callJiraRead } from './jira-read-call'
 import { resolveJiraTarget } from './jira-target'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 
 function transferFailure(): RuntimeClientError {
   return new RuntimeClientError(

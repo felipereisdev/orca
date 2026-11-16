@@ -9,7 +9,7 @@ import {
   structuredAgentSessionTargetForHost
 } from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
 import { getStructuredAgentSessionStatusFeed } from '@/runtime/native-chat/status/structured-agent-session-status-feed'
-import { useProviderAccountList } from '../status-bar/use-provider-account-list'
+import { useProviderAccountList } from '../status-bar/accounts/use-provider-account-list'
 import { getClaudeAccountLabel } from '@/lib/provider-accounts/claude-account-label'
 
 export function ClaudeChatAccountLabel({

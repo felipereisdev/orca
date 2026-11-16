@@ -6,12 +6,15 @@ import {
   deliverAgentAttentionNotification,
   readAgentAttentionNotificationSound
 } from '@/attention/agent-attention-notification-delivery'
-import { parseExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
+import {
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host/execution-host'
 import {
   notificationExecutionHostForOwner,
   notificationSourceForOwner,
   notificationWorkspaceExecutionHostForOwner
-} from '../../../../shared/notification-source'
+} from '../../../../shared/notifications/notification-source'
 
 export type TaskStartWaitingItem = { cardKey: string; worktreeId: string; title: string }
 

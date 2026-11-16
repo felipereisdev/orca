@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const call = vi.fn()
 vi.mock('../runtime/client', async () => {
-  const errors = await import('../runtime/types.js')
+  const errors = await import('../runtime/connection/types.js')
   return {
     ...errors,
     RuntimeClient: class {

@@ -2,7 +2,7 @@ import { ALL_TUI_AGENTS } from '../../shared/agent-launch/catalog/tui-agent-disp
 import { isTuiAgent } from '../../shared/agent-launch/catalog/tui-agent-config'
 import { filterEnabledTuiAgents } from '../../shared/agent-launch/catalog/tui-agent-selection'
 import { orderAgentLaunchPickerAgents } from '../../shared/agent-launch/picker/agent-launch-picker-rows'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../shared/execution-host/execution-host'
 import { getClaudeProfileRouter } from '../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { getIssue as getJiraIssue } from '../jira/jira-issue-read'
 import { getIssue as getLinearIssue } from '../linear/issues/linear-issue-lookups'

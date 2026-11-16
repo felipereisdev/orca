@@ -1,11 +1,11 @@
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../execution-host'
+import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../execution-host/execution-host'
 import {
   getProjectIdentityKey,
   hasProjectRemoteIdentity,
   isProjectRemoteIdentityPending
-} from '../project-host-setup-projection'
-import { isGitRepoKind } from '../repo-kind'
-import type { Repo } from '../repo-types'
+} from '../project/host-setup/project-host-setup-projection'
+import { isGitRepoKind } from '../repository/repo-kind'
+import type { Repo } from '../repository/repo-types'
 
 // Keep unknown/offline identities eligible until probing proves no usable remote, so repos cannot vanish without explanation.
 export function getTaskEligibleRepos(repos: readonly Repo[]): Repo[] {

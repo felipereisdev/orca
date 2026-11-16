@@ -1,19 +1,20 @@
 import { normalizeGitGraphFilters } from '../../../../shared/git/history/git-graph-filters'
-import { resolveStatusBarCompactChangeNoticeDismissed } from '../../../../shared/status-bar-compact-change-notice'
+import { resolveStatusBarCompactChangeNoticeDismissed } from '../../../../shared/status-bar/status-bar-compact-change-notice'
 import { migrateExplorerDisplayRoots } from '../../../../shared/file-listing/file-explorer-display-root'
-import '../../../../shared/constants'
+import '../../../../shared/orca-profiles/constants'
 import {
   getWorktreeCardModeProperties,
   isCurrentCompactWorktreeCardProperties,
   isDefaultedCompactWorktreeCardProperties,
   normalizeWorktreeCardProperties
-} from '../../../../shared/worktree/card-properties'
-import { isExistingPersistedProfile } from '../../../../shared/project-order-manual-default-notice'
-import { resolveUsagePercentageDisplayChangeNoticeDismissed } from '../../../../shared/usage-percentage-display-change-notice'
+} from '../../../../shared/worktree/row-display/card-properties'
+import { isExistingPersistedProfile } from '../../../../shared/sidebar-list/sections/project-order-manual-default-notice'
+import { resolveUsagePercentageDisplayChangeNoticeDismissed } from '../../../../shared/status-bar/usage-percentage-display-change-notice'
 import { normalizeTaskBoardSeenComments } from '../../../../shared/task-board/task-board-seen-comments'
 import { normalizeTaskStartRuns } from '../../../../shared/task-board/task-start-run'
-import { normalizePersistedWorkspaceStatuses } from '../../../../shared/workspace-statuses'
+import { normalizePersistedWorkspaceStatuses } from '../../../../shared/workspace/status/workspace-statuses'
 import {
+  normalizeNotificationsMutedByWorktree,
   normalizeRightSidebarExplorerView,
   normalizeRightSidebarTab,
   normalizeShowDotfilesByWorktree,
@@ -24,8 +25,8 @@ import {
   readDeprecatedExperimentFlag,
   resolveSetupGuideSidebarDismissedOnLoad
 } from '../../applying-settings/onboarding-normalization'
-import type { PersistedState } from '../../../../shared/persisted-state-types'
-import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import type { PersistedState } from '../../../../shared/orca-profiles/persisted-state-types'
+import type { OnboardingState } from '../../../../shared/onboarding/onboarding-state-types'
 
 export function normalizeLoadedUiState(
   parsed: PersistedState,
@@ -234,6 +235,9 @@ export function normalizeLoadedUiState(
     ...(parsed.ui?.taskStartRuns !== undefined
       ? { taskStartRuns: normalizeTaskStartRuns(parsed.ui.taskStartRuns) }
       : {}),
+    notificationsMutedByWorktree: normalizeNotificationsMutedByWorktree(
+      parsed.ui?.notificationsMutedByWorktree
+    ),
     workspaceStatuses,
     _workspaceStatusesDefaultOrderMigrated: true,
     _workspaceStatusesReorderedDefaultRepaired: true,

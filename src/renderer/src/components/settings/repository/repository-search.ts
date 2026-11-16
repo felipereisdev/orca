@@ -1,10 +1,10 @@
-import type { Repo } from '../../../../../shared/repo-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import { getRepositoryPresenceSearchEntries } from './repository-project-presence-search'
-import { isFolderRepo } from '../../../../../shared/repo-kind'
+import { isFolderRepo } from '../../../../../shared/repository/repo-kind'
 import {
   getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID
-} from '../../../../../shared/execution-host'
+} from '../../../../../shared/execution-host/execution-host'
 import type { SettingsSearchEntry } from '../search/settings-search'
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
@@ -21,6 +21,8 @@ import { getRepositoryAgentTrustSearchEntry } from './RepositoryAgentTrustSectio
 import { getRepositoryTaskStartSearchEntry } from './RepositoryTaskStartSection'
 import { getRepositoryJiraProjectSearchEntry } from './RepositoryJiraProjectSection'
 import { getRepositoryLinearProjectSearchEntry } from './RepositoryLinearProjectSection'
+import { getRepositoryBrowserProfileSearchEntry } from './RepositoryBrowserProfileSection'
+import { getRepositoryWorkspaceCleanupSearchEntry } from './workspace-cleanup/repository-workspace-cleanup-search'
 
 type RepositoryPaneSearchOptions = {
   isLocalWindowsProject?: boolean
@@ -190,6 +192,7 @@ function getRepositorySearchParts(
   const { removeProject, sidebarVisibility } = getRepositoryPresenceSearchEntries(repo, t)
   return {
     agentTrust: getRepositoryAgentTrustSearchEntry(),
+    browserProfile: getRepositoryBrowserProfileSearchEntry(t),
     jira: getRepositoryJiraProjectSearchEntry(repo, t),
     linear: getRepositoryLinearProjectSearchEntry(repo, t),
     displayName,
@@ -215,6 +218,7 @@ export function getRepositoryPaneSearchEntries(
     getRepositoryFormatterSearchEntry(t),
     getRepositoryTaskStartSearchEntry(t),
     parts.agentTrust,
+    parts.browserProfile,
     parts.jira,
     parts.linear,
     parts.displayName,
@@ -231,6 +235,7 @@ export function getRepositoryPaneSearchEntries(
   }
   if (!isFolderRepo(repo)) {
     entries.push(...getRepositoryGitWorktreeSearchEntries(repo, t))
+    entries.push(getRepositoryWorkspaceCleanupSearchEntry(repo, t))
   }
   entries.push(parts.sidebarVisibility, parts.removeProject)
   if (parts.sourceControlAi) {
@@ -252,7 +257,14 @@ export function getRepositoryPaneSearchMetadata(
 ) {
   const parts = getRepositorySearchParts(repo, options, t)
   const worktrees = isFolderRepo(repo) ? undefined : getRepositoryGitWorktreeSearchMetadata(repo, t)
-  const identity = [parts.agentTrust, parts.jira, parts.linear, parts.displayName, parts.icon]
+  const identity = [
+    parts.agentTrust,
+    parts.browserProfile,
+    parts.jira,
+    parts.linear,
+    parts.displayName,
+    parts.icon
+  ]
   if (parts.github) {
     identity.push(parts.github)
   }

@@ -64,6 +64,15 @@ export const AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY = 'agent.launch.surface.v1'
 export const AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY =
   'agent-launch.claude-account.v1' as const
 
+// Host-advertised: accepts a Pi model/effort; hosts before the Pi launch catalog silently start Pi
+// on its default.
+export const AGENT_LAUNCH_PI_MODEL_RUNTIME_CAPABILITY = 'agent.launch.pi-model.v1' as const
+
+// Host-advertised: accepts a reserved chat ID in any Orca ID spelling; older hosts refuse one not
+// spelled `<agent>_…`.
+export const AGENT_LAUNCH_PLAIN_SESSION_ID_RUNTIME_CAPABILITY =
+  'agent.launch.plain-session-id.v1' as const
+
 export const AGENT_LAUNCH_RUNTIME_CAPABILITIES = [
   AGENT_LAUNCH_CLAUDE_ACCOUNT_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_CHAT_OPTIONS_RUNTIME_CAPABILITY,
@@ -80,5 +89,7 @@ export const AGENT_LAUNCH_RUNTIME_CAPABILITIES = [
   AGENT_LAUNCH_PLACEMENT_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_CREATE_FOLDER_WORKSPACE_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY
+  AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_PI_MODEL_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_PLAIN_SESSION_ID_RUNTIME_CAPABILITY
 ] as const

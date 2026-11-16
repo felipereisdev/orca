@@ -1,6 +1,6 @@
 import type { HostStackRouteTarget } from '../navigation/host-stack-navigation'
 import type { TaskProvider } from '../../../src/shared/work-items/task-providers'
-import { MOBILE_TASK_BOARD_RUNTIME_CAPABILITY } from '../../../src/shared/mobile-runtime-capabilities'
+import { MOBILE_TASK_BOARD_RUNTIME_CAPABILITY } from '../../../src/shared/remote-runtime/protocol/mobile-runtime-capabilities'
 import { loadTasksSurface, type TasksSurface } from '../storage/tasks-surface-preference'
 
 export function mobileTasksRouteTarget(

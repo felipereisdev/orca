@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeRpcClient, rpcSuccess } from '../mobile-web-shell/bridge-host-test-fakes'
-import { scopeRpcClientToExecutionHost } from '../worktree/execution-host-scoped-rpc-client'
+import {
+  createFakeRpcClient,
+  rpcSuccess
+} from '../mobile-web-shell/test-support/bridge-host-test-fakes'
+import { scopeRpcClientToExecutionHost } from '../worktree/execution-hosts/execution-host-scoped-rpc-client'
 import { RpcIncompatibleReplyError } from '../transport/rpc/rpc-incompatible-reply-error'
 import { createMobileDatabaseClient } from './mobile-database-rpc'
 

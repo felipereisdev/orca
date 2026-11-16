@@ -1,9 +1,12 @@
-import { getRepoExecutionHostId, getRepoRoutingConnectionId } from '../../shared/execution-host'
-import type { ClassifiedError } from '../../shared/classified-error'
-import type { GitLabWorkItem } from '../../shared/gitlab-types'
-import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
+import {
+  getRepoExecutionHostId,
+  getRepoRoutingConnectionId
+} from '../../shared/execution-host/execution-host'
+import type { ClassifiedError } from '../../shared/errors/classified-error'
+import type { GitLabWorkItem } from '../../shared/gitlab/gitlab-types'
+import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import { parseGitLabIssueOrMRLink } from '../../shared/new-workspace/gitlab-links'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskBoardCard } from '../../shared/task-board/task-board-card'
 import { toGitLabTaskBoardCard } from '../../shared/task-board/task-board-provider-cards'
 import {

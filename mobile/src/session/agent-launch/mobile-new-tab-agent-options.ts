@@ -1,5 +1,5 @@
-import type { ClaudeAccountLaunchTarget } from '../../../../src/shared/claude-account-launch-target'
-import { filterClaudeAccountsForLaunchTarget } from '../../../../src/shared/claude-account-launch-target'
+import type { ClaudeAccountLaunchTarget } from '../../../../src/shared/agent-accounts/claude/claude-account-launch-target'
+import { filterClaudeAccountsForLaunchTarget } from '../../../../src/shared/agent-accounts/claude/claude-account-launch-target'
 import type { ClaudeAccountSummary } from '../../accounts/accounts-snapshot'
 import type { TuiAgent } from '../../../../src/shared/agent-launch/catalog/tui-agent'
 import { filterEnabledMobileTuiAgents } from '../../agents/mobile-tui-agents'
@@ -65,7 +65,7 @@ export function expandMobileClaudeAccountOptions(
     option.agent === 'claude'
       ? applicable.map((account) => ({
           agent: option.agent,
-          label: account.label || account.email,
+          label: account.displayName || account.email,
           claudeAccountId: account.id
         }))
       : [option]

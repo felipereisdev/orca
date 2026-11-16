@@ -2,17 +2,17 @@ import {
   getRepoExecutionHostId,
   getRepoRoutingConnectionId,
   getWorktreeExecutionHostId
-} from '../../shared/execution-host'
+} from '../../shared/execution-host/execution-host'
 import type { FolderWorkspace } from '../../shared/folder-workspaces/folder-workspace-types'
 import type { GitBranchCompareResult } from '../../shared/git/diff/git-diff-compare-types'
-import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
-import type { Repo } from '../../shared/repo-types'
-import type { RuntimeWorktreeListResult } from '../../shared/runtime-worktree-contracts'
+import type { PersistedUIState } from '../../shared/orca-profiles/persisted-ui-state-types'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { RuntimeWorktreeListResult } from '../../shared/worktree/catalog/runtime-worktree-contracts'
 import { resolveSourceControlBaseRef } from '../../shared/source-control/decisions/source-control-base-ref-resolution'
 import { normalizeTaskBoardSeenComments } from '../../shared/task-board/task-board-seen-comments'
 import type { TaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { normalizeVisibleTaskProviders } from '../../shared/work-items/task-providers'
-import { normalizeWorkspaceStatuses } from '../../shared/workspace-statuses'
+import { normalizeWorkspaceStatuses } from '../../shared/workspace/status/workspace-statuses'
 import { addIssueComment as addGitHubIssueComment } from '../github/issues/issue-comment'
 import { listLabels as listGitHubLabels } from '../github/issues/issue-field-options'
 import { updateIssue as updateGitHubIssue } from '../github/issues/issue-update'

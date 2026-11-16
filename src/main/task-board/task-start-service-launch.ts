@@ -1,7 +1,7 @@
 import type { AgentLaunchResult } from '../../shared/agent-launch/contracts/agent-launch-intent'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import type { Repo } from '../../shared/repo-types'
-import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch-params'
+import { getRepoExecutionHostId } from '../../shared/execution-host/execution-host'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch/agent-launch-params'
 import type { TaskStartResult } from '../../shared/task-board/task-board-wire-types'
 import {
   summarizeTaskStartRun,

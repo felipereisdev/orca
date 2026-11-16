@@ -1,5 +1,5 @@
 import { SquareKanban } from 'lucide-react-native'
-import { useOptionalHostProtocolGates } from '../../components/host-protocol-gates-context'
+import { useOptionalHostProtocolGates } from '../../components/host-connection/host-protocol-gates-context'
 import { FilterChip } from '../../components/nav-bar/FilterChip'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { RouteHandoff } from '../../navigation/route-handoff'

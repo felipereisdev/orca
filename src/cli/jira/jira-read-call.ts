@@ -1,5 +1,6 @@
 import type { HandlerContext } from '../dispatch/dispatch'
-import { RuntimeClientError, type RuntimeRpcSuccess } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
+import type { RuntimeRpcSuccess } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 
 export async function callJiraRead<T>(
   context: HandlerContext,

@@ -5,7 +5,7 @@ import { afterEach, expect, it } from 'vitest'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabases } from '../../../native-chat/agent-session-journal/store-lifecycle/journal-host-database-test-support'
 import type { AgentSessionReserveRequest } from '../ownership/agent-session-reservation-admission'
-import { structuredAgentSessionCreateFingerprint } from '../../../../shared/agent-session/lifecycle/structured-agent-session-mutation'
+import { structuredAgentSessionCreateFingerprint } from '../../../../shared/agent-session/lifecycle/operations/structured-agent-session-mutation'
 
 let root: string
 afterEach(async () => {

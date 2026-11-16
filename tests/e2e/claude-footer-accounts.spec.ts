@@ -63,7 +63,6 @@ test('pins independent Claude usage accounts and retains the selection after rel
     writeFileSync(join(home, '..', 'profile.json'), '{}')
     return {
       id,
-      label: id === 'work' ? 'Ucloud' : 'Pessoal',
       email: `${id}@example.test`,
       managedAuthPath: '',
       authMethod: 'subscription-oauth' as const,
@@ -77,6 +76,7 @@ test('pins independent Claude usage accounts and retains the selection after rel
     await window.__store!.getState().updateSettings({
       uiLanguage: 'en',
       claudeManagedAccounts: accounts,
+      managedAccountDisplayNames: { claude: { work: 'Ucloud', personal: 'Pessoal' } },
       activeClaudeManagedAccountId: null,
       activeClaudeManagedAccountIdsByRuntime: { host: null, wsl: {} }
     })

@@ -1,7 +1,10 @@
-import { getRepoExecutionHostId, getRepoRoutingConnectionId } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoRoutingConnectionId
+} from '../../shared/execution-host/execution-host'
 import { isGitHubWorkItemsSshRemoteRequiredError } from '../../shared/github/work-items/work-item-ssh-error'
-import { mapSettledWithConcurrency } from '../../shared/map-with-concurrency'
-import type { Repo } from '../../shared/repo-types'
+import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskBoardCard } from '../../shared/task-board/task-board-card'
 import { toGitHubTaskBoardCard } from '../../shared/task-board/task-board-provider-cards'
 import {

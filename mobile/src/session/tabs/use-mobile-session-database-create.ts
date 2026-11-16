@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { DatabaseConnectionRef } from '../../../../src/shared/database/database-contracts'
 import { translate } from '../../i18n/mobile-i18n'
 import { interpretOrThrowRefusalMessage } from '../../transport/rpc/rpc-refusal-message'
-import type { MobileSessionTerminalCreateActionsModel } from '../../terminal/session/use-mobile-session-terminal-create-actions'
+import type { MobileSessionTerminalCreateActionsModel } from '../../terminal/session/creation/use-mobile-session-terminal-create-actions'
 import { sessionTabOpenDatabase } from './mobile-session-tab-write-operations'
 
 type DatabaseCreateState = { owner: object; show: boolean; creating: boolean; error: string }

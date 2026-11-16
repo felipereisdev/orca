@@ -4,7 +4,7 @@ import { translate } from '@/i18n/i18n'
 import { listTaskBoard } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
 import { subscribeTaskBoardRunsChanged } from '@/runtime/task-board/task-board-runs-changed'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import {
   markTaskBoardLoaded,
   readTaskBoardCards,

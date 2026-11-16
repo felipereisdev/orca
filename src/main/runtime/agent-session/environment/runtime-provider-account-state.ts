@@ -9,8 +9,8 @@ import type {
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState,
   ManagedDataAccountsState
-} from '../../../../shared/managed-account-types'
-import type { RateLimitState } from '../../../../shared/rate-limit-types'
+} from '../../../../shared/agent-accounts/managed-account-types'
+import type { RateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
 
 export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService

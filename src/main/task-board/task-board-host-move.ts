@@ -1,4 +1,4 @@
-import { getRepoRoutingConnectionId } from '../../shared/execution-host'
+import { getRepoRoutingConnectionId } from '../../shared/execution-host/execution-host'
 import {
   classifyTransitionRequirements,
   jiraTransitionChoice,
@@ -10,7 +10,7 @@ import type {
   JiraTransition
 } from '../../shared/jira/jira-types'
 import type { LinearWorkflowState } from '../../shared/linear/workspace-types'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { TaskBoardCard } from '../../shared/task-board/task-board-card'
 import { resolveTaskBoardColumnId } from '../../shared/task-board/task-board-columns'
 import {

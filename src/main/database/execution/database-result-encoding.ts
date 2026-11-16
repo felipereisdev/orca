@@ -2,7 +2,7 @@ import type {
   DatabaseCell,
   DatabaseColumn
 } from '../../../shared/database/database-query-contracts'
-import { clampUtf8TextPrefix } from '../../../shared/utf8-byte-limits'
+import { clampUtf8TextPrefix } from '../../../shared/text/utf8-byte-limits'
 
 export type EncodedDatabaseRow = {
   row: DatabaseCell[]

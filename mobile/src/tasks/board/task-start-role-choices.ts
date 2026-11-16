@@ -4,7 +4,7 @@ import type {
   TaskStartRole,
   TaskStartRoles
 } from '../../../../src/shared/task-board/task-start-settings'
-import type { PickerOption } from '../../components/PickerModal'
+import type { PickerOption } from '../../components/sheets/PickerModal'
 import type { Translate } from '../../i18n/mobile-i18n'
 
 // The desktop role picker's rules (TaskStartRolePicker) for the phone's one-list pickers.

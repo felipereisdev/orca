@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TaskBoardWireCard } from '../../../../src/shared/task-board/task-board-wire-types'
 import type { TaskStartRunSummary } from '../../../../src/shared/task-board/task-start-run'
-import { useOptionalHostProtocolGates } from '../../components/host-protocol-gates-context'
+import { useOptionalHostProtocolGates } from '../../components/host-connection/host-protocol-gates-context'
 import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { HostStackRouteHref } from '../../navigation/host-stack-navigation'
 import { readHostStatusReply } from '../../query/host-status-query'

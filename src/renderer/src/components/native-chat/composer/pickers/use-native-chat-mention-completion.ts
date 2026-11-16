@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
 import type { NativeChatMentionChoice } from './native-chat-mention-items'
 import { completeNativeChatMention } from './native-chat-mention-completion'

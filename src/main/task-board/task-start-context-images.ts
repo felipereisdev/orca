@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join, sep } from 'node:path'
-import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { mapWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import type { TaskStartImage } from '../../shared/task-board/task-start-context-types'
 import { TASK_START_IMAGE_MAX_BYTES } from './task-start-image-fetch'
 

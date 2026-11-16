@@ -5,8 +5,8 @@ import type {
 } from '@/lib/work-items/task-board/task-board-rendered-comments'
 import { markTaskBoardSeen } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { newestOtherTaskBoardComments } from '../../../../../shared/task-board/task-board-seen-comments'
 import type {
   TaskBoardCardRef,

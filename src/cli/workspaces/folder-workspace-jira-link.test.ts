@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import type { HandlerContext } from '../dispatch/dispatch'
-import { FOLDER_WORKSPACE_UNIQUE_ID_MUTATION_RUNTIME_CAPABILITY } from '../../shared/worktree-runtime-capabilities'
+import { FOLDER_WORKSPACE_UNIQUE_ID_MUTATION_RUNTIME_CAPABILITY } from '../../shared/remote-runtime/protocol/worktree-runtime-capabilities'
 import { setIfFolderWorkspace } from './folder-workspace-mutations'
 
 vi.mock('../jira/jira-target', () => ({

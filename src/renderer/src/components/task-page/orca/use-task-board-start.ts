@@ -8,8 +8,8 @@ import {
   stopTask,
   type TaskStartParams
 } from '@/runtime/task-board/runtime-task-board-client'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { TaskStartRunSummary } from '../../../../../shared/task-board/task-start-run'
 import type {
   TaskStartPrimaryReason,

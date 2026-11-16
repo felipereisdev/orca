@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { OrchestrationTaskStartPhaseParams } from '../../../../../shared/rpc-contract/task-board-params'
+import { OrchestrationTaskStartPhaseParams } from '../../../../../shared/rpc-contract/task-board/task-board-params'
 import type { TaskStartPhaseResult } from '../../../../../shared/task-board/task-board-wire-types'
 import {
   summarizeTaskStartRun,

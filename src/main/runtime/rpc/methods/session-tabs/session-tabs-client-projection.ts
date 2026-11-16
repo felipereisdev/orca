@@ -1,5 +1,5 @@
-import { SESSION_TABS_DATABASE_RUNTIME_CAPABILITY } from '../../../../../shared/session-tabs-runtime-capabilities'
-import type { RuntimeMobileSessionTabsResult } from '../../../../../shared/runtime-session-contracts'
+import { SESSION_TABS_DATABASE_RUNTIME_CAPABILITY } from '../../../../../shared/remote-runtime/protocol/session-tabs-runtime-capabilities'
+import type { RuntimeMobileSessionTabsResult } from '../../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import { projectSessionTabAgentStatus } from './session-tab-agent-status-projection'
 import {
   withoutSessionTabs,

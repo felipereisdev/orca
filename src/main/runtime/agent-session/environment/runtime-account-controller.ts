@@ -9,7 +9,7 @@ import {
   installClaudeHostAccountResolver,
   prepareExplicitClaudeAccountLaunch
 } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
-import { hasAppEnvironment } from '../../../../shared/app-environment'
+import { hasAppEnvironment } from '../../../../shared/app-lifecycle/app-environment'
 import { getManagedDataAccountService } from '../../../managed-data-accounts/service'
 import type {
   ClaudeAccountSignIn,
@@ -18,14 +18,14 @@ import type {
   CodexRateLimitAccountsState,
   ManagedDataAccountProvider,
   ManagedDataAccountsState
-} from '../../../../shared/managed-account-types'
-import type { CodexAccountSelectionTarget } from '../../../../shared/codex-selection-lane'
+} from '../../../../shared/agent-accounts/managed-account-types'
+import type { CodexAccountSelectionTarget } from '../../../../shared/agent-accounts/codex/codex-selection-lane'
 import type {
   HostAccountSignInChannel,
   HostAccountSignInProvider,
   HostAccountSignInStatus
-} from '../../../../shared/host-account-sign-in-types'
-import type { CodexResetCreditExpectedScope } from '../../../../shared/codex-reset-credit-scope'
+} from '../../../../shared/agent-accounts/host-account-sign-in-types'
+import type { CodexResetCreditExpectedScope } from '../../../../shared/agent-accounts/codex/codex-reset-credit-scope'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/execution/commit-message-agent-environment'
 import {
   getClaudeSelectionTargetForAccount,
@@ -37,6 +37,8 @@ import {
 } from '../../../../shared/agent-launch/startup/host-account-launch-env'
 import type { HostClaudeProfileRefresh } from './host-claude-profile-refresh'
 import { HostAccountLaunchEnvState } from './host-account-launch-env-state'
+import { subscribeRuntimeAccountChanges } from './runtime-account-change-subscription'
+import type { ManagedAccountNameProvider } from '../../../../shared/agent-accounts/managed-account-display-names'
 import type { RuntimeNotifier } from '../../client/events/runtime-notifier-contract'
 
 export type { CodexRateLimitResetRpcResult } from './codex-account-reset-rpc-result'
@@ -266,10 +268,6 @@ export class RuntimeAccountController {
     return { outcome: result.outcome, scope: result.scope, snapshot }
   }
 
-  renameClaude(accountId: string, label: string | null): Promise<ClaudeRateLimitAccountsState> {
-    return this.requireServices().claudeAccounts.renameAccount(accountId, label)
-  }
-
   removeClaude(accountId: string): Promise<ClaudeRateLimitAccountsState> {
     return this.requireServices().claudeAccounts.removeAccount(accountId)
   }
@@ -303,6 +301,11 @@ export class RuntimeAccountController {
     return this.requireServices().codexAccounts.removeAccount(accountId)
   }
 
+  renameAccount(provider: ManagedAccountNameProvider, id: string, name: string | null) {
+    const { claudeAccounts, codexAccounts } = this.requireServices()
+    return (provider === 'claude' ? claudeAccounts : codexAccounts).renameAccount(id, name)
+  }
+
   addCodexFromHome(
     sourceHome: string,
     target?: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }
@@ -315,22 +318,14 @@ export class RuntimeAccountController {
       this.hostAccountListeners.add(listener)
       return () => this.hostAccountListeners.delete(listener)
     }
-    const services = this.requireServices()
-    const unsubscribeData = hasAppEnvironment()
-      ? getManagedDataAccountService().onChanged(() => listener(this.getStreamSnapshot()))
-      : () => {}
-    const unsubscribeUsage = services.rateLimits.onStateChange((rateLimits) => {
-      listener({
-        ...this.streamDataAccountsSnapshot(),
-        claude: services.claudeAccounts.listAccounts(),
-        codex: services.codexAccounts.listAccounts(),
-        rateLimits
-      })
-    })
-    return () => {
-      unsubscribeData()
-      unsubscribeUsage()
-    }
+    return subscribeRuntimeAccountChanges(
+      this.requireServices(),
+      {
+        stream: () => this.getStreamSnapshot(),
+        dataAccounts: () => this.streamDataAccountsSnapshot()
+      },
+      listener
+    )
   }
 
   private requireServices(): RuntimeAccountServices {

@@ -1,6 +1,6 @@
 import type { JiraProjectReference } from '../../../../../shared/jira/jira-project-reference'
 import type { LinearProjectReference } from '../../../../../shared/linear/linear-project-reference'
-import type { Repo } from '../../../../../shared/repo-types'
+import type { Repo } from '../../../../../shared/repository/repo-types'
 import { RepositoryJiraProjectSection } from './RepositoryJiraProjectSection'
 import { RepositoryLinearProjectSection } from './RepositoryLinearProjectSection'
 

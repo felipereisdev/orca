@@ -15,7 +15,7 @@ import {
   salvagedField,
   salvagedOptional,
   salvagingArray
-} from '../../../../src/shared/zod-salvage'
+} from '../../../../src/shared/validation/zod-salvage'
 import { taskStartSummarySchema } from './task-board-reply-schema'
 
 // The host owns agents and roles; the phone only checks the shape it draws from.

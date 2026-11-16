@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GITHUB_WORK_ITEMS_SSH_REMOTE_REQUIRED_MESSAGE } from '../../shared/github/work-items/work-item-ssh-error'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 
 const listWorkItems = vi.hoisted(() => vi.fn())
 vi.mock('../github/client/list/list-work-items', () => ({ listWorkItems }))

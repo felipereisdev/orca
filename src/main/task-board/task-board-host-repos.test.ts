@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import type { PreflightStatus } from '../preflight/agent-detection'
 import { selectTaskBoardHostRepos } from './task-board-host-repos'
 

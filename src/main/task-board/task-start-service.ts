@@ -1,7 +1,7 @@
 import type { z } from 'zod'
-import { getRepoSshConnectionId } from '../../shared/execution-host'
-import type { Repo } from '../../shared/repo-types'
-import type { TaskBoardStartTaskParams } from '../../shared/rpc-contract/task-board-params'
+import { getRepoSshConnectionId } from '../../shared/execution-host/execution-host'
+import type { Repo } from '../../shared/repository/repo-types'
+import type { TaskBoardStartTaskParams } from '../../shared/rpc-contract/task-board/task-board-params'
 import type {
   TaskBoardCardRef,
   TaskStartPrimaryReason,

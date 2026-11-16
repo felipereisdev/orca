@@ -1,21 +1,23 @@
 import type { StateCreator } from 'zustand'
-import { normalizeRepoTaskStartSettings } from '../../../../shared/task-board/task-start-settings'
+import {
+  mergeRepoTaskStartUpdate,
+  sanitizeDefaultLinearProjectUpdate
+} from './repo-task-start-update'
 import type { AppState } from '../types'
-import type { Repo } from '../../../../shared/repo-types'
-import { sanitizeRepoIcon } from '../../../../shared/repo-icon'
-import { normalizeRepoBadgeColor } from '../../../../shared/repo-badge-color'
+import type { Repo } from '../../../../shared/repository/repo-types'
+import { sanitizeRepoIcon } from '../../../../shared/repository/appearance/repo-icon'
+import { normalizeRepoBadgeColor } from '../../../../shared/repository/appearance/repo-badge-color'
 import { normalizeGhAccountBinding } from '../../../../shared/github/accounts/account-binding'
 import { normalizeJiraProjectReference } from '../../../../shared/jira/jira-project-reference'
-import { normalizeLinearProjectReference } from '../../../../shared/linear/linear-project-reference'
 import { sanitizeAgentWorkspaceTrustDecision } from '../../../../shared/agent-launch/permissions/agent-workspace-trust-decision'
 import { findRepoForHost, repoMatchesHostIdentity } from './repo-host-identity'
-import { getRepoHostIdentityForParts } from '../../../../shared/repo-host-identity'
+import { getRepoHostIdentityForParts } from '../../../../shared/repository/repo-host-identity'
 import { callRuntimeRpc } from '../../runtime/rpc/calls/runtime-rpc-call'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import {
   normalizeCustomWorktreeVisibilitySources,
   normalizeWorktreeVisibilitySourcePreferences
-} from '../../../../shared/worktree/visibility-sources'
+} from '../../../../shared/worktree/visibility/visibility-sources'
 import type { RepoSlice, RepoUpdate } from './repo-state'
 import { adoptFromEndpoint } from '../host-catalog/endpoint-catalog-adoption'
 import { getProjectSetupRuntimeTarget } from '../projects/project-host-routing'
@@ -31,14 +33,7 @@ export function sanitizeRepoUpdate(updates: RepoUpdate): RepoUpdate {
       sanitized.defaultJiraProject = reference
     }
   }
-  if ('defaultLinearProject' in sanitized) {
-    const reference = normalizeLinearProjectReference(sanitized.defaultLinearProject)
-    if (reference === undefined) {
-      delete sanitized.defaultLinearProject
-    } else {
-      sanitized.defaultLinearProject = reference
-    }
-  }
+  sanitizeDefaultLinearProjectUpdate(sanitized)
   if ('badgeColor' in sanitized) {
     const badgeColor = normalizeRepoBadgeColor(sanitized.badgeColor)
     if (!badgeColor) {
@@ -183,6 +178,13 @@ export function createRepoUpdateActions(
           ) {
             return false
           }
+          // A host from before per-repo browser profiles drops the field and still answers with its row.
+          if (
+            sanitizedUpdates.browserProfileId !== undefined &&
+            (updatedRepo?.browserProfileId ?? null) !== sanitizedUpdates.browserProfileId
+          ) {
+            return false
+          }
           set((s) => {
             const nextRepos = s.repos.map((r) => {
               const matchesOwner = ownerHasExplicitHost
@@ -211,6 +213,8 @@ export function createRepoUpdateActions(
                 ghAccount,
                 externalWorktreeVisibility,
                 agentWorktreeVisibility,
+                workspaceCleanupPolicy,
+                browserProfileId,
                 ...updatesWithoutClearSentinels
               } = sanitizedUpdates
               mergedRepo = { ...mergedRepo, ...updatesWithoutClearSentinels }
@@ -221,16 +225,7 @@ export function createRepoUpdateActions(
               } else if (sourceControlAi !== undefined) {
                 mergedRepo = { ...mergedRepo, sourceControlAi }
               }
-              if (taskStart === null) {
-                const { taskStart: _taskStart, ...repoWithoutTaskStart } = mergedRepo
-                mergedRepo = repoWithoutTaskStart
-              } else if (taskStart !== undefined) {
-                // Why: mirrors the host, where an update that normalizes to nothing is a no-op.
-                const normalizedTaskStart = normalizeRepoTaskStartSettings(taskStart)
-                if (normalizedTaskStart !== undefined) {
-                  mergedRepo = { ...mergedRepo, taskStart: normalizedTaskStart }
-                }
-              }
+              mergedRepo = mergeRepoTaskStartUpdate(mergedRepo, taskStart)
               if (externalWorktreeVisibility === null) {
                 const { externalWorktreeVisibility: _visibility, ...repoWithoutVisibility } =
                   mergedRepo
@@ -265,6 +260,19 @@ export function createRepoUpdateActions(
                 mergedRepo = repoWithoutGhAccount
               } else if (ghAccount !== undefined) {
                 mergedRepo = { ...mergedRepo, ghAccount }
+              }
+              if (workspaceCleanupPolicy === null) {
+                const { workspaceCleanupPolicy: _policy, ...repoWithoutCleanupPolicy } = mergedRepo
+                mergedRepo = repoWithoutCleanupPolicy
+              } else if (workspaceCleanupPolicy !== undefined) {
+                mergedRepo = { ...mergedRepo, workspaceCleanupPolicy }
+              }
+              if (browserProfileId === null) {
+                const { browserProfileId: _browserProfileId, ...repoWithoutBrowserProfile } =
+                  mergedRepo
+                mergedRepo = repoWithoutBrowserProfile
+              } else if (browserProfileId !== undefined) {
+                mergedRepo = { ...mergedRepo, browserProfileId }
               }
               return s.githubSourceCollections?.adopt(mergedRepo) ?? mergedRepo
             })

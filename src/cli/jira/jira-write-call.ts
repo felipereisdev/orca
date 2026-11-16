@@ -1,9 +1,6 @@
 import type { HandlerContext } from '../dispatch/dispatch'
-import {
-  RuntimeClientError,
-  RuntimeRpcFailureError,
-  type RuntimeRpcSuccess
-} from '../runtime/types'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
+import type { RuntimeRpcSuccess } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 
 export function jiraWriteFailure(failure: {
   code?: string

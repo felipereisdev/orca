@@ -7,7 +7,7 @@ import type {
 import { databaseExplorerReference } from '../../../src/shared/database/database-explorer-reference'
 import type { DatabaseQueryStatus } from '../../../src/shared/database/database-query-contracts'
 import { FieldTextInput } from '../components/composer-input/FieldTextInput'
-import { MobileSegmentedControl } from '../components/MobileSegmentedControl'
+import { MobileSegmentedControl } from '../components/controls/MobileSegmentedControl'
 import { useDurableDraftField } from '../drafts/durable-draft-fields'
 import { workspaceDraftRowKey } from '../drafts/durable-draft-rows'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import { getTaskStartOptions } from '@/runtime/task-board/runtime-task-board-client'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/rpc/targets/runtime-client-target'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type {
   TaskBoardCardRef,
   TaskStartOptionsResult

@@ -8,13 +8,13 @@ import { RpcDispatcher } from '../../src/main/runtime/rpc/dispatcher'
 import { DATABASE_METHODS } from '../../src/main/runtime/rpc/methods/database/database'
 import { DATABASE_BINDING_METHODS } from '../../src/main/runtime/rpc/methods/database/database-bindings'
 import { disposeRuntimeDatabase } from '../../src/main/runtime/database/runtime-database-service-slot'
-import type { RuntimeRpcResponse } from '../../src/shared/runtime-rpc-envelope'
+import type { RuntimeRpcResponse } from '../../src/shared/remote-runtime/rpc/runtime-rpc-envelope'
 import type { DatabaseConnectionConfiguration } from '../../src/shared/database/database-contracts'
 import type {
   DatabaseQueryHandle,
   DatabaseQuerySnapshot
 } from '../../src/shared/database/database-query-contracts'
-import { waitForPromiseWithSignal } from '../../src/shared/abort-signal-reason'
+import { waitForPromiseWithSignal } from '../../src/shared/concurrency/abort-signal-reason'
 
 let fixture: Awaited<ReturnType<typeof createPostgresFixture>>
 let controllerProfile: ReturnType<typeof createDatabaseTestProfile>

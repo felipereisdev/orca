@@ -1,5 +1,5 @@
 import type { TaskBoardProject } from '../../../../../shared/task-board/task-board-project-filter'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import type { TaskProvider } from '../../../../../shared/work-items/task-providers'
 import type { TaskBoardWireCard } from '../../../../../shared/task-board/task-board-wire-types'
 import { changeHeldTaskBoardCard } from './task-board-move-override-store'

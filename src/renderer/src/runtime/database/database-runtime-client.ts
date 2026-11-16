@@ -6,10 +6,10 @@ import type {
   DatabaseSettingsOptions,
   DatabaseHostCapabilities
 } from '../../../../shared/database/database-settings-options'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { z } from 'zod'
-import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
-import type { RuntimeStatus } from '../../../../shared/runtime-session-contracts'
+import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import type { RuntimeStatus } from '../../../../shared/remote-runtime/session-graph/runtime-session-contracts'
 import type {
   DatabaseConnectionConfiguration,
   DatabaseConnectionInput,
@@ -27,7 +27,7 @@ import {
   databaseQueryRecordSchema
 } from '../../../../shared/database/database-query-result-schema'
 import { DATABASE_RUNTIME_CAPABILITIES } from '../../../../shared/database/database-runtime-capabilities'
-import type { DatabaseScope } from '../../../../shared/rpc-contract/database-params'
+import type { DatabaseScope } from '../../../../shared/rpc-contract/database/database-params'
 import { callRuntimeRpc } from '../rpc/calls/runtime-rpc-call'
 import { captureRuntimeEnvironmentRequestRevision } from '../rpc/environment-revisions/runtime-environment-revision'
 

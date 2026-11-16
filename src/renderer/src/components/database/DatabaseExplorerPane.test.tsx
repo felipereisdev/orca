@@ -6,7 +6,7 @@ import { createDatabaseExplorerState } from './database-explorer-state'
 import { createDatabaseClientFixture } from '../settings/database/testing/database-client-fixture'
 
 const editor = vi.hoisted(() => vi.fn())
-vi.mock('../editor/MonacoEditor', () => ({
+vi.mock('../editor/monaco/MonacoEditor', () => ({
   default: (props: { fileId: string; viewStateKey: string; content: string }) => {
     editor(props)
     return null

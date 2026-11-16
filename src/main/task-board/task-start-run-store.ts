@@ -5,7 +5,7 @@ import {
   type TaskStartRunState
 } from '../../shared/task-board/task-start-run'
 import type { TaskStartWorkspaceMode } from '../../shared/task-board/task-start-settings'
-import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
+import type { RuntimeClientEvent } from '../../shared/remote-runtime/session-graph/runtime-client-events'
 import { mintAgentSessionOperationId } from '../runtime/orchestration/mailbox/structured-pointer/structured-pointer-operation-id'
 
 const ENDED: ReadonlySet<TaskStartRunState> = new Set(['stopped', 'completed', 'failed'])

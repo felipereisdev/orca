@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { parseExecutionHostId } from '../execution-host'
+import { parseExecutionHostId } from '../execution-host/execution-host'
 import type { DatabaseCatalogState, DatabaseConnection } from './database-contracts'
 
 const host = z.string().transform((value) => {

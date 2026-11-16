@@ -1,4 +1,4 @@
-import type { ClaudeAccountLaunchTarget } from '../../../../../shared/claude-account-launch-target'
+import type { ClaudeAccountLaunchTarget } from '../../../../../shared/agent-accounts/claude/claude-account-launch-target'
 import type { AgentDetectionHost } from '../../../../preflight/workspace-agent-detection'
 import type { OrcaRuntimeService } from '../../../orca-runtime'
 

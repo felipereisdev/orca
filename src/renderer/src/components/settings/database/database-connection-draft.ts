@@ -3,7 +3,7 @@ import type {
   DatabaseEngine,
   DatabaseProjectKey
 } from '../../../../../shared/database/database-contracts'
-import type { ExecutionHostId } from '../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../shared/execution-host/execution-host'
 import { databaseConnectionInputSchema } from '../../../../../shared/database/database-configuration-schema'
 
 export type DatabaseConnectionDraft = {

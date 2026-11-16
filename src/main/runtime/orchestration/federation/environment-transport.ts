@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
 import { fingerprintAuthenticatedPairingCredential } from '../../rpc/server/pairing/device-principal'
 import type {
+  RuntimeRequestGuard,
   RuntimeRequestPreparation,
   RuntimeOrchestrationEnvelope,
   RuntimeRpcResponse
-} from '../../../../shared/runtime-rpc-envelope'
+} from '../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 
 export type OrchestrationWorkerServer = {
   environmentId: string
@@ -18,20 +19,22 @@ export type OrchestrationWorkerServer = {
 export type OrchestrationEnvironmentCallOptions = {
   expectedRuntimeId?: string
   prepareRequest?: RuntimeRequestPreparation
+  prepareGuard?: RuntimeRequestGuard
   contractVerified?: boolean
   expectedEnvironmentPairingRevision?: number
 }
 
 export type OrchestrationEnvironmentSendOptions = {
   prepareRequest?: RuntimeRequestPreparation
+  prepareGuard?: RuntimeRequestGuard
   /** Send only to this host incarnation; any other answers runtime_environment_changed before sending. */
   expectedRuntimeId?: string
 }
 
 export type OrchestrationEnvironmentTransport = {
-  resolve(selector: string): OrchestrationWorkerServer
+  resolve(selector: string): OrchestrationWorkerServer | Promise<OrchestrationWorkerServer>
   /** False once the server is removed from this host, so its relays stop instead of retrying forever. */
-  hasEnvironment?(environmentId: string): boolean
+  hasEnvironment?(environmentId: string): boolean | Promise<boolean>
   call(
     selector: string,
     method: string,

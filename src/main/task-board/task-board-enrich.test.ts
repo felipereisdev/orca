@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { JiraComment, JiraIssue } from '../../shared/jira/jira-types'
 import type { GitHubWorkItem } from '../../shared/github/work-items/work-item-types'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo } from '../../shared/repository/repo-types'
 import {
   toGitHubTaskBoardCard,
   toJiraTaskBoardCard
