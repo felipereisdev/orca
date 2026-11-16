@@ -152,6 +152,10 @@ export type TaskStartError =
   | 'remote_account_unsupported'
   | 'worktree_create_failed'
   | 'primary_status_failed'
+  /** Git refused the task branch in the primary checkout (pending changes, say). */
+  | 'primary_branch_failed'
+  /** The base branch could not be fetched from its remote. */
+  | 'base_update_failed'
   | 'context_fetch_failed'
   | 'launch_failed'
   | 'cancelled'

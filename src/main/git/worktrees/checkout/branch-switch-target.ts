@@ -74,7 +74,27 @@ export async function resolveBranchSwitchTarget(
   const run = (args: string[]) => gitExecFileAsync(args, execution)
   if (target.kind === 'new') {
     await validateNewBranchName(path, target.name, { ...options, admissionTier: 'interactive' })
-    return { branch: target.name, creation: { kind: 'new' } }
+    if (target.startPoint === undefined) {
+      return { branch: target.name, creation: { kind: 'new' } }
+    }
+    // Pinned to its commit: an option-like or moving ref never reaches the checkout.
+    const missing = new Error(
+      `The start point ${target.startPoint} is not a commit in this repository.`
+    )
+    if (target.startPoint.startsWith('-')) {
+      throw missing
+    }
+    const { stdout } = await run([
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      `${target.startPoint}^{commit}`
+    ]).catch(() => ({ stdout: '' }))
+    const commit = stdout.trim()
+    if (!/^[a-f0-9]{40,64}$/.test(commit)) {
+      throw missing
+    }
+    return { branch: target.name, creation: { kind: 'new', startPoint: commit } }
   }
   if (!isBranchNameValid(target.name)) {
     throw new Error('This branch name is invalid. Choose a different name.')

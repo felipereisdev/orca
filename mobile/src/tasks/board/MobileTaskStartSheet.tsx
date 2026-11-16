@@ -78,8 +78,7 @@ export function MobileTaskStartSheet(props: Props) {
     props.onSubmit({
       repoId,
       ...(edits.mode ? { workspaceMode: edits.mode } : {}),
-      // The primary checkout has no base branch to start from.
-      ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
+      ...(edits.baseRef ? { baseRef: edits.baseRef } : {}),
       ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {}),
       ...(userPrompt.trim() ? { userPrompt: userPrompt.trim() } : {})
     })
@@ -154,7 +153,7 @@ export function MobileTaskStartSheet(props: Props) {
           />
         </>
       ) : null}
-      {repoId && data && !isFolder && mode === 'worktree' ? (
+      {repoId && data && !isFolder ? (
         <ListGroup style={styles.base}>
           <ListRow
             title={t('tasks.board.start.baseBranch', 'Base branch')}

@@ -34,35 +34,34 @@ import {
 } from './task-start-service-guard'
 import { launchTaskStartOrchestrator, type TaskStartLaunchDeps } from './task-start-service-launch'
 import type { TaskStartStopDeps } from './task-start-stop'
+import {
+  openTaskStartWorkspace,
+  resolveTaskStartBase,
+  type TaskStartWorkspaceDeps
+} from './task-start-workspace'
 
 export type TaskStartParams = z.infer<typeof TaskBoardStartTaskParams>
 
-export type TaskStartServiceDeps = TaskStartLaunchDeps & {
-  options: TaskStartOptionsDeps
-  /** What ⏹ ends, for a start a stop cancels after its orchestrator was published. */
-  orchestration: TaskStartStopDeps['orchestration']
-  stopMutation(): StopMutation
-  lifecycle: TaskStartLifecycleDeps
-  /** The card's board key; throws when its repo left this host. */
-  cardKey(ref: TaskBoardCardRef): string
-  /** The card and its context; throws when the item cannot be read. */
-  readContext(ref: TaskBoardCardRef): Promise<{ card: TaskStartCard; context: TaskStartContext }>
-  /** Images saved on the orchestrator's host; a failed one keeps its URL. */
-  writeImages(args: {
-    card: TaskStartCard
-    repo: Repo
-    runId: string
-    images: TaskStartImage[]
-  }): Promise<TaskStartImage[]>
-  primaryWorktreeId(repo: Repo): Promise<string>
-  gitStatus(worktreeId: string): Promise<{ entries: readonly unknown[]; branch?: string }>
-  /** A new worktree with the card's item linked. */
-  createWorktree(args: {
-    repo: Repo
-    card: TaskStartCard
-    baseBranch?: string
-  }): Promise<{ worktreeId: string }>
-}
+export type TaskStartServiceDeps = TaskStartLaunchDeps &
+  TaskStartWorkspaceDeps & {
+    options: TaskStartOptionsDeps
+    /** What ⏹ ends, for a start a stop cancels after its orchestrator was published. */
+    orchestration: TaskStartStopDeps['orchestration']
+    stopMutation(): StopMutation
+    lifecycle: TaskStartLifecycleDeps
+    /** The card's board key; throws when its repo left this host. */
+    cardKey(ref: TaskBoardCardRef): string
+    /** The card and its context; throws when the item cannot be read. */
+    readContext(ref: TaskBoardCardRef): Promise<{ card: TaskStartCard; context: TaskStartContext }>
+    /** Images saved on the orchestrator's host; a failed one keeps its URL. */
+    writeImages(args: {
+      card: TaskStartCard
+      repo: Repo
+      runId: string
+      images: TaskStartImage[]
+    }): Promise<TaskStartImage[]>
+    gitStatus(worktreeId: string): Promise<{ entries: readonly unknown[]; branch?: string }>
+  }
 
 // Remotes a configured base usually names; anything else must match the branch exactly.
 const BASE_REMOTE = /^(?:refs\/remotes\/)?(?:origin|upstream)\//
@@ -76,15 +75,11 @@ function isBaseBranch(branch: string, base: string): boolean {
 
 async function primaryReasons(
   repo: Repo,
-  params: TaskStartParams,
+  base: string | null,
   deps: TaskStartServiceDeps
 ): Promise<{ worktreeId: string; reasons: TaskStartPrimaryReason[] }> {
   const worktreeId = await deps.primaryWorktreeId(repo)
   const status = await deps.gitStatus(`id:${worktreeId}`)
-  const base =
-    params.baseRef ??
-    repo.worktreeBaseRef ??
-    (await deps.options.baseRefDefault(repo).catch(() => null))
   const reasons: TaskStartPrimaryReason[] = []
   if (status.entries.length > 0) {
     reasons.push('uncommitted')
@@ -99,6 +94,8 @@ type Prepared = {
   repo: Repo
   cardKey: string
   workspaceMode: 'worktree' | 'primary'
+  /** Null for folder repos and repos without a resolvable base. */
+  base: string | null
   primaryWorktreeId?: string
   roles: NonNullable<ReturnType<typeof resolveTaskStartRoles>>
   labels: ReturnType<typeof taskStartRoleLabels>
@@ -158,16 +155,18 @@ async function prepare(
   }
   const workspaceMode = resolveTaskStartWorkspaceMode(repo, params.workspaceMode)
   const accounts = new Map(options.claudeAccounts().map((account) => [account.id, account]))
+  // Folder repos never consult git.
+  const isGit = repo.kind !== 'folder'
   const prepared: Prepared = {
     repo,
     cardKey,
     workspaceMode,
+    base: isGit ? await resolveTaskStartBase(repo, params.baseRef, deps) : null,
     roles,
     labels: taskStartRoleLabels(roles, accounts)
   }
-  // Folder repos never consult git.
-  if (workspaceMode === 'primary' && repo.kind !== 'folder') {
-    const primary = await primaryReasons(repo, params, deps).catch((error: unknown) => {
+  if (workspaceMode === 'primary' && isGit) {
+    const primary = await primaryReasons(repo, prepared.base, deps).catch((error: unknown) => {
       console.warn('[task-start] reading the primary checkout failed', error)
       return null
     })
@@ -210,24 +209,11 @@ async function runStart(
   if (!guard.alive()) {
     return guard.settle()
   }
-  let worktreeId: string
-  try {
-    worktreeId =
-      prepared.workspaceMode === 'primary'
-        ? (prepared.primaryWorktreeId ?? (await deps.primaryWorktreeId(repo)))
-        : (
-            await deps.createWorktree({
-              repo,
-              card,
-              ...((params.baseRef ?? repo.worktreeBaseRef)
-                ? { baseBranch: params.baseRef ?? repo.worktreeBaseRef }
-                : {})
-            })
-          ).worktreeId
-  } catch (error) {
-    console.warn('[task-start] preparing the workspace failed', error)
-    return guard.fail('worktree-create-failed', 'worktree_create_failed')
+  const workspace = await openTaskStartWorkspace(prepared, card, guard, deps)
+  if ('ok' in workspace) {
+    return workspace
   }
+  const { worktreeId } = workspace
   guard.worktreeId = worktreeId
   if (!guard.alive() || !guard.patch({ worktreeId, cardTitle: card.title })) {
     return guard.settle()

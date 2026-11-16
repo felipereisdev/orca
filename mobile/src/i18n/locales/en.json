@@ -4809,7 +4809,9 @@
           "stopFailed": "Could not stop the task.",
           "roleAgentUnavailable": "The agent chosen for {{role}} is not available on this host.",
           "roleAccountNeedsSignIn": "Sign in to the account chosen for {{role}}, then start again.",
-          "primaryStatusFailed": "Could not read the primary checkout's status."
+          "primaryStatusFailed": "Could not read the primary checkout's status.",
+          "primaryBranchFailed": "Could not create the task branch in the primary checkout. Check pending changes and try again.",
+          "baseUpdateFailed": "Could not update the base branch from the remote. Check your connection and try again."
         },
         "primaryReason": {
           "uncommitted": "It has uncommitted changes.",

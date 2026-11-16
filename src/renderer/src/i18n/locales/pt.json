@@ -24922,7 +24922,7 @@
       "description": "Como as tarefas começam neste projeto e quais agentes executam cada função. As funções deixadas em herdar usam os padrões globais.",
       "searchDescription": "Modo de workspace, ramo base e agentes usados quando uma tarefa inicia neste projeto.",
       "mode": "Modo de workspace",
-      "baseBranch": "Ramo base para novos worktrees",
+      "baseBranch": "Branch base das novas branches de tarefa",
       "agents": "Agentes",
       "modeWorktree": "Novo worktree",
       "modePrimary": "Ramo principal",
@@ -25021,7 +25021,9 @@
       "primaryNeedsConfirmation": "O checkout principal precisa da sua confirmação.",
       "roleAgentUnavailable": "O agente escolhido para {{role}} não está disponível neste host.",
       "roleAccountNeedsSignIn": "Entre na conta escolhida para {{role}} e inicie novamente.",
-      "primaryStatusFailed": "Não foi possível ler o estado do checkout principal."
+      "primaryStatusFailed": "Não foi possível ler o estado do checkout principal.",
+      "primaryBranchFailed": "Não foi possível criar a branch da tarefa no ramo principal. Verifique alterações pendentes e tente de novo.",
+      "baseUpdateFailed": "Não foi possível atualizar a branch base a partir do remoto. Verifique a conexão e tente de novo."
     },
     "primaryReason": {
       "uncommitted": "Há alterações não commitadas.",

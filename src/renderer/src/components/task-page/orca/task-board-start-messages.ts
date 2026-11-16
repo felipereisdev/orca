@@ -70,6 +70,16 @@ export function taskStartErrorMessage(error: TaskStartError, role?: TaskStartRol
         'taskStart.error.primaryStatusFailed',
         "Could not read the primary checkout's status."
       )
+    case 'primary_branch_failed':
+      return translate(
+        'taskStart.error.primaryBranchFailed',
+        'Could not create the task branch in the primary checkout. Check pending changes and try again.'
+      )
+    case 'base_update_failed':
+      return translate(
+        'taskStart.error.baseUpdateFailed',
+        'Could not update the base branch from the remote. Check your connection and try again.'
+      )
     case 'context_fetch_failed':
       return translate('taskStart.error.contextFetchFailed', 'Could not read the issue.')
     case 'launch_failed':

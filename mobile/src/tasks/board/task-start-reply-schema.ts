@@ -71,6 +71,8 @@ const START_ERRORS = [
   'remote_account_unsupported',
   'worktree_create_failed',
   'primary_status_failed',
+  'primary_branch_failed',
+  'base_update_failed',
   'context_fetch_failed',
   'launch_failed',
   'cancelled'

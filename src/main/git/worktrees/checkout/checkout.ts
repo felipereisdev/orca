@@ -29,7 +29,14 @@ export async function checkoutBranch(
   assertValidBranchName(branch)
   const args =
     creation?.kind === 'new'
-      ? ['checkout', '--no-track', '-b', branch, '--']
+      ? [
+          'checkout',
+          '--no-track',
+          '-b',
+          branch,
+          ...(creation.startPoint ? [creation.startPoint] : []),
+          '--'
+        ]
       : creation?.kind === 'remote'
         ? ['checkout', '--track', '-b', branch, creation.startPoint, '--']
         : ['checkout', ...(options.detached ? ['--detach', `${branch}^{commit}`] : [branch]), '--']

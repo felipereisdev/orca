@@ -4754,7 +4754,9 @@
           "stopFailed": "Não foi possível parar a tarefa.",
           "roleAgentUnavailable": "O agente escolhido para {{role}} não está disponível neste host.",
           "roleAccountNeedsSignIn": "Entre na conta escolhida para {{role}} e inicie novamente.",
-          "primaryStatusFailed": "Não foi possível ler o estado do checkout principal."
+          "primaryStatusFailed": "Não foi possível ler o estado do checkout principal.",
+          "primaryBranchFailed": "Não foi possível criar a branch da tarefa no ramo principal. Verifique alterações pendentes e tente de novo.",
+          "baseUpdateFailed": "Não foi possível atualizar a branch base a partir do remoto. Verifique a conexão e tente de novo."
         },
         "primaryReason": {
           "uncommitted": "Há alterações não commitadas.",

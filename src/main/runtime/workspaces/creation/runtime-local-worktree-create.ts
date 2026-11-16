@@ -6,16 +6,13 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import type { RuntimeStore } from '../../construction/runtime-store-contract'
 import {
   getLocalProjectGitExecOptions,
-  getLocalProjectWorktreeGitOptions,
-  getWorktreeMirrorDistro
+  getLocalProjectWorktreeGitOptions
 } from '../../../workspaces/execution-host/project-runtime-git-options'
 import {
   resolveDefaultBaseRefWithLocalGit,
   type LocalGitExecOptions
 } from '../../../git/refs/resolution/repo-default-base-ref'
 
-import { resolveLocalGitUsername } from '../../../git/repositories/git-username'
-import { computeWorkspaceRoot, getWorktreePathSettings } from '../../../ipc/worktree-logic'
 import { resolveWorktreeCreateBase } from '../../../workspaces/creation/worktree-create-base'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type {
@@ -25,6 +22,10 @@ import type {
 import type { HostedReviewExecutionOptions } from '../../../source-control/hosted-review-git-options'
 import { hasLocalWorktreeBaseRef } from '../../../git/worktrees/creation/worktree-base-ref-probe'
 import { resolveRuntimeLocalWorktreeCreateCandidate } from './runtime-local-worktree-create-candidate'
+import {
+  runtimeLocalWorktreeCreateSettings,
+  runtimeLocalWorktreeCreateUsername
+} from './runtime-local-worktree-create-naming'
 import {
   createRuntimeLocalGitWorktree,
   startRuntimeLocalBaseRefRefresh
@@ -83,19 +84,11 @@ async function performRuntimeLocalWorktreeCreate<T>(
   pathClaim: WorktreeCreatePathClaim
 ) {
   const { request, repo, store } = args
-  const hostSettings = store.getSettings()
-  // Carry layout choice through name retirement and metadata, not just path creation.
-  const settings = {
-    ...hostSettings,
-    nestWorkspaces: request.nestWorkspaces ?? hostSettings.nestWorkspaces,
-    // Paired desktops own this toggle in their profiles, not the host's.
-    refreshLocalBaseRefOnWorktreeCreate:
-      request.refreshLocalBaseRefOnWorktreeCreate ??
-      hostSettings.refreshLocalBaseRefOnWorktreeCreate,
-    localBaseRefSuggestionDismissed:
-      request.localBaseRefSuggestionDismissed ?? hostSettings.localBaseRefSuggestionDismissed
-  }
-  const pathSettings = getWorktreePathSettings(repo, settings, getWorktreeMirrorDistro(store, repo))
+  const { settings, pathSettings, workspaceRoot } = runtimeLocalWorktreeCreateSettings(
+    store,
+    repo,
+    request
+  )
   const gitExecOptions = getLocalProjectGitExecOptions(store, repo)
   const worktreeGitOptions = getLocalProjectWorktreeGitOptions(store, repo)
   args.timing.recordExecutionHost(localWorktreeCreateExecutionHost(gitExecOptions))
@@ -114,10 +107,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
     }
   }
   // Overlap independent username/base reads to remove one serial Git/config round trip.
-  const usernamePromise =
-    !request.branchNameOverride && settings.branchPrefix === 'git-username'
-      ? resolveLocalGitUsername(repo.path)
-      : Promise.resolve('')
+  const usernamePromise = runtimeLocalWorktreeCreateUsername(repo, request, settings)
   const baseBranchPromise = resolveWorktreeCreateBase({
     requestedBaseBranch: request.baseBranch,
     repoWorktreeBaseRef: repo.worktreeBaseRef,
@@ -167,7 +157,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
       repo,
       settings,
       worktreePathSettings: pathSettings,
-      workspaceRoot: computeWorkspaceRoot(repo.path, pathSettings),
+      workspaceRoot,
       username,
       store,
       baseBranch: base.baseBranch,
@@ -189,7 +179,7 @@ async function performRuntimeLocalWorktreeCreate<T>(
       store,
       settings,
       base,
-      workspaceRoot: computeWorkspaceRoot(repo.path, pathSettings),
+      workspaceRoot,
       branchName: candidate.branchName,
       worktreePath: candidate.worktreePath,
       effectiveSanitizedName: candidate.effectiveSanitizedName,

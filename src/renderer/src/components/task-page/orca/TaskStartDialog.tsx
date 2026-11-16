@@ -138,7 +138,7 @@ export function TaskStartDialogView(props: TaskStartDialogViewProps): React.JSX.
               </ToggleGroup>
             </div>
           ) : null}
-          {repoId && data && !isFolder && mode === 'worktree' ? (
+          {repoId && data && !isFolder ? (
             <div className="flex flex-col gap-1.5">
               <Label>{t('taskStart.dialog.baseBranch', 'Base branch')}</Label>
               <BaseRefPicker
@@ -230,7 +230,6 @@ function TaskStartDialogBody({
   const [userPrompt, setUserPrompt] = useState('')
   const options = useTaskStartOptions({ ref: state.card.ref, repoId: chosenRepoId }, hostId)
   const repoId = chosenRepoId ?? options.data?.repoId ?? null
-  const mode = edits.mode ?? options.data?.workspaceMode
   const runtimeHost = parseExecutionHostId(hostId)?.kind === 'runtime' ? hostId : undefined
   return (
     <TaskStartDialogView
@@ -257,8 +256,7 @@ function TaskStartDialogBody({
         onSubmit({
           repoId,
           ...(edits.mode ? { workspaceMode: edits.mode } : {}),
-          // The primary checkout has no base branch to start from.
-          ...(edits.baseRef && mode !== 'primary' ? { baseRef: edits.baseRef } : {}),
+          ...(edits.baseRef ? { baseRef: edits.baseRef } : {}),
           ...(Object.keys(edits.roles).length > 0 ? { roles: edits.roles } : {}),
           ...(userPrompt.trim() ? { userPrompt: userPrompt.trim() } : {})
         })

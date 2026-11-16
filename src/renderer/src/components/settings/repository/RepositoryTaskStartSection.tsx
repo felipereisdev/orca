@@ -95,7 +95,7 @@ export function RepositoryTaskStartView({
   const t = useTranslate()
   const entry = getRepositoryTaskStartSearchEntry(t)
   const modeLabel = t('taskStart.repository.mode', 'Workspace mode')
-  const baseLabel = t('taskStart.repository.baseBranch', 'Base branch for new worktrees')
+  const baseLabel = t('taskStart.repository.baseBranch', 'Base branch for new task branches')
   const agentsLabel = t('taskStart.repository.agents', 'Agents')
   const isFolder = isFolderRepo(repo)
   const mode = resolveTaskStartWorkspaceMode(repo)
@@ -154,18 +154,13 @@ export function RepositoryTaskStartView({
         {isFolder ? null : (
           <div className="space-y-2">
             <Label variant="settings">{baseLabel}</Label>
-            <div
-              inert={mode === 'primary'}
-              className={mode === 'primary' ? 'opacity-50' : undefined}
-            >
-              <BaseRefPicker
-                repoId={repo.id}
-                hostId={getRepoExecutionHostId(repo)}
-                currentBaseRef={repo.worktreeBaseRef}
-                onSelect={(ref) => updateRepo(repo.id, { worktreeBaseRef: ref })}
-                onUsePrimary={() => updateRepo(repo.id, { worktreeBaseRef: undefined })}
-              />
-            </div>
+            <BaseRefPicker
+              repoId={repo.id}
+              hostId={getRepoExecutionHostId(repo)}
+              currentBaseRef={repo.worktreeBaseRef}
+              onSelect={(ref) => updateRepo(repo.id, { worktreeBaseRef: ref })}
+              onUsePrimary={() => updateRepo(repo.id, { worktreeBaseRef: undefined })}
+            />
           </div>
         )}
         <div className="space-y-2">

@@ -25708,7 +25708,7 @@
       "description": "How tasks start in this project, and which agents run each role. Roles left on inherit use the global defaults.",
       "searchDescription": "Workspace mode, base branch and agents used when a task starts in this project.",
       "mode": "Workspace mode",
-      "baseBranch": "Base branch for new worktrees",
+      "baseBranch": "Base branch for new task branches",
       "agents": "Agents",
       "modeWorktree": "New worktree",
       "modePrimary": "Primary branch",
@@ -25806,7 +25806,9 @@
       "primaryNeedsConfirmation": "The primary checkout needs your confirmation.",
       "roleAgentUnavailable": "The agent chosen for {{role}} is not available on this host.",
       "roleAccountNeedsSignIn": "Sign in to the account chosen for {{role}}, then start again.",
-      "primaryStatusFailed": "Could not read the primary checkout's status."
+      "primaryStatusFailed": "Could not read the primary checkout's status.",
+      "primaryBranchFailed": "Could not create the task branch in the primary checkout. Check pending changes and try again.",
+      "baseUpdateFailed": "Could not update the base branch from the remote. Check your connection and try again."
     },
     "primaryReason": {
       "uncommitted": "It has uncommitted changes.",

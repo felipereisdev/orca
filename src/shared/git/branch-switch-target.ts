@@ -1,5 +1,12 @@
-export type BranchSwitchTarget = { kind: 'local' | 'remote' | 'new'; name: string }
-export type BranchSwitchCreation = { kind: 'new' } | { kind: 'remote'; startPoint: string }
+export type BranchSwitchTarget = {
+  kind: 'local' | 'remote' | 'new'
+  name: string
+  /** `new` only, host-internal: the ref the branch starts at instead of HEAD. */
+  startPoint?: string
+}
+export type BranchSwitchCreation =
+  | { kind: 'new'; startPoint?: string }
+  | { kind: 'remote'; startPoint: string }
 
 export function isBranchNameValid(name: string): boolean {
   return (

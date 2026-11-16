@@ -1,16 +1,14 @@
 import { getRepoSshConnectionId } from '../../shared/execution-host'
 import type { TaskStartOrchestratorRef } from '../../shared/task-board/task-start-run'
-import { WorktreeCreate } from '../../shared/rpc-contract/worktree-create-params'
 import { createWorktreeWithStartupAgent } from '../agent-launch/startup-agent-worktree-create'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { resolveRpcWorkspaceCreatorProvenance } from '../runtime/rpc/callers/workspace-creator-context'
 import type { RpcContext } from '../runtime/rpc/core'
 import { launchAgentOnHost } from '../runtime/rpc/methods/agent-launch/agent-launch'
-import { buildManagedWorktreeCreateArgs } from '../runtime/rpc/methods/workspaces/worktree-create-args'
 import { readTaskBoardCard, taskBoardRefKeyForRef } from './task-board-host-card'
 import { createTaskBoardServiceDeps } from './task-board-host-deps'
+import { createTaskStartBranchDeps, taskStartWorktreeCreateArgs } from './task-start-branch-deps'
 import {
   collectTaskStartContext,
   createTaskStartFetchBytes,
@@ -30,7 +28,6 @@ import {
   createTaskStartStopDeps,
   taskStartStopMutation
 } from './task-start-stop-deps'
-import { taskStartWorktreeCreateFields } from './task-start-worktree-link'
 
 // In-process like automations: the host launches the orchestrator for whichever client asked.
 const TASK_START_AGENT_CALLER = { kind: 'local-cli' } as const
@@ -91,20 +88,11 @@ export function createTaskStartServiceDeps(
       return main.id
     },
     gitStatus: (selector) => runtime.getRuntimeGitStatus(selector),
+    ...createTaskStartBranchDeps(runtime, context),
     createWorktree: async ({ repo, card, baseBranch }) => {
-      const params = WorktreeCreate.parse({
-        repo: `id:${repo.id}`,
-        ...taskStartWorktreeCreateFields(card),
-        ...(baseBranch ? { baseBranch } : {}),
-        activate: false
-      })
       const created = await createWorktreeWithStartupAgent(
         runtime,
-        buildManagedWorktreeCreateArgs(
-          params,
-          { creatorProvenance: resolveRpcWorkspaceCreatorProvenance(context) },
-          context
-        )
+        taskStartWorktreeCreateArgs(context, repo, card, baseBranch)
       )
       return { worktreeId: created.worktree.id }
     },

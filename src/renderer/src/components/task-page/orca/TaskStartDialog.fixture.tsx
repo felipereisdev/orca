@@ -47,13 +47,15 @@ const options: TaskStartOptionsResult = {
 
 function Harness({
   repoRequired = false,
-  error = null
+  error = null,
+  mode
 }: {
   repoRequired?: boolean
   error?: string | null
+  mode?: TaskStartDialogEdits['mode']
 }): React.JSX.Element {
   const [repoId, setRepoId] = useState<string | null>(repoRequired ? null : 'repo-1')
-  const [edits, setEdits] = useState<TaskStartDialogEdits>({ roles: {} })
+  const [edits, setEdits] = useState<TaskStartDialogEdits>({ roles: {}, ...(mode ? { mode } : {}) })
   const [userPrompt, setUserPrompt] = useState('Foque primeiro no endpoint de faturas.')
   return (
     <TaskStartDialogView
@@ -84,6 +86,13 @@ export const resolvedRepo = defineFixture({
   store: { settings: getDefaultSettings('/home/fixture') },
   setup,
   render: () => <Harness />
+})
+
+export const primaryMode = defineFixture({
+  width: 720,
+  store: { settings: getDefaultSettings('/home/fixture') },
+  setup,
+  render: () => <Harness mode="primary" />
 })
 
 export const repoRequired = defineFixture({

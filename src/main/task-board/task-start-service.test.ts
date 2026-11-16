@@ -116,6 +116,12 @@ function serviceDeps(
     writeImages: async ({ images }) => images,
     primaryWorktreeId: async () => 'wt-main',
     gitStatus: async () => ({ entries: [], branch: 'main' }),
+    remoteBase: vi.fn(async (_repo: Repo, base: string) => {
+      const branch = /^origin\/(.+)$/.exec(base)?.[1]
+      return branch ? { remote: 'origin', branch, ref: `refs/remotes/${base}`, base } : null
+    }),
+    fetchBase: vi.fn(async () => {}),
+    createPrimaryBranch: vi.fn(async () => {}),
     createWorktree: vi.fn(async () => ({ worktreeId: 'wt-new' })),
     launchAgent: vi.fn(async (_params, onSurfacePublished) => {
       const result = launched()
@@ -363,5 +369,118 @@ describe('startTaskFromCard', () => {
     const run = store.getById(result.ok ? result.run.id : '')
     expect(run).toMatchObject({ state: 'running', launch: 'published' })
     expect(run?.note).toBeUndefined()
+  })
+
+  it('fetches the base from its remote before creating the worktree from the remote ref', async () => {
+    const deps = serviceDeps(memoryStore())
+    expect((await startTaskFromCard({ ref: ref(7) }, deps)).ok).toBe(true)
+    expect(deps.fetchBase).toHaveBeenCalledWith(REPO, {
+      remote: 'origin',
+      branch: 'main',
+      ref: 'refs/remotes/origin/main',
+      base: 'origin/main'
+    })
+    expect(deps.createWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ baseBranch: 'origin/main' })
+    )
+    expect(vi.mocked(deps.fetchBase).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(deps.createWorktree).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('creates the task branch in the primary checkout from the fetched base before launching', async () => {
+    const deps = serviceDeps(memoryStore())
+    const result = await startTaskFromCard(
+      { ref: ref(7), workspaceMode: 'primary', baseRef: 'origin/develop', confirmPrimary: true },
+      deps
+    )
+    expect(result.ok).toBe(true)
+    expect(deps.createWorktree).not.toHaveBeenCalled()
+    expect(deps.fetchBase).toHaveBeenCalledWith(
+      REPO,
+      expect.objectContaining({ branch: 'develop' })
+    )
+    expect(deps.createPrimaryBranch).toHaveBeenCalledWith({
+      repo: REPO,
+      worktreeId: 'wt-main',
+      card: expect.objectContaining({ ref: ref(7), displayId: '#7' }),
+      startPoint: 'origin/develop'
+    })
+    const [fetched] = vi.mocked(deps.fetchBase).mock.invocationCallOrder
+    const [branched] = vi.mocked(deps.createPrimaryBranch).mock.invocationCallOrder
+    const [launchedAt] = vi.mocked(deps.launchAgent).mock.invocationCallOrder
+    expect(fetched).toBeLessThan(branched)
+    expect(branched).toBeLessThan(launchedAt)
+  })
+
+  it('fails the start with primary_branch_failed when git refuses the task branch', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      createPrimaryBranch: vi.fn(async () => {
+        throw new Error('Your local changes would be overwritten by checkout')
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7), workspaceMode: 'primary' }, deps)
+    expect(result).toMatchObject({ ok: false, error: 'primary_branch_failed' })
+    expect(deps.launchAgent).not.toHaveBeenCalled()
+    const runId = result.ok ? '' : (result.run?.id ?? '')
+    expect(store.getById(runId)).toMatchObject({
+      state: 'failed',
+      failure: 'worktree-create-failed'
+    })
+  })
+
+  it('fails the start with base_update_failed when the base cannot be fetched', async () => {
+    for (const workspaceMode of ['worktree', 'primary'] as const) {
+      const store = memoryStore()
+      const deps = serviceDeps(store, {
+        fetchBase: vi.fn(async () => {
+          throw new Error('Could not resolve host: github.com')
+        })
+      })
+      const result = await startTaskFromCard({ ref: ref(7), workspaceMode }, deps)
+      expect(result).toMatchObject({ ok: false, error: 'base_update_failed' })
+      expect(deps.createWorktree).not.toHaveBeenCalled()
+      expect(deps.createPrimaryBranch).not.toHaveBeenCalled()
+      expect(deps.launchAgent).not.toHaveBeenCalled()
+      const runId = result.ok ? '' : (result.run?.id ?? '')
+      expect(store.getById(runId)).toMatchObject({
+        state: 'failed',
+        failure: 'worktree-create-failed'
+      })
+    }
+  })
+
+  it('starts from a local-only base without fetching', async () => {
+    const deps = serviceDeps(memoryStore())
+    expect((await startTaskFromCard({ ref: ref(7), baseRef: 'feature-x' }, deps)).ok).toBe(true)
+    expect(deps.createWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({ baseBranch: 'feature-x' })
+    )
+    const primary = serviceDeps(memoryStore(), {
+      gitStatus: async () => ({ entries: [], branch: 'feature-x' })
+    })
+    const started = await startTaskFromCard(
+      { ref: ref(7), workspaceMode: 'primary', baseRef: 'feature-x' },
+      primary
+    )
+    expect(started.ok).toBe(true)
+    expect(primary.createPrimaryBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ startPoint: 'feature-x' })
+    )
+    expect(deps.fetchBase).not.toHaveBeenCalled()
+    expect(primary.fetchBase).not.toHaveBeenCalled()
+  })
+
+  it('creates no branch for a folder project', async () => {
+    const folder: Repo = { ...REPO, kind: 'folder' }
+    const deps = serviceDeps(memoryStore(), { options: options({ repos: () => [folder] }) })
+    expect((await startTaskFromCard({ ref: ref(7) }, deps)).ok).toBe(true)
+    expect(deps.createPrimaryBranch).not.toHaveBeenCalled()
+    expect(deps.fetchBase).not.toHaveBeenCalled()
+    expect(vi.mocked(deps.launchAgent).mock.calls[0][0].target).toEqual({
+      kind: 'existing',
+      worktree: 'id:wt-main'
+    })
   })
 })
