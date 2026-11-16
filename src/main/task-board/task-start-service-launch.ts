@@ -23,6 +23,8 @@ export type TaskStartLaunchDeps = {
   /** The published terminal's pane and PTY, when the host can tell. */
   terminalIdentity(handle: string): { paneKey?: string; ptyId?: string }
   closeOrchestrator(ref: TaskStartOrchestratorRef): Promise<void>
+  /** Names the orchestrator's tab or chat the way a user's rename does. */
+  renameOrchestrator(ref: TaskStartOrchestratorRef, title: string): Promise<void>
 }
 
 const CONFIRMED_PROMPT = new Set(['journaled', 'handed-to-terminal'])
@@ -98,9 +100,29 @@ function started(run: TaskStartRun | null, guard: TaskStartRunGuard): Promise<Ta
     : guard.fail('launch-failed', 'launch_failed')
 }
 
+/** A name is cosmetic: failing to set it never fails the start. */
+function nameOrchestrator(
+  ref: TaskStartOrchestratorRef,
+  title: string,
+  deps: TaskStartLaunchDeps
+): void {
+  void Promise.resolve()
+    .then(() => deps.renameOrchestrator(ref, title))
+    .catch((error: unknown) => {
+      console.warn('[task-start] naming the orchestrator tab failed', error)
+    })
+}
+
 /** Launches the orchestrator and records its surface before the prompt is delivered. */
 export async function launchTaskStartOrchestrator(
-  input: { repo: Repo; worktreeId: string; choice: TaskStartAgentChoice; prompt: string },
+  input: {
+    repo: Repo
+    worktreeId: string
+    choice: TaskStartAgentChoice
+    prompt: string
+    /** The orchestrator's tab title. */
+    title: string
+  },
   guard: TaskStartRunGuard,
   deps: TaskStartLaunchDeps
 ): Promise<TaskStartResult> {
@@ -116,6 +138,7 @@ export async function launchTaskStartOrchestrator(
     if (run) {
       watchTaskStartOrchestrator(run, deps.lifecycle, { ptyId: published.ptyId })
     }
+    nameOrchestrator(published, input.title, deps)
   }
   let result: AgentLaunchResult
   try {

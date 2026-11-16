@@ -216,6 +216,30 @@ describe('orchestration RPC methods', () => {
       )
     })
 
+    it("names the worker's tab after --title, else after its Task", async () => {
+      setup()
+      mockCurrentWorkerStart()
+      const titled = db.createTask({ spec: 'plan the change' })
+      const plain = db.createTask({ spec: 'review the change' })
+
+      await call('orchestration.workerStart', {
+        task: titled.id,
+        from: 'term_coord',
+        agent: 'codex',
+        title: 'Planner · VIKINGS-66'
+      })
+      await call('orchestration.workerStart', {
+        task: plain.id,
+        from: 'term_coord',
+        agent: 'codex'
+      })
+
+      const titles = vi
+        .mocked(runtime.createTerminal)
+        .mock.calls.map(([, options]) => options?.title)
+      expect(titles).toEqual(['Planner · VIKINGS-66', `worker-${plain.id}`])
+    })
+
     it('returns a failed receipt and preserves a created terminal as residual', async () => {
       setup()
       mockCurrentWorkerStart({ ready: false })

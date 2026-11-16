@@ -66,6 +66,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   launchPreferences?: AgentLaunchPreferences
   claudeAccountId?: string
   taskId: string
+  /** `--title`; without it the tab is named after the Task. */
+  title?: string
   effects: WorkerEffect[]
 }): Promise<RuntimeTerminalCreate> {
   const terminal = await args.runtime.createTerminal(`id:${args.worktreeId}`, {
@@ -75,7 +77,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     suppressStartupUpdatePrompt: true,
     ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
-    title: `worker-${args.taskId}`,
+    title: args.title ?? `worker-${args.taskId}`,
     // Worker creation is background work and must not pull the sidebar away.
     surfaceOwner: false
   })
@@ -99,6 +101,8 @@ export async function createStructuredWorkerSessionForWorktree(args: {
   /** `--model`/`--effort`; the session seeds them exactly as a saved selection is seeded. */
   launchPreferences?: AgentLaunchPreferences
   claudeAccountId?: string
+  /** `--title`: the chat's name, set the way a user's rename sets it. */
+  title?: string
   effects: WorkerEffect[]
 }): Promise<Awaited<ReturnType<typeof createStructuredWorkerSession>>> {
   const options = narrowStructuredLaunchSeedOptions(args.launchPreferences)
@@ -110,6 +114,9 @@ export async function createStructuredWorkerSessionForWorktree(args: {
     ...(options ? { options } : {}),
     ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {})
   })
+  if (args.title) {
+    await nameStructuredWorkerChat(created, args.title)
+  }
   args.effects.push({
     kind: 'terminal',
     role: 'agent',
@@ -118,6 +125,18 @@ export async function createStructuredWorkerSessionForWorktree(args: {
     surface: 'background'
   })
   return created
+}
+
+/** A name is cosmetic: a chat that refuses it still runs the worker. */
+async function nameStructuredWorkerChat(
+  created: Awaited<ReturnType<typeof createStructuredWorkerSession>>,
+  title: string
+): Promise<void> {
+  try {
+    await created.host.setUserConversationName(created.identity.sessionId, title, 'rename')
+  } catch (error) {
+    console.warn('[orchestration] naming a structured worker chat failed', error)
+  }
 }
 
 export function applyWaitForSetupOutcome(

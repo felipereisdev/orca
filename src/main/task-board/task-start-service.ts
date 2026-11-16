@@ -11,7 +11,7 @@ import type {
   TaskStartContext,
   TaskStartImage
 } from '../../shared/task-board/task-start-context-types'
-import { buildTaskStartPrompt } from '../../shared/task-board/task-start-prompt'
+import { buildTaskStartPrompt, taskStartTabTitle } from '../../shared/task-board/task-start-prompt'
 import {
   resolveTaskStartRoles,
   resolveTaskStartWorkspaceMode,
@@ -239,7 +239,13 @@ async function runStart(
     userPrompt: params.userPrompt
   })
   return launchTaskStartOrchestrator(
-    { repo, worktreeId, choice: prepared.roles.orchestrator, prompt },
+    {
+      repo,
+      worktreeId,
+      choice: prepared.roles.orchestrator,
+      prompt,
+      title: taskStartTabTitle('orchestrator', card.displayId)
+    },
     guard,
     deps
   )

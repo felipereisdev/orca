@@ -32,6 +32,8 @@ export const WorkerStartParams = z
     effort: OptionalWorkerLaunchPreference,
     /** A managed Claude account on the worker's host; Claude only, never with --terminal or a remote placement. */
     claudeAccountId: ClaudeAccountIdParam.optional(),
+    /** The worker's tab title in place of `worker-<taskId>`; a remote placement ignores it. */
+    title: z.string().trim().min(1).max(120).optional(),
     retryOf: OptionalString,
     timeoutMs: OptionalFiniteNumber,
     devMode: z.boolean().optional(),

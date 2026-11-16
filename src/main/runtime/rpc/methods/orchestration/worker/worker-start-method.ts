@@ -251,6 +251,7 @@ export async function prepareWorkerStart(
       ...(placement.effort ? { effort: placement.effort } : {}),
       // Set only when the follow-up starts the agent again, never for one taken in place.
       ...(placement.claudeAccountId ? { claudeAccountId: placement.claudeAccountId } : {}),
+      ...(placement.title ? { title: placement.title } : {}),
       spec
     }
     followUp = { ...followUp, reopen: placement.reopen, earlierWork: placement.earlierWork }

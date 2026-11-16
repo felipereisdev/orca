@@ -54,6 +54,8 @@ that the CLI is installed; a missing one fails as an `agent_readiness` timeout.
 - Add `--model` only if the user named one.
 - Add `--account <id|email|label>` (from `ORCA account list`) only with
   `--agent claude`, and only when the user or the Task names one.
+- Add `--title "<text>"` to name the worker's tab when the user or the Task
+  gives one; otherwise it is `worker-<task_id>`.
 - If `worker-start` fails, do not rerun it; read `failedStage` and load
   `references/recovery-and-cleanup.md`.
 - To talk to a worker, use

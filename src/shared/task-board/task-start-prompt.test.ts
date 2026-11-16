@@ -128,25 +128,43 @@ describe('task-start prompt card data', () => {
 })
 
 describe('taskStartWorkerCommand', () => {
+  const tab = { role: 'reviewer', displayId: 'ABC-1' } as const
+
   it('omits account, model and effort when unset', () => {
-    const command = taskStartWorkerCommand({ agent: 'codex' })
+    const command = taskStartWorkerCommand({ agent: 'codex' }, tab)
     expect(command).not.toMatch(/--model|--effort|--account/)
   })
 
   it('orders account, model and effort', () => {
-    const command = taskStartWorkerCommand({
-      agent: 'claude',
-      accountId: 'acc',
-      model: 'opus',
-      effort: 'high'
-    })
+    const command = taskStartWorkerCommand(
+      { agent: 'claude', accountId: 'acc', model: 'opus', effort: 'high' },
+      tab
+    )
     expect(command).toContain(
       '--agent claude --account acc --model opus --effort high --worktree current'
     )
   })
 
   it('shell-quotes values with unsafe characters', () => {
-    const command = taskStartWorkerCommand({ agent: 'claude', model: "o p'us" })
+    const command = taskStartWorkerCommand({ agent: 'claude', model: "o p'us" }, tab)
     expect(command).toContain("--model 'o p'\\''us'")
+  })
+
+  it("titles the worker's tab after its role and the card", () => {
+    const prompt = buildTaskStartPrompt({
+      context,
+      roles: { planReviewer: { agent: 'codex' }, implementer: { agent: 'codex' } },
+      labels: {}
+    })
+    expect(prompt).toContain("--title 'Revisor do plano · ABC-1'")
+    expect(prompt).toContain("--title 'Implementador · ABC-1'")
+  })
+
+  it('keeps a display id with shell-special characters one quoted argument', () => {
+    const command = taskStartWorkerCommand(
+      { agent: 'codex' },
+      { role: 'qa', displayId: "#7'; rm -rf $HOME" }
+    )
+    expect(command).toContain("--title 'QA · #7'\\''; rm -rf $HOME' ")
   })
 })

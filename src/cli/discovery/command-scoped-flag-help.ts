@@ -111,7 +111,8 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     agent: '--agent <names>        Comma-separated install targets; default is detected agents'
   },
   'orchestration worker-start': {
-    account: '--account <id|email|label> Claude account from `orca account list`; not system'
+    account: '--account <id|email|label> Claude account from `orca account list`; not system',
+    title: "--title <text>         The worker's tab title (default worker-<task_id>)"
   },
   'orchestration run-show': {
     removed: '--removed              List the Tasks, Dispatches and workers removed from this Run',

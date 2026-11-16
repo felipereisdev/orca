@@ -94,6 +94,12 @@ export async function placeWorkerAgent(
   }
   const reopened = existing && (await args.followUp?.reopen?.(args.dispatchId))
   if (existing && reopened) {
+    if (!reopened.chat && !reopened.userOpened && args.params.title) {
+      // A resumed tab opens under the agent's own name; a reopened chat keeps the one it had.
+      await args.runtime.renameTerminal(reopened.handle, args.params.title).catch((error) => {
+        console.warn('[orchestration] naming a resumed worker tab failed', error)
+      })
+    }
     args.effects.push({
       kind: 'terminal',
       role: 'agent',
@@ -234,6 +240,7 @@ function workerSurfaceFactory(
         dispatchId: args.dispatchId,
         ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
         ...(args.params.claudeAccountId ? { claudeAccountId: args.params.claudeAccountId } : {}),
+        ...(args.params.title ? { title: args.params.title } : {}),
         effects: args.effects
       })
       onStructuredSession(session)
@@ -252,6 +259,7 @@ function workerSurfaceFactory(
         ...(args.launchPreferences ? { launchPreferences: args.launchPreferences } : {}),
         ...(args.params.claudeAccountId ? { claudeAccountId: args.params.claudeAccountId } : {}),
         taskId: args.taskId,
+        ...(args.params.title ? { title: args.params.title } : {}),
         effects: args.effects
       })
       onTerminalCreation(terminal)

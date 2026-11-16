@@ -98,6 +98,7 @@ export const ORCHESTRATION_WORKER_LAUNCH_HANDLER: Record<string, CommandHandler>
       model,
       effort,
       ...(claudeAccountId ? { claudeAccountId } : {}),
+      title: getOptionalStringFlag(flags, 'title')?.trim() || undefined,
       terminal,
       retryOf: getOptionalStringFlag(flags, 'retry-of'),
       timeoutMs: getOptionalPositiveIntegerValueFlag(flags, 'timeout-ms'),

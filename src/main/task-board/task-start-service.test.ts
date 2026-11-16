@@ -124,6 +124,7 @@ function serviceDeps(
     }),
     terminalIdentity: () => ({ ptyId: 'pty-1' }),
     closeOrchestrator: vi.fn(async () => {}),
+    renameOrchestrator: vi.fn(async () => {}),
     orchestration: {
       fence: () => {},
       liveWorkers: () => [],
@@ -338,5 +339,29 @@ describe('startTaskFromCard', () => {
       launch: 'published',
       note: 'prompt-unconfirmed'
     })
+  })
+
+  it("names the orchestrator's tab after the card", async () => {
+    const deps = serviceDeps(memoryStore())
+    expect((await startTaskFromCard({ ref: ref(7) }, deps)).ok).toBe(true)
+    expect(deps.renameOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({ handle: 'term-1' }),
+      'Orquestrador · #7'
+    )
+  })
+
+  it('starts the task even when naming its tab fails', async () => {
+    const store = memoryStore()
+    const deps = serviceDeps(store, {
+      renameOrchestrator: vi.fn(() => {
+        throw new Error('rename failed')
+      })
+    })
+    const result = await startTaskFromCard({ ref: ref(7) }, deps)
+    expect(result.ok).toBe(true)
+    expect(deps.renameOrchestrator).toHaveBeenCalled()
+    const run = store.getById(result.ok ? result.run.id : '')
+    expect(run).toMatchObject({ state: 'running', launch: 'published' })
+    expect(run?.note).toBeUndefined()
   })
 })

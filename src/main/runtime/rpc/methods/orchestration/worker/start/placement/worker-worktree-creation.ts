@@ -109,6 +109,7 @@ export async function createWorkerWorktree(args: {
     setup?: 'run' | 'skip' | 'inherit'
     from: string
     claudeAccountId?: string
+    title?: string
   }
   agent: TuiAgent
   /** Structured creation skips startup agent and TUI trust presets: no PTY menu can consume its first paste. Setup/default tabs still run, matching renderer chat creates. */
@@ -153,6 +154,7 @@ export async function createWorkerWorktree(args: {
           startupAgent: args.agent,
           startupLaunchSource: 'orchestration',
           startupSuppressUpdatePrompt: true,
+          ...(params.title ? { startupTitle: params.title } : {}),
           ...(args.launchPreferences ? { startupLaunchPreferences: args.launchPreferences } : {}),
           // The startup terminal's create prepares this account's login from the pinned id.
           ...(params.claudeAccountId

@@ -19,6 +19,20 @@ const AGENT_SECTION: readonly [string, TaskStartRole, string][] = [
   ['$qa', 'qa', 'QA']
 ]
 
+// The tab each role's agent opens in, named after the role and the card: fixed copy, never translated.
+const ROLE_TAB_NAMES: Record<TaskStartRole, string> = {
+  orchestrator: 'Orquestrador',
+  planner: 'Planner',
+  planReviewer: 'Revisor do plano',
+  implementer: 'Implementador',
+  reviewer: 'Revisor',
+  qa: 'QA'
+}
+
+export function taskStartTabTitle(role: TaskStartRole, displayId: string): string {
+  return `${ROLE_TAB_NAMES[role]} · ${displayId.replace(/\s+/g, ' ').trim()}`
+}
+
 export function taskStartRoleLabel(choice: TaskStartAgentChoice, accountLabel?: string): string {
   const agent = choice.agent.charAt(0).toUpperCase() + choice.agent.slice(1)
   const parts = [accountLabel ? `${agent} (${accountLabel})` : agent]
@@ -35,7 +49,10 @@ function shellQuote(value: string): string {
   return /^[A-Za-z0-9._:@/-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`
 }
 
-export function taskStartWorkerCommand(choice: TaskStartAgentChoice): string {
+export function taskStartWorkerCommand(
+  choice: TaskStartAgentChoice,
+  tab: { role: TaskStartRole; displayId: string }
+): string {
   const flags = [`--agent ${shellQuote(choice.agent)}`]
   if (choice.accountId) {
     flags.push(`--account ${shellQuote(choice.accountId)}`)
@@ -46,7 +63,8 @@ export function taskStartWorkerCommand(choice: TaskStartAgentChoice): string {
       flags.push(`--effort ${shellQuote(choice.effort)}`)
     }
   }
-  return `ORCA orchestration worker-start ${flags.join(' ')} --worktree current --spec-file <arquivo>`
+  const title = shellQuote(taskStartTabTitle(tab.role, tab.displayId))
+  return `ORCA orchestration worker-start ${flags.join(' ')} --worktree current --title ${title} --spec-file <arquivo>`
 }
 
 function renderFlow(labels: Partial<Record<TaskStartRole, string>>): string {
@@ -134,14 +152,21 @@ export function buildTaskStartPrompt(args: {
 }): string {
   const { context, roles, labels } = args
   const userPrompt = args.userPrompt?.trim()
+  const displayId = cardLine(context.displayId)
   const agentLines = AGENT_SECTION.flatMap(([token, role, purpose]) => {
     const choice = roles[role]
     if (!choice) {
       return []
     }
     const label = labels[role] ?? taskStartRoleLabel(choice)
-    return [`- ${token} (${purpose}): ${label}`, `  \`${taskStartWorkerCommand(choice)}\``]
+    const command = taskStartWorkerCommand(choice, { role, displayId })
+    return [`- ${token} (${purpose}): ${label}`, `  \`${command}\``]
   })
+  if (agentLines.length > 0) {
+    agentLines.push(
+      `Ao iniciar mais de um agente do mesmo papel (subtarefas), acrescente a subtarefa ao papel no \`--title\`: \`<Papel> n/m · ${displayId}\` (ex.: \`Implementador 3/7 · ${displayId}\`).`
+    )
+  }
   const roleLabels = Object.fromEntries(
     FLOW_TOKENS.map(([, role]) => [
       role,
@@ -149,7 +174,7 @@ export function buildTaskStartPrompt(args: {
     ])
   )
   return [
-    `# Tarefa ${cardLine(context.displayId)}: ${cardLine(context.title)}`,
+    `# Tarefa ${displayId}: ${cardLine(context.title)}`,
     `Origem: ${context.provider} — ${cardLine(context.url)}`,
     '',
     renderCardData(context),

@@ -1,6 +1,8 @@
 import { getRepoSshConnectionId } from '../../shared/execution-host'
+import type { TaskStartOrchestratorRef } from '../../shared/task-board/task-start-run'
 import { WorktreeCreate } from '../../shared/rpc-contract/worktree-create-params'
 import { createWorktreeWithStartupAgent } from '../agent-launch/startup-agent-worktree-create'
+import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { resolveRpcWorkspaceCreatorProvenance } from '../runtime/rpc/callers/workspace-creator-context'
@@ -116,6 +118,25 @@ export function createTaskStartServiceDeps(
       paneKey: runtime.getTerminalPaneKey(handle) ?? undefined,
       ptyId: runtime.getTerminalPtyIdForHandle(handle) ?? undefined
     }),
-    closeOrchestrator: (ref) => closeTaskStartOrchestrator(runtime, ref)
+    closeOrchestrator: (ref) => closeTaskStartOrchestrator(runtime, ref),
+    renameOrchestrator: (ref, title) => renameTaskStartOrchestrator(runtime, ref, title)
+  }
+}
+
+/** Names the orchestrator the way the user renames its tab: the terminal, or the chat's own name. */
+async function renameTaskStartOrchestrator(
+  runtime: OrcaRuntimeService,
+  ref: TaskStartOrchestratorRef,
+  title: string
+): Promise<void> {
+  if (ref.surface === 'terminal') {
+    if (ref.handle) {
+      await runtime.renameTerminal(ref.handle, title)
+    }
+    return
+  }
+  const host = getStructuredAgentSessionHost()
+  if (host && ref.sessionId) {
+    await host.setUserConversationName(ref.sessionId, title, 'rename')
   }
 }
