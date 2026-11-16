@@ -25,7 +25,8 @@ function withoutDescription(source: TaskBoardCardSource): TaskBoardCardSource {
       const { description: _description, descriptionImageUrls: _images, ...item } = source.item
       return { provider: 'linear', item }
     }
-    default:
+    case 'github':
+    case 'gitlab':
       return source
   }
 }
