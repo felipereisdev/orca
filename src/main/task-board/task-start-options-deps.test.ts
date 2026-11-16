@@ -33,9 +33,11 @@ describe('createTaskStartOptionsDeps modelCatalog', () => {
     // An earlier run (the agent's settings or a picker) listed and saved the catalog.
     await catalogService(store).read({ agent: 'opencode', waitForListing: true })
     const restarted = catalogService(store)
-    const deps = createTaskStartOptionsDeps({
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: modelCatalog reads only structuredAgentModelCatalog from the runtime.
+    const runtime = {
       structuredAgentModelCatalog: async () => restarted
-    } as unknown as TaskStartOptionsRuntime)
+    } as unknown as TaskStartOptionsRuntime
+    const deps = createTaskStartOptionsDeps(runtime)
 
     expect(await deps.modelCatalog('opencode')).toMatchObject({
       origin: 'probe',
