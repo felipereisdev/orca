@@ -22271,6 +22271,7 @@
       "description": "Linear cards from this project start in this repository.",
       "none": "No default project",
       "search": "Search Linear projects",
+      "searching": "Searching…",
       "empty": "No projects found.",
       "connect": "Connect Linear in Integrations to choose a project.",
       "keywordLinear": "linear",

@@ -5,8 +5,15 @@ import type { LinearProjectReference } from '../../../../../shared/linear/linear
 import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { taskSourceRuntimeTarget } from '@/lib/work-items/task-source-runtime-target'
 import { useAppStore } from '@/store/index'
-import { useLinearProjectInventory } from '../../use-linear-project-inventory'
-import { WorkItemScopePicker, type WorkItemScopeOption } from '../../work-item-scope-picker'
+import {
+  useLinearProjectInventory,
+  useLinearProjectSearch
+} from '../../use-linear-project-inventory'
+import {
+  WorkItemScopePicker,
+  type WorkItemScopeOption,
+  type WorkItemScopeSearch
+} from '../../work-item-scope-picker'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import type { SettingsSearchEntry } from '../search/settings-search'
@@ -52,6 +59,7 @@ function RepositoryLinearProjectView({
   loading,
   saving,
   error,
+  search,
   onChange,
   forceVisible
 }: {
@@ -61,6 +69,7 @@ function RepositoryLinearProjectView({
   loading: boolean
   saving: boolean
   error: string | null
+  search: WorkItemScopeSearch
   onChange: (project: LinearProjectReference | null) => void
   forceVisible?: boolean
 }): React.JSX.Element {
@@ -99,6 +108,7 @@ function RepositoryLinearProjectView({
         )}
         emptyLabel={t('components.RepositoryLinearProjectSection.empty', 'No projects found.')}
         disabled={loading || saving}
+        search={search}
       />
       {!loading && !connected && !error ? (
         <p className="text-xs text-muted-foreground">
@@ -133,6 +143,8 @@ export function RepositoryLinearProjectSection({
   const hostId = getRepoExecutionHostId(repo)
   const source = useMemo(() => taskSourceRuntimeTarget({ hostId }), [hostId])
   const inventory = useLinearProjectInventory(source, true)
+  const [query, setQuery] = useState('')
+  const found = useLinearProjectSearch(source, query)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const applyProject = async (project: LinearProjectReference | null) => {
@@ -171,11 +183,17 @@ export function RepositoryLinearProjectSection({
   return (
     <RepositoryLinearProjectView
       repo={repo}
-      projects={inventory.projects}
+      projects={found.projects ?? inventory.projects}
       connected={inventory.connected}
       loading={inventory.loading}
       saving={saving}
-      error={error ?? inventory.error}
+      error={error ?? found.error ?? inventory.error}
+      search={{
+        query,
+        onQueryChange: setQuery,
+        loading: found.loading,
+        loadingLabel: t('components.RepositoryLinearProjectSection.searching', 'Searching…')
+      }}
       onChange={(project) => void applyProject(project)}
       forceVisible={forceVisible}
     />

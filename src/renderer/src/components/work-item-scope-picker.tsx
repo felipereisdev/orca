@@ -21,6 +21,14 @@ export type WorkItemScopeOption<T> = {
   description?: string
 }
 
+/** Options come from the caller's own (server) search instead of local filtering. */
+export type WorkItemScopeSearch = {
+  query: string
+  onQueryChange: (query: string) => void
+  loading: boolean
+  loadingLabel: string
+}
+
 export function WorkItemScopePicker<T>({
   options,
   selectedKey,
@@ -32,7 +40,8 @@ export function WorkItemScopePicker<T>({
   emptyLabel,
   disabled,
   size = 'default',
-  returnFocusRef
+  returnFocusRef,
+  search
 }: {
   options: readonly WorkItemScopeOption<T>[]
   selectedKey: string | null
@@ -45,8 +54,15 @@ export function WorkItemScopePicker<T>({
   disabled?: boolean
   size?: 'default' | 'xs'
   returnFocusRef?: React.RefObject<HTMLElement | null>
+  search?: WorkItemScopeSearch
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpenState] = useState(false)
+  const setOpen = (next: boolean) => {
+    setOpenState(next)
+    if (!next) {
+      search?.onQueryChange('')
+    }
+  }
   const returnFocusOnCloseRef = useRef(false)
   const select = (value: T | null) => {
     returnFocusOnCloseRef.current = true
@@ -90,15 +106,22 @@ export function WorkItemScopePicker<T>({
           returnFocusRef.current.focus({ preventScroll: true })
         }}
       >
-        <Command density={size === 'xs' ? 'menu' : 'default'}>
-          <CommandInput placeholder={searchPlaceholder} />
+        <Command density={size === 'xs' ? 'menu' : 'default'} shouldFilter={!search}>
+          <CommandInput
+            placeholder={searchPlaceholder}
+            {...(search ? { value: search.query, onValueChange: search.onQueryChange } : {})}
+          />
           <CommandList>
-            <CommandEmpty>{emptyLabel}</CommandEmpty>
+            <CommandEmpty>
+              {search?.loading && options.length === 0 ? search.loadingLabel : emptyLabel}
+            </CommandEmpty>
             <CommandGroup>
-              <CommandItem selection="palette" value={allLabel} onSelect={() => select(null)}>
-                <span className="flex-1">{allLabel}</span>
-                {selectedKey === null ? <Check className="size-4" /> : null}
-              </CommandItem>
+              {search?.query.trim() ? null : (
+                <CommandItem selection="palette" value={allLabel} onSelect={() => select(null)}>
+                  <span className="flex-1">{allLabel}</span>
+                  {selectedKey === null ? <Check className="size-4" /> : null}
+                </CommandItem>
+              )}
               {options.map((option) => (
                 <CommandItem
                   key={option.key}

@@ -83,6 +83,20 @@ describe('resolveTaskStartRepoForParams for Linear cards', () => {
     )
     expect(resolved).toEqual({ repoId: null, candidates: [] })
   })
+  it('leaves the card unresolved when the Linear read fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const repos = [repo('web', { defaultLinearProject: linearProject })]
+    const resolved = await resolveTaskStartRepoForParams(
+      { ref: linearRef },
+      repos,
+      optionsDeps(repos[0], {
+        linearIssueProject: async () => {
+          throw new Error('Linear is unreachable')
+        }
+      })
+    )
+    expect(resolved).toEqual({ repoId: null, candidates: [] })
+  })
 })
 
 const account = {

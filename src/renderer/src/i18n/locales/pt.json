@@ -22443,6 +22443,7 @@
       "description": "Cards Linear deste projeto iniciam neste repositório.",
       "none": "Nenhum projeto padrão",
       "search": "Buscar projetos do Linear",
+      "searching": "Buscando…",
       "empty": "Nenhum projeto encontrado.",
       "connect": "Conecte o Linear em Integrações para escolher um projeto.",
       "keywordLinear": "linear",

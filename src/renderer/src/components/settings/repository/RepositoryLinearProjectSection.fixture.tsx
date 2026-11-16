@@ -8,6 +8,13 @@ const projects: LinearProjectSummary[] = [
   { id: 'proj-web', name: 'Web app', workspaceId: 'ws-1', workspaceName: 'Acme' },
   { id: 'proj-api', name: 'Public API', workspaceId: 'ws-1', workspaceName: 'Acme' }
 ]
+// Older than the recent page: only the server search finds it.
+const archived: LinearProjectSummary = {
+  id: 'proj-billing',
+  name: 'Billing migration',
+  workspaceId: 'ws-1',
+  workspaceName: 'Acme'
+}
 
 function repo(overrides: Partial<Repo> = {}): Repo {
   return {
@@ -30,7 +37,15 @@ function fixture(target: Repo, connected: boolean) {
         linear: {
           ...window.api.linear,
           status: async () => ({ connected, viewer: null }),
-          listProjects: async () => ({ items: connected ? projects : [] })
+          listProjects: async (args) => ({
+            items: !connected
+              ? []
+              : args?.query
+                ? [...projects, archived].filter((project) =>
+                    project.name.toLowerCase().includes(args.query!.toLowerCase())
+                  )
+                : projects
+          })
         }
       }
     },
@@ -55,6 +70,23 @@ export const connectedOpen = defineFixture({
     await new Promise((resolve) => setTimeout(resolve, 200))
     frame.querySelector('button')?.click()
     await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+})
+
+export const connectedServerSearch = defineFixture({
+  ...fixture(repo(), true),
+  interact: async (frame) => {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    frame.querySelector('button')?.click()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const input = document.querySelector<HTMLInputElement>('[cmdk-input]')
+    if (input) {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setValue?.call(input, 'billing')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    // Past the search debounce.
+    await new Promise((resolve) => setTimeout(resolve, 500))
   }
 })
 
