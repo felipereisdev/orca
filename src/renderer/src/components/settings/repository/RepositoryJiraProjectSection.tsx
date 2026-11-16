@@ -7,7 +7,32 @@ import { useAppStore } from '@/store/index'
 import { useJiraProjectInventory } from '../../use-jira-project-inventory'
 import { JiraProjectPicker } from '../../jira-project-picker'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
-import { useTranslate } from '@/i18n/use-translate'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
+import type { SettingsSearchEntry } from '../search/settings-search'
+import { searchKeywordTranslator } from '../search/settings-search-keywords'
+
+export function getRepositoryJiraProjectSearchEntry(repo: Repo, t: Translate): SettingsSearchEntry {
+  const translateSearchKeyword = searchKeywordTranslator(t)
+  return {
+    title: t('components.RepositoryJiraProjectSection.title', 'Default Jira project'),
+    description: t(
+      'components.RepositoryJiraProjectSection.description',
+      'Default the Jira issue picker and Tasks list to this project. You can change it for each worktree.'
+    ),
+    keywords: [
+      repo.displayName,
+      ...translateSearchKeyword('components.RepositoryJiraProjectSection.keywordJira', 'jira'),
+      ...translateSearchKeyword(
+        'components.RepositoryJiraProjectSection.keywordDefaultProject',
+        'default project'
+      ),
+      ...translateSearchKeyword(
+        'components.RepositoryJiraProjectSection.keywordIssuePicker',
+        'issue picker'
+      )
+    ]
+  }
+}
 
 export function RepositoryJiraProjectSection({
   repo,

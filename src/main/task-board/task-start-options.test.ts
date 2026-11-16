@@ -4,6 +4,7 @@ import type { Repo } from '../../shared/repo-types'
 import {
   getTaskStartOptions,
   resolveTaskStartRepo,
+  resolveTaskStartRepoForParams,
   type TaskStartOptionsDeps
 } from './task-start-options'
 
@@ -22,14 +23,6 @@ describe('resolveTaskStartRepo', () => {
     expect(resolved).toEqual({ repoId: 'web' })
   })
 
-  it('leaves a Linear card unresolved', () => {
-    const resolved = resolveTaskStartRepo(
-      { ref: { provider: 'linear', workspaceId: null, id: 'L-1', teamId: 't' } },
-      [repo('web')]
-    )
-    expect(resolved).toEqual({ repoId: null, candidates: [] })
-  })
-
   it('leaves a Jira card unresolved when two repos map its project', () => {
     const resolved = resolveTaskStartRepo(
       {
@@ -43,6 +36,52 @@ describe('resolveTaskStartRepo', () => {
       ]
     )
     expect(resolved).toEqual({ repoId: null, candidates: ['api', 'web'] })
+  })
+})
+
+const linearRef = { provider: 'linear' as const, workspaceId: 'ws-1', id: 'L-1', teamId: 't' }
+const linearProject = { id: 'proj-1', name: 'App', workspaceId: 'ws-1' }
+
+describe('resolveTaskStartRepoForParams for Linear cards', () => {
+  it('resolves to the one repo whose default project, in the same workspace, is the issue’s', async () => {
+    const repos = [
+      repo('api', { defaultLinearProject: { ...linearProject, id: 'proj-2' } }),
+      repo('other-ws', { defaultLinearProject: { ...linearProject, workspaceId: 'ws-2' } }),
+      repo('web', { defaultLinearProject: linearProject })
+    ]
+    const resolved = await resolveTaskStartRepoForParams(
+      { ref: linearRef },
+      repos,
+      optionsDeps(repos[0], {
+        linearIssueProject: async () => ({ id: 'proj-1', workspaceId: 'ws-1' })
+      })
+    )
+    expect(resolved).toEqual({ repoId: 'web' })
+  })
+
+  it('leaves the repo to pick, among both, when two repos map the project', async () => {
+    const repos = [
+      repo('api', { defaultLinearProject: linearProject }),
+      repo('web', { defaultLinearProject: { ...linearProject, workspaceId: null } })
+    ]
+    const resolved = await resolveTaskStartRepoForParams(
+      { ref: linearRef },
+      repos,
+      optionsDeps(repos[0], {
+        linearIssueProject: async () => ({ id: 'proj-1', workspaceId: 'ws-1' })
+      })
+    )
+    expect(resolved).toEqual({ repoId: null, candidates: ['api', 'web'] })
+  })
+
+  it('leaves the card unresolved when its issue has no project', async () => {
+    const repos = [repo('web', { defaultLinearProject: linearProject })]
+    const resolved = await resolveTaskStartRepoForParams(
+      { ref: linearRef },
+      repos,
+      optionsDeps(repos[0], { linearIssueProject: async () => null })
+    )
+    expect(resolved).toEqual({ repoId: null, candidates: [] })
   })
 })
 
@@ -63,6 +102,7 @@ function optionsDeps(
     repos: () => [target],
     settings: () => ({ taskStart: { roles: {} }, defaultTuiAgent: 'claude' }),
     jiraIssue: async () => null,
+    linearIssueProject: async () => null,
     baseRefDefault: async () => 'origin/main',
     launchHost: async () => ({
       agents: ['claude'],

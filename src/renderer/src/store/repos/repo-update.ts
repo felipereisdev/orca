@@ -6,6 +6,7 @@ import { sanitizeRepoIcon } from '../../../../shared/repo-icon'
 import { normalizeRepoBadgeColor } from '../../../../shared/repo-badge-color'
 import { normalizeGhAccountBinding } from '../../../../shared/github/accounts/account-binding'
 import { normalizeJiraProjectReference } from '../../../../shared/jira/jira-project-reference'
+import { normalizeLinearProjectReference } from '../../../../shared/linear/linear-project-reference'
 import { sanitizeAgentWorkspaceTrustDecision } from '../../../../shared/agent-launch/permissions/agent-workspace-trust-decision'
 import { findRepoForHost, repoMatchesHostIdentity } from './repo-host-identity'
 import { getRepoHostIdentityForParts } from '../../../../shared/repo-host-identity'
@@ -28,6 +29,14 @@ export function sanitizeRepoUpdate(updates: RepoUpdate): RepoUpdate {
       delete sanitized.defaultJiraProject
     } else {
       sanitized.defaultJiraProject = reference
+    }
+  }
+  if ('defaultLinearProject' in sanitized) {
+    const reference = normalizeLinearProjectReference(sanitized.defaultLinearProject)
+    if (reference === undefined) {
+      delete sanitized.defaultLinearProject
+    } else {
+      sanitized.defaultLinearProject = reference
     }
   }
   if ('badgeColor' in sanitized) {

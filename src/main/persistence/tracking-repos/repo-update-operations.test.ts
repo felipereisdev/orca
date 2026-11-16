@@ -60,3 +60,37 @@ describe('updateRepo taskStart', () => {
     expect(state.repos[0].taskStart).toEqual({ workspaceMode: 'primary' })
   })
 })
+
+describe('updateRepo defaultLinearProject', () => {
+  it('persists a normalized project and clears it on null', () => {
+    const { operations, state } = makeOperations({
+      id: 'repo-1',
+      path: '/repos/example',
+      displayName: 'Example',
+      badgeColor: '#000000',
+      addedAt: 0,
+      kind: 'git'
+    })
+
+    operations.updateRepo(
+      { id: 'repo-1' },
+      {
+        defaultLinearProject: {
+          id: ' proj-1 ',
+          name: ' App ',
+          workspaceId: ' ws-1 ',
+          // @ts-expect-error -- untyped RPC input can carry extra project fields
+          url: 'https://linear.app/x'
+        }
+      }
+    )
+    expect(state.repos[0].defaultLinearProject).toEqual({
+      id: 'proj-1',
+      name: 'App',
+      workspaceId: 'ws-1'
+    })
+
+    operations.updateRepo({ id: 'repo-1' }, { defaultLinearProject: null })
+    expect(state.repos[0].defaultLinearProject ?? null).toBeNull()
+  })
+})

@@ -22264,6 +22264,18 @@
       "keywordDefaultProject": "default project",
       "keywordIssuePicker": "issue picker"
     },
+    "RepositoryLinearProjectSection": {
+      "saveFailed": "Could not save the default Linear project.",
+      "runtimeUpdate": "Update this runtime to save a default Linear project.",
+      "title": "Default Linear project",
+      "description": "Linear cards from this project start in this repository.",
+      "none": "No default project",
+      "search": "Search Linear projects",
+      "empty": "No projects found.",
+      "connect": "Connect Linear in Integrations to choose a project.",
+      "keywordLinear": "linear",
+      "keywordStartTask": "start task"
+    },
     "managed-runtime": {
       "cancelled": "Installation cancelled.",
       "cancelling": "Cancelling…",

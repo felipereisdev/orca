@@ -69,6 +69,7 @@ function options(overrides: Partial<TaskStartOptionsDeps> = {}): TaskStartOption
     repos: () => [REPO],
     settings: () => ({ taskStart: { roles: {} }, defaultTuiAgent: 'claude' }),
     jiraIssue: async () => null,
+    linearIssueProject: async () => null,
     baseRefDefault: async () => 'origin/main',
     launchHost: async () => ({
       agents: ['claude'],

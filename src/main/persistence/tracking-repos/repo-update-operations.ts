@@ -106,6 +106,7 @@ export class RepoUpdatePersistenceOperations {
         | 'dictationTerms'
         | 'issueSourcePreference'
         | 'defaultJiraProject'
+        | 'defaultLinearProject'
         | 'forkSyncMode'
         | 'agentWorkspaceTrust'
         | 'externalWorktreeVisibilityPromptDismissedAt'

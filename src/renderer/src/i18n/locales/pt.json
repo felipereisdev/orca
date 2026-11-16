@@ -22436,6 +22436,18 @@
       "keywordDefaultProject": "projeto padrão",
       "keywordIssuePicker": "seletor de issues"
     },
+    "RepositoryLinearProjectSection": {
+      "saveFailed": "Não foi possível salvar o projeto Linear padrão.",
+      "runtimeUpdate": "Atualize este ambiente de execução para salvar um projeto Linear padrão.",
+      "title": "Projeto Linear padrão",
+      "description": "Cards Linear deste projeto iniciam neste repositório.",
+      "none": "Nenhum projeto padrão",
+      "search": "Buscar projetos do Linear",
+      "empty": "Nenhum projeto encontrado.",
+      "connect": "Conecte o Linear em Integrações para escolher um projeto.",
+      "keywordLinear": "linear",
+      "keywordStartTask": "iniciar tarefa"
+    },
     "managed-runtime": {
       "cancelled": "Instalação cancelada.",
       "cancelling": "Cancelando…",

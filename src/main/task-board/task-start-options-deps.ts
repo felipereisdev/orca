@@ -5,6 +5,7 @@ import { orderAgentLaunchPickerAgents } from '../../shared/agent-launch/picker/a
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import { getClaudeProfileRouter } from '../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { getIssue as getJiraIssue } from '../jira/jira-issue-read'
+import { getIssue as getLinearIssue } from '../linear/issues/linear-issue-lookups'
 import { agentCommandOverrideDetectionOptions } from '../preflight/installed-agent-detection'
 import { detectAgentsOnHost } from '../preflight/workspace-agent-detection'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
@@ -33,6 +34,12 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
       return { taskStart: settings.taskStart, defaultTuiAgent: settings.defaultTuiAgent }
     },
     jiraIssue: (key, siteId) => getJiraIssue(key, siteId, true),
+    linearIssueProject: async (id, workspaceId) => {
+      const issue = await getLinearIssue(id, workspaceId)
+      return issue?.project
+        ? { id: issue.project.id, workspaceId: issue.workspaceId ?? workspaceId }
+        : null
+    },
     baseRefDefault: async (repo) =>
       (await runtime.getRepoBaseRefDefault(`id:${repo.id}`)).defaultBaseRef,
     launchHost: async (repo) => {

@@ -9,9 +9,14 @@ import {
   filterClaudeAccountsForLaunchTarget,
   type ClaudeAccountLaunchTarget
 } from '../../shared/claude-account-launch-target'
-import { getRepoSshConnectionId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoSshConnectionId,
+  LOCAL_EXECUTION_HOST_ID
+} from '../../shared/execution-host'
 import { findJiraIssueRepoCandidates } from '../../shared/jira/jira-project-reference'
 import type { JiraIssue } from '../../shared/jira/jira-types'
+import { findLinearProjectRepoCandidates } from '../../shared/linear/linear-project-reference'
 import type { ClaudeManagedAccountSummary } from '../../shared/managed-account-types'
 import type { Repo } from '../../shared/repo-types'
 import type {
@@ -28,12 +33,17 @@ import {
   type TaskStartAgentChoice,
   type TaskStartRole
 } from '../../shared/task-board/task-start-settings'
+import { isTaskBoardHostExecuted } from './task-board-host-repos'
 
 export type TaskStartRepoCard = {
   ref: TaskBoardCardRef
   /** Jira only: the issue's project, which `defaultJiraProject` maps to a repo. */
   jiraIssue?: Pick<JiraIssue, 'project' | 'siteId'> | null
+  /** Linear only: the issue's project, which `defaultLinearProject` maps to a repo. */
+  linearProject?: TaskStartLinearIssueProject | null
 }
+
+export type TaskStartLinearIssueProject = { id: string; workspaceId: string | null }
 
 export type TaskStartRepoResolution = { repoId: string } | { repoId: null; candidates: string[] }
 
@@ -60,10 +70,21 @@ export type TaskStartOptionsDeps = TaskStartAgentCatalogDeps & {
     key: string,
     siteId: string | null
   ): Promise<Pick<JiraIssue, 'project' | 'siteId'> | null>
+  /** The Linear issue's project; null when the issue has none. */
+  linearIssueProject(
+    id: string,
+    workspaceId: string | null
+  ): Promise<TaskStartLinearIssueProject | null>
   baseRefDefault(repo: Repo): Promise<string | null>
 }
 
-/** GitHub/GitLab cards name their repo; Jira maps through `defaultJiraProject`; Linear has no mapping. */
+function repoResolution(candidates: readonly Repo[]): TaskStartRepoResolution {
+  return candidates.length === 1
+    ? { repoId: candidates[0].id }
+    : { repoId: null, candidates: candidates.map((repo) => repo.id) }
+}
+
+/** GitHub/GitLab cards name their repo; Jira and Linear map through the repo's default project. */
 export function resolveTaskStartRepo(
   card: TaskStartRepoCard,
   repos: readonly Repo[]
@@ -76,10 +97,14 @@ export function resolveTaskStartRepo(
   }
   if (ref.provider === 'jira' && card.jiraIssue) {
     // Host repos only: SSH repos map to this host's Jira, like local ones.
-    const candidates = findJiraIssueRepoCandidates(repos, card.jiraIssue, LOCAL_EXECUTION_HOST_ID)
-    return candidates.length === 1
-      ? { repoId: candidates[0].id }
-      : { repoId: null, candidates: candidates.map((repo) => repo.id) }
+    return repoResolution(
+      findJiraIssueRepoCandidates(repos, card.jiraIssue, LOCAL_EXECUTION_HOST_ID)
+    )
+  }
+  if (ref.provider === 'linear' && card.linearProject) {
+    // Host repos only, as for Jira: SSH repos use this host's Linear.
+    const hostRepos = repos.filter((repo) => isTaskBoardHostExecuted(getRepoExecutionHostId(repo)))
+    return repoResolution(findLinearProjectRepoCandidates(hostRepos, card.linearProject))
   }
   return { repoId: null, candidates: [] }
 }
@@ -169,7 +194,14 @@ export async function resolveTaskStartRepoForParams(
   // An unreadable issue leaves the repo for the user to pick.
   const jiraIssue =
     ref.provider === 'jira' ? await deps.jiraIssue(ref.key, ref.siteId).catch(() => null) : null
-  return resolveTaskStartRepo({ ref, jiraIssue }, repos)
+  const linearProject =
+    ref.provider === 'linear'
+      ? await deps.linearIssueProject(ref.id, ref.workspaceId).catch((error: unknown) => {
+          console.warn('[task-start] Linear issue read failed:', error)
+          return null
+        })
+      : null
+  return resolveTaskStartRepo({ ref, jiraIssue, linearProject }, repos)
 }
 
 /** Unknown agent/account, model or effort; an empty model list (unreadable catalog) checks only the agent. */
