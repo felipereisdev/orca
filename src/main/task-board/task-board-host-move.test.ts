@@ -7,6 +7,7 @@ import type {
 } from '../../shared/jira/jira-types'
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
+import { createTaskBoardMoveHolds } from './task-board-move-holds'
 import { decideJiraMove, moveTaskBoardCard, type TaskBoardMoveDeps } from './task-board-host-move'
 
 const inProgress: JiraStatus = {
@@ -144,6 +145,7 @@ function jiraHost(transitions: JiraTransition[], options: { rereadFails?: boolea
       ]
     },
     caches: createTaskBoardEnrichCaches(),
+    moveHolds: createTaskBoardMoveHolds(),
     repo: () => null,
     getLocalGitArgs: () => [],
     jiraSites: () => [{ id: 'site-a', accountId: 'me' }],

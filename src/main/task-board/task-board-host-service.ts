@@ -31,7 +31,7 @@ import {
   type TaskBoardHostDeps,
   type TaskBoardListOptions
 } from './task-board-host-list'
-import type { TaskBoardListFreshness } from './task-board-list-freshness'
+import type { TaskBoardMoveHolds } from './task-board-move-holds'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
 import { summarizeTaskStartRun } from '../../shared/task-board/task-start-run'
 import { reconcileTaskStartRuns, type TaskStartLifecycleDeps } from './task-start-lifecycle'
@@ -54,7 +54,7 @@ export type TaskBoardServiceDeps = TaskBoardEnrichDeps &
   TaskBoardCommentWriteDeps & {
     host: TaskBoardHostDeps
     taskStart: TaskStartLifecycleDeps
-    listFreshness: TaskBoardListFreshness
+    moveHolds: TaskBoardMoveHolds
     readSeen(): TaskBoardSeenComments
     writeSeen(next: TaskBoardSeenComments): void
   }
@@ -67,13 +67,17 @@ export async function listTaskBoard(
   await reconcileTaskStartRuns(deps.taskStart).catch((error: unknown) => {
     console.warn('[task-board] reconciling task-start runs failed', error)
   })
-  // Only provider lists go fresh after a host move; enrichment keeps its own caches.
-  const list = await buildTaskBoardList(deps.host, {
-    ...options,
-    fresh: deps.listFreshness.fresh(options.fresh)
+  const list = await buildTaskBoardList(deps.host, options)
+  const { taskBoard } = deps.host.settings()
+  // A confirmed move stays in its column while provider lists still show where it came from.
+  const placed = list.cards.map((card) => {
+    const columnId = deps.moveHolds.place(card.refKey, card.columnId)
+    return columnId === card.columnId
+      ? card
+      : (placeTaskBoardCard(card, list.columns, taskBoard, columnId) ?? card)
   })
-  const cards = await enrichTaskBoardCards(list.cards, {
-    todoColumnId: resolveCategoryColumnId('todo', list.columns, deps.host.settings().taskBoard),
+  const cards = await enrichTaskBoardCards(placed, {
+    todoColumnId: resolveCategoryColumnId('todo', list.columns, taskBoard),
     doneColumnId: list.doneColumnId,
     fresh: options.fresh,
     seen: deps.readSeen(),

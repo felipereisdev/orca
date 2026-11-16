@@ -50,7 +50,7 @@ import {
 } from './task-start-lifecycle-deps'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
 import { findTaskBoardHostRepo, isTaskBoardHostExecuted } from './task-board-host-repos'
-import { createTaskBoardListFreshness } from './task-board-list-freshness'
+import { createTaskBoardMoveHolds } from './task-board-move-holds'
 import { createTaskBoardHostSources } from './task-board-host-sources'
 import type { TaskBoardMoveWriteDeps } from './task-board-host-move'
 import type { TaskBoardServiceDeps } from './task-board-host-service'
@@ -81,7 +81,7 @@ export type TaskBoardRuntime = TaskStartLifecycleRuntime & {
 
 // One per host process: listings from every client share the raw progress/comments.
 const caches = createTaskBoardEnrichCaches()
-const listFreshness = createTaskBoardListFreshness()
+const moveHolds = createTaskBoardMoveHolds()
 
 function defaultLinearWorkspaceId(): string {
   const workspaceId = getLinearClients(null)[0]?.workspace.id
@@ -146,7 +146,7 @@ export function createTaskBoardServiceDeps(
     },
     taskStart: createTaskStartLifecycleDeps(runtime),
     caches,
-    listFreshness,
+    moveHolds,
     repo,
     getLocalGitArgs,
     jiraSites: () => getJiraStatus().sites ?? [],

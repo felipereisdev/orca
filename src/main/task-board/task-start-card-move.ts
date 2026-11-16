@@ -2,18 +2,16 @@ import { resolveTaskBoardColumnId } from '../../shared/task-board/task-board-col
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
 import { readTaskBoardCard } from './task-board-host-card'
 import { moveTaskBoardCard, type TaskBoardMoveDeps } from './task-board-host-move'
-import type { TaskBoardListFreshness } from './task-board-list-freshness'
 
-/** `kept`: already there or past it, or no such column; `skipped`: the move needs the user. */
+/** `kept`: already there or past it, no such column, or the run ended; `skipped`: the move needs the user. */
 export type TaskStartCardMove = 'moved' | 'kept' | 'skipped'
 
-export type TaskStartCardMoveDeps = TaskBoardMoveDeps & { listFreshness: TaskBoardListFreshness }
-
-/** Moves a started card forward to `columnId` the way a drag does; never backwards. */
+/** Moves a started card forward to `columnId` the way a drag does; never backwards, never for an ended run. */
 export async function moveStartedTaskBoardCard(
   ref: TaskBoardCardRef,
   columnId: string,
-  deps: TaskStartCardMoveDeps
+  runAlive: () => boolean,
+  deps: TaskBoardMoveDeps
 ): Promise<TaskStartCardMove> {
   const columns = deps.host.statuses()
   const target = columns.findIndex((column) => column.id === columnId)
@@ -23,13 +21,12 @@ export async function moveStartedTaskBoardCard(
   const card = await readTaskBoardCard(ref, deps)
   const current = resolveTaskBoardColumnId(card, columns, deps.host.settings().taskBoard)
   const index = columns.findIndex((column) => column.id === current)
-  if (index === -1 || index >= target) {
+  // A stop during the read leaves the card where it was.
+  if (index === -1 || index >= target || !runAlive()) {
     return 'kept'
   }
   const result = await moveTaskBoardCard({ ref, targetColumnId: columnId }, deps)
   if (result.status === 'moved') {
-    // A drag's client lists fresh after its move; no client asked for this one.
-    deps.listFreshness.markMoved()
     return 'moved'
   }
   if (result.status === 'blocked' && result.reason === 'same-column') {

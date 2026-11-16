@@ -89,7 +89,7 @@ export function createTaskStartServiceDeps(
       return main.id
     },
     gitStatus: (selector) => runtime.getRuntimeGitStatus(selector),
-    moveCard: (ref, columnId) => moveStartedTaskBoardCard(ref, columnId, board),
+    moveCard: (ref, columnId, runAlive) => moveStartedTaskBoardCard(ref, columnId, runAlive, board),
     cardMoved: (cardKey) =>
       runtime.notifyTaskBoardRunsChanged({ type: 'taskBoardRunsChanged', cardKeys: [cardKey] }),
     ...createTaskStartBranchDeps(runtime, context),

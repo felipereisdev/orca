@@ -549,7 +549,11 @@ describe('startTaskFromCard', () => {
     const deps = serviceDeps(store)
     const result = await startTaskFromCard({ ref: ref(7) }, deps)
     expect(result.ok).toBe(true)
-    expect(deps.moveCard).toHaveBeenCalledExactlyOnceWith(ref(7), 'in-progress')
+    expect(deps.moveCard).toHaveBeenCalledExactlyOnceWith(
+      ref(7),
+      'in-progress',
+      expect.any(Function)
+    )
     expect(deps.cardMoved).toHaveBeenCalledExactlyOnceWith('github:local:web:7')
     expect(store.getById(result.ok ? result.run.id : '')?.note).toBeUndefined()
   })
@@ -625,5 +629,23 @@ describe('startTaskFromCard', () => {
       error: 'cancelled'
     })
     expect(cancelled.moveCard).not.toHaveBeenCalled()
+  })
+
+  it('runs one move per card at a time when a stopped card starts again', async () => {
+    const store = memoryStore()
+    const first = deferred<'moved'>()
+    const moveCard = vi
+      .fn<TaskStartServiceDeps['moveCard']>()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue('kept')
+    const deps = serviceDeps(store, { moveCard, moveWaitMs: 0 })
+    const started = await startTaskFromCard({ ref: ref(7) }, deps)
+    store.transition(started.ok ? started.run.id : '', ['running', 'waiting'], {
+      state: 'stopped'
+    })
+    expect((await startTaskFromCard({ ref: ref(7) }, deps)).ok).toBe(true)
+    expect(moveCard).toHaveBeenCalledTimes(1)
+    first.resolve('moved')
+    await vi.waitFor(() => expect(moveCard).toHaveBeenCalledTimes(2))
   })
 })

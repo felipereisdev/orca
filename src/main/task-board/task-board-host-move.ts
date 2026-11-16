@@ -23,7 +23,8 @@ import type {
   TaskBoardCardRef,
   TaskBoardChoice,
   TaskBoardMoveFields,
-  TaskBoardMoveResult
+  TaskBoardMoveResult,
+  TaskBoardWireCard
 } from '../../shared/task-board/task-board-wire-types'
 import type { WorkspaceStatusDefinition } from '../../shared/worktree/types'
 import type { updateIssue as updateGitHubIssue } from '../github/issues/issue-update'
@@ -35,6 +36,7 @@ import {
   type TaskBoardCardReadDeps
 } from './task-board-host-card'
 import { placeTaskBoardCard, type TaskBoardHostDeps } from './task-board-host-list'
+import type { TaskBoardMoveHolds } from './task-board-move-holds'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
 
 type RepoRef = Extract<TaskBoardCardRef, { provider: 'gitlab' | 'github' }>
@@ -63,6 +65,7 @@ export type TaskBoardMoveDeps = TaskBoardCardReadDeps &
   TaskBoardMoveWriteDeps & {
     host: Pick<TaskBoardHostDeps, 'settings' | 'statuses'>
     caches: TaskBoardEnrichCaches
+    moveHolds: TaskBoardMoveHolds
   }
 
 export type TaskBoardMoveParams = {
@@ -257,13 +260,15 @@ export async function moveTaskBoardCard(
   }
   const target = { columnId: params.targetColumnId, columns, settings }
   let refKey: string
+  let from: string | null
   let write: () => Promise<ProviderWrite>
   try {
     // Keyed before the write, so a confirmed move never ends as an RPC error.
     refKey = taskBoardRefKeyForRef(params.ref, deps)
     // The provider's current state, not the client's possibly stale card, decides the move.
     const card = await readTaskBoardCard(params.ref, deps)
-    if (resolveTaskBoardColumnId(card, columns, settings) === params.targetColumnId) {
+    from = resolveTaskBoardColumnId(card, columns, settings)
+    if (from === params.targetColumnId) {
       return { status: 'blocked', reason: 'same-column' }
     }
     const plan = await planMove(params, card, target, deps)
@@ -284,11 +289,15 @@ export async function moveTaskBoardCard(
     return { status: 'failed', error: written.error }
   }
   invalidateTaskBoardCardCaches(deps.caches, refKey)
+  let card: TaskBoardWireCard | null = null
   try {
-    const moved = await readTaskBoardCard(params.ref, deps)
-    return { status: 'moved', card: placeTaskBoardCard(moved, columns, settings) }
+    card = placeTaskBoardCard(await readTaskBoardCard(params.ref, deps), columns, settings)
   } catch {
     // Applied but unread: the client keeps the card where it dropped it and re-lists.
-    return { status: 'moved', card: null }
   }
+  if (from !== null) {
+    // The item read is current; provider lists can lag it, and would show `from` meanwhile.
+    deps.moveHolds.hold(refKey, from, card?.columnId ?? params.targetColumnId)
+  }
+  return { status: 'moved', card }
 }

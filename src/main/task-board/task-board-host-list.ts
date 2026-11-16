@@ -109,9 +109,10 @@ function taskBoardMoveTargets(
 export function placeTaskBoardCard(
   card: TaskBoardCard,
   columns: readonly WorkspaceStatusDefinition[],
-  settings: TaskBoardSettings
+  settings: TaskBoardSettings,
+  /** A held move's column, in place of the one the card's status resolves to. */
+  columnId: string | null = resolveTaskBoardColumnId(card, columns, settings)
 ): TaskBoardWireCard | null {
-  const columnId = resolveTaskBoardColumnId(card, columns, settings)
   if (columnId === null) {
     return null
   }

@@ -1,9 +1,13 @@
-import { expect, it } from 'vitest'
-import type { JiraComment, JiraIssue } from '../../shared/jira/jira-types'
-import { toJiraTaskBoardCard } from '../../shared/task-board/task-board-provider-cards'
+import { expect, it, vi } from 'vitest'
+import type { JiraComment, JiraIssue, JiraStatus } from '../../shared/jira/jira-types'
+import {
+  taskBoardRefKey,
+  toJiraTaskBoardCard
+} from '../../shared/task-board/task-board-provider-cards'
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
-import { createTaskBoardListFreshness } from './task-board-list-freshness'
+import type { TaskBoardListOptions } from './task-board-host-list'
+import { createTaskBoardMoveHolds } from './task-board-move-holds'
 import type { TaskStartRun } from '../../shared/task-board/task-start-run'
 import { createTaskStartRunStore } from './task-start-run-store'
 import {
@@ -99,7 +103,7 @@ function setup(writeResult: { ok: true; id: string } | { ok: false; error: strin
       }
     },
     caches: createTaskBoardEnrichCaches(),
-    listFreshness: createTaskBoardListFreshness(),
+    moveHolds: createTaskBoardMoveHolds(),
     workspaces: async () => [],
     commitsAhead: unused,
     hostedReview: unused,
@@ -183,4 +187,33 @@ it('lists the task-start run of a card in any column', async () => {
     percent: 20,
     orchestrator: { paneKey: 'tab-1:1' }
   })
+})
+
+it('holds a moved card in its new column until the provider list agrees or the hold expires', async () => {
+  let now = 0
+  const { deps } = setup({ ok: true, id: 'c-2' })
+  deps.moveHolds = createTaskBoardMoveHolds(() => now)
+  const toDo: JiraStatus = { id: '1', name: 'To Do', categoryKey: 'new', categoryName: 'To Do' }
+  let status = toDo
+  const jira = vi.fn(async (_options: TaskBoardListOptions) => ({
+    provider: 'jira' as const,
+    status: 'ready' as const,
+    cards: [toJiraTaskBoardCard({ ...jiraIssue, status })]
+  }))
+  deps.host = { ...deps.host, sources: { ...deps.host.sources, jira } }
+  const column = async () => (await listTaskBoard(deps, { fresh: false })).cards[0].columnId
+  const key = taskBoardRefKey(ref, null)
+
+  deps.moveHolds.hold(key, 'todo', 'in-progress')
+  expect(await column()).toBe('in-progress')
+  status = jiraIssue.status
+  expect(await column()).toBe('in-progress')
+  // The list agreed, so the hold is gone: a later move back shows as the provider lists it.
+  status = toDo
+  expect(await column()).toBe('todo')
+
+  deps.moveHolds.hold(key, 'todo', 'in-progress')
+  now += 120_001
+  expect(await column()).toBe('todo')
+  expect(jira.mock.calls.every(([options]) => options.fresh === false)).toBe(true)
 })

@@ -12,15 +12,12 @@ import type {
   TaskStartImage
 } from '../../shared/task-board/task-start-context-types'
 import { buildTaskStartPrompt, taskStartTabTitle } from '../../shared/task-board/task-start-prompt'
-import { summarizeTaskStartRun, type TaskStartRun } from '../../shared/task-board/task-start-run'
 import {
   resolveTaskStartRoles,
   resolveTaskStartWorkspaceMode,
   TASK_START_ROLES
 } from '../../shared/task-board/task-start-settings'
-import { DEFAULT_WORKSPACE_STATUS_ID } from '../../shared/workspace/status/workspace-statuses'
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
-import type { TaskStartCardMove } from './task-start-card-move'
 import type { TaskStartCard } from './task-start-context'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
 import {
@@ -36,6 +33,7 @@ import {
   type TaskStartRunGuard
 } from './task-start-service-guard'
 import { launchTaskStartOrchestrator, type TaskStartLaunchDeps } from './task-start-service-launch'
+import { moveStartedCard, type TaskStartMoveDeps } from './task-start-service-move'
 import type { TaskStartStopDeps } from './task-start-stop'
 import {
   openTaskStartWorkspace,
@@ -46,6 +44,7 @@ import {
 export type TaskStartParams = z.infer<typeof TaskBoardStartTaskParams>
 
 export type TaskStartServiceDeps = TaskStartLaunchDeps &
+  TaskStartMoveDeps &
   TaskStartWorkspaceDeps & {
     options: TaskStartOptionsDeps
     /** What ⏹ ends, for a start a stop cancels after its orchestrator was published. */
@@ -64,16 +63,7 @@ export type TaskStartServiceDeps = TaskStartLaunchDeps &
       images: TaskStartImage[]
     }): Promise<TaskStartImage[]>
     gitStatus(worktreeId: string): Promise<{ entries: readonly unknown[]; branch?: string }>
-    /** Moves the card forward to the column the way a drag does, provider status included. */
-    moveCard(ref: TaskBoardCardRef, columnId: string): Promise<TaskStartCardMove>
-    /** The card moved on its provider: clients re-list the board. */
-    cardMoved(cardKey: string): void
-    /** How long the start's answer waits on the move; it finishes in the background after. */
-    moveWaitMs?: number
   }
-
-// The answer never waits on a slow provider; the move and its note still land after it.
-const MOVE_WAIT_MS = 8000
 
 // Remotes a configured base usually names; anything else must match the branch exactly.
 const BASE_REMOTE = /^(?:refs\/remotes\/)?(?:origin|upstream)\//
@@ -247,51 +237,6 @@ async function runStart(
     guard,
     deps
   )
-}
-
-/** The move's outcome on the run: a refresh once moved, `move-skipped` while live and unnoted. */
-function recordCardMove(
-  moved: TaskStartCardMove,
-  cardKey: string,
-  guard: TaskStartRunGuard,
-  deps: TaskStartServiceDeps
-): TaskStartRun | null {
-  if (moved === 'moved') {
-    deps.cardMoved(cardKey)
-    return null
-  }
-  // A note already on the run (say `prompt-unconfirmed`) matters more than this hint.
-  if (moved === 'kept' || deps.lifecycle.store.getById(guard.runId)?.note) {
-    return null
-  }
-  return guard.patch({ note: 'move-skipped' })
-}
-
-/** A started card goes to In progress; a move that needs the user only marks the run. */
-async function moveStartedCard(
-  ref: TaskBoardCardRef,
-  cardKey: string,
-  started: Extract<TaskStartResult, { ok: true }>,
-  guard: TaskStartRunGuard,
-  deps: TaskStartServiceDeps
-): Promise<TaskStartResult> {
-  const recorded = Promise.resolve()
-    .then(() => deps.moveCard(ref, DEFAULT_WORKSPACE_STATUS_ID))
-    .catch((error: unknown) => {
-      console.warn('[task-start] moving the started card failed', error)
-      return 'skipped' as const
-    })
-    .then((moved) => recordCardMove(moved, cardKey, guard, deps))
-    .catch((error: unknown) => {
-      console.warn('[task-start] recording the started card move failed', error)
-      return null
-    })
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const bound = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), deps.moveWaitMs ?? MOVE_WAIT_MS)
-  })
-  const run = await Promise.race([recorded, bound]).finally(() => clearTimeout(timer))
-  return run ? { ok: true, run: summarizeTaskStartRun(run) } : started
 }
 
 /** Starts the card's orchestrator: every effect happens after the atomic claim. */

@@ -9,8 +9,9 @@ import { taskBoardRefKey } from '../../shared/task-board/task-board-provider-car
 import { getDefaultTaskBoardSettings } from '../../shared/task-board/task-board-settings'
 import type { WorkspaceStatusDefinition } from '../../shared/worktree/types'
 import { createTaskBoardEnrichCaches } from './task-board-enrich'
-import { createTaskBoardListFreshness } from './task-board-list-freshness'
-import { moveStartedTaskBoardCard, type TaskStartCardMoveDeps } from './task-start-card-move'
+import type { TaskBoardMoveDeps } from './task-board-host-move'
+import { createTaskBoardMoveHolds } from './task-board-move-holds'
+import { moveStartedTaskBoardCard } from './task-start-card-move'
 
 const toDo: JiraStatus = { id: '1', name: 'To Do', categoryKey: 'new', categoryName: 'To Do' }
 const inProgress: JiraStatus = {
@@ -59,13 +60,13 @@ function jiraHost(
   const state = { issue: issue(status) }
   const settings = getDefaultTaskBoardSettings()
   settings.providers.jira.rules = [{ match: 'In Review', statusId: 'in-review' }]
-  const deps: TaskStartCardMoveDeps = {
+  const deps: TaskBoardMoveDeps = {
     host: {
       settings: () => ({ taskBoard: settings, visibleTaskProviders: ['jira'] }),
       statuses: () => columns
     },
     caches: createTaskBoardEnrichCaches(),
-    listFreshness: createTaskBoardListFreshness(),
+    moveHolds: createTaskBoardMoveHolds(),
     repo: () => null,
     getLocalGitArgs: () => [],
     jiraSites: () => [{ id: 'site-a', accountId: 'me' }],
@@ -96,31 +97,41 @@ function jiraHost(
 }
 
 const start: JiraTransition = { id: '21', name: 'Start', to: inProgress }
+const live = () => true
 
 describe('moveStartedTaskBoardCard', () => {
   it('moves a card from Todo to In progress through its provider', async () => {
     const { deps, state } = jiraHost(toDo, [start])
-    expect(await moveStartedTaskBoardCard(ref, 'in-progress', deps)).toBe('moved')
+    expect(await moveStartedTaskBoardCard(ref, 'in-progress', live, deps)).toBe('moved')
     expect(state.issue.status.name).toBe('In Progress')
   })
 
-  it('clears what a drag clears and has lists skip provider list caches after a move', async () => {
+  it('clears what a drag clears and holds the card in In progress while lists lag', async () => {
     const { deps } = jiraHost(toDo, [start])
     const key = taskBoardRefKey(ref, null)
     deps.caches.comments.set(key, [])
-    await moveStartedTaskBoardCard(ref, 'in-progress', deps)
+    await moveStartedTaskBoardCard(ref, 'in-progress', live, deps)
     expect(deps.caches.comments.get(key)).toBeUndefined()
-    expect(deps.listFreshness.fresh(false)).toBe(true)
+    expect(deps.moveHolds.place(key, 'todo')).toBe('in-progress')
+  })
 
-    const kept = jiraHost(inProgress, [start]).deps
-    await moveStartedTaskBoardCard(ref, 'in-progress', kept)
-    expect(kept.listFreshness.fresh(false)).toBe(false)
+  it('writes nothing when the run stops while the card is read', async () => {
+    let stopped = false
+    const { deps, state } = jiraHost(toDo, [start])
+    const read = deps.jiraIssue
+    deps.jiraIssue = async (key, siteId) => {
+      stopped = true
+      return read(key, siteId)
+    }
+    expect(await moveStartedTaskBoardCard(ref, 'in-progress', () => !stopped, deps)).toBe('kept')
+    expect(deps.updateJiraIssue).not.toHaveBeenCalled()
+    expect(state.issue.status.name).toBe('To Do')
   })
 
   it('leaves a card already in In progress or a later column where it is', async () => {
     for (const status of [inProgress, inReview]) {
       const { deps, state } = jiraHost(status, [start])
-      expect(await moveStartedTaskBoardCard(ref, 'in-progress', deps)).toBe('kept')
+      expect(await moveStartedTaskBoardCard(ref, 'in-progress', live, deps)).toBe('kept')
       expect(deps.updateJiraIssue).not.toHaveBeenCalled()
       expect(state.issue.status.name).toBe(status.name)
     }
@@ -128,7 +139,7 @@ describe('moveStartedTaskBoardCard', () => {
 
   it('leaves the card when the board has no In progress column', async () => {
     const { deps } = jiraHost(toDo, [start], [BOARD[0], BOARD[2], BOARD[3]])
-    expect(await moveStartedTaskBoardCard(ref, 'in-progress', deps)).toBe('kept')
+    expect(await moveStartedTaskBoardCard(ref, 'in-progress', live, deps)).toBe('kept')
     expect(deps.jiraTransitions).not.toHaveBeenCalled()
   })
 
@@ -140,7 +151,7 @@ describe('moveStartedTaskBoardCard', () => {
     ]
     vi.mocked(hosts[2].deps.updateJiraIssue).mockResolvedValue({ ok: false, error: 'Forbidden' })
     for (const { deps, state } of hosts) {
-      expect(await moveStartedTaskBoardCard(ref, 'in-progress', deps)).toBe('skipped')
+      expect(await moveStartedTaskBoardCard(ref, 'in-progress', live, deps)).toBe('skipped')
       expect(state.issue.status.name).toBe('To Do')
     }
   })
