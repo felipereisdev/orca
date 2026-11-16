@@ -14,7 +14,7 @@ const now = Date.now()
 const accounts = [
   {
     id: 'work',
-    label: 'Ucloud',
+    displayName: 'Ucloud',
     email: 'empresa@example.test',
     authMethod: 'subscription-oauth' as const,
     createdAt: 0,
@@ -23,7 +23,7 @@ const accounts = [
   },
   {
     id: 'personal',
-    label: 'Pessoal',
+    displayName: 'Pessoal',
     email: 'pessoal@example.test',
     authMethod: 'subscription-oauth' as const,
     createdAt: 0,
@@ -72,7 +72,7 @@ function fixture({
       : accounts.map((account) => ({
           ...account,
           ...(long
-            ? { label: 'Ucloud — Equipe de desenvolvimento e operações internacionais' }
+            ? { displayName: 'Ucloud — Equipe de desenvolvimento e operações internacionais' }
             : {}),
           ...(signedOut ? { needsSignIn: true as const } : {})
         })),

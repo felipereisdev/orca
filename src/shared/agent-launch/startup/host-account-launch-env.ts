@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { AgentLaunchAccountEnv } from './agent-launch-account-env'
 import { MANAGED_ACCOUNT_DISPLAY_NAME_MAX_LENGTH } from '../../agent-accounts/managed-account-display-names'
 
+/** Names pushed to a WSL orcad stay within what fork orcads before shared account names accept. */
+export const HOST_ACCOUNT_PUSH_NAME_MAX_LENGTH = 80
+
 export const HostAccountLaunchEnvParams = z
   .object({
     /** The distro whose accounts these are; names the owner in this host's messages. */

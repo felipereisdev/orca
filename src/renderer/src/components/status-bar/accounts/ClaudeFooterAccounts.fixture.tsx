@@ -12,10 +12,10 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 
-const accounts = ['Ucloud', 'Pessoal'].map((label) => ({
-  id: label.toLowerCase(),
-  label,
-  email: `${label.toLowerCase()}@example.test`,
+const accounts = ['Ucloud', 'Pessoal'].map((displayName) => ({
+  id: displayName.toLowerCase(),
+  displayName,
+  email: `${displayName.toLowerCase()}@example.test`,
   authMethod: 'subscription-oauth' as const,
   createdAt: 0,
   updatedAt: 0,

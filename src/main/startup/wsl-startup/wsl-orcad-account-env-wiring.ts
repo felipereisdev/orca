@@ -12,6 +12,7 @@ import {
   type WslOrcadAccountNotAppliedEvent
 } from '../../../shared/remote-runtime/wsl-hosts/wsl-orcad-account-notice'
 import { mainProcessState as state } from '../main-process-state'
+import { HOST_ACCOUNT_PUSH_NAME_MAX_LENGTH } from '../../../shared/agent-launch/startup/host-account-launch-env'
 
 /** Calls `send` once per distro (case-insensitive) for the life of this process. */
 export function oncePerDistro(send: (distro: string) => void): (distro: string) => void {
@@ -68,7 +69,9 @@ export function installWslOrcadAccountShim(store: Pick<Store, 'getSettings'>): v
               {
                 configDir: folder.configDir,
                 email: account.email,
-                ...(account.displayName ? { label: account.displayName } : {}),
+                ...(account.displayName
+                  ? { label: account.displayName.slice(0, HOST_ACCOUNT_PUSH_NAME_MAX_LENGTH) }
+                  : {}),
                 ...(account.organizationUuid ? { organizationUuid: account.organizationUuid } : {}),
                 ...(account.needsSignIn ? { needsSignIn: true as const } : {})
               }

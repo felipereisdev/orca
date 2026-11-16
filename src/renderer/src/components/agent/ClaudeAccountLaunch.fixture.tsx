@@ -24,7 +24,7 @@ const accounts = {
   accounts: [
     {
       id: 'personal',
-      label: 'Pessoal',
+      displayName: 'Pessoal',
       email: 'personal@example.test',
       authMethod: 'subscription-oauth' as const,
       createdAt: 0,
@@ -33,7 +33,7 @@ const accounts = {
     },
     {
       id: 'work',
-      label: 'Empresa',
+      displayName: 'Empresa',
       email: 'work@example.test',
       authMethod: 'subscription-oauth' as const,
       createdAt: 0,
