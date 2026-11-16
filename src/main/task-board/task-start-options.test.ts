@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
 import type { Repo } from '../../shared/repo-types'
 import {
   getTaskStartOptions,
@@ -83,6 +84,23 @@ describe('getTaskStartOptions', () => {
     expect(options.catalog.filter((entry) => entry.accountId !== undefined)).toEqual([])
     expect(options.catalog.map((entry) => entry.agent)).toEqual(['claude'])
     expect(options.invalidRoles).toEqual(['reviewer'])
+  })
+
+  it('builds the host catalog for the global settings, which name no repo', async () => {
+    const agents: TuiAgent[] = ['claude', 'codex']
+    const launchHost = vi.fn(async () => ({
+      agents,
+      claudeAccountTarget: { runtime: 'host' as const, wslDistro: null }
+    }))
+    const options = await getTaskStartOptions({}, optionsDeps(repo('web'), { launchHost }))
+    expect(launchHost).toHaveBeenCalledWith(null)
+    expect(options.repoId).toBeNull()
+    expect(options.catalog.map((entry) => [entry.agent, entry.accountId])).toEqual([
+      ['claude', undefined],
+      ['claude', 'acc-1'],
+      ['codex', undefined]
+    ])
+    expect(options.roles?.orchestrator).toEqual({ agent: 'claude' })
   })
 
   it('flags a role whose model the agent does not offer', async () => {

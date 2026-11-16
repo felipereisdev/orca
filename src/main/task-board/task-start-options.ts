@@ -45,7 +45,8 @@ export type TaskStartLaunchHost = {
 }
 
 export type TaskStartAgentCatalogDeps = {
-  launchHost(repo: Repo): Promise<TaskStartLaunchHost>
+  /** `null`: no repo is named (the global settings), so this host's own terminals. */
+  launchHost(repo: Repo | null): Promise<TaskStartLaunchHost>
   claudeAccounts(): ClaudeManagedAccountSummary[]
   /** The host's saved catalog only; never opens a session or starts a listing. */
   modelCatalog(agent: TuiAgent, accountId?: string): Promise<AgentSessionModelCatalogResult>
@@ -116,13 +117,13 @@ function accountName(account: ClaudeManagedAccountSummary): string {
 
 /** One source for desktop and mobile: this host's agents, accounts and saved model catalogs. */
 export async function buildTaskStartAgentCatalog(
-  repo: Repo,
+  repo: Repo | null,
   deps: TaskStartAgentCatalogDeps
 ): Promise<TaskStartAgentCatalogEntry[]> {
   const { agents, claudeAccountTarget } = await deps.launchHost(repo)
   // The SSH launch path refuses managed accounts; the remote's own login runs.
   const accounts =
-    getRepoSshConnectionId(repo) === null && claudeAccountTarget
+    (repo === null || getRepoSshConnectionId(repo) === null) && claudeAccountTarget
       ? filterClaudeAccountsForLaunchTarget(deps.claudeAccounts(), claudeAccountTarget)
       : []
   const entries = await Promise.all(
@@ -230,6 +231,9 @@ export async function getTaskStartOptions(
     label: repo.displayName,
     kind: repo.kind === 'folder' ? ('folder' as const) : ('git' as const)
   }))
+  if (!params.ref && !params.repoId) {
+    return globalTaskStartOptions(list, deps)
+  }
   const resolution = await resolveTaskStartRepoForParams(params, repos, deps)
   const repo = repos.find((candidate) => candidate.id === resolution.repoId)
   if (!repo) {
@@ -270,5 +274,30 @@ export async function getTaskStartOptions(
     labels,
     catalog,
     invalidRoles
+  }
+}
+
+/** The global settings name no repo: this host's agents and accounts, and the global roles. */
+async function globalTaskStartOptions(
+  repos: TaskStartOptionsResult['repos'],
+  deps: TaskStartOptionsDeps
+): Promise<TaskStartOptionsResult> {
+  const settings = deps.settings()
+  const roles = resolveTaskStartRoles({
+    global: settings.taskStart,
+    defaultAgent: settings.defaultTuiAgent
+  })
+  const catalog = await buildTaskStartAgentCatalog(null, deps)
+  const accounts = new Map(deps.claudeAccounts().map((account) => [account.id, account]))
+  return {
+    repoId: null,
+    repoCandidates: [],
+    repos,
+    workspaceMode: 'worktree',
+    baseRef: null,
+    roles,
+    labels: roles ? taskStartRoleLabels(roles, accounts) : null,
+    catalog,
+    invalidRoles: roles ? invalidTaskStartRoles(roles, catalog) : []
   }
 }

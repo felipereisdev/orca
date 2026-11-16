@@ -38,7 +38,7 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
     launchHost: async (repo) => {
       const settings = runtime.getClientSettings()
       // The new-workspace resolution: an SSH target, or local with the project's runtime (WSL).
-      const host = await runtime.resolveAgentDetectionHost(undefined, repo.id)
+      const host = await runtime.resolveAgentDetectionHost(undefined, repo?.id)
       let detected: string[]
       try {
         detected = await detectAgentsOnHost(host, {
