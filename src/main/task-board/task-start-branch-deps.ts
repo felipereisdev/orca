@@ -13,6 +13,14 @@ import type { TaskStartCard } from './task-start-context'
 import type { TaskStartServiceDeps } from './task-start-service'
 import { taskStartWorktreeCreateFields } from './task-start-worktree-link'
 
+/** Who created the task's workspace: the desktop's own window is this host; others prove a paired device. */
+function taskStartCreatorProvenance(context: RpcContext) {
+  // Why: the desktop IPC context carries a client id but no paired device, which the RPC resolver refuses.
+  return context.caller?.kind === 'desktop'
+    ? { kind: 'host' as const }
+    : resolveRpcWorkspaceCreatorProvenance(context)
+}
+
 /** The card's `worktree.create`: one request names both its worktree and its primary-mode branch. */
 export function taskStartWorktreeCreateArgs(
   context: RpcContext,
@@ -28,7 +36,7 @@ export function taskStartWorktreeCreateArgs(
   })
   return buildManagedWorktreeCreateArgs(
     params,
-    { creatorProvenance: resolveRpcWorkspaceCreatorProvenance(context) },
+    { creatorProvenance: taskStartCreatorProvenance(context) },
     context
   )
 }
