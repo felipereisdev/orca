@@ -1,4 +1,7 @@
-import { getRepoExecutionHostId } from '../../shared/execution-host/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoRoutingConnectionId
+} from '../../shared/execution-host/execution-host'
 import type { JiraIssue } from '../../shared/jira/jira-types'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import { parseGitLabIssueOrMRLink } from '../../shared/new-workspace/gitlab-links'
@@ -11,6 +14,7 @@ import {
   toLinearTaskBoardCard
 } from '../../shared/task-board/task-board-provider-cards'
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
+import type { getWorkItemStatuses as getGitLabWorkItemStatuses } from '../gitlab/work-items/work-item-status'
 import {
   readTaskBoardGitHubIssue,
   readTaskBoardGitLabIssue,
@@ -24,6 +28,8 @@ export type TaskBoardCardReadDeps = TaskBoardCommentDeps & {
   /** The listing names the site on cards only when several are connected. */
   jiraSiteCount(): number
   linearIssue(id: string, workspaceId: string | null): Promise<LinearIssue | null>
+  /** Answers null when the project has no statuses; the card then stays on labels. */
+  gitlabWorkItemStatuses: typeof getGitLabWorkItemStatuses
 }
 
 function unreadable(ref: TaskBoardCardRef): Error {
@@ -74,6 +80,15 @@ export async function readTaskBoardCard(
       const { projectRef: _detailsProjectRef, ...item } = details.item
       // Same project pin as the listing, which reads it from the issue URL.
       const projectRef = parseGitLabIssueOrMRLink(item.url)?.slug ?? ref.projectRef
+      const statuses = projectRef
+        ? await deps.gitlabWorkItemStatuses(
+            repo.path,
+            projectRef,
+            [ref.number],
+            getRepoRoutingConnectionId(repo),
+            deps.getLocalGitArgs(repo)[0] ?? {}
+          )
+        : null
       return toGitLabTaskBoardCard(
         {
           ...item,
@@ -82,7 +97,8 @@ export async function readTaskBoardCard(
           repoHostId: getRepoExecutionHostId(repo),
           ...(projectRef ? { projectRef } : {})
         },
-        repo.displayName
+        repo.displayName,
+        statuses?.get(ref.number) ?? null
       )
     }
     case 'github': {

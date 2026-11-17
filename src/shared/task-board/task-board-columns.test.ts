@@ -88,6 +88,44 @@ describe('resolveTaskBoardColumnId', () => {
     expect(resolve(['a', 'workflow::doing', 'workflow::review'])).toBe('in-review')
   })
 
+  it('places a GitLab issue by its work item Status, which beats a conflicting label', () => {
+    const settings = settingsWith('gitlab', [
+      { match: 'In progress', statusId: 'in-progress' },
+      { match: 'In review', statusId: 'in-review' }
+    ])
+    const resolve = (labels: string[]): string | null =>
+      resolveTaskBoardColumnId(
+        {
+          provider: 'gitlab',
+          statusName: 'In review',
+          category: 'todo',
+          labels,
+          workItemStatus: { name: ' in REVIEW' }
+        },
+        columns,
+        settings
+      )
+    expect(resolve([])).toBe('in-review')
+    expect(resolve(['In progress'])).toBe('in-review')
+  })
+
+  it('falls back to GitLab labels when no rule names the Status', () => {
+    const settings = settingsWith('gitlab', [{ match: 'In progress', statusId: 'in-progress' }])
+    expect(
+      resolveTaskBoardColumnId(
+        {
+          provider: 'gitlab',
+          statusName: 'To do',
+          category: 'todo',
+          labels: ['In progress'],
+          workItemStatus: { name: 'To do' }
+        },
+        columns,
+        settings
+      )
+    ).toBe('in-progress')
+  })
+
   it('falls back to first and last columns when todo and done ids are absent', () => {
     const custom = [
       { id: 'backlog', label: 'Backlog' },

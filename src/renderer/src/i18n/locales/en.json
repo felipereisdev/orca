@@ -26188,6 +26188,7 @@
     "settings": {
       "statusNamePlaceholder": "Status name",
       "labelPlaceholder": "Label",
+      "statusOrLabelPlaceholder": "Status or label",
       "dropTargetTitle": "Status to apply on drop",
       "columnLabel": "Column",
       "removeRule": "Remove rule",

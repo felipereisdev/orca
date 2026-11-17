@@ -77,6 +77,7 @@ function jiraHost(
     linearViewerId: unused,
     linearIssue: unused,
     gitlabWorkItemDetails: unused,
+    gitlabWorkItemStatuses: unused,
     githubWorkItemDetails: unused,
     jiraTransitions: vi.fn(async () => transitions),
     updateJiraIssue: vi.fn(async (_key: string, updates: JiraIssueUpdate) => {
@@ -91,6 +92,8 @@ function jiraHost(
     updateLinearIssue: unused,
     repoLabels: unused,
     updateGitLabIssue: unused,
+    gitlabWorkItemStatusTarget: unused,
+    updateGitLabWorkItemStatus: unused,
     updateGitHubIssue: unused
   }
   return { deps, state }

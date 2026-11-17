@@ -21,6 +21,11 @@ import { addIssueComment as addGitLabIssueComment } from '../gitlab/issues/gitla
 import { updateIssue as updateGitLabIssue } from '../gitlab/issues/issue-update'
 import { listLabels as listGitLabLabels } from '../gitlab/projects/project-label-and-member-lookup'
 import { getWorkItemDetails as getGitLabWorkItemDetails } from '../gitlab/work-items/work-item-details'
+import {
+  getWorkItemStatuses as getGitLabWorkItemStatuses,
+  getWorkItemStatusTarget as getGitLabWorkItemStatusTarget,
+  updateWorkItemStatus as updateGitLabWorkItemStatus
+} from '../gitlab/work-items/work-item-status'
 import { getStatus as getJiraStatus } from '../jira/client'
 import { getIssueComments as getJiraIssueComments } from '../jira/jira-issue-comments'
 import {
@@ -158,6 +163,7 @@ export function createTaskBoardServiceDeps(
       (await getViewerForWorkspaceOrThrow(workspaceId ?? defaultLinearWorkspaceId())).id,
     linearIssue: (id, workspaceId) => getLinearIssue(id, workspaceId),
     gitlabWorkItemDetails: getGitLabWorkItemDetails,
+    gitlabWorkItemStatuses: getGitLabWorkItemStatuses,
     githubWorkItemDetails: getGitHubWorkItemDetails,
     workspaces: async () => {
       hostWorkspaces = await readHostWorkspaces(runtime)
@@ -232,6 +238,8 @@ export function createTaskBoardServiceDeps(
           )
     },
     updateGitLabIssue,
+    gitlabWorkItemStatusTarget: getGitLabWorkItemStatusTarget,
+    updateGitLabWorkItemStatus,
     updateGitHubIssue,
     readSeen: () => normalizeTaskBoardSeenComments(runtime.getUIState().taskBoardSeenComments),
     writeSeen: (next) => runtime.updateUIState({ taskBoardSeenComments: next })

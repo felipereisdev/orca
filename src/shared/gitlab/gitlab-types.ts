@@ -11,6 +11,16 @@ import type { HostedReviewDecision } from '../source-control/hosted-review/hoste
 // Why: flat owner/repo is inadequate — projects nest (`group/subgroup/project`) and self-hosted hosts must travel with the path for URL/glab targeting.
 export type GitLabProjectRef = { host: string; path: string }
 
+/** A work item's Status (GraphQL status widget; Premium/Ultimate). `id` is its global ID. */
+export type GitLabWorkItemStatus = { id: string; name: string }
+
+/** The statuses a work item type allows, and those GitLab sets when it opens or closes one. */
+export type GitLabWorkItemStatusLifecycle = {
+  allowedStatuses: readonly GitLabWorkItemStatus[]
+  defaultOpenStatus: GitLabWorkItemStatus | null
+  defaultClosedStatus: GitLabWorkItemStatus | null
+}
+
 // Retain GitLab-native opened state rather than ambiguously mapping to GitHub open.
 
 export type MRState = 'opened' | 'closed' | 'merged' | 'locked' | 'draft'

@@ -162,6 +162,7 @@ function jiraHost(transitions: JiraTransition[], options: { rereadFails?: boolea
     linearViewerId: unused,
     linearIssue: unused,
     gitlabWorkItemDetails: unused,
+    gitlabWorkItemStatuses: unused,
     githubWorkItemDetails: unused,
     jiraTransitions: async () => transitions,
     updateJiraIssue: async (_key, updates: JiraIssueUpdate) => {
@@ -176,6 +177,8 @@ function jiraHost(transitions: JiraTransition[], options: { rereadFails?: boolea
     updateLinearIssue: unused,
     repoLabels: unused,
     updateGitLabIssue: unused,
+    gitlabWorkItemStatusTarget: unused,
+    updateGitLabWorkItemStatus: unused,
     updateGitHubIssue: unused
   }
   return { deps, state }
@@ -204,5 +207,126 @@ describe('moveTaskBoardCard', () => {
     const { deps } = jiraHost([transition('31', 'Done')])
     const result = await moveTaskBoardCard({ ref, targetColumnId: 'completed' }, deps)
     expect(result.status === 'moved' ? result.card?.columnId : result).toBe('completed')
+  })
+})
+
+const gitlabRef = {
+  provider: 'gitlab' as const,
+  repoId: 'app',
+  number: 7,
+  projectRef: { host: 'git.example.com', path: 'acme/app' }
+}
+const toDoStatus = { id: 'gid://status/30', name: 'To do' }
+const inReviewStatus = { id: 'gid://status/39', name: 'In review' }
+const doneStatus = { id: 'gid://status/27', name: 'Done' }
+
+/** A GitLab issue whose Status (or labels) really change when written. */
+function gitlabHost(status: { id: string; name: string } | null) {
+  const state: {
+    status: { id: string; name: string } | null
+    labels: string[]
+    statusWrites: string[]
+  } = { status, labels: [], statusWrites: [] }
+  const settings = getDefaultTaskBoardSettings()
+  settings.providers.gitlab.rules = [
+    { match: 'To do', statusId: 'todo' },
+    { match: 'workflow::doing', statusId: 'in-progress' },
+    { match: 'In review', statusId: 'in-review' }
+  ]
+  const deps: TaskBoardMoveDeps = {
+    host: {
+      settings: () => ({ taskBoard: settings, visibleTaskProviders: ['gitlab'] }),
+      statuses: () => [
+        { id: 'todo', label: 'Todo' },
+        { id: 'in-progress', label: 'In progress' },
+        { id: 'in-review', label: 'In review' },
+        { id: 'completed', label: 'Done' }
+      ]
+    },
+    caches: createTaskBoardEnrichCaches(),
+    moveHolds: createTaskBoardMoveHolds(),
+    repo: () => ({ id: 'app', path: '/src/app', displayName: 'app', badgeColor: '', addedAt: 1 }),
+    getLocalGitArgs: () => [],
+    jiraSites: () => [],
+    jiraSiteCount: () => 0,
+    jiraIssue: unused,
+    jiraComments: unused,
+    linearComments: unused,
+    linearViewerId: unused,
+    linearIssue: unused,
+    gitlabWorkItemDetails: async () => ({
+      item: {
+        id: 'x',
+        type: 'issue',
+        number: 7,
+        title: 'Fix login',
+        state: 'opened',
+        url: 'https://git.example.com/acme/app/-/issues/7',
+        labels: state.labels,
+        updatedAt: '2026-11-13T00:00:00Z',
+        author: null
+      },
+      body: '',
+      comments: []
+    }),
+    gitlabWorkItemStatuses: async () => (state.status ? new Map([[7, state.status]]) : null),
+    githubWorkItemDetails: unused,
+    jiraTransitions: unused,
+    updateJiraIssue: unused,
+    linearTeamStates: unused,
+    updateLinearIssue: unused,
+    repoLabels: async () => [],
+    updateGitLabIssue: async (_path, _number, updates) => {
+      state.labels = [...state.labels, ...(updates.addLabels ?? [])]
+      return { ok: true }
+    },
+    gitlabWorkItemStatusTarget: async () => ({
+      workItemId: 'gid://gitlab/WorkItem/385444',
+      status: state.status,
+      lifecycle: {
+        allowedStatuses: [toDoStatus, inReviewStatus, doneStatus],
+        defaultOpenStatus: toDoStatus,
+        defaultClosedStatus: doneStatus
+      }
+    }),
+    updateGitLabWorkItemStatus: async (_path, _project, workItemId, statusId) => {
+      state.statusWrites.push(`${workItemId} → ${statusId}`)
+      state.status = [toDoStatus, inReviewStatus, doneStatus].find((s) => s.id === statusId)!
+      return { ok: true }
+    },
+    updateGitHubIssue: unused
+  }
+  return { deps, state }
+}
+
+describe('moveTaskBoardCard on GitLab', () => {
+  it('sets the matching allowed Status of a card that has one, leaving labels alone', async () => {
+    const { deps, state } = gitlabHost(toDoStatus)
+    const result = await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'in-review' }, deps)
+    expect(result.status === 'moved' ? result.card?.columnId : result).toBe('in-review')
+    expect(state.statusWrites).toEqual(['gid://gitlab/WorkItem/385444 → gid://status/39'])
+    expect(state.labels).toEqual([])
+  })
+
+  it('blocks a column whose rules name no allowed Status, instead of adding a label', async () => {
+    const { deps, state } = gitlabHost(toDoStatus)
+    expect(
+      await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'in-progress' }, deps)
+    ).toEqual({ status: 'blocked', reason: 'no-mapping' })
+    expect(state.statusWrites).toEqual([])
+  })
+
+  it('sets the lifecycle’s default closed Status for the done column no rule names', async () => {
+    const { deps, state } = gitlabHost(inReviewStatus)
+    await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'completed' }, deps)
+    expect(state.statusWrites).toEqual(['gid://gitlab/WorkItem/385444 → gid://status/27'])
+  })
+
+  it('moves a card without a Status by labels', async () => {
+    const { deps, state } = gitlabHost(null)
+    const result = await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'in-review' }, deps)
+    expect(result.status).toBe('moved')
+    expect(state.labels).toEqual(['In review'])
+    expect(state.statusWrites).toEqual([])
   })
 })

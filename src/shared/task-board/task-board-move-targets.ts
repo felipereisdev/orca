@@ -1,3 +1,4 @@
+import type { GitLabWorkItemStatus, GitLabWorkItemStatusLifecycle } from '../gitlab/gitlab-types'
 import type { JiraTransition } from '../jira/jira-types'
 import type { LinearWorkflowState } from '../linear/workspace-types'
 import type { TaskBoardSettings } from './task-board-settings'
@@ -75,6 +76,65 @@ export function resolveLabelProviderMove(
     }
   }
   return { ok: false, reason: 'no-mapping' }
+}
+
+/** A GitLab card with a Status moves by Status: a column some rule targets, or the todo/done fallback. */
+export function canMoveByWorkItemStatus(
+  targetColumnId: string,
+  columns: readonly WorkspaceStatusDefinition[],
+  settings: TaskBoardSettings
+): boolean {
+  return (
+    getActiveTaskBoardRules('gitlab', columns, settings).some(
+      (rule) => rule.statusId === targetColumnId
+    ) ||
+    targetColumnId === resolveCategoryColumnId('todo', columns, settings) ||
+    targetColumnId === resolveCategoryColumnId('done', columns, settings)
+  )
+}
+
+/** The allowed Status that lands `card` in the target column; null when none does. */
+export function selectGitLabMoveStatus(
+  card: TaskBoardCard,
+  lifecycle: GitLabWorkItemStatusLifecycle,
+  targetColumnId: string,
+  columns: readonly WorkspaceStatusDefinition[],
+  settings: TaskBoardSettings
+): GitLabWorkItemStatus | null {
+  const named = (match: string): GitLabWorkItemStatus[] =>
+    lifecycle.allowedStatuses.filter(
+      (status) => normalizeTaskBoardMatch(status.name) === normalizeTaskBoardMatch(match)
+    )
+  const candidates: { status: GitLabWorkItemStatus; closed: boolean }[] = [
+    ...getActiveTaskBoardRules('gitlab', columns, settings)
+      .filter((rule) => rule.statusId === targetColumnId)
+      .flatMap((rule) => named(rule.match).map((status) => ({ status, closed: false }))),
+    // Then the defaults GitLab itself sets on close/reopen, as the label path closes/reopens.
+    ...(targetColumnId === resolveCategoryColumnId('done', columns, settings) &&
+    lifecycle.defaultClosedStatus
+      ? [{ status: lifecycle.defaultClosedStatus, closed: true }]
+      : []),
+    ...(targetColumnId === resolveCategoryColumnId('todo', columns, settings) &&
+    lifecycle.defaultOpenStatus
+      ? [{ status: lifecycle.defaultOpenStatus, closed: false }]
+      : [])
+  ]
+  // Labels stay as they are, so a candidate must land the card in the column with them.
+  const hit = candidates.find(
+    ({ status, closed }) =>
+      resolveTaskBoardColumnId(
+        {
+          provider: 'gitlab',
+          statusName: status.name,
+          category: closed ? 'done' : 'todo',
+          labels: card.labels,
+          workItemStatus: status
+        },
+        columns,
+        settings
+      ) === targetColumnId
+  )
+  return hit?.status ?? null
 }
 
 export function selectJiraMoveTransitions(

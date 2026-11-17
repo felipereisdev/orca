@@ -71,7 +71,9 @@ export function TaskBoardProviderRules({
   const supportsDropTargets = provider === 'jira' || provider === 'linear'
   const matchPlaceholder = supportsDropTargets
     ? t('taskBoard.settings.statusNamePlaceholder', 'Status name')
-    : t('taskBoard.settings.labelPlaceholder', 'Label')
+    : provider === 'gitlab'
+      ? t('taskBoard.settings.statusOrLabelPlaceholder', 'Status or label')
+      : t('taskBoard.settings.labelPlaceholder', 'Label')
   const dropTargetTitle = t('taskBoard.settings.dropTargetTitle', 'Status to apply on drop')
 
   const commitRows = (nextRows: RuleRow[]): void => {

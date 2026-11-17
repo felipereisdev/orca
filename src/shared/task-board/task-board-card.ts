@@ -1,5 +1,5 @@
 import type { GitHubWorkItem } from '../github/work-items/work-item-types'
-import type { GitLabWorkItem } from '../gitlab/gitlab-types'
+import type { GitLabWorkItem, GitLabWorkItemStatus } from '../gitlab/gitlab-types'
 import type { JiraIssue } from '../jira/jira-types'
 import type { LinearIssue } from '../linear/issue-types'
 import type { TaskProvider } from '../work-items/task-providers'
@@ -23,6 +23,8 @@ export type TaskBoardCard = {
   statusName: string
   category: TaskBoardStatusCategory
   labels: string[]
+  /** GitLab only: the work item's Status, when its project has statuses. */
+  workItemStatus?: GitLabWorkItemStatus | null
   priorityLabel?: string
   updatedAt: string
   source: TaskBoardCardSource

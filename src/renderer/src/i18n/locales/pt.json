@@ -24841,6 +24841,7 @@
     "settings": {
       "statusNamePlaceholder": "Nome do status",
       "labelPlaceholder": "Label",
+      "statusOrLabelPlaceholder": "Status ou label",
       "dropTargetTitle": "Status a aplicar ao soltar",
       "columnLabel": "Coluna",
       "removeRule": "Remover regra",

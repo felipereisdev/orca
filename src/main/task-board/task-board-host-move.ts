@@ -29,6 +29,10 @@ import type {
 import type { WorkspaceStatusDefinition } from '../../shared/worktree/types'
 import type { updateIssue as updateGitHubIssue } from '../github/issues/issue-update'
 import type { updateIssue as updateGitLabIssue } from '../gitlab/issues/issue-update'
+import type {
+  getWorkItemStatusTarget as getGitLabWorkItemStatusTarget,
+  updateWorkItemStatus as updateGitLabWorkItemStatus
+} from '../gitlab/work-items/work-item-status'
 import { invalidateTaskBoardCardCaches, type TaskBoardEnrichCaches } from './task-board-enrich'
 import {
   readTaskBoardCard,
@@ -38,6 +42,7 @@ import {
 import { placeTaskBoardCard, type TaskBoardHostDeps } from './task-board-host-list'
 import type { TaskBoardMoveHolds } from './task-board-move-holds'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
+import { planGitLabStatusMove } from './task-board-host-gitlab-status-move'
 
 type RepoRef = Extract<TaskBoardCardRef, { provider: 'gitlab' | 'github' }>
 type ProviderWrite = { ok: true } | { ok: false; error: string }
@@ -58,6 +63,9 @@ export type TaskBoardMoveWriteDeps = {
   /** The labels of the issue's own project/repository; [] when unreadable. */
   repoLabels(ref: RepoRef, repo: Repo): Promise<string[]>
   updateGitLabIssue: typeof updateGitLabIssue
+  /** Throws when unreadable; null when the issue has no status widget. */
+  gitlabWorkItemStatusTarget: typeof getGitLabWorkItemStatusTarget
+  updateGitLabWorkItemStatus: typeof updateGitLabWorkItemStatus
   updateGitHubIssue: typeof updateGitHubIssue
 }
 
@@ -128,12 +136,12 @@ export function decideJiraMove(
     : { status: 'needs-fields', choice: jiraTransitionChoice(transition) }
 }
 
-type BoardTarget = {
+export type BoardTarget = {
   columnId: string
   columns: readonly WorkspaceStatusDefinition[]
   settings: TaskBoardSettings
 }
-type MovePlan = { write: () => Promise<ProviderWrite> } | { stop: MoveStop }
+export type MovePlan = { write: () => Promise<ProviderWrite> } | { stop: MoveStop }
 
 async function planJiraMove(
   ref: Extract<TaskBoardCardRef, { provider: 'jira' }>,
@@ -243,6 +251,9 @@ function planMove(
     case 'linear':
       return planLinearMove(ref, params, target, deps)
     case 'gitlab':
+      return card.workItemStatus
+        ? planGitLabStatusMove(ref, card, target, deps)
+        : planLabelMove(ref, card, target, deps)
     case 'github':
       return planLabelMove(ref, card, target, deps)
   }

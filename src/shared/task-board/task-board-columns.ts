@@ -8,6 +8,8 @@ export type TaskBoardStatusInput = {
   statusName: string
   category: TaskBoardStatusCategory
   labels: readonly string[]
+  /** GitLab's work item Status; rules match it before labels. */
+  workItemStatus?: { name: string } | null
 }
 
 export function normalizeTaskBoardMatch(value: string): string {
@@ -55,9 +57,15 @@ export function resolveTaskBoardColumnId(
     if (hit) {
       return hit.statusId
     }
-  } else if (input.category !== 'done') {
-    const labels = new Set(input.labels.map(normalizeTaskBoardMatch))
-    const hit = rules.find((rule) => labels.has(normalizeTaskBoardMatch(rule.match)))
+  } else {
+    const ruleFor = (values: readonly string[]): TaskBoardRule | undefined => {
+      const names = new Set(values.map(normalizeTaskBoardMatch))
+      return rules.find((rule) => names.has(normalizeTaskBoardMatch(rule.match)))
+    }
+    // The Status is GitLab's own workflow field, so it wins over a label that disagrees.
+    const hit =
+      (input.workItemStatus ? ruleFor([input.workItemStatus.name]) : undefined) ??
+      (input.category !== 'done' ? ruleFor(input.labels) : undefined)
     if (hit) {
       return hit.statusId
     }

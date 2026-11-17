@@ -1,5 +1,5 @@
 import type { GitHubWorkItem } from '../github/work-items/work-item-types'
-import type { GitLabWorkItem } from '../gitlab/gitlab-types'
+import type { GitLabWorkItem, GitLabWorkItemStatus } from '../gitlab/gitlab-types'
 import type { JiraIssue } from '../jira/jira-types'
 import type { LinearIssue } from '../linear/issue-types'
 import type { ExecutionHostId } from '../execution-host/execution-host'
@@ -80,7 +80,11 @@ export function toLinearTaskBoardCard(
   }
 }
 
-export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): TaskBoardCard {
+export function toGitLabTaskBoardCard(
+  item: GitLabWorkItem,
+  repoLabel: string,
+  workItemStatus: GitLabWorkItemStatus | null = null
+): TaskBoardCard {
   return {
     refKey: taskBoardRefKey(
       {
@@ -96,9 +100,10 @@ export function toGitLabTaskBoardCard(item: GitLabWorkItem, repoLabel: string): 
     title: item.title,
     url: item.url,
     projectLabel: repoLabel,
-    statusName: item.state,
+    statusName: workItemStatus?.name ?? item.state,
     category: openClosedStatusCategory(item.state),
     labels: item.labels,
+    ...(workItemStatus ? { workItemStatus } : {}),
     updatedAt: item.updatedAt,
     source: { provider: 'gitlab', item }
   }

@@ -3,7 +3,11 @@ import {
   getRepoRoutingConnectionId
 } from '../../shared/execution-host/execution-host'
 import type { ClassifiedError } from '../../shared/errors/classified-error'
-import type { GitLabWorkItem } from '../../shared/gitlab/gitlab-types'
+import type {
+  GitLabProjectRef,
+  GitLabWorkItem,
+  GitLabWorkItemStatus
+} from '../../shared/gitlab/gitlab-types'
 import { mapSettledWithConcurrency } from '../../shared/concurrency/map-with-concurrency'
 import { parseGitLabIssueOrMRLink } from '../../shared/new-workspace/gitlab-links'
 import type { Repo } from '../../shared/repository/repo-types'
@@ -15,6 +19,7 @@ import {
   type TaskBoardProviderResult
 } from '../../shared/task-board/task-board-provider-results'
 import { listIssues as listGitLabIssues } from '../gitlab/issues/gitlab-issue-queries'
+import { getWorkItemStatuses } from '../gitlab/work-items/work-item-status'
 import type { LocalProjectGhExecOptions } from '../workspaces/execution-host/project-runtime-git-options'
 import type { TaskBoardListOptions } from './task-board-host-list'
 import {
@@ -98,32 +103,69 @@ function gitLabRepoReader(deps: TaskBoardRepoSourceDeps): RepoReader {
       return { error: taskBoardRepoError(error) }
     }
     const repoHostId = getRepoExecutionHostId(repo)
-    const issues = [
+    const items = [
       ...opened.items,
       ...closed.items.filter((issue) => isWithinDoneWindow(issue.updatedAt ?? '', now))
-    ]
+    ].map((issue): GitLabWorkItem => {
+      // The issue URL pins the project that owns it, whatever the checkout resolves to later.
+      const projectRef = parseGitLabIssueOrMRLink(issue.url)?.slug
+      return {
+        id: `gitlab-issue-${repo.id}-${issue.number}`,
+        type: 'issue',
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        url: issue.url,
+        labels: issue.labels,
+        updatedAt: issue.updatedAt ?? '',
+        author: issue.author ?? null,
+        repoId: repo.id,
+        repoHostId,
+        ...(projectRef ? { projectRef } : {})
+      }
+    })
+    const statusOf = await readWorkItemStatuses(repo, items, deps)
     return {
-      cards: issues.map((issue) => {
-        // The issue URL pins the project that owns it, whatever the checkout resolves to later.
-        const projectRef = parseGitLabIssueOrMRLink(issue.url)?.slug
-        const item: GitLabWorkItem = {
-          id: `gitlab-issue-${repo.id}-${issue.number}`,
-          type: 'issue',
-          number: issue.number,
-          title: issue.title,
-          state: issue.state,
-          url: issue.url,
-          labels: issue.labels,
-          updatedAt: issue.updatedAt ?? '',
-          author: issue.author ?? null,
-          repoId: repo.id,
-          repoHostId,
-          ...(projectRef ? { projectRef } : {})
-        }
-        return toGitLabTaskBoardCard(item, repo.displayName)
-      })
+      cards: items.map((item) => toGitLabTaskBoardCard(item, repo.displayName, statusOf(item)))
     }
   }
+}
+
+function projectKey(projectRef: GitLabProjectRef): string {
+  return `${projectRef.host}/${projectRef.path}`
+}
+
+/** One GraphQL read per project; a project that cannot answer keeps its cards on labels. */
+async function readWorkItemStatuses(
+  repo: Repo,
+  items: readonly GitLabWorkItem[],
+  deps: TaskBoardRepoSourceDeps
+): Promise<(item: GitLabWorkItem) => GitLabWorkItemStatus | null> {
+  const projects = new Map<string, { projectRef: GitLabProjectRef; iids: number[] }>()
+  for (const { projectRef, number } of items) {
+    if (projectRef) {
+      const project = projects.get(projectKey(projectRef)) ?? { projectRef, iids: [] }
+      project.iids.push(number)
+      projects.set(projectKey(projectRef), project)
+    }
+  }
+  const reads = new Map<string, Map<number, GitLabWorkItemStatus | null> | null>()
+  await Promise.all(
+    [...projects].map(async ([key, { projectRef, iids }]) => {
+      reads.set(
+        key,
+        await getWorkItemStatuses(
+          repo.path,
+          projectRef,
+          iids,
+          getRepoRoutingConnectionId(repo),
+          deps.getLocalGitArgs(repo)[0] ?? {}
+        )
+      )
+    })
+  )
+  return (item) =>
+    (item.projectRef && reads.get(projectKey(item.projectRef))?.get(item.number)) || null
 }
 
 export function readGitLabTaskBoardRepos(

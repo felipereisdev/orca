@@ -5,7 +5,10 @@ import {
   resolveCategoryColumnId,
   resolveTaskBoardColumnId
 } from '../../shared/task-board/task-board-columns'
-import { resolveLabelProviderMove } from '../../shared/task-board/task-board-move-targets'
+import {
+  canMoveByWorkItemStatus,
+  resolveLabelProviderMove
+} from '../../shared/task-board/task-board-move-targets'
 import { taskBoardProject } from '../../shared/task-board/task-board-project-filter'
 import {
   disconnectedTaskBoardResult,
@@ -94,6 +97,12 @@ function taskBoardMoveTargets(
     // Jira/Linear targets depend on the issue's live transitions, so the move itself decides.
     if (card.provider === 'jira' || card.provider === 'linear') {
       return [{ columnId: column.id, allowed: true }]
+    }
+    // The project's allowed statuses are read only when moving, so a rule (or todo/done) is enough here.
+    if (card.workItemStatus) {
+      return canMoveByWorkItemStatus(column.id, columns, settings)
+        ? [{ columnId: column.id, allowed: true }]
+        : [{ columnId: column.id, allowed: false, reason: 'no-mapping' }]
     }
     const move = resolveLabelProviderMove(card, column.id, columns, settings)
     if (move.ok) {

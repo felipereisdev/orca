@@ -117,6 +117,7 @@ function setup(writeResult: { ok: true; id: string } | { ok: false; error: strin
     linearViewerId: unused,
     linearIssue: unused,
     gitlabWorkItemDetails: unused,
+    gitlabWorkItemStatuses: unused,
     githubWorkItemDetails: unused,
     addJiraComment: async () => {
       if (writeResult.ok) {
