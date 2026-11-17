@@ -20,8 +20,8 @@ import {
 import type { StopMutation } from '../runtime/rpc/methods/orchestration/worker/stop/single-worker-stop'
 import type { TaskStartCard } from './task-start-context'
 import type { TaskStartLifecycleDeps } from './task-start-lifecycle'
+import { buildTaskStartAgentCatalog } from './task-start-agent-catalog'
 import {
-  buildTaskStartAgentCatalog,
   invalidTaskStartRoles,
   resolveTaskStartRepoForParams,
   taskStartRoleLabels,
