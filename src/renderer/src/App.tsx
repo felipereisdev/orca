@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConfirmationDialogProvider } from './components/confirmation-dialog'
 import { BrowserWebAuthnAccountDialog } from './components/browser-webauthn-account-dialog'
 import { BrowserExtensionInstallDialog } from './components/browser-extension-install-dialog'
+import { DatabaseConnectionPicker } from './components/database/DatabaseConnectionPicker'
 import { BrowserPagePrompts } from './components/browser-pane/browser-page-prompts'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
 import { SkillFreshnessNudge } from './components/skills/freshness/SkillFreshnessNudge'
@@ -117,6 +118,7 @@ function App(): React.JSX.Element {
             />
             <BrowserWebAuthnAccountDialog />
             <BrowserExtensionInstallDialog />
+            <DatabaseConnectionPicker />
           </LinkRoutingPreferenceDialogProvider>
         </ConfirmationDialogProvider>
         {createPortal(

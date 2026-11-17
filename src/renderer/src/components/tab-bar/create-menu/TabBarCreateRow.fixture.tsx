@@ -1,5 +1,6 @@
 import {
   Code,
+  Database,
   FilePlus,
   FileText,
   Globe,
@@ -56,6 +57,12 @@ const BUILT_IN: TabBarCreateRowItem[] = [
     label: 'Open Markdown...',
     icon: <FileText className={ICON} />,
     actionId: 'tab.openMarkdown',
+    run: noop
+  },
+  {
+    id: 'database-connections',
+    label: 'Database connections',
+    icon: <Database className={ICON} />,
     run: noop
   },
   {

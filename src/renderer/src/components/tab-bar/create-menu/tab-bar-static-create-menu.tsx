@@ -1,5 +1,5 @@
 import React from 'react'
-import { FilePlus, FileText, Globe, Smartphone, TerminalSquare } from 'lucide-react'
+import { Database, FilePlus, FileText, Globe, Smartphone, TerminalSquare } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
 import { MobileEmulatorTabIntroCallout } from '../../emulator-pane/tab-intro/MobileEmulatorTabIntroCallout'
 import { ShellIcon } from '../../terminal/shells/ShellIcon'
@@ -16,11 +16,13 @@ import { resolveWindowsShellLaunchTarget } from './windows-shell-launch'
 import { TabBarCreateRow } from './TabBarCreateRow'
 import { NEW_TAB_MENU_LAYOUT_SETTING } from '../../../../../shared/new-tab-menu/new-tab-menu-layout'
 import {
+  CREATE_ROW_DATABASE_CONNECTIONS_ID,
   CREATE_ROW_MOBILE_EMULATOR_ID,
   CREATE_ROW_TERMINAL_ID,
   type TabBarCreateRowItem
 } from './tab-bar-create-row-item'
-import { DatabaseWorkspaceMenu } from '../../database/DatabaseWorkspaceMenu'
+import { useWorkspaceDatabaseClient } from '../../database/use-workspace-database-connections'
+import { requestDatabaseConnectionPicker } from '@/lib/database/database-connection-picker-request'
 
 const ICON_CLASS = 'size-4'
 
@@ -64,6 +66,7 @@ export function TabBarStaticCreateMenu({
     onOpenFileTab
   } = props
   const pluginNewFiles = usePluginNewFiles()
+  const databaseClient = useWorkspaceDatabaseClient(terminalOnly ? null : props.worktreeId)
   const simulatorAvailable = !terminalOnly && mobileEmulatorEnabled && mobileEmulatorCreationEnabled
 
   const terminalItems: TabBarCreateRowItem[] =
@@ -182,6 +185,18 @@ export function TabBarStaticCreateMenu({
             }
           ]
         : []
+  // Why: like other unavailable creators, the icon is left out (its saved slot is kept) without a runtime.
+  const databaseItems: TabBarCreateRowItem[] =
+    !terminalOnly && databaseClient
+      ? [
+          {
+            id: CREATE_ROW_DATABASE_CONNECTIONS_ID,
+            label: t('database.workspace.open', 'Database connections'),
+            icon: <Database className={ICON_CLASS} />,
+            run: () => requestDatabaseConnectionPicker({ worktreeId: props.worktreeId, groupId })
+          }
+        ]
+      : []
   const items =
     newTabMenuSurface === 'floating-panel'
       ? [
@@ -189,6 +204,7 @@ export function TabBarStaticCreateMenu({
           ...openMarkdownItems,
           ...terminalItems,
           ...browserItems,
+          ...databaseItems,
           ...simulatorItems
         ]
       : [
@@ -196,6 +212,7 @@ export function TabBarStaticCreateMenu({
           ...browserItems,
           ...markdownItems,
           ...openMarkdownItems,
+          ...databaseItems,
           ...simulatorItems
         ]
 
@@ -204,19 +221,11 @@ export function TabBarStaticCreateMenu({
       items={items}
       customizable={!terminalOnly}
       layoutSetting={NEW_TAB_MENU_LAYOUT_SETTING[newTabMenuSurface]}
-      renderBelow={(shownIds) => (
-        <>
-          {/* Database connections open a submenu of entries, so they sit below the icon row. */}
-          {!terminalOnly ? (
-            <DatabaseWorkspaceMenu worktreeId={props.worktreeId} groupId={groupId} />
-          ) : null}
-          {showMobileEmulatorIntroCallout &&
-          isMacOs &&
-          shownIds.has(CREATE_ROW_MOBILE_EMULATOR_ID) ? (
-            <MobileEmulatorTabIntroCallout />
-          ) : null}
-        </>
-      )}
+      renderBelow={(shownIds) =>
+        showMobileEmulatorIntroCallout && isMacOs && shownIds.has(CREATE_ROW_MOBILE_EMULATOR_ID) ? (
+          <MobileEmulatorTabIntroCallout />
+        ) : null
+      }
     />
   )
 }

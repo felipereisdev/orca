@@ -24818,6 +24818,16 @@
       "importFailed": "Não foi possível importar o repositório"
     }
   },
+  "database": {
+    "workspace": {
+      "open": "Conexões de banco de dados",
+      "loading": "Carregando conexões…",
+      "empty": "Nenhuma conexão associada a este projeto",
+      "pickerDescription": "Escolha uma conexão para explorar.",
+      "search": "Buscar conexões…",
+      "noMatch": "Nenhuma conexão encontrada"
+    }
+  },
   "taskBoard": {
     "emptyColumn": "Nenhuma issue",
     "openExternal": "Abrir {{id}} no navegador",

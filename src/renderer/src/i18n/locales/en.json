@@ -26142,7 +26142,10 @@
     "workspace": {
       "open": "Database connections",
       "loading": "Loading connections…",
-      "empty": "No connections associated with this project"
+      "empty": "No connections associated with this project",
+      "pickerDescription": "Choose a connection to explore.",
+      "search": "Search connections…",
+      "noMatch": "No matching connections"
     },
     "mention": {
       "files": "Files",
