@@ -78,21 +78,6 @@ export function resolveLabelProviderMove(
   return { ok: false, reason: 'no-mapping' }
 }
 
-/** A GitLab card with a Status moves by Status: a column some rule targets, or the todo/done fallback. */
-export function canMoveByWorkItemStatus(
-  targetColumnId: string,
-  columns: readonly WorkspaceStatusDefinition[],
-  settings: TaskBoardSettings
-): boolean {
-  return (
-    getActiveTaskBoardRules('gitlab', columns, settings).some(
-      (rule) => rule.statusId === targetColumnId
-    ) ||
-    targetColumnId === resolveCategoryColumnId('todo', columns, settings) ||
-    targetColumnId === resolveCategoryColumnId('done', columns, settings)
-  )
-}
-
 /** The allowed Status that lands `card` in the target column; null when none does. */
 export function selectGitLabMoveStatus(
   card: TaskBoardCard,

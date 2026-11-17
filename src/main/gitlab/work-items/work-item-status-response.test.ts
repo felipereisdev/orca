@@ -15,30 +15,45 @@ function project(nodes: unknown[]) {
 
 describe('parseWorkItemStatusesResponse', () => {
   it('reads each item’s Status by iid, and null where the status widget is absent', () => {
-    const statuses = parseWorkItemStatusesResponse(
-      project([
-        { iid: '7', widgets: [{}, { status: inReview }, {}] },
-        { iid: '8', widgets: [{}, {}] }
-      ])
-    )
-    expect(statuses).toEqual(
-      new Map([
+    expect(
+      parseWorkItemStatusesResponse(
+        project([
+          { iid: '7', widgets: [{}, { status: inReview }, {}] },
+          { iid: '8', widgets: [{}, {}] }
+        ])
+      )
+    ).toEqual({
+      kind: 'statuses',
+      statuses: new Map([
         [7, inReview],
         [8, null]
       ])
-    )
+    })
   })
 
-  it('answers null for a GraphQL errors array, so cards keep their labels', () => {
+  it('reads a schema without the status types as unsupported', () => {
     expect(
       parseWorkItemStatusesResponse({
-        errors: [{ message: 'No such type WorkItemWidgetStatus, so it can’t be a fragment' }]
+        errors: [
+          {
+            message: 'No such type WorkItemWidgetStatus, so it can’t be a fragment condition',
+            extensions: { code: 'undefinedType', typeName: 'WorkItemWidgetStatus' }
+          }
+        ]
       })
-    ).toBeNull()
+    ).toEqual({ kind: 'unsupported' })
   })
 
-  it('answers null when the project is not readable', () => {
-    expect(parseWorkItemStatusesResponse({ data: { project: null } })).toBeNull()
+  it('reads any other errors array as a failure', () => {
+    expect(
+      parseWorkItemStatusesResponse({ errors: [{ message: 'Internal server error' }] })
+    ).toEqual({ kind: 'failed', error: expect.stringContaining('Internal server error') })
+  })
+
+  it('reads an unreadable project as a failure', () => {
+    expect(parseWorkItemStatusesResponse({ data: { project: null } })).toMatchObject({
+      kind: 'failed'
+    })
   })
 })
 
@@ -62,17 +77,20 @@ describe('parseWorkItemStatusTargetResponse', () => {
       }
     ])
     expect(parseWorkItemStatusTargetResponse(payload, 7)).toEqual({
-      workItemId: 'gid://gitlab/WorkItem/385444',
-      status: toDo,
-      lifecycle: {
-        allowedStatuses: [toDo, inReview, done],
-        defaultOpenStatus: toDo,
-        defaultClosedStatus: done
+      kind: 'target',
+      target: {
+        workItemId: 'gid://gitlab/WorkItem/385444',
+        status: toDo,
+        lifecycle: {
+          allowedStatuses: [toDo, inReview, done],
+          defaultOpenStatus: toDo,
+          defaultClosedStatus: done
+        }
       }
     })
   })
 
-  it('answers null when the type has no status widget definition', () => {
+  it('reads a type without a status widget definition as unsupported', () => {
     const payload = project([
       {
         id: 'gid://gitlab/WorkItem/1',
@@ -81,7 +99,7 @@ describe('parseWorkItemStatusTargetResponse', () => {
         workItemType: { widgetDefinitions: [{}] }
       }
     ])
-    expect(parseWorkItemStatusTargetResponse(payload, 7)).toBeNull()
+    expect(parseWorkItemStatusTargetResponse(payload, 7)).toEqual({ kind: 'unsupported' })
   })
 })
 

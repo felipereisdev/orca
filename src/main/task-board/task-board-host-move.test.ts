@@ -220,8 +220,12 @@ const toDoStatus = { id: 'gid://status/30', name: 'To do' }
 const inReviewStatus = { id: 'gid://status/39', name: 'In review' }
 const doneStatus = { id: 'gid://status/27', name: 'Done' }
 
-/** A GitLab issue whose Status (or labels) really change when written. */
-function gitlabHost(status: { id: string; name: string } | null) {
+/** A GitLab issue whose Status (or labels) really change when written; `null`: no statuses. */
+function gitlabHost(
+  status: { id: string; name: string } | null,
+  options: { statusReadFails?: boolean } = {}
+) {
+  const failedRead = { kind: 'failed' as const, error: 'GitLab GraphQL timed out' }
   const state: {
     status: { id: string; name: string } | null
     labels: string[]
@@ -269,7 +273,12 @@ function gitlabHost(status: { id: string; name: string } | null) {
       body: '',
       comments: []
     }),
-    gitlabWorkItemStatuses: async () => (state.status ? new Map([[7, state.status]]) : null),
+    gitlabWorkItemStatuses: async () =>
+      options.statusReadFails
+        ? failedRead
+        : state.status
+          ? { kind: 'statuses', statuses: new Map([[7, state.status]]) }
+          : { kind: 'unsupported' },
     githubWorkItemDetails: unused,
     jiraTransitions: unused,
     updateJiraIssue: unused,
@@ -280,15 +289,25 @@ function gitlabHost(status: { id: string; name: string } | null) {
       state.labels = [...state.labels, ...(updates.addLabels ?? [])]
       return { ok: true }
     },
-    gitlabWorkItemStatusTarget: async () => ({
-      workItemId: 'gid://gitlab/WorkItem/385444',
-      status: state.status,
-      lifecycle: {
-        allowedStatuses: [toDoStatus, inReviewStatus, doneStatus],
-        defaultOpenStatus: toDoStatus,
-        defaultClosedStatus: doneStatus
+    gitlabWorkItemStatusTarget: async () => {
+      if (options.statusReadFails) {
+        return failedRead
       }
-    }),
+      return state.status
+        ? {
+            kind: 'target',
+            target: {
+              workItemId: 'gid://gitlab/WorkItem/385444',
+              status: state.status,
+              lifecycle: {
+                allowedStatuses: [toDoStatus, inReviewStatus, doneStatus],
+                defaultOpenStatus: toDoStatus,
+                defaultClosedStatus: doneStatus
+              }
+            }
+          }
+        : { kind: 'unsupported' }
+    },
     updateGitLabWorkItemStatus: async (_path, _project, workItemId, statusId) => {
       state.statusWrites.push(`${workItemId} → ${statusId}`)
       state.status = [toDoStatus, inReviewStatus, doneStatus].find((s) => s.id === statusId)!
@@ -322,7 +341,15 @@ describe('moveTaskBoardCard on GitLab', () => {
     expect(state.statusWrites).toEqual(['gid://gitlab/WorkItem/385444 → gid://status/27'])
   })
 
-  it('moves a card without a Status by labels', async () => {
+  it('fails the move when GitLab cannot answer the Status, instead of editing labels', async () => {
+    const { deps, state } = gitlabHost(toDoStatus, { statusReadFails: true })
+    const result = await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'in-review' }, deps)
+    expect(result).toEqual({ status: 'failed', error: expect.stringContaining('timed out') })
+    expect(state.labels).toEqual([])
+    expect(state.statusWrites).toEqual([])
+  })
+
+  it('moves a card of a project without statuses by labels', async () => {
     const { deps, state } = gitlabHost(null)
     const result = await moveTaskBoardCard({ ref: gitlabRef, targetColumnId: 'in-review' }, deps)
     expect(result.status).toBe('moved')

@@ -109,6 +109,16 @@ export function toGitLabTaskBoardCard(
   }
 }
 
+/** The GitLab card as it reads with `workItemStatus`; other cards unchanged. */
+export function withGitLabWorkItemStatus(
+  card: TaskBoardCard,
+  workItemStatus: GitLabWorkItemStatus | null
+): TaskBoardCard {
+  return card.source.provider === 'gitlab'
+    ? toGitLabTaskBoardCard(card.source.item, card.projectLabel, workItemStatus)
+    : card
+}
+
 export function toGitHubTaskBoardCard(item: GitHubWorkItem, repoLabel: string): TaskBoardCard {
   return {
     refKey: taskBoardRefKey(

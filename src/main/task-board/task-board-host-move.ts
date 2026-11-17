@@ -33,6 +33,7 @@ import type {
   getWorkItemStatusTarget as getGitLabWorkItemStatusTarget,
   updateWorkItemStatus as updateGitLabWorkItemStatus
 } from '../gitlab/work-items/work-item-status'
+import type { GitLabWorkItemStatusTarget } from '../gitlab/work-items/work-item-status-response'
 import { invalidateTaskBoardCardCaches, type TaskBoardEnrichCaches } from './task-board-enrich'
 import {
   readTaskBoardCard,
@@ -42,7 +43,7 @@ import {
 import { placeTaskBoardCard, type TaskBoardHostDeps } from './task-board-host-list'
 import type { TaskBoardMoveHolds } from './task-board-move-holds'
 import { taskBoardErrorMessage } from './task-board-provider-errors'
-import { planGitLabStatusMove } from './task-board-host-gitlab-status-move'
+import { planGitLabStatusMove, readTaskBoardMoveCard } from './task-board-host-gitlab-status-move'
 
 type RepoRef = Extract<TaskBoardCardRef, { provider: 'gitlab' | 'github' }>
 type ProviderWrite = { ok: true } | { ok: false; error: string }
@@ -63,7 +64,6 @@ export type TaskBoardMoveWriteDeps = {
   /** The labels of the issue's own project/repository; [] when unreadable. */
   repoLabels(ref: RepoRef, repo: Repo): Promise<string[]>
   updateGitLabIssue: typeof updateGitLabIssue
-  /** Throws when unreadable; null when the issue has no status widget. */
   gitlabWorkItemStatusTarget: typeof getGitLabWorkItemStatusTarget
   updateGitLabWorkItemStatus: typeof updateGitLabWorkItemStatus
   updateGitHubIssue: typeof updateGitHubIssue
@@ -238,9 +238,10 @@ async function planLabelMove(
   }
 }
 
-function planMove(
+async function planMove(
   params: TaskBoardMoveParams,
   card: TaskBoardCard,
+  statusTarget: GitLabWorkItemStatusTarget | null,
   target: BoardTarget,
   deps: TaskBoardMoveDeps
 ): Promise<MovePlan> {
@@ -251,8 +252,8 @@ function planMove(
     case 'linear':
       return planLinearMove(ref, params, target, deps)
     case 'gitlab':
-      return card.workItemStatus
-        ? planGitLabStatusMove(ref, card, target, deps)
+      return statusTarget
+        ? planGitLabStatusMove(ref, card, statusTarget, target, deps)
         : planLabelMove(ref, card, target, deps)
     case 'github':
       return planLabelMove(ref, card, target, deps)
@@ -277,12 +278,12 @@ export async function moveTaskBoardCard(
     // Keyed before the write, so a confirmed move never ends as an RPC error.
     refKey = taskBoardRefKeyForRef(params.ref, deps)
     // The provider's current state, not the client's possibly stale card, decides the move.
-    const card = await readTaskBoardCard(params.ref, deps)
+    const { card, statusTarget } = await readTaskBoardMoveCard(params.ref, deps)
     from = resolveTaskBoardColumnId(card, columns, settings)
     if (from === params.targetColumnId) {
       return { status: 'blocked', reason: 'same-column' }
     }
-    const plan = await planMove(params, card, target, deps)
+    const plan = await planMove(params, card, statusTarget, target, deps)
     if ('stop' in plan) {
       return plan.stop
     }

@@ -49,7 +49,8 @@ export function createTaskStartServiceDeps(
     lifecycle: board.taskStart,
     cardKey: (ref) => taskBoardRefKeyForRef(ref, board),
     readContext: async (ref) => {
-      const read = await readTaskBoardCard(ref, board)
+      // The context needs the title and URL, not the column.
+      const read = await readTaskBoardCard(ref, board, { workItemStatus: 'skip' })
       const card: TaskStartCard = {
         ref,
         provider: read.provider,

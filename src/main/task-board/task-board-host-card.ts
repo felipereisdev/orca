@@ -28,9 +28,12 @@ export type TaskBoardCardReadDeps = TaskBoardCommentDeps & {
   /** The listing names the site on cards only when several are connected. */
   jiraSiteCount(): number
   linearIssue(id: string, workspaceId: string | null): Promise<LinearIssue | null>
-  /** Answers null when the project has no statuses; the card then stays on labels. */
   gitlabWorkItemStatuses: typeof getGitLabWorkItemStatuses
 }
+
+/** How a GitLab card read treats the work item Status: `required` fails the read when GitLab
+ *  cannot answer (an instance without statuses still reads); `best-effort` falls back to labels. */
+export type TaskBoardCardReadOptions = { workItemStatus?: 'required' | 'best-effort' | 'skip' }
 
 function unreadable(ref: TaskBoardCardRef): Error {
   const name = ref.provider === 'jira' ? ref.key : ref.provider === 'linear' ? ref.id : ref.number
@@ -52,7 +55,8 @@ export function taskBoardRefKeyForRef(ref: TaskBoardCardRef, deps: TaskBoardComm
 /** One issue read by its ref, shaped like the listing's card so its refKey matches. */
 export async function readTaskBoardCard(
   ref: TaskBoardCardRef,
-  deps: TaskBoardCardReadDeps
+  deps: TaskBoardCardReadDeps,
+  options: TaskBoardCardReadOptions = {}
 ): Promise<TaskBoardCard> {
   switch (ref.provider) {
     case 'jira': {
@@ -80,15 +84,21 @@ export async function readTaskBoardCard(
       const { projectRef: _detailsProjectRef, ...item } = details.item
       // Same project pin as the listing, which reads it from the issue URL.
       const projectRef = parseGitLabIssueOrMRLink(item.url)?.slug ?? ref.projectRef
-      const statuses = projectRef
-        ? await deps.gitlabWorkItemStatuses(
-            repo.path,
-            projectRef,
-            [ref.number],
-            getRepoRoutingConnectionId(repo),
-            deps.getLocalGitArgs(repo)[0] ?? {}
-          )
-        : null
+      const mode = options.workItemStatus ?? 'required'
+      const statuses =
+        projectRef && mode !== 'skip'
+          ? await deps.gitlabWorkItemStatuses(
+              repo.path,
+              projectRef,
+              [ref.number],
+              getRepoRoutingConnectionId(repo),
+              deps.getLocalGitArgs(repo)[0] ?? {}
+            )
+          : null
+      // Without its Status the card would resolve by labels, and a move would edit them.
+      if (statuses?.kind === 'failed' && mode === 'required') {
+        throw new Error(statuses.error)
+      }
       return toGitLabTaskBoardCard(
         {
           ...item,
@@ -98,7 +108,7 @@ export async function readTaskBoardCard(
           ...(projectRef ? { projectRef } : {})
         },
         repo.displayName,
-        statuses?.get(ref.number) ?? null
+        statuses?.kind === 'statuses' ? (statuses.statuses.get(ref.number) ?? null) : null
       )
     }
     case 'github': {

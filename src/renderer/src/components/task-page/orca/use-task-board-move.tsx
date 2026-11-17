@@ -193,15 +193,18 @@ export function useTaskBoardMove(args: {
 
   function canDrop(card: TaskBoardWireCard, columnId: string): TaskBoardDropCheck {
     const target = card.moveTargets.find((item) => item.columnId === columnId)
-    return target?.allowed === false
-      ? {
-          ok: false,
-          reason: t(
-            'taskBoard.noLabelMapping',
-            'Map a label to this column in Settings → Task Sources'
+    if (target?.allowed !== false) {
+      return { ok: true }
+    }
+    return {
+      ok: false,
+      reason: card.workItemStatus
+        ? t(
+            'taskBoard.noStatusOrLabelMapping',
+            'Map a GitLab status or label to this column in Settings → Task Sources'
           )
-        }
-      : { ok: true }
+        : t('taskBoard.noLabelMapping', 'Map a label to this column in Settings → Task Sources')
+    }
   }
 
   async function move(card: TaskBoardWireCard, columnId: string): Promise<void> {

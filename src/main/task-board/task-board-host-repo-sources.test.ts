@@ -35,12 +35,13 @@ beforeEach(() => {
 
 describe('readGitLabTaskBoardRepos', () => {
   it('reads the listed issues’ Status in one call per project and shows it on the card', async () => {
-    getWorkItemStatuses.mockResolvedValue(
-      new Map([
+    getWorkItemStatuses.mockResolvedValue({
+      kind: 'statuses',
+      statuses: new Map([
         [7, { id: 'gid://status/39', name: 'In review' }],
         [8, null]
       ])
-    )
+    })
 
     const result = await readGitLabTaskBoardRepos([repo], { fresh: false }, deps)
 
@@ -58,7 +59,7 @@ describe('readGitLabTaskBoardRepos', () => {
   })
 
   it('keeps the board ready on labels and state when GitLab cannot answer statuses', async () => {
-    getWorkItemStatuses.mockResolvedValue(null)
+    getWorkItemStatuses.mockResolvedValue({ kind: 'failed', error: 'timed out' })
 
     const result = await readGitLabTaskBoardRepos([repo], { fresh: false }, deps)
 

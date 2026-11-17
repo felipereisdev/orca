@@ -3,6 +3,9 @@ import type {
   GitLabWorkItemStatusLifecycle
 } from '../../../shared/gitlab/gitlab-types'
 
+/** `unsupported`: the instance has no statuses (labels are right); `failed`: it could not answer. */
+export type GitLabStatusReadFailure = { kind: 'unsupported' } | { kind: 'failed'; error: string }
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -13,19 +16,54 @@ function parseStatus(value: unknown): GitLabWorkItemStatus | null {
     : null
 }
 
-/** The work item nodes of `project.workItems`; null for a GraphQL error or an unreadable project. */
-function workItemNodes(payload: unknown): Record<string, unknown>[] | null {
+function graphqlErrors(payload: Record<string, unknown>): Record<string, unknown>[] {
+  return Array.isArray(payload.errors) ? payload.errors.filter(isRecord) : []
+}
+
+// Older, CE or Free schemas reject the status types and fields before running the query.
+function isSchemaError(error: Record<string, unknown>): boolean {
+  const code = isRecord(error.extensions) ? error.extensions.code : undefined
+  return code === 'undefinedType' || code === 'undefinedField'
+}
+
+function failed(error: string): GitLabStatusReadFailure {
+  return { kind: 'failed', error }
+}
+
+/** The work item nodes of `project.workItems`, or why there are none. */
+function workItemNodes(
+  payload: unknown
+): { nodes: Record<string, unknown>[] } | GitLabStatusReadFailure {
   if (!isRecord(payload)) {
-    return null
+    return failed('GitLab returned an unreadable status reply')
   }
-  // Older or Free instances reject the status fragment with an errors array.
-  if (payload.errors !== undefined && !(Array.isArray(payload.errors) && !payload.errors.length)) {
-    return null
+  const errors = graphqlErrors(payload)
+  if (errors.length > 0) {
+    return errors.every(isSchemaError)
+      ? { kind: 'unsupported' }
+      : failed(errors.map((error) => String(error.message ?? '')).join('; '))
   }
   const project = isRecord(payload.data) ? payload.data.project : undefined
   const workItems = isRecord(project) ? project.workItems : undefined
   const nodes = isRecord(workItems) ? workItems.nodes : undefined
-  return Array.isArray(nodes) ? nodes.filter(isRecord) : null
+  return Array.isArray(nodes)
+    ? { nodes: nodes.filter(isRecord) }
+    : failed('GitLab did not return the project’s work items')
+}
+
+/** True when every error is a field missing from the schema and named in `fields`. */
+export function onlyMissingFields(payload: unknown, fields: readonly string[]): boolean {
+  const errors = isRecord(payload) ? graphqlErrors(payload) : []
+  return (
+    errors.length > 0 &&
+    errors.every(
+      (error) =>
+        isRecord(error.extensions) &&
+        error.extensions.code === 'undefinedField' &&
+        typeof error.extensions.fieldName === 'string' &&
+        fields.includes(error.extensions.fieldName)
+    )
+  )
 }
 
 // Inline fragments answer `{}` for every other widget; only the status widget has `status`.
@@ -40,22 +78,24 @@ function iidOf(node: Record<string, unknown>): number | null {
   return Number.isSafeInteger(iid) ? iid : null
 }
 
-/** Status by iid (null when the item has none); null when the instance cannot answer. */
-export function parseWorkItemStatusesResponse(
-  payload: unknown
-): Map<number, GitLabWorkItemStatus | null> | null {
-  const nodes = workItemNodes(payload)
-  if (!nodes) {
-    return null
+export type GitLabWorkItemStatusesRead =
+  | { kind: 'statuses'; statuses: Map<number, GitLabWorkItemStatus | null> }
+  | GitLabStatusReadFailure
+
+/** Status by iid; null for an item without the status widget. */
+export function parseWorkItemStatusesResponse(payload: unknown): GitLabWorkItemStatusesRead {
+  const read = workItemNodes(payload)
+  if (!('nodes' in read)) {
+    return read
   }
   const statuses = new Map<number, GitLabWorkItemStatus | null>()
-  for (const node of nodes) {
+  for (const node of read.nodes) {
     const iid = iidOf(node)
     if (iid !== null) {
       statuses.set(iid, statusOf(node))
     }
   }
-  return statuses
+  return { kind: 'statuses', statuses }
 }
 
 export type GitLabWorkItemStatusTarget = {
@@ -65,14 +105,22 @@ export type GitLabWorkItemStatusTarget = {
   lifecycle: GitLabWorkItemStatusLifecycle
 }
 
-/** The item's id, Status and its type's allowed statuses; null when it has no status widget. */
+export type GitLabWorkItemStatusTargetRead =
+  | { kind: 'target'; target: GitLabWorkItemStatusTarget }
+  | GitLabStatusReadFailure
+
+/** The item's id, Status and its type's allowed statuses; `unsupported` without a status widget. */
 export function parseWorkItemStatusTargetResponse(
   payload: unknown,
   iid: number
-): GitLabWorkItemStatusTarget | null {
-  const node = workItemNodes(payload)?.find((entry) => iidOf(entry) === iid)
+): GitLabWorkItemStatusTargetRead {
+  const read = workItemNodes(payload)
+  if (!('nodes' in read)) {
+    return read
+  }
+  const node = read.nodes.find((entry) => iidOf(entry) === iid)
   if (!node || typeof node.id !== 'string') {
-    return null
+    return failed(`GitLab did not return work item #${iid}`)
   }
   const type = isRecord(node.workItemType) ? node.workItemType : {}
   const definitions = Array.isArray(type.widgetDefinitions) ? type.widgetDefinitions : []
@@ -81,17 +129,21 @@ export function parseWorkItemStatusTargetResponse(
       isRecord(entry) && Array.isArray(entry.allowedStatuses)
   )
   if (!definition || !Array.isArray(definition.allowedStatuses)) {
-    return null
+    return { kind: 'unsupported' }
   }
   return {
-    workItemId: node.id,
-    status: statusOf(node),
-    lifecycle: {
-      allowedStatuses: definition.allowedStatuses
-        .map(parseStatus)
-        .filter((status): status is GitLabWorkItemStatus => status !== null),
-      defaultOpenStatus: parseStatus(definition.defaultOpenStatus),
-      defaultClosedStatus: parseStatus(definition.defaultClosedStatus)
+    kind: 'target',
+    target: {
+      workItemId: node.id,
+      status: statusOf(node),
+      lifecycle: {
+        allowedStatuses: definition.allowedStatuses
+          .map(parseStatus)
+          .filter((status): status is GitLabWorkItemStatus => status !== null),
+        // Absent before GitLab 18.0, where the status query leaves them out.
+        defaultOpenStatus: parseStatus(definition.defaultOpenStatus),
+        defaultClosedStatus: parseStatus(definition.defaultClosedStatus)
+      }
     }
   }
 }

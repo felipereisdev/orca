@@ -1,6 +1,6 @@
 import { resolveTaskBoardColumnId } from '../../shared/task-board/task-board-columns'
 import type { TaskBoardCardRef } from '../../shared/task-board/task-board-wire-types'
-import { readTaskBoardCard } from './task-board-host-card'
+import { readTaskBoardMoveCard } from './task-board-host-gitlab-status-move'
 import { moveTaskBoardCard, type TaskBoardMoveDeps } from './task-board-host-move'
 
 /** `kept`: already there or past it, no such column, or the run ended; `skipped`: the move needs the user. */
@@ -18,7 +18,7 @@ export async function moveStartedTaskBoardCard(
   if (target === -1) {
     return 'kept'
   }
-  const card = await readTaskBoardCard(ref, deps)
+  const { card } = await readTaskBoardMoveCard(ref, deps)
   const current = resolveTaskBoardColumnId(card, columns, deps.host.settings().taskBoard)
   const index = columns.findIndex((column) => column.id === current)
   // A stop during the read leaves the card where it was.

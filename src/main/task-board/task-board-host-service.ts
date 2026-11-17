@@ -117,7 +117,8 @@ export async function getTaskBoardDetail(
   }
   const { taskBoard } = deps.host.settings()
   const card = placeTaskBoardCard(
-    await readTaskBoardCard(ref, shared),
+    // The detail view still opens when only the Status read fails.
+    await readTaskBoardCard(ref, shared, { workItemStatus: 'best-effort' }),
     deps.host.statuses(),
     taskBoard
   )

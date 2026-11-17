@@ -24824,6 +24824,7 @@
     "openExternalTooltip": "Abrir no navegador",
     "loadFailed": "Não foi possível carregar as issues. Atualize para tentar novamente.",
     "noLabelMapping": "Mapeie uma label para esta coluna em Configurações → Origens de Tarefas",
+    "noStatusOrLabelMapping": "Mapeie um status ou label do GitLab para esta coluna em Configurações → Origens de Tarefas",
     "providerAuthFailed": "{{provider}} precisa que você entre novamente.",
     "providerHostUnavailable": "{{provider}} não está disponível neste host.",
     "hostUpdateRequired": "Atualize o Orca no host para usar o Meu quadro.",

@@ -26171,6 +26171,7 @@
     "openExternalTooltip": "Open in browser",
     "loadFailed": "Could not load issues. Refresh to try again.",
     "noLabelMapping": "Map a label to this column in Settings → Task Sources",
+    "noStatusOrLabelMapping": "Map a GitLab status or label to this column in Settings → Task Sources",
     "providerAuthFailed": "{{provider}} needs you to sign in again.",
     "providerHostUnavailable": "{{provider}} is not available on this host.",
     "hostUpdateRequired": "Update Orca on the host to use My board.",

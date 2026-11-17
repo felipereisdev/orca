@@ -149,19 +149,20 @@ async function readWorkItemStatuses(
       projects.set(projectKey(projectRef), project)
     }
   }
-  const reads = new Map<string, Map<number, GitLabWorkItemStatus | null> | null>()
+  const reads = new Map<string, Map<number, GitLabWorkItemStatus | null>>()
   await Promise.all(
     [...projects].map(async ([key, { projectRef, iids }]) => {
-      reads.set(
-        key,
-        await getWorkItemStatuses(
-          repo.path,
-          projectRef,
-          iids,
-          getRepoRoutingConnectionId(repo),
-          deps.getLocalGitArgs(repo)[0] ?? {}
-        )
+      const read = await getWorkItemStatuses(
+        repo.path,
+        projectRef,
+        iids,
+        getRepoRoutingConnectionId(repo),
+        deps.getLocalGitArgs(repo)[0] ?? {}
       )
+      // Unsupported or failed alike: the listing shows labels rather than no board.
+      if (read.kind === 'statuses') {
+        reads.set(key, read.statuses)
+      }
     })
   )
   return (item) =>

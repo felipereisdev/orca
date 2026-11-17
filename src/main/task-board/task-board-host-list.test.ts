@@ -134,6 +134,30 @@ describe('buildTaskBoardList', () => {
     ])
   })
 
+  it('places a GitLab card by its Status and offers the columns a Status move can reach', async () => {
+    const settings = getDefaultTaskBoardSettings()
+    settings.providers.gitlab.rules = [{ match: 'In review', statusId: 'in-review' }]
+    const statusCard = toGitLabTaskBoardCard(gitLabIssue, 'app', {
+      id: 'gid://status/39',
+      name: 'In review'
+    })
+    const result = await buildTaskBoardList(
+      deps({
+        settings: () => ({ taskBoard: settings, visibleTaskProviders: ['gitlab'] }),
+        sources: { ...deps().sources, gitlab: ready('gitlab', [statusCard]) }
+      }),
+      { fresh: false }
+    )
+    const card = result.cards.find((c) => c.provider === 'gitlab')
+
+    expect(card?.columnId).toBe('in-review')
+    expect(card?.moveTargets).toEqual([
+      { columnId: 'todo', allowed: true },
+      { columnId: 'in-progress', allowed: false, reason: 'no-mapping' },
+      { columnId: 'completed', allowed: true }
+    ])
+  })
+
   it('reports a hidden provider as disconnected without reading it', async () => {
     const linear = vi.fn(ready('linear', []))
     const base = deps()
