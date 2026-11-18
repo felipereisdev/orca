@@ -8,7 +8,10 @@ import {
   type EphemeralVmRecipeDoctorCheck,
   type EphemeralVmRecipeDoctorResult
 } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
-import { getEphemeralVmRecipeResultWarnings } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
+import {
+  describeEphemeralVmRecipeStdoutForDiagnostics,
+  getEphemeralVmRecipeResultWarnings
+} from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
 import { redactEphemeralVmRecipeDiagnosticText } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
 // This module uses Node fs/path; exporting it through the shared barrel would break browser bundles.
 import { doctorEphemeralVmRecipe } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor'
@@ -101,9 +104,17 @@ type DoctorResult = EphemeralVmRecipeDoctorResult & {
 
 const MAX_TRANSCRIPT_STREAM_CHARS = 16_000
 
+// Stdout carries the recipe result and its secrets, so it is only shown parsed and redacted.
+function capTranscriptStdout(value: string): string {
+  return capRedactedTranscript(describeEphemeralVmRecipeStdoutForDiagnostics(value))
+}
+
 // Keep setup context and final diagnostics while bounding and redacting each stream.
 function capTranscriptStream(value: string): string {
-  const redacted = redactEphemeralVmRecipeDiagnosticText(value)
+  return capRedactedTranscript(redactEphemeralVmRecipeDiagnosticText(value))
+}
+
+function capRedactedTranscript(redacted: string): string {
   if (redacted.length <= MAX_TRANSCRIPT_STREAM_CHARS) {
     return redacted
   }
@@ -155,7 +166,7 @@ async function doctorRecipeWithProvision(
         provision: {
           exitCode: start.exitCode,
           signal: start.signal,
-          stdout: capTranscriptStream(start.stdout),
+          stdout: capTranscriptStdout(start.stdout),
           stderr: capTranscriptStream(start.stderr),
           parseError: start.error
         }
@@ -218,7 +229,7 @@ async function doctorRecipeWithProvision(
     provision: {
       exitCode: 0,
       signal: null,
-      stdout: capTranscriptStream(start.stdout),
+      stdout: capTranscriptStdout(start.stdout),
       stderr: capTranscriptStream(start.stderr)
     },
     ...(cleanup.skipped
@@ -227,7 +238,7 @@ async function doctorRecipeWithProvision(
           destroy: {
             exitCode: cleanup.exitCode,
             signal: cleanup.signal,
-            stdout: capTranscriptStream(cleanup.stdout),
+            stdout: capTranscriptStdout(cleanup.stdout),
             stderr: capTranscriptStream(cleanup.stderr)
           }
         })
@@ -243,7 +254,7 @@ async function doctorRecipeWithProvision(
 
 function buildProvisionFailureRemediation(stderr: string, stdout: string): string {
   const redactedStderr = redactEphemeralVmRecipeDiagnosticText(stderr).trim()
-  const redactedStdout = redactEphemeralVmRecipeDiagnosticText(stdout).trim()
+  const redactedStdout = describeEphemeralVmRecipeStdoutForDiagnostics(stdout).trim()
   const detail = redactedStderr || redactedStdout
   return detail
     ? `Check recipe output. Last captured output: ${detail.slice(-500)}`
