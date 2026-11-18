@@ -9,16 +9,10 @@ import {
   DesktopViewerParams,
   DesktopViewerUnsubscribeParams
 } from '../../../../../shared/rpc-contract/desktop/desktop-params'
-import { isAgentRpcCaller, type RpcCallerIdentity } from '../../callers/rpc-caller-identity'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
+import { assertDesktopController, claimDesktopController } from './desktop-controller-identity'
 
 const VIEWER_SUBSCRIPTION_PREFIX = 'desktop-viewer:'
-
-function refuseAgentCaller(caller: RpcCallerIdentity | undefined): void {
-  if (isAgentRpcCaller(caller)) {
-    throw new DesktopError('desktop_agent_not_allowed')
-  }
-}
 
 /**
  * Bridges one subscription to a broker viewer: binary frames from the client become the viewer's
@@ -99,10 +93,11 @@ export function createDesktopMethods(getBroker: () => DesktopBroker = getDesktop
       name: 'desktop.configure',
       permission: 'host-admin',
       params: DesktopConfigureParams,
-      handler: async (params, { caller }) => {
-        refuseAgentCaller(caller)
+      handler: async (params, ctx) => {
         const broker = getBroker()
+        const bind = claimDesktopController(broker, ctx)
         await broker.configure(params)
+        bind()
         return broker.status()
       }
     }),
@@ -116,9 +111,9 @@ export function createDesktopMethods(getBroker: () => DesktopBroker = getDesktop
       name: 'desktop.control.set',
       permission: 'workspace',
       params: DesktopControlSetParams,
-      handler: async (params, { caller }) => {
-        refuseAgentCaller(caller)
+      handler: async (params, ctx) => {
         const broker = getBroker()
+        assertDesktopController(broker, ctx)
         broker.setOwner(params.owner, params.viewerId)
         return broker.status()
       }
@@ -128,21 +123,22 @@ export function createDesktopMethods(getBroker: () => DesktopBroker = getDesktop
       permission: 'workspace',
       params: DesktopViewerParams,
       handler: async (params, ctx, emit) => {
-        refuseAgentCaller(ctx.caller)
-        await streamViewer(getBroker(), params.viewerId, ctx, emit)
+        const broker = getBroker()
+        assertDesktopController(broker, ctx)
+        await streamViewer(broker, params.viewerId, ctx, emit)
       }
     }),
     defineMethod({
       name: 'desktop.viewer.unsubscribe',
       permission: 'workspace',
       params: DesktopViewerUnsubscribeParams,
-      handler: async (params, { runtime, caller }) => {
-        refuseAgentCaller(caller)
+      handler: async (params, ctx) => {
+        assertDesktopController(getBroker(), ctx)
         // Only viewer streams: this must not become a way to end other subscriptions.
         if (!params.subscriptionId.startsWith(VIEWER_SUBSCRIPTION_PREFIX)) {
           return { unsubscribed: false }
         }
-        runtime.cleanupSubscription(params.subscriptionId)
+        ctx.runtime.cleanupSubscription(params.subscriptionId)
         return { unsubscribed: true }
       }
     })
