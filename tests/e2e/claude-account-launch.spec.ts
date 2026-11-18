@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Page } from '@stablyai/playwright-test'
-import { test, SUPPORTED } from './helpers/structured-claude-stub'
-import { expect } from './helpers/orca-app'
-import { waitForSessionReady } from './helpers/store'
-import { waitForTerminalOutput } from './helpers/terminal'
+import { test, SUPPORTED } from './agents/session-fixtures/structured-claude-stub'
+import { expect } from '@stablyai/playwright-test'
+import { waitForSessionReady } from './desktop/renderer-probes/store'
+import { waitForTerminalOutput } from './terminal/layout/terminal-pane-operations'
 
 test.use({
   seedTestRepo: false,

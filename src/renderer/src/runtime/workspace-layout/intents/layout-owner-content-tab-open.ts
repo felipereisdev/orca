@@ -6,12 +6,19 @@ import { expectTabFacts, type PendingTabFacts } from './layout-owner-pending-tab
 
 type ContentTabOpenCommand = Extract<
   WindowLayoutCommand,
-  { type: 'openBrowserTab' | 'openAgentSessionTab' | 'openSimulatorTab' | 'openDatabaseTab' }
+  {
+    type:
+      | 'openBrowserTab'
+      | 'openAgentSessionTab'
+      | 'openSimulatorTab'
+      | 'openDatabaseTab'
+      | 'openRoomTab'
+  }
 >
 
 export type ContentTabOpen = {
   worktreeId: string
-  /** What the tab shows: a browser record, chat session or the simulator tab itself. */
+  /** What the tab shows: a browser record, chat session, bot group or the simulator tab itself. */
   entityId: string
   command: ContentTabOpenCommand
   facts: Omit<PendingTabFacts, 'worktreeId' | 'tabId'>

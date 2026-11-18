@@ -8,9 +8,9 @@ import {
   type ProviderAccountsSnapshot
 } from '@/runtime/provider-accounts/observations/runtime-provider-accounts-client'
 import { useActiveAccountOwner } from '@/runtime/provider-accounts/ownership/use-active-account-owner'
+import type { AccountOwner } from '@/runtime/provider-accounts/ownership/wsl-host-account-owner'
 import type { RateLimitState } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
-import type { ClaudeRateLimitAccountsState } from '../../../../../shared/agent-accounts/managed-account-types'
 import { useAppStore } from '../../../store/index'
 import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
 import {
@@ -47,8 +47,10 @@ export function getUsageOwnerHostScope(remoteOwner: RemoteUsageOwner | null): Ru
 }
 
 export type OwnerUsageRateLimits = {
+  /** Whose accounts the shown usage belongs to; account switchers list this owner's accounts. */
+  owner: AccountOwner
   rateLimits: RateLimitState
-  claudeAccounts: ClaudeRateLimitAccountsState | null
+  accounts: ProviderAccountsSnapshot | null
   /** Null when this device owns the shown usage. */
   remoteOwner: RemoteUsageOwner | null
   /** Forces the owning host to re-read usage; null when this device owns it. */
@@ -70,8 +72,8 @@ export function useOwnerUsageRateLimits(local: RateLimitState): OwnerUsageRateLi
         : LOCAL_TARGET,
     [pairedEnvironmentId]
   )
-  const { target } = useActiveAccountOwner(fallback)
-  const ownerId = runtimeTargetEnvironmentId(target)
+  const owner = useActiveAccountOwner(fallback)
+  const ownerId = runtimeTargetEnvironmentId(owner.target)
   const ownerName = useAppStore(
     (s) => s.runtimeEnvironments.find((environment) => environment.id === ownerId)?.name ?? null
   )
@@ -98,6 +100,7 @@ export function useOwnerUsageRateLimits(local: RateLimitState): OwnerUsageRateLi
 
   const applySnapshot = useCallback(
     (owner: string, snapshot: ProviderAccountsSnapshot) => {
+      // Why: a host that predates published usage answers without it; say so, never spin, and keep its roster.
       apply({
         ownerId: owner,
         snapshot,
@@ -210,11 +213,9 @@ export function useOwnerUsageRateLimits(local: RateLimitState): OwnerUsageRateLi
     [local, ownerState, t]
   )
   return {
+    owner,
     rateLimits,
-    claudeAccounts:
-      remoteOwner && owned?.ownerId === remoteOwner.environmentId
-        ? (owned.snapshot?.claude ?? null)
-        : null,
+    accounts: ownerId && owned?.ownerId === ownerId ? owned.snapshot : null,
     remoteOwner,
     refreshRemote: ownerId ? refreshRemote : null
   }

@@ -21,7 +21,10 @@ import type { TaskPageJiraBoardSection } from './task-page-jira-board-sections'
 import { JiraBoardMoveDialog, type JiraBoardMovePrompt } from './task-page-jira-board-move-dialog'
 import { applyJiraBoardMove, getJiraBoardMoveTransitions } from './task-page-jira-board-move'
 import { formatRelativeTime } from '../../task-page-source-context'
-import { enqueueJiraIssueMutation, jiraIssueRequestScope } from '../../../jira-issue-mutation-queue'
+import {
+  enqueueJiraIssueMutation,
+  jiraIssueRequestScope
+} from '../issue-workspace/jira-issue-mutation-queue'
 
 /** The tab keeps Jira's own transitions; the shared dialog sees them as board choices. */
 type JiraTabMovePrompt = {

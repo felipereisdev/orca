@@ -21,7 +21,7 @@ import type { OrchestrationDb } from '../../db/orchestration-db'
 import {
   orchestrationMailNotice,
   type AgentMessageSource
-} from '../../../../../shared/agent-session/agent-session-message-source'
+} from '../../../../../shared/agent-session/journal/agent-session-message-source'
 import type { QueuedMessageOwed } from '../../../../native-chat/agent-session-journal/queued-messages/queued-message-consume-error'
 import {
   structuredMailboxCustody,
@@ -197,20 +197,26 @@ export abstract class OrcaRuntimeWithGetPtyRecordForPaneKey extends OrcaRuntimeW
     }
     // Log failures without blocking the later first-turn workspace rename.
     try {
-      // A working edge can follow a human answer, unblocking parked mail too.
-      this.notifyStructuredSessionJournalActivity(summary.sessionId)
       if (summary.status === 'working') {
+        // A working edge can follow a human answer, unblocking parked mail too.
+        this.notifyStructuredSessionJournalActivity(summary.sessionId)
         return
       }
-      const openDb = () => this.getExistingOrchestrationDb()
-      const deliver = (mailbox: string) => this.deliverPendingMessagesForHandle(mailbox)
-      structuredSessionIdleEdgeMailboxes(summary.sessionId, openDb).forEach(deliver)
+      this.redriveStructuredSessionMail(summary.sessionId)
     } catch (error) {
       console.warn('[orchestration] structured session mail redrive failed', {
         sessionId: summary.sessionId,
         error: error instanceof Error ? error.message : String(error)
       })
     }
+  }
+
+  /** A chat's idle edge for its mail: parked mail retried, and the mailboxes it owns re-derived. */
+  redriveStructuredSessionMail(sessionId: string): void {
+    this.notifyStructuredSessionJournalActivity(sessionId)
+    const openDb = () => this.getExistingOrchestrationDb()
+    const deliver = (mailbox: string) => this.deliverPendingMessagesForHandle(mailbox)
+    structuredSessionIdleEdgeMailboxes(sessionId, openDb).forEach(deliver)
   }
 
   private readonly structuredSessionTabHiddenListeners = new Set<(sessionId: string) => void>()

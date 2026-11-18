@@ -20,6 +20,7 @@ function validateOne(
   clearTimeout(idle)
   if (!worker) {
     const created = spawnWorkerThread(databaseQueryPolicyWorkerPath, {
+      name: 'orca-database-query-policy',
       execArgv: [],
       resourceLimits: { maxOldGenerationSizeMb: 384 }
     })

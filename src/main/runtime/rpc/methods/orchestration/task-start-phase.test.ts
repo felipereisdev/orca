@@ -5,7 +5,7 @@ import { testOrcaSessionId } from '../../../../../shared/agent-session/identity/
 import type { TaskStartOrchestratorRef } from '../../../../../shared/task-board/task-start-run'
 import { getTaskStartRunStore } from '../../../../task-board/task-start-lifecycle-deps'
 import { OrcaRuntimeService } from '../../../orca-runtime'
-import { partialRuntimeStore } from '../../../orca-runtime-tests/runtime-store-partial-fixture'
+import { partialRuntimeStore } from '../../../construction/test-context/runtime-store-partial-fixture'
 import type { RpcContext } from '../../core'
 import { ORCHESTRATION_TASK_START_METHODS } from './task-start-phase'
 

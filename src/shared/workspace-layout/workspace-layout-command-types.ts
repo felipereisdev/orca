@@ -1,6 +1,7 @@
 import type { WindowContentTabOpenCommand } from './workspace-layout-window-content-open-command'
 // Pure commands change layout only; runtime owns catalog/path/host-support/liveness refusals requiring external facts.
 
+import type { DrawnTabPlacement } from './workspace-layout-tab-placement'
 import type { LayoutClientVisibility } from './client-views/workspace-layout-client-visibility'
 import type { LiveTerminalAdoption } from './commands/workspace-layout-terminal-adoption'
 import type { SleepingAgentSessionRecord } from '../agent-session/lifecycle/agent-session-resume'
@@ -137,7 +138,7 @@ export type LayoutCommand =
       fileId?: string
       contentType: Exclude<
         TabContentType,
-        'terminal' | 'browser' | 'agent-session' | 'simulator' | 'database'
+        'terminal' | 'browser' | 'agent-session' | 'simulator' | 'database' | 'room'
       >
       /** Present for edit-mode files, which are restored after restart. */
       file?: LayoutEditorFile
@@ -215,6 +216,8 @@ export type LayoutCommand =
       initial?: InitialSurfaceReason
       split?: NewGroupSplit
     })
+  /** A bot group's room; `botGroupId` is the tab's entity: the group's id, or a thread's. */
+  | (On & DrawnTabPlacement & { type: 'openRoomTab'; tabId?: string; botGroupId: string })
   | (On & { type: 'startPane'; paneKey: string })
   | (On & { type: 'restartPane'; paneKey: string })
   | (On & {

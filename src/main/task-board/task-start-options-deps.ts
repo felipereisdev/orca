@@ -1,9 +1,7 @@
 import { acpListingNeedsChatFolder } from '../acp/discovery/acp-model-discovery-policy'
 import { acpLaunchSpecFor } from '../acp/launch/acp-launch-registry'
-import type {
-  AgentSessionModelCatalogResult,
-  AgentSessionModelOption
-} from '../../shared/agent-session/agent-session-wire'
+import type { AgentSessionModelCatalogResult } from '../../shared/agent-session/agent-session-wire'
+import type { AgentSessionModelOption } from '../../shared/agent-session/options/model-catalog/agent-session-model-option'
 import type { Repo } from '../../shared/repository/repo-types'
 import { getRepoMainWorktreeId } from '../../shared/worktree/id'
 import { ALL_TUI_AGENTS } from '../../shared/agent-launch/catalog/tui-agent-display-names'

@@ -1,7 +1,7 @@
 import { Database, ShieldCheck, Plug, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import {
   DropdownMenu,
   DropdownMenuContent,

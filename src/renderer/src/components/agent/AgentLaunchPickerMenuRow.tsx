@@ -32,9 +32,7 @@ function pickerLaunchRow(entry: AgentPickerEntry, surface: AgentPickerSurface): 
 export type AgentPickerMenuLaunch = (
   row: NewTabAgentMenuRow,
   draft?: AgentPickerDraft,
-  entry?: AgentPickerEntry,
-  /** Select mode: the surface explicitly accepted by a named launch action. */
-  surface?: AgentPickerSurface
+  entry?: AgentPickerEntry
 ) => boolean | void | Promise<boolean>
 
 // Why: catalog and seed reads land one agent at a time after the menu opens; only that row re-renders.
@@ -154,9 +152,7 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
       preset={preset}
       entry={entry}
       initial={source}
-      seed={initial ?? selected ?? source}
-      surface={selected?.surface}
-      mode={mode}
+      seed={initial ?? source}
       terminalBlocked={terminalBlocked}
       open={openSetup === setupId}
       disabled={disabled || entry.accountNeedsSignIn || setupDisabled || !entry.surfaces.length}
@@ -170,17 +166,8 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
           onSelectAgent?.(entry.agent)
         }
       }}
-      onSelect={
-        mode === 'select'
-          ? (draft) => runLaunch(pickerLaunchRow(entry, draft.surface), draft, entry)
-          : undefined
-      }
       onUse={(draft) => {
-        const chosen = mode === 'select' ? draft.surface : undefined
-        const result =
-          chosen === undefined
-            ? runLaunch(pickerLaunchRow(entry, draft.surface), draft, entry)
-            : runLaunch(pickerLaunchRow(entry, draft.surface), draft, entry, chosen)
+        const result = runLaunch(pickerLaunchRow(entry, draft.surface), draft, entry)
         if (result !== false) {
           closeMenu()
         }
@@ -195,7 +182,7 @@ export const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
             if (disabled || entry.accountNeedsSignIn || launchBlocked || !entry.surfaces.length) {
               return
             }
-            const draft = initial ?? (mode === 'select' ? selected : undefined)
+            const draft = initial
             const surface = draft?.surface ?? entry.defaultSurface
             const row = draft
               ? pickerLaunchRow(entry, surface)

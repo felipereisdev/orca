@@ -7,7 +7,7 @@ import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire
 import {
   captureStructuredSessionSurface,
   retireCapturedStructuredSessionSurface
-} from '../runtime/agent-session/structured-agent-session-close'
+} from '../runtime/agent-session/lifecycle/structured-agent-session-close'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { OrchestrationCoordinatorKey } from '../runtime/orchestration/addressing/orchestration-caller-identity'
 import type { OrchestrationDb } from '../runtime/orchestration/db/orchestration-db'

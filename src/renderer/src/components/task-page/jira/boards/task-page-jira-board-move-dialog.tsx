@@ -11,7 +11,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import {
   JiraTransitionFieldsForm,
   type JiraTransitionFieldsSubmit
-} from '../../../jira-transition-fields-form'
+} from '../issue-workspace/jira-transition-fields-form'
 import type { TaskBoardChoice } from '../../../../../../shared/task-board/task-board-wire-types'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
 

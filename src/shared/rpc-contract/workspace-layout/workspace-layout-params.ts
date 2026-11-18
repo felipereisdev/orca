@@ -1,5 +1,5 @@
 import { databaseExplorerEntitySchema } from '../../database/database-explorer-reference'
-import { z } from 'zod'
+import * as z from 'zod'
 import { isTerminalLeafId } from '../../workspace-layout/stable-pane-id'
 import { SleepCommand, StartPaneCommand, WakeCommand } from './workspace-layout-sleep-wake-params'
 import { RenameTabsCommand } from './workspace-layout-rename-tabs-params'
@@ -198,6 +198,18 @@ const OpenAgentSessionTabCommand = z.object({
   split: NewGroupSplit
 })
 
+/** A bot group's room tab; its entity is the group id. */
+const OpenRoomTabCommand = z.object({
+  type: z.literal('openRoomTab'),
+  ...OnTab,
+  botGroupId: z.string().min(1),
+  groupId: z.string().min(1).optional(),
+  afterTabId: z.string().min(1).optional(),
+  index: z.number().int().nonnegative().optional(),
+  createdAt: z.number().int().nonnegative().optional(),
+  split: NewGroupSplit
+})
+
 const OnBrowserPage = {
   workspace: OnPane.workspace,
   browserTabId: z.string().min(1),
@@ -326,6 +338,7 @@ export const LayoutApplyParams = z.object({
     PromotePreviewTabCommand,
     OpenSimulatorTabCommand,
     OpenDatabaseTabCommand,
+    OpenRoomTabCommand,
     MoveTabToWorkspaceCommand,
     RenameEditorFilesCommand,
     SleepCommand,

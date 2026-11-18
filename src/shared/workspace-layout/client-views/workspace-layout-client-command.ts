@@ -125,6 +125,7 @@ export function clientLayoutCommand(
     case 'openSimulatorTab':
     case 'openBrowserTab':
     case 'openAgentSessionTab':
+    case 'openRoomTab':
       return placement(model.workspaces[command.workspace], command, visible)
     case 'movePaneToNewTab': {
       const workspace = model.workspaces[command.workspace]

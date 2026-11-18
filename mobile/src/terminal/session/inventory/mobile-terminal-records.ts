@@ -3,10 +3,10 @@ import type {
   RuntimeMobileTerminalTheme
 } from '../../../../../src/shared/remote-runtime/session-graph/runtime-mobile-session-tab-contracts'
 import type { AgentStatusEntry } from '../../../../../src/shared/agent-status/contracts/agent-status-types'
-import type { BrowserLoadError } from '../../../../../src/shared/browser/workspaces/browser-workspace-types'
 import { browserLoadErrorsEqual } from '../../../../../src/shared/browser/navigation/browser-load-failure'
 import { translate } from '../../../i18n/mobile-i18n'
 import { mobileTerminalThemesEqual } from './mobile-terminal-theme-equality'
+import type { MobileBrowserTab } from '../../../session/tabs/mobile-session-tabs'
 
 export type TerminalRecord = {
   handle: string
@@ -68,19 +68,7 @@ type MobileSessionTabLike =
       isDirty?: boolean
       isActive?: boolean
     }
-  | {
-      type: 'browser'
-      id: string
-      title?: string
-      browserWorkspaceId?: string
-      browserPageId?: string | null
-      url?: string
-      loading?: boolean
-      loadError?: BrowserLoadError | null
-      canGoBack?: boolean
-      canGoForward?: boolean
-      isActive?: boolean
-    }
+  | (Partial<MobileBrowserTab> & { type: 'browser'; id: string })
   | {
       type: 'agent-session'
       id: string
@@ -174,7 +162,8 @@ function mobileSessionTabEqual(
         a.loading === b.loading &&
         browserLoadErrorsEqual(a.loadError, b.loadError) &&
         a.canGoBack === b.canGoBack &&
-        a.canGoForward === b.canGoForward
+        a.canGoForward === b.canGoForward &&
+        a.faviconUrl === b.faviconUrl
       )
     case 'agent-session':
       return (

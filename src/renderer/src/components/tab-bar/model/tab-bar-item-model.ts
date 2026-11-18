@@ -112,6 +112,7 @@ export function buildOrderedTabItems({
   editorFileIds,
   browserTabIds,
   simulatorTabIds,
+  roomTabIds = [],
   agentSessionTabIds,
   terminalMap,
   editorMap,
@@ -124,6 +125,7 @@ export function buildOrderedTabItems({
   editorFileIds: string[]
   browserTabIds: string[]
   simulatorTabIds: string[]
+  roomTabIds?: string[]
   agentSessionTabIds: string[]
   terminalMap: Map<string, TerminalTab & { unifiedTabId?: string }>
   editorMap: Map<string, OpenFile & { tabId?: string }>
@@ -136,7 +138,7 @@ export function buildOrderedTabItems({
     terminalIds,
     editorFileIds,
     browserTabIds,
-    simulatorTabIds,
+    [...simulatorTabIds, ...roomTabIds],
     agentSessionTabIds
   )
   const items: TabBarItem[] = []
@@ -177,14 +179,18 @@ export function buildOrderedTabItems({
       })
       continue
     }
-    const simulatorTab = unifiedTabByVisibleId.get(id)
-    if (simulatorTab?.contentType === 'simulator' || simulatorTab?.contentType === 'database') {
+    const recordless = unifiedTabByVisibleId.get(id)
+    if (
+      recordless?.contentType === 'simulator' ||
+      recordless?.contentType === 'database' ||
+      recordless?.contentType === 'room'
+    ) {
       items.push({
-        type: simulatorTab.contentType,
+        type: recordless.contentType,
         id,
-        unifiedTabId: simulatorTab.id,
-        isPinned: simulatorTab.isPinned === true,
-        data: simulatorTab
+        unifiedTabId: recordless.id,
+        isPinned: recordless.isPinned === true,
+        data: recordless
       })
       continue
     }
@@ -242,7 +248,7 @@ export function findActiveVisibleTabId(
     if (item.type === 'simulator') {
       return active.activeTabType === 'simulator' && item.id === active.activeSimulatorTabId
     }
-    if (item.type === 'agent-session') {
+    if (item.type === 'agent-session' || item.type === 'room') {
       // Structured-chat callers pass their unified tab ID; the background terminal’s activeTabId cannot identify this item.
       return active.activeTabType === 'agent-session' && item.id === active.activeTabId
     }

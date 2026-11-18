@@ -7,6 +7,7 @@ import type { TaskBoardSettings } from '../../../../shared/task-board/task-board
 import type { GlobalTaskStartSettings } from '../../../../shared/task-board/task-start-settings'
 import type { WorkspaceCleanupRules } from '../../../../shared/workspace-cleanup/workspace-cleanup-policy'
 import type { SourceControlAiActionDefaults } from '../../../../shared/source-control/ai/recipes/source-control-ai-actions'
+import type { NativeChatDefaultSettings } from '../../../../shared/agent-launch/choices/structured-native-chat-launch-route'
 
 export type RuntimeClientSettings = Pick<
   GlobalSettings,
@@ -18,6 +19,7 @@ export type RuntimeClientSettings = Pick<
   | 'agentDefaultEnv'
   | 'agentStatusHooksEnabled'
   | 'codexShareHistoryAcrossAccounts'
+  | 'deleteChatHistoryWithWorkspace'
   | 'claudeSubagentNavigationEnabled'
   | 'terminalCopyTrimsGutter'
   | 'defaultTaskSource'
@@ -57,6 +59,8 @@ export type RuntimeClientSettings = Pick<
   taskStart: GlobalTaskStartSettings
   hostSettingOverrides: RuntimeHostDisplayLabelOverrides
   sourceControlAi: RuntimeClientSourceControlAi
+  /** This host's Chat or CLI choice for new agents; null on a headless host nobody set one on. Absent on older hosts. */
+  nativeChatDefaults: NativeChatDefaultSettings | null
   /** Models directory and microphone stay host-private. */
   voice: Pick<VoiceSettings, 'enabled' | 'sttModel'>
 }
@@ -73,7 +77,7 @@ export type RuntimeClientSettingsUpdate = Pick<
   Partial<GlobalSettings>,
   | 'agentStatusHooksEnabled'
   | 'claudeSubagentNavigationEnabled'
-  | 'experimentalConnectors'
+  | 'botsEnabled'
   | 'defaultTuiAgent'
   | 'disabledTuiAgents'
   | 'agentDefaultArgs'

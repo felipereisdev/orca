@@ -111,6 +111,14 @@ export const PERSISTED_STATE_DISPOSITIONS = {
     62,
     'Credentials stay sealed on their enrolled execution host.'
   ),
+  bots: notApplicableDisposition(
+    62,
+    "A bot's hidden project group is never offered for a move; the bot stays with its host."
+  ),
+  botsPermissionDefaultMigrated: notApplicableDisposition(
+    62,
+    'A one-time migration marker for bots.'
+  ),
   orcadMigrationImportReceipts: notApplicableDisposition(67, 'Mover-owned.'),
   databaseQueryHistory: notApplicableDisposition(62, 'Controller-owned execution history.'),
   orcadMigrationEvictedReceipts: notApplicableDisposition(67, 'Mover-owned.'),

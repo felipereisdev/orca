@@ -21,6 +21,7 @@ import { ProjectCollectionOperations } from './project-catalog/project-collectio
 import { AutomationPersistence } from './automation-state/automation-persistence'
 import { MobileTabSelectionPersistence } from './profile-preferences/mobile-tab-selection-persistence'
 import { DatabasePersistence } from './database-persistence'
+import { BotPersistence } from './bot-state/bot-persistence'
 import { RemoteLayoutSnapshotPersistence } from '../../remote-layout-snapshot/remote-layout-snapshot-persistence'
 import { HostRepoCatalogSnapshotPersistence } from '../../host-repo-catalog-snapshot/host-repo-catalog-snapshot-persistence'
 import { SparsePresetPersistence } from './project-catalog/sparse-preset-persistence'
@@ -39,6 +40,7 @@ export type StoreDomainOperations = WriteSchedulingOperations &
   ProjectCollectionOperations &
   RepoLifecycleOperations &
   MobileTabSelectionPersistence &
+  BotPersistence &
   RemoteLayoutSnapshotPersistence &
   HostRepoCatalogSnapshotPersistence &
   SparsePresetPersistence &
@@ -79,6 +81,7 @@ export type StoreDomains = {
   automations: AutomationPersistence
   databases: DatabasePersistence
   mobileTabSelections: MobileTabSelectionPersistence
+  bots: BotPersistence
   remoteLayoutSnapshots: RemoteLayoutSnapshotPersistence
   hostRepoCatalogSnapshots: HostRepoCatalogSnapshotPersistence
   sparsePresets: SparsePresetPersistence
@@ -99,6 +102,7 @@ export const STORE_DOMAIN_OPERATION_CLASSES = [
   ProjectCollectionOperations,
   RepoLifecycleOperations,
   MobileTabSelectionPersistence,
+  BotPersistence,
   RemoteLayoutSnapshotPersistence,
   HostRepoCatalogSnapshotPersistence,
   SparsePresetPersistence,
@@ -184,6 +188,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     automations,
     databases: new DatabasePersistence(runtime, writes),
     mobileTabSelections,
+    bots: new BotPersistence(runtime, scheduling),
     remoteLayoutSnapshots,
     hostRepoCatalogSnapshots: new HostRepoCatalogSnapshotPersistence(runtime, scheduling),
     sparsePresets,

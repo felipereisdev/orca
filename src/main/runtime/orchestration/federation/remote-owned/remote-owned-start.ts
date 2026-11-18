@@ -18,6 +18,7 @@ import type { OrchestrationCoordinatorKey } from '../../addressing/orchestration
 import { getRemoteDispatch } from '../../db/remote-owned/remote-dispatch-records'
 import { getOpenRemoteRunLink, openRemoteRunLink } from '../../db/remote-owned/remote-run-links'
 import { stopRemoteWorker } from './remote-owned-stop'
+import { workerLaunchAgent } from '../../workers/launch/worker-launch-observation'
 import { getOrchestrationPeerCapabilityCache } from '../orchestration-peer-capability-cache'
 import type { OrchestrationWorkerServer } from '../environment-transport'
 import {
@@ -27,6 +28,7 @@ import {
 } from '../../db/remote-owned/remote-placements'
 import { refuseTaskOfClosedPairing } from '../../db/remote-owned/remote-placement-hold'
 import { callRemoteOwnedServer } from './remote-owned-calls'
+import { resolveCrossMachineChildParent } from '../cross-machine-child-parent'
 import { remoteForwardKey } from './remote-forward-caller'
 import { errorData, inServerTerms, serverNeverAnswered } from './remote-owned-answers'
 
@@ -68,6 +70,7 @@ const StartedOnServer = z.object({
   dispatchId: z.string().min(1),
   run: z.object({ id: z.string().min(1) }).optional(),
   agent: z.string().nullable().optional(),
+  launch: z.unknown().optional(),
   state: z.string().optional()
 })
 
@@ -97,6 +100,11 @@ export async function startRemoteOwnedWorker(
   refuseFencedCoordinator(runtime, coordinator)
   const db = runtime.getOrchestrationDb()
   const server = await runtime.resolveOrchestrationWorkerServer(params.on!)
+  // This caller's workspace is here, so a server's new-child nests under it across machines.
+  const crossStoreParent =
+    params.worktree === 'new-child'
+      ? await resolveCrossMachineChildParent(runtime, params.from, ctx.orchestrationCaller)
+      : undefined
   const { run } = bindRun()
   // An older CLI sends no request ID; the start still runs, but a retry cannot find it.
   const forward = remoteForwardKey(runtime, ctx, params.from, callerRequestId ?? randomUUID())!
@@ -136,6 +144,7 @@ export async function startRemoteOwnedWorker(
     parent: _parent,
     ...options
   } = params
+  const startCard = prepareWorkerStartCard(runtime, ctx.orchestrationCaller)
   let receipt: unknown
   try {
     receipt = await callRemoteOwnedServer(runtime, link, {
@@ -146,7 +155,8 @@ export async function startRemoteOwnedWorker(
         ...(params.retryOf
           ? { task: task.id }
           : { spec: task.spec, ...(task.task_title ? { taskTitle: task.task_title } : {}) }),
-        adoptTaskId: task.id
+        adoptTaskId: task.id,
+        ...(crossStoreParent ? { crossStoreParent } : {})
       },
       timeoutMs: budgets.attachDeadlineMs,
       requestId: forward.key,
@@ -168,13 +178,15 @@ export async function startRemoteOwnedWorker(
   }
   const started = StartedOnServer.safeParse(receipt)
   if (started.success) {
+    // The server's receipt names the agent in its launch, as a local start's does.
+    const agent = started.data.agent ?? workerLaunchAgent(started.data.launch)
     const recorded = recordRemoteStart(db, {
       conversationId: link.conversation_id,
       taskId,
       dispatchId: started.data.dispatchId,
       requestKey: forward.key,
       peerRunId: started.data.run?.id,
-      agent: started.data.agent ?? null
+      agent
     })
     if (!recorded) {
       // A reset already removed the reservation; a re-made pairing keeps it, so a later start of the Task there is refused here.
@@ -198,18 +210,15 @@ export async function startRemoteOwnedWorker(
         { server: server.name, dispatchId: started.data.dispatchId }
       )
     }
-    // As local and attached starts do: a start the server could not ready leaves no card.
-    if (started.data.state === 'ready') {
-      prepareWorkerStartCard(
-        runtime,
-        ctx.orchestrationCaller
-      )({
-        dispatchId: started.data.dispatchId,
-        workerAddress: `dispatch:${started.data.dispatchId}`,
-        task: task.spec,
-        agent: started.data.agent ?? null
-      })
-    }
+    startCard({
+      // As local and attached starts do: a start the server could not ready leaves no card.
+      ready: started.data.state === 'ready',
+      dispatchId: started.data.dispatchId,
+      taskId: task.id,
+      workerAddress: `dispatch:${started.data.dispatchId}`,
+      task: task.spec,
+      agent
+    })
   }
   const answer = inServerTerms(receipt, { server: server.name, forward })
   return withRun(

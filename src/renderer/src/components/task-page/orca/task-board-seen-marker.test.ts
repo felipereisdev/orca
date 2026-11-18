@@ -12,7 +12,7 @@ vi.mock('@/runtime/task-board/runtime-task-board-client', () => ({
 }))
 
 import { useReportRenderedComments } from '@/lib/work-items/task-board/task-board-rendered-comments'
-import { isLocalJiraComment } from '@/components/use-jira-issue-comment-submission'
+import { isLocalJiraComment } from '@/components/task-page/jira/issue-workspace/use-jira-issue-comment-submission'
 import { rememberTaskBoardDetailCard, useTaskBoardSeenMarker } from './task-board-seen-marker'
 import { confirmTaskBoardMove, useTaskBoardMoveOverrides } from './task-board-move-override-store'
 import { readTaskBoardCards, writeTaskBoardCards } from './task-board-session-cache'

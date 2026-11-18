@@ -42,7 +42,8 @@ const TAB_ID_RULES: Record<TabContentType, 'terminal' | 'kept'> = {
   'agent-session': 'kept',
   browser: 'kept',
   simulator: 'kept',
-  database: 'kept'
+  database: 'kept',
+  room: 'kept'
 }
 
 function isKnownTabKind(kind: string): kind is TabContentType {

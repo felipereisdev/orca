@@ -6,6 +6,7 @@ import {
   applyClaudeEnvPatch
 } from '../../../claude-accounts/runtime-auth/environment'
 import { resolveStructuredClaudeAccountHomePath } from '../../../runtime/agent-session/environment/structured-agent-account-home'
+import { claudeConfigDirEnvPatch } from './claude-config-dir-pin'
 
 /** The account a launch runs under is the current selection; the receipt records what it used. */
 export async function prepareClaudeLaunchAccount(
@@ -45,4 +46,15 @@ export async function prepareClaudeLaunchAccount(
   return preparation.provenance.startsWith('profile:')
     ? { route: 'managed', accountId: preparation.provenance.slice('profile:'.length), home }
     : { route: 'system', home, configDir: env.CLAUDE_CONFIG_DIR ?? null }
+}
+
+/** A chosen account pins its own auth; otherwise only a nondefault home is pinned. */
+export function claudeAccountHomeEnv(
+  base: Record<string, string>,
+  home: string,
+  claudeAccountId?: string
+): Record<string, string> {
+  return claudeAccountId
+    ? explicitClaudeAccountEnv(base, claudeAccountId, { CLAUDE_CONFIG_DIR: home })
+    : { ...base, ...claudeConfigDirEnvPatch(home, { env: base }) }
 }

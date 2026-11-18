@@ -20,7 +20,9 @@ import { isTerminalPhoneDisplayMode } from '../terminal/session/pane-layout/term
 import type { MobileSessionController } from './use-mobile-session-controller'
 import { useMobileAllowAutoCloseActions } from './tabs/mobile-worker-auto-close'
 import { MobileAgentSessionTabActionSheet } from './tabs/MobileAgentSessionTabActionSheet'
+import { MobileSessionBotSheet } from './MobileSessionBotSheet'
 import { MobileNewTabSheet } from './tabs/MobileNewTabSheet'
+import { MobileSessionTextSizeSheet } from './MobileSessionTextSizeSheet'
 
 export function MobileSessionSheets({ controller }: { controller: MobileSessionController }) {
   const t = useMobileTranslation()
@@ -94,17 +96,20 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
     closeWithBulkActions,
     createTabAgentStatusRow,
     createTabAgentOptions,
+    createTabAgentSurfaceChoice,
     sendDiffNotesAgentActions
   } = controller
   const clipboard = useClipboardWriter()
   const onPairedHost = useWorkspaceOnPairedHost()
   return (
     <>
+      <MobileSessionBotSheet controller={controller} />
       <MobileSessionTerminalLayoutSheet
         controller={controller}
         visible={showTerminalLayout}
         onClose={() => setShowTerminalLayout(false)}
       />
+      <MobileSessionTextSizeSheet controller={controller} />
       <QuickCommandsSheet
         visible={showQuickCommands && quickCommandsSupported === true}
         onClose={() => setShowQuickCommands(false)}
@@ -122,7 +127,9 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         visible={showCreateTabDrawer}
         workspaceName={worktreeName}
         agentOptions={createTabAgentOptions}
+        surfaceChoice={createTabAgentSurfaceChoice}
         agentStatusRow={createTabAgentStatusRow}
+        leadingAgentActions={controller.createTabLeadingAgentActions}
         // Why: browser/markdown creation resolve a real worktree on the host
         // (browser.tabCreate, files.createFile); the floating sentinel is
         // terminal-only over RPC, so those options hide there.
@@ -134,7 +141,8 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         onCreateAgent={(option) =>
           void handleCreateTerminal(
             option.agent,
-            option.claudeAccountId ? { claudeAccountId: option.claudeAccountId } : undefined
+            option.claudeAccountId ? { claudeAccountId: option.claudeAccountId } : undefined,
+            option.nativeChatDefault
           )
         }
         onCreateTerminal={() => void handleCreateTerminal()}
@@ -142,8 +150,8 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
           if (browserScreencastSupported !== true) {
             showToast(
               t(
-                'session.sheets.browserUpdateRequired',
-                'Desktop update required for mobile browser streaming'
+                'session.sheets.browserStreamingUnavailable',
+                "This host can't stream browser tabs"
               ),
               1600
             )

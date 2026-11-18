@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { resolveVisibleTaskSource } from '../../../../shared/work-items/task-source'
 import { normalizeGitHubTaskPreset } from '../../../../shared/work-items/task-github-search'
 import { getTaskPresetQuery } from '../../../../shared/work-items/task-preset-query'
-import { loadLinearIssueView } from '../linear-issue-view-storage'
+import { loadLinearIssueView } from './linear/filters/linear-issue-view-storage'
 import { translate } from '@/i18n/i18n'
 export function useTaskPageResumeRestoration(model: TaskPageJiraListStateModel) {
   const {

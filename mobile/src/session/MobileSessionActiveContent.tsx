@@ -1,9 +1,9 @@
+import { MobileSessionBotIdentity } from './native-chat/MobileSessionBotIdentity'
+import { MobileBotCardHostProvider } from './native-chat/transcript/bot-cards/MobileBotCardHostProvider'
+import { nativeChatTerminalRunner } from './native-chat/native-chat-terminal-runner'
 import { useCallback, useMemo, useState } from 'react'
 import { computeActiveTerminalKeyboardLift } from '../terminal/keyboard/terminal-keyboard-avoidance-lift'
-import {
-  terminalPaneDirection,
-  terminalPaneKeyboardLayout
-} from '../terminal/session/pane-layout/mobile-terminal-pane-layout'
+import * as paneLayout from '../terminal/session/pane-layout/mobile-terminal-pane-layout'
 import { View, Text, Pressable, ActivityIndicator } from 'react-native'
 import { MobileBrowserPane } from '../browser/MobileBrowserPane'
 import { MobileSessionDatabasePane } from '../database/MobileSessionDatabasePane'
@@ -45,7 +45,7 @@ export function MobileSessionActiveContent({
   const t = useMobileTranslation()
   const executionHost = useWorkspaceExecutionHost()
   const [paneFrame, setPaneFrame] = useState({ width: 0, height: 0 })
-  const paneDirection = terminalPaneDirection(paneFrame, controller.terminalSplitLayout)
+  const paneDirection = paneLayout.terminalPaneDirection(paneFrame, controller.terminalSplitLayout)
   const {
     hostId,
     worktreeId,
@@ -295,7 +295,7 @@ export function MobileSessionActiveContent({
                   ? 0
                   : terminalSplitActive
                     ? computeActiveTerminalKeyboardLift({
-                        keyboardLift: terminalPaneKeyboardLayout(
+                        keyboardLift: paneLayout.terminalPaneKeyboardLayout(
                           paneFrame,
                           paneDirection,
                           visibleTerminalHandles.indexOf(terminal.handle),
@@ -341,44 +341,44 @@ export function MobileSessionActiveContent({
             open={openSender}
           >
             <MobileNativeChatForkProvider controller={controller}>
-              <MobileNativeChatOverlay
-                controller={nativeChatController}
-                imageSource={nativeChatImageSource}
-                worktreePath={controller.worktreePath}
-                connState={controller.connState}
-                activeSessionTabId={controller.activeSessionTab?.id}
-                onOpenFile={handleNativeChatFileTap}
-                images={nativeChatImages}
-                structuredComposer={nativeChatStructuredComposer}
-                onMicPress={dictationEnabled ? handleDictationToggle : undefined}
-                micActive={dictation.isStarting || dictation.isRecording}
-                micStarting={dictation.isStarting}
-                micProcessing={dictation.isProcessing}
-                dictationMode={dictationMode}
-                onMicPressIn={handleDictationPressIn}
-                onMicPressOut={handleDictationPressOut}
-                inputLockReason={nativeChatOverlayInputLockReason}
-                sendErrorMessage={nativeChatSendError.message}
-                onClearSendError={nativeChatSendError.clear}
-                sendSurfaceId={controller.nativeChatScopeKey ?? ''}
-                sessionId={resolveMobileNativeChatSessionId(controller.activeSessionTab)}
-                getSendCompletionGeneration={controller.getSendCompletionGeneration}
-                keyboardInset={keyboardLift}
-                // A workspace routed to another server stops with that server, whose name the phone lacks.
-                hostName={executionHost === undefined && hostProfile ? hostTitle : null}
-                onOpenUrlInOrca={openUrlInOrca}
-                linkOpenMode={controller.linkOpenMode}
-                hostOutage={nativeChatHostOutage}
-                onRunInTerminal={(command) =>
-                  void controller.handleCreateTerminal(undefined, {
-                    startupCommand: command,
-                    startupCommandDelivery: 'shell-ready',
-                    terminalView: true
-                  })
-                }
-                // Accounts open on the paired host, so a chat another server runs offers none.
-                onOpenAccounts={executionHost === undefined ? openNativeChatAccounts : undefined}
-              />
+              <MobileBotCardHostProvider {...{ client, hostId, executionHost, hostTitle }}>
+                <MobileSessionBotIdentity controller={controller}>
+                  <MobileNativeChatOverlay
+                    controller={nativeChatController}
+                    imageSource={nativeChatImageSource}
+                    worktreePath={controller.worktreePath}
+                    connState={controller.connState}
+                    activeSessionTabId={controller.activeSessionTab?.id}
+                    onOpenFile={handleNativeChatFileTap}
+                    images={nativeChatImages}
+                    structuredComposer={nativeChatStructuredComposer}
+                    onMicPress={dictationEnabled ? handleDictationToggle : undefined}
+                    micActive={dictation.isStarting || dictation.isRecording}
+                    micStarting={dictation.isStarting}
+                    micProcessing={dictation.isProcessing}
+                    dictationMode={dictationMode}
+                    onMicPressIn={handleDictationPressIn}
+                    onMicPressOut={handleDictationPressOut}
+                    inputLockReason={nativeChatOverlayInputLockReason}
+                    sendErrorMessage={nativeChatSendError.message}
+                    onClearSendError={nativeChatSendError.clear}
+                    sendSurfaceId={controller.nativeChatScopeKey ?? ''}
+                    sessionId={resolveMobileNativeChatSessionId(controller.activeSessionTab)}
+                    getSendCompletionGeneration={controller.getSendCompletionGeneration}
+                    keyboardInset={keyboardLift}
+                    // A workspace routed to another server stops with that server, whose name the phone lacks.
+                    hostName={executionHost === undefined && hostProfile ? hostTitle : null}
+                    onOpenUrlInOrca={openUrlInOrca}
+                    linkOpenMode={controller.linkOpenMode}
+                    hostOutage={nativeChatHostOutage}
+                    onRunInTerminal={nativeChatTerminalRunner(controller)}
+                    // Accounts open on the paired host, so a chat another server runs offers none.
+                    onOpenAccounts={
+                      executionHost === undefined ? openNativeChatAccounts : undefined
+                    }
+                  />
+                </MobileSessionBotIdentity>
+              </MobileBotCardHostProvider>
             </MobileNativeChatForkProvider>
           </MobileAgentMessageProvider>
         </MobileNativeChatDictationPreviewContext.Provider>

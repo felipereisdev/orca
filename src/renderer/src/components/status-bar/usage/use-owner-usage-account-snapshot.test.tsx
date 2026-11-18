@@ -116,22 +116,22 @@ it('uses the paired host for a web client without a focused workspace and separa
   const { result, rerender } = renderHook(() => useOwnerUsageRateLimits(local))
   expect(result.current.remoteOwner?.environmentId).toBe('paired-a')
   act(() => source.streams[0].onSnapshot(snapshot('work', 7, 'personal', 17)))
-  expect(result.current.claudeAccounts?.activeAccountId).toBe('work')
+  expect(result.current.accounts?.claude?.activeAccountId).toBe('work')
   expect(result.current.rateLimits.claude?.session?.usedPercent).toBe(7)
   source.pairedId = 'paired-b'
   rerender()
   expect(result.current.remoteOwner?.environmentId).toBe('paired-b')
-  expect(result.current.claudeAccounts).toBeNull()
+  expect(result.current.accounts).toBeNull()
   expect(result.current.rateLimits.inactiveClaudeAccounts).toEqual([])
 })
 
 it('publishes account selection and usage from the same remote snapshot', () => {
   const { result } = renderHook(() => useOwnerUsageRateLimits(local))
   act(() => source.streams[0].onSnapshot(snapshot('personal', 20, 'work', 5)))
-  expect(result.current.claudeAccounts?.activeAccountId).toBe('personal')
+  expect(result.current.accounts?.claude?.activeAccountId).toBe('personal')
   expect(result.current.rateLimits.claude?.session?.usedPercent).toBe(20)
   act(() => source.streams[0].onSnapshot(snapshot('work', 5, 'personal', 20)))
-  expect(result.current.claudeAccounts?.activeAccountId).toBe('work')
+  expect(result.current.accounts?.claude?.activeAccountId).toBe('work')
   expect(result.current.rateLimits.claude?.session?.usedPercent).toBe(5)
   expect(result.current.rateLimits.inactiveClaudeAccounts[0].accountId).toBe('personal')
   expect(result.current.rateLimits.inactiveClaudeAccounts[0].rateLimits?.session?.usedPercent).toBe(
@@ -157,11 +157,11 @@ it('does not reuse an old owner snapshot when the next host has matching account
   act(() => first.onSnapshot(snapshot('personal', 20, 'work', 5)))
   source.ownerId = 'server-b'
   rerender()
-  expect(result.current.claudeAccounts).toBeNull()
+  expect(result.current.accounts).toBeNull()
   expect(result.current.rateLimits.inactiveClaudeAccounts).toEqual([])
   act(() => first.onSnapshot(snapshot('work', 99, 'personal', 99)))
   act(() => source.streams[1].onSnapshot(snapshot('work', 6, 'personal', 17)))
-  expect(result.current.claudeAccounts?.activeAccountId).toBe('work')
+  expect(result.current.accounts?.claude?.activeAccountId).toBe('work')
   expect(result.current.rateLimits.claude?.session?.usedPercent).toBe(6)
   expect(result.current.rateLimits.inactiveClaudeAccounts[0].rateLimits?.session?.usedPercent).toBe(
     17

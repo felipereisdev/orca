@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import type * as GraphPublication from '@/runtime/sync-runtime-graph/graph-publication'
-import { registerSessionTabIpcBridge } from './session-tab-ipc-bridge'
+import { registerSessionTabIpcBridge } from './session-tabs/session-tab-ipc-bridge'
 import type {
   DatabaseTabOpenRequest,
   DatabaseTabOpenResponse

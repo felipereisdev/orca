@@ -44,7 +44,12 @@ export type RuntimeApi = {
       graph: RuntimeRendererSyncWindowGraph
     ) => Promise<RuntimeSyncWindowGraphResult>
     getStatus: () => Promise<RuntimeStatus>
-    call: (args: { method: string; params?: unknown }) => Promise<RuntimeRpcResponse<unknown>>
+    call: (args: {
+      method: string
+      params?: unknown
+      /** An orchestration mutation's contract and idempotency key, as the CLI sends them. */
+      orchestration?: { contractVersion: number; requestId: string }
+    }) => Promise<RuntimeRpcResponse<unknown>>
     subscribe: (
       args: { method: string; params?: unknown },
       callback: (response: RuntimeRpcResponse<unknown>) => void
@@ -95,6 +100,9 @@ export type RuntimeApi = {
     onSidebarInputsChanged: (callback: (event: SidebarInputsChangedEvent) => void) => () => void
     /** The local host's task-start runs; absent in the web client, which reads paired hosts' events. */
     onTaskBoardRunsChanged?: (callback: (event: TaskBoardRunsChangedEvent) => void) => () => void
+    onOrchestrationSessionWorkersChanged?: (
+      callback: (event: { sessionId: string }) => void
+    ) => () => void
   }
   runtimeEnvironments: {
     desktopCreatedChatIds?: () => Promise<string[]>
@@ -185,6 +193,8 @@ export type RuntimeApi = {
   wsl: {
     isAvailable: () => Promise<boolean>
     listDistros: () => Promise<string[]>
+    /** The `\\wsl.localhost\<distro>` spelling of a path on a drive mapped to a distro share; else null. */
+    resolveMappedDrivePath: (path: string) => Promise<string | null>
   }
   pwsh: {
     isAvailable: () => Promise<boolean>

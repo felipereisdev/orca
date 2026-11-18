@@ -16,7 +16,7 @@ import {
   WorkItemScopePicker,
   type WorkItemScopeOption,
   type WorkItemScopeSearch
-} from '../../work-item-scope-picker'
+} from '../../task-page/source-selection/work-item-scope-picker'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import type { SettingsSearchEntry } from '../search/settings-search'

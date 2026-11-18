@@ -67,12 +67,17 @@ export async function readTextOrFileFlag(
 
 async function readBodyFile(path: string, cwd: string, maximumBytes?: number): Promise<string> {
   if (path !== '-') {
-    const absolutePath = isAbsolute(path) ? path : join(cwd, path)
-    return maximumBytes === undefined
-      ? readFile(absolutePath, 'utf8')
-      : (
-          await readNodeFileWithinLimit(absolutePath, maximumBytes, { regularFileOnly: true })
-        ).buffer.toString('utf8')
+    const resolved = isAbsolute(path) ? path : join(cwd, path)
+    try {
+      return maximumBytes === undefined
+        ? await readFile(resolved, 'utf8')
+        : (
+            await readNodeFileWithinLimit(resolved, maximumBytes, { regularFileOnly: true })
+          ).buffer.toString('utf8')
+    } catch (error) {
+      const reason = error instanceof Error && 'code' in error ? String(error.code) : String(error)
+      throw new RuntimeClientError('invalid_argument', `Could not read ${resolved}: ${reason}`)
+    }
   }
   return readStdin('body', maximumBytes)
 }

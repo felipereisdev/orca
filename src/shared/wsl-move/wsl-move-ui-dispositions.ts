@@ -82,7 +82,11 @@ export const UI_STATE_DISPOSITIONS = {
     38,
     'Runs belong to the host that started them; a move does not carry a live orchestrator.'
   ),
-  taskResumeState: notApplicableDisposition(38)
+  taskResumeState: notApplicableDisposition(38),
+  hiddenWslMovedProjectKeys: notApplicableDisposition(
+    38,
+    'Names already-moved projects by the ids a move keeps; pruned once a project is no longer moved.'
+  )
 } as const satisfies Partial<Record<keyof PersistedUIState, WslMoveFieldDisposition>>
 
 export const UI_STATE_GLOBAL_FIELDS = [
@@ -112,6 +116,9 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'agentsHideWorkspacesFromOtherDevices',
   'agentsHideAutomationGeneratedWorkspaces',
   'agentsHideCliCreatedWorkspaces',
+  'hideBotCreatedWorkspaces',
+  'botSidebarView',
+  'botChatFolds',
   'agentsShowChildAgents',
   'agentsCompactMode',
   'agentsShowSearch',
@@ -126,6 +133,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'workspaceStatuses',
   'workspaceBoardOpacity',
   'workspaceBoardColumnWidth',
+  'sidebarBotsHeight',
   'syncTaskStatusFromWorkspaceBoard',
   'statusBarItems',
   'statusBarClaudeAccountIdsByScope',
@@ -161,11 +169,13 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'speechModelUpdateNoticeSeen',
   'claudeDiffPanelNoticeSeen',
   'claudeAccountSignInNoticeSeen',
+  'wslMovedSectionCollapsed',
   'browserDefaultUrl',
   'browserDefaultSearchEngine',
   'browserDefaultZoomLevel',
   'browserKagiSessionLink',
   'browserDevToolsDock',
+  'browserExtensionSidePanelWidth',
   'windowBounds',
   'windowMaximized',
   'windowFullScreen',
@@ -193,6 +203,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   '_cursorStatusBarDefaultAdded',
   '_expandedWorktreeCardPropertiesDefaulted',
   '_explorerDisplayRootMigrated',
+  '_gitBlameStatusBarDefaultAdded',
   '_grokStatusBarDefaultAdded',
   '_hostWorktreeCardPropertyDefaulted',
   '_inlineAgentsDefaultedForAllUsers',

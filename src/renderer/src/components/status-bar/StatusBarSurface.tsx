@@ -33,8 +33,10 @@ import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/overlay-interaction/close-a
 import { StatusBarUsageIndicators } from './usage/StatusBarUsageIndicators'
 import { useStatusBarController } from './composition/use-status-bar-controller'
 import { isOwnerNotSetUpPlaceholder } from './usage/owner-usage-rate-limits'
+import { getAccountOwnerKey } from './accounts/owner-account-rows'
 import { StatusBarVisibilityMenu } from './composition/StatusBarVisibilityMenu'
 import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
+import { GitBlameStatusSegment } from './GitBlameStatusSegment'
 
 const PetStatusSegment = lazyWithRetry(() =>
   import('./PetStatusSegment').then((module) => ({ default: module.PetStatusSegment }))
@@ -77,8 +79,6 @@ export function StatusBarSurface({
     canSignInFromUsageRow,
     collapseUsage,
     collapsedUsageProviders,
-    claudeUsageState,
-    claudeUsageAccounts,
     compact,
     floatingTerminalActionLabel,
     floatingTerminalShortcut,
@@ -92,6 +92,7 @@ export function StatusBarSurface({
     isEmptyUsageState,
     isRefreshing,
     overflowing,
+    ownerUsage,
     petEnabled,
     remoteOwner,
     rosterProviders,
@@ -103,6 +104,7 @@ export function StatusBarSurface({
     showEmptyUsageCta,
     showFloatingTerminalToggle,
     showFloatingWorkspaceAttentionDot,
+    showGitBlame,
     showPorts,
     showResourceUsage,
     showSsh,
@@ -200,13 +202,7 @@ export function StatusBarSurface({
                         return (
                           <ClaudeSwitcherMenu
                             claude={p}
-                            usageState={claudeUsageState}
-                            usageAccounts={claudeUsageAccounts}
-                            usageOwner={
-                              remoteOwner
-                                ? { kind: 'environment', environmentId: remoteOwner.environmentId }
-                                : undefined
-                            }
+                            ownerUsage={ownerUsage}
                             compact={compact}
                             iconOnly={false}
                             asSubmenu
@@ -228,7 +224,9 @@ export function StatusBarSurface({
                       if (p.provider === 'codex') {
                         return (
                           <CodexSwitcherMenu
+                            key={getAccountOwnerKey(ownerUsage.owner)}
                             codex={p}
+                            ownerUsage={ownerUsage}
                             compact={compact}
                             iconOnly={false}
                             asSubmenu
@@ -298,6 +296,7 @@ export function StatusBarSurface({
           <SkillUpdateStatusSegment iconOnly={segmentsIconOnly} />
           <NativeChatResumeStatusSegment iconOnly={segmentsIconOnly} />
           <UpdateStatusSegment compact={compact} iconOnly={segmentsIconOnly} />
+          {showGitBlame ? <GitBlameStatusSegment iconOnly={segmentsIconOnly} /> : null}
           <React.Suspense fallback={null}>
             {petEnabled ? <PetStatusSegment /> : null}
             {showResourceUsage ? (

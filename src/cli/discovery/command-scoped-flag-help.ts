@@ -20,7 +20,31 @@ const JIRA_FLAG_HELP: Record<string, string> = {
   all: '--all                  Download every listed attachment within limits'
 }
 
+const BOT_ITEM_TITLE_HELP = "--title <text>         The item's title"
+
+const AGENT_ID_FLAG_HELP =
+  "--id <id>              The agent's orca_session_id: ID; also accepted positionally"
+
 const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
+  'bot item add': {
+    title: BOT_ITEM_TITLE_HELP,
+    for: '--for bot:<name>       Make the item for another bot'
+  },
+  'bot item set': {
+    title: BOT_ITEM_TITLE_HELP,
+    comment: '--comment <text>       Add a comment with this change'
+  },
+  'bot item comment': { text: "--text <text>          The comment's text" },
+  'bot item link': { ref: '--ref <ref>            A worker, PR, URL or file to link' },
+  'bot item list': { cursor: '--cursor <c>           Cursor printed with the previous page' },
+  'agent list': {
+    state: '--state <state>        Only agents in this state: working, blocked, waiting or done'
+  },
+  'agent show': { id: AGENT_ID_FLAG_HELP },
+  'agent read': {
+    id: AGENT_ID_FLAG_HELP,
+    limit: '--limit <n>            Newest entries to return (default 20, at most 100)'
+  },
   'extension reload': {
     'extension-id':
       '--extension-id <id>   Installed unpacked extension ID; also accepted positionally',

@@ -20,7 +20,7 @@ export function tabItemLabel(
   if (item.type === 'agent-session') {
     return savedName ?? item.data.label
   }
-  if (item.type === 'database') {
+  if (item.type === 'database' || item.type === 'room') {
     return item.data.customLabel ?? item.data.label
   }
   if (item.type === 'simulator') {

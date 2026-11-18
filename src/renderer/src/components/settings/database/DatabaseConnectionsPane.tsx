@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
+import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { useTranslate } from '@/i18n/use-translate'
 import type { DatabaseRuntimeClient } from '@/runtime/database/database-runtime-client'
 import type { DatabaseConnectionSummary } from '../../../../../shared/database/database-contracts'

@@ -5,7 +5,7 @@ import type {
 import type {
   AgentSessionThreadGoalChange,
   AgentSessionThreadGoalResult
-} from '../../../../shared/agent-session/agent-session-thread-goal-wire'
+} from '../../../../shared/agent-session/thread-goals/agent-session-thread-goal-wire'
 import type { StructuredAgentSessionCaller } from '../host/structured-agent-session-host-types'
 import {
   runStructuredAgentSessionMutation,

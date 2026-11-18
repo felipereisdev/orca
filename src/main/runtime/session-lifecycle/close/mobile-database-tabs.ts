@@ -1,7 +1,7 @@
 import { OrcaRuntimeWithRefuseUnattributedMobileSessionTabClose } from './refuse-unattributed-mobile-session-tab-close'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/workspace-layout/layout-owner-switch'
 import { openMobileDatabaseTab } from '../../session-tabs/mobile-database-tab-open'
-import { retireMobileSessionTabSelection } from '../../session-tabs/mobile-session-tab-selection'
+import { retireMobileSessionTabSelection } from '../../session-tabs/layout/mobile-session-tab-selection'
 
 export abstract class OrcaRuntimeWithMobileDatabaseTabs extends OrcaRuntimeWithRefuseUnattributedMobileSessionTabClose {
   async openMobileSessionDatabaseTab(worktreeId: string, entityId: string, title: string) {

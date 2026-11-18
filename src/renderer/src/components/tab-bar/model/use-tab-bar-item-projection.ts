@@ -11,7 +11,7 @@ import {
   type TabBarItem
 } from './tab-bar-item-model'
 import type { DropIndicator } from '../strip/drop-indicator'
-import { sameStringArray } from '@/runtime/web-session-tabs-sync/state-equality-core'
+import { sameStringArray } from '@/runtime/web-session-tabs-sync/snapshots/state-equality-core'
 
 export type TabBarItemProjection = {
   orderedItems: TabBarItem[]
@@ -80,6 +80,13 @@ export function useTabBarItemProjection({
         .map((tab) => tab.id),
     [unifiedTabs, resolvedGroupId]
   )
+  const roomTabIds = useMemo(
+    () =>
+      unifiedTabs
+        .filter((tab) => tab.groupId === resolvedGroupId && tab.contentType === 'room')
+        .map((tab) => tab.id),
+    [unifiedTabs, resolvedGroupId]
+  )
   const agentSessionTabIds = useMemo(
     () => agentSessionTabs?.map((tab) => tab.id) ?? [],
     [agentSessionTabs]
@@ -92,6 +99,7 @@ export function useTabBarItemProjection({
         editorFileIds,
         browserTabIds,
         simulatorTabIds,
+        roomTabIds,
         agentSessionTabIds,
         terminalMap,
         editorMap,
@@ -105,6 +113,7 @@ export function useTabBarItemProjection({
       editorFileIds,
       browserTabIds,
       simulatorTabIds,
+      roomTabIds,
       agentSessionTabIds,
       terminalMap,
       editorMap,

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { surfaceRuntime } from '../terminal/surface/terminal-surface-replies.test-fixture'
-import { TEST_WORKTREE_ID } from '../orca-runtime-tests/orca-runtime-test-fixtures.spec'
+import { TEST_WORKTREE_ID } from '../construction/test-context/orca-runtime-test-fixtures.spec'
 
 it('opens, selects, closes and reopens a database tab without a desktop renderer', async () => {
   const { runtime, killed } = surfaceRuntime()

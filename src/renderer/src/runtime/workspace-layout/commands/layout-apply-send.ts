@@ -39,6 +39,13 @@ import type {
   TabTitle
 } from '../../../../../shared/workspace-layout/workspace-layout-command-types'
 
+type ContentTabPlacement = {
+  afterTabId?: string
+  index?: number
+  createdAt?: number
+  split?: NewGroupSplit
+}
+
 /** What a window sends `layout.apply`; main mints any new id but one the window already drew. */
 export type WindowLayoutCommand =
   | {
@@ -120,37 +127,27 @@ export type WindowLayoutCommand =
       createdAt?: number
       split?: NewGroupSplit
     }
-  | {
+  | ({
       type: 'openAgentSessionTab'
       tabId: string
       sessionId: string
       agent: string
       groupId: string
-      afterTabId?: string
-      index?: number
-      createdAt?: number
-      split?: NewGroupSplit
-    }
+    } & ContentTabPlacement)
   | { type: 'promotePreviewTab'; tabId: string }
-  | {
-      type: 'openSimulatorTab'
+  | ({
+      type: 'openRoomTab'
       tabId: string
+      botGroupId: string
       groupId: string
-      afterTabId?: string
-      index?: number
-      createdAt?: number
-      split?: NewGroupSplit
-    }
-  | {
+    } & ContentTabPlacement)
+  | ({ type: 'openSimulatorTab'; tabId: string; groupId: string } & ContentTabPlacement)
+  | ({
       type: 'openDatabaseTab'
       entityId: string
       tabId: string
       groupId?: string
-      afterTabId?: string
-      index?: number
-      createdAt?: number
-      split?: NewGroupSplit
-    }
+    } & ContentTabPlacement)
   | {
       type: 'moveTabToWorkspace'
       toWorkspace: string
@@ -213,6 +210,7 @@ function drawnTabHolds(worktreeId: string, command: WindowLayoutCommand): DrawnT
     case 'openAgentSessionTab':
     case 'openDatabaseTab':
     case 'openSimulatorTab':
+    case 'openRoomTab':
     case 'openEditorTab':
     case 'promotePreviewTab':
     case 'moveTabToWorkspace':

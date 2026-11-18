@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useShortcutLabel } from '@/hooks/useShortcutLabel'
+import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
 import { useAppStore } from '../../../store/index'
 import { selectFloatingWorkspaceHasUnread } from '../../../store/workspaces/floating/floating-workspace-unread-selector'
 import type { ProviderRateLimits } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
@@ -31,8 +31,9 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const floatingTerminalShortcut = useShortcutLabel('floatingTerminal.toggle')
   const localRateLimits = useAppStore((s) => s.rateLimits)
   // Why: with a remote account owner the agents run there, so its usage is the one to show.
-  const { rateLimits, claudeAccounts, remoteOwner, refreshRemote } =
-    useOwnerUsageRateLimits(localRateLimits)
+  const ownerUsage = useOwnerUsageRateLimits(localRateLimits)
+  const { rateLimits, remoteOwner, refreshRemote } = ownerUsage
+  const claudeAccounts = ownerUsage.accounts?.claude ?? null
   const remoteOwned = remoteOwner !== null
   const statusBarVisible = useAppStore((s) => s.statusBarVisible)
   const footerClaudeAccounts = useClaudeFooterAccounts(
@@ -195,10 +196,11 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   const showSsh = statusBarItems.includes('ssh')
   const showResourceUsage = statusBarItems.includes('resource-usage')
   const showPorts = statusBarItems.includes('ports')
+  const showGitBlame = statusBarItems.includes('git-blame')
   const showFloatingTerminalToggle =
     floatingTerminalEnabled && floatingTerminalTriggerLocation === 'status-bar'
   // Why: include Settings so durable managed accounts count — a configured user isn't shown the empty state while snapshots hydrate.
-  const isEmptyUsageState = isUsageEmptyState(providerSnapshots, usageSettings)
+  const isEmptyUsageState = isUsageEmptyState(rateLimits, usageSettings)
   // Why: one-time nudge — once dismissed, stays hidden even if providers reconnect later.
   const showEmptyUsageCta = isEmptyUsageState && !usageEmptyStateDismissed
   const anyFetching = Object.values(providerSnapshots).some(
@@ -271,8 +273,6 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
   return {
     footerClaudeAccounts,
     footerUsageEntries,
-    claudeUsageState: rateLimits,
-    claudeUsageAccounts: claudeAccounts,
     antigravityAccounts: rateLimits.antigravityAccounts,
     anyFetching,
     anyVisible,
@@ -295,6 +295,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     menuOpen,
     menuPoint,
     overflowing,
+    ownerUsage,
     petEnabled,
     recordFeatureInteraction,
     remoteOwner,
@@ -307,6 +308,7 @@ export function useStatusBarController(floatingTerminalOpen: boolean) {
     showEmptyUsageCta,
     showFloatingTerminalToggle,
     showFloatingWorkspaceAttentionDot,
+    showGitBlame,
     showPorts,
     showResourceUsage,
     showSsh,

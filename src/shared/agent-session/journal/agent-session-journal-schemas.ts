@@ -6,8 +6,10 @@ import { databaseMentionReferenceSchema } from '../../database/database-mention-
 // Older rewind replaces unknown turn/tool/resolution states with placeholders and blocks with raw-JSON text, retaining unknown bodies.
 // History pages lack row v: extensions must also remain safe for older clients.
 
+import { BOT_JOURNAL_ITEM_BODIES } from './agent-session-journal-bot-item-schemas'
+import { BoundedPayload, ProviderFrame } from './agent-session-journal-bounded-payload-schema'
 import * as z from 'zod'
-import { AgentSessionContextUsageSchema } from '../agent-session-context-usage-schema'
+import { AgentSessionContextUsageSchema } from '../conversation-context/agent-session-context-usage-schema'
 import { AgentJournalThreadGoalStateSchema } from './agent-session-journal-thread-goal-schema'
 import { AgentSessionFailureFactSchema } from '../failures/agent-session-failure-fact-schema'
 import { knownTags, openDiscriminatedUnion } from './agent-session-journal-open-union'
@@ -20,19 +22,6 @@ import type {
   AgentJournalRenderItem
 } from './agent-session-journal-types'
 import { AGENT_JOURNAL_PROMPT_INTENTS } from './agent-session-journal-types'
-
-const BoundedPayload = z.object({
-  head: z.string(),
-  byteLength: z.number(),
-  digest: z.string(),
-  truncated: z.boolean()
-})
-
-const ProviderFrame = z.object({
-  provider: z.string(),
-  kind: z.string(),
-  payload: BoundedPayload
-})
 
 const ToolMetadata = {
   mcpIdentity: z.object({ server: z.string(), tool: z.string() }).optional(),
@@ -195,7 +184,8 @@ const KnownItemBody = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('agent-start'),
     dispatchId: z.string().min(1),
-    task: z.string()
+    task: z.string(),
+    agent: z.string().min(1).optional()
   }),
   z.object({
     kind: z.literal('agent-handoff'),
@@ -214,7 +204,12 @@ const KnownItemBody = z.discriminatedUnion('kind', [
     endedAs: z.string().min(1).optional(),
     output: BoundedPayload.optional()
   }),
-  z.object({ kind: z.literal('diff'), path: z.string(), patch: BoundedPayload }),
+  z.object({
+    kind: z.literal('diff'),
+    path: z.string(),
+    paths: z.array(z.string()).optional(),
+    patch: BoundedPayload
+  }),
   z.object({
     kind: z.literal('approval'),
     title: z.string(),
@@ -268,7 +263,8 @@ const KnownItemBody = z.discriminatedUnion('kind', [
     ...TurnLifecycleFields,
     contextUsage: AgentSessionContextUsageSchema.optional(),
     providerTurnId: z.string().min(1).optional()
-  })
+  }),
+  ...BOT_JOURNAL_ITEM_BODIES
 ])
 
 /** Every body kind this build knows; a body of another kind is kept as-is and drawn by nobody. */

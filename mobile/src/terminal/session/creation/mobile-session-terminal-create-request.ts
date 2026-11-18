@@ -2,7 +2,7 @@ import type { MobileQuickCommandLaunch } from '../../quick-commands/quick-comman
 import type { RpcClient } from '../../../transport/rpc/rpc-client-contract'
 import type { MobileNewTabAgentOption } from '../../../session/agent-launch/mobile-new-tab-agent-options'
 import { sessionTabCreateTerminal } from '../../../session/tabs/mobile-session-tab-write-operations'
-import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../../src/shared/agent-session/agent-session-create-capabilities'
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../../src/shared/agent-session/lifecycle/operations/agent-session-create-capabilities'
 
 export type MobileSessionTerminalCreateOptions = MobileQuickCommandLaunch['options'] & {
   onPromptSent?: () => void

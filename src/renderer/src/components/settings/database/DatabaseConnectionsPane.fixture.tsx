@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { defineFixture } from '../../../component-fixtures/component-fixture'
-import { ConfirmationDialogProvider } from '../../confirmation-dialog'
+import { ConfirmationDialogProvider } from '../../dismiss/confirmation/confirmation-dialog'
 import { DatabaseConnectionsPane } from './DatabaseConnectionsPane'
 import { createDatabaseClientFixture } from './testing/database-client-fixture'
 import type { DatabaseConnectionSummary } from '../../../../../shared/database/database-contracts'

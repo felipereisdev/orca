@@ -51,6 +51,8 @@ export async function launchNewTabAgentThroughHost(args: {
   worktreeId: string
   agent: TuiAgent
   options: NewTabAgentLaunchOptions | undefined
+  /** Chat or CLI from the New Tab sheet; a chat that can't open here starts the CLI. */
+  nativeChatDefault?: boolean
   lock: string
   activeSessionTabId?: string | null
   pendingSelectionRef: { current: PendingSessionSelection | null }
@@ -74,6 +76,7 @@ export async function launchNewTabAgentThroughHost(args: {
     worktreeId: args.worktreeId,
     agent: args.agent,
     claudeAccountId: options?.claudeAccountId,
+    nativeChatDefault: args.nativeChatDefault,
     reservation,
     ...(afterTabId ? { placement: { afterTabId } } : {}),
     ...(prompt?.trim() ? { prompt: { text: prompt, delivery: 'submit' as const } } : {}),

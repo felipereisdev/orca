@@ -70,8 +70,6 @@ type AiVaultResumeStartupArgs = {
   commandOverride?: string | null
 }
 
-export { getAiVaultResumeCodexHome } from './ai-vault-resume-path'
-
 export function getAiVaultAgentProviderSession(
   session: Pick<AiVaultSession, 'agent' | 'sessionId'> & { filePath?: string }
 ): AgentProviderSessionMetadata | null {
@@ -88,6 +86,10 @@ export function getAiVaultAgentProviderSession(
     return session.filePath
       ? { key: 'session_id', id: session.sessionId, transcriptPath: session.filePath }
       : null
+  }
+  // A Hermes row's `<store>#<id>` names the profile every resume, restore and host rebuild must pin.
+  if (session.agent === 'hermes' && session.filePath?.includes('#')) {
+    return { key: 'session_id', id: session.sessionId, transcriptPath: session.filePath }
   }
   return { key: 'session_id', id: session.sessionId }
 }

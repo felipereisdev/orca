@@ -74,6 +74,9 @@ export function useProviderAccountList<Provider extends 'claude' | 'codex'>(
     [mountedRef, observing, observation, ownerKey]
   )
   const loadAccounts = useCallback(async () => {
+    if (!enabled) {
+      return
+    }
     const request = fetchProviderAccountsSnapshot(ownerTarget)
     const writeSequence = readStartSequencesRef.current.get(request) ?? writeSequenceRef.current
     readStartSequencesRef.current.set(request, writeSequence)
@@ -89,13 +92,13 @@ export function useProviderAccountList<Provider extends 'claude' | 'codex'>(
         setLocal({ ownerKey, accounts: snapshot[provider], known: true })
       }
     }
-  }, [provider, ownerTarget, ownerKey, observing, observation, mountedRef])
+  }, [provider, ownerTarget, ownerKey, observing, observation, mountedRef, enabled])
   useEffect(() => {
     if (enabled && !observing) {
       void loadAccounts().catch((error: unknown) =>
         console.error(`Failed to load ${provider} accounts:`, error)
       )
     }
-  }, [enabled, loadAccounts, observing, provider, syncKey])
+  }, [loadAccounts, observing, provider, syncKey, enabled])
   return { accounts, setAccounts, accountsLoaded, loadAccounts, mountedRef }
 }

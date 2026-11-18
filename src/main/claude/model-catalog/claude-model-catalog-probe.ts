@@ -1,8 +1,9 @@
 import { join } from 'node:path'
 import { agentModelCatalogInputStamp } from '../../native-chat/agent-model-catalog/agent-model-catalog-input-stamp'
 import { withOrcaClaudeChatEntrypoint } from '../../../shared/agent-launch/startup/claude-chat-entrypoint'
-import { explicitClaudeAccountEnv } from '../../claude-accounts/runtime-auth/environment'
+import { claudeAccountHomeEnv } from '../structured/launch/claude-launch-account'
 import { waitForPromiseWithSignal } from '../../../shared/concurrency/abort-signal-reason'
+import type { ClaudeCliLaunch } from '../cli-capabilities/claude-cli-flag-support'
 import {
   assertStructuredAgentResolutionCurrent,
   type StructuredAgentResolutionOperation
@@ -24,10 +25,10 @@ import {
   catalogListingDirectory
 } from '../../../shared/shell/command-resolution/node-cli-command-resolution'
 import {
-  CLAUDE_DEFAULT_SETTING_SOURCES,
   resolveClaudeStructuredInvocation,
   type ClaudeStructuredLaunchPartDeps
 } from '../structured/launch/claude-structured-launch-resolution'
+import { CLAUDE_DEFAULT_SETTING_SOURCES } from '../structured/launch/claude-discovery-options'
 import {
   resolveClaudeChildEnvSources,
   type ClaudeEnvDeps
@@ -63,6 +64,8 @@ export async function runClaudeListing(
     cwd?: string
     signal?: AbortSignal
     isCurrent?: () => boolean
+    /** Flags that decide what this CLI loads (a chat's discovery options), read for the resolved CLI. */
+    discovery?: (launch: ClaudeCliLaunch) => Promise<readonly string[]>
   }
 ): Promise<string> {
   // Explicitly pinning the default directory changes the CLI's Keychain identity.
@@ -73,6 +76,12 @@ export async function runClaudeListing(
     })),
     request.signal
   )
+  const discoveryArgs = request.discovery
+    ? await waitForPromiseWithSignal(
+        request.discovery({ command, prefixArgs, cwd: request.cwd ?? process.cwd(), env }),
+        request.signal
+      )
+    : []
   const run = (args: readonly string[]) => {
     request.signal?.throwIfAborted()
     if (request.isCurrent && !request.isCurrent()) {
@@ -95,12 +104,14 @@ export async function runClaudeListing(
   const result = await runClaudeBackgroundAttempts({
     agentId: 'claude',
     run: (strictMcp) =>
-      run(buildClaudeModelListArgs(strictMcp)).catch((error: unknown) => {
-        if (error instanceof AgentModelCatalogProbeError) {
-          return error
+      run([...buildClaudeModelListArgs(strictMcp, discoveryArgs), ...discoveryArgs]).catch(
+        (error: unknown) => {
+          if (error instanceof AgentModelCatalogProbeError) {
+            return error
+          }
+          throw error
         }
-        throw error
-      }),
+      ),
     failedExit: (outcome) =>
       outcome instanceof AgentModelCatalogProbeError && outcome.reason === 'exit'
         ? outcome.failedExit
@@ -154,16 +165,11 @@ export function createClaudeModelCatalogProbe(
     const { command, prefixArgs, env, account } = await resolveClaudeStructuredInvocation(
       launchDeps,
       (base) =>
-        claudeAccountId
-          ? explicitClaudeAccountEnv(base, claudeAccountId, {
-              CLAUDE_CONFIG_DIR: requireLegacyAgentSessionAccountHome(accountHome).path
-            })
-          : {
-              ...base,
-              ...claudeConfigDirEnvPatch(requireLegacyAgentSessionAccountHome(accountHome).path, {
-                env: base
-              })
-            },
+        claudeAccountHomeEnv(
+          base,
+          requireLegacyAgentSessionAccountHome(accountHome).path,
+          claudeAccountId
+        ),
       sources
     )
     assertStructuredAgentResolutionCurrent(operation)

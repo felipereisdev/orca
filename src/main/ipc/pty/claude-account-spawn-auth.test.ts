@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { assemblePtySpawnEnvDeletions } from './spawn-options-assembly'
+import { assemblePtySpawnEnvDeletions } from './spawn/spawn-options-assembly'
 import { createDaemonPtyEnvironment } from '../../daemon/pty-subprocess/spawn-environment'
 import { buildInheritedLocalPtyEnvironment } from '../../providers/local-pty/local-pty-spawn-environment'
 

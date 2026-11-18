@@ -39,6 +39,7 @@ export function renderAgentsSettingsSection(
             settings={model.settings}
             updateSettings={model.updateSettings}
             hostScope={model.settingsHostScope}
+            showDeleteAgentHistory
             wslSupportedPlatform={terminal.localWslSupportedPlatform}
             wslAvailable={terminal.localWindowsRuntimeCapabilities.wslAvailable}
             wslDistros={terminal.localWindowsRuntimeCapabilities.wslDistros}

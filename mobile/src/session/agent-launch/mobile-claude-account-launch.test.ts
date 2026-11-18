@@ -5,7 +5,7 @@ import {
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_RUNTIME_CAPABILITY
 } from '../../../../src/shared/agent-launch/contracts/agent-launch-runtime-capability'
-import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/agent-session-create-capabilities'
+import { CLAUDE_ACCOUNT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../src/shared/agent-session/lifecycle/operations/agent-session-create-capabilities'
 import { launchNewTabAgentThroughHost } from './new-tab-agent-host-launch'
 import { requestMobileSessionTerminalCreate } from '../../terminal/session/creation/mobile-session-terminal-create-request'
 

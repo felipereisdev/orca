@@ -7,8 +7,8 @@ import {
   SheetDescription
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
-import { useConfirmationDialog } from '@/components/confirmation-dialog-context'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { useTranslate } from '@/i18n/use-translate'
 import type { DatabaseRuntimeClient } from '@/runtime/database/database-runtime-client'
 import type { DatabaseSettingsOptions } from '../../../../../shared/database/database-settings-options'
@@ -44,9 +44,7 @@ export function DatabaseConnectionSheet({
           'database.form.discardHelp',
           'The unsaved changes and entered credentials will be discarded'
         ),
-        confirmLabel: t('database.form.discard', 'Discard'),
-        cancelVariant: 'ghost',
-        compact: true
+        confirmLabel: t('database.form.discard', 'Discard')
       }))
     ) {
       return

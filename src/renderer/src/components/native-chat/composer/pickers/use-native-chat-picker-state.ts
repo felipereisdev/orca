@@ -17,7 +17,7 @@ import {
   type SetStateAction
 } from 'react'
 import type { AgentType } from '../../../../../../shared/agent-status/contracts/agent-status-types'
-import { getNativeChatAgentProfile } from '../../../../../../shared/native-chat/native-chat-agent-profiles'
+import { getNativeChatAgentProfile } from '../../../../../../shared/native-chat/input/commands/native-chat-agent-profiles'
 
 import {
   deriveComposerAutocomplete,
@@ -51,6 +51,8 @@ export type NativeChatPickerState = {
   /** The draft still leads with the skill the user picked from the menu. */
   isPickedSkill: (draft: string) => boolean
   completeItem: (item: NativeChatPickerItem) => void
+  /** `token` replaces the file-reference form, e.g. a room's `@Name`; with `from`, it replaces
+   *  `from` to the caret wherever the menu is (a bot's chats filter on text with spaces). */
   completeMention: ReturnType<typeof useNativeChatMentionCompletion>
   dismiss: (triggerKey: string) => void
   handleDraftOrCaretChange: (value: string, caret: number) => void

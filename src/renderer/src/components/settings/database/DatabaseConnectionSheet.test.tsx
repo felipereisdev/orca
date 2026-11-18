@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import { ConfirmationDialogProvider } from '../../confirmation-dialog'
+import { ConfirmationDialogProvider } from '../../dismiss/confirmation/confirmation-dialog'
 import { DatabaseConnectionSheet } from './DatabaseConnectionSheet'
 import { createDatabaseClientFixture } from './testing/database-client-fixture'
 

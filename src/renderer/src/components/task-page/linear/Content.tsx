@@ -1,5 +1,5 @@
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
-import LinearIssueWorkspace from '@/components/LinearIssueWorkspace'
+import LinearIssueWorkspace from '@/components/task-page/linear/issue-workspace/LinearIssueWorkspace'
 import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
 import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 import { LoaderCircle } from 'lucide-react'

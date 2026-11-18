@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { build, testContext, WS } from '../commands/workspace-layout-command.test-fixture'
 import { projectSessionTabs } from './old-client-session-tabs-projection'
-import { withMainSessionTabRows } from '../../../main/runtime/session-tabs/main-session-tab-rows'
+import { withMainSessionTabRows } from '../../../main/runtime/session-tabs/layout/main-session-tab-rows'
 
 it('publishes a database tab with its stable reference and retires stale window rows after close', () => {
   const context = testContext()

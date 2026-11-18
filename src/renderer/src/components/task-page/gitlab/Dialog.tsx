@@ -1,5 +1,5 @@
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
-import GitLabItemDialog from '@/components/GitLabItemDialog'
+import GitLabItemDialog from '@/components/gitlab-item-dialog/GitLabItemDialog'
 import { useTaskBoardSeenMarker } from '@/components/task-page/orca/task-board-seen-marker'
 import { isOrcaTaskSource } from '../../../../../shared/work-items/task-source'
 export function TaskPageGitLabDialog({

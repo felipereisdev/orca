@@ -41,6 +41,9 @@ import { AccountRuntimeToggle } from '../composition/StatusBarAccountControls'
 import { AccountSwitchSection } from './AccountSwitchList'
 import { ProviderDetailsMenu } from '../usage/ProviderDetailsMenu'
 import { signInToClaudeAccount } from '@/lib/provider-accounts/claude-account-sign-in'
+import { getOwnerAccountRows } from './owner-account-rows'
+
+const EMPTY_CLAUDE_ACCOUNTS = emptyClaudeAccountsState()
 
 export function ClaudeSwitcherForOwner({
   claude,
@@ -49,8 +52,7 @@ export function ClaudeSwitcherForOwner({
   asSubmenu = false,
   triggerContent,
   chatAction,
-  usageState,
-  usageAccounts,
+  ownerUsage,
   owner
 }: ClaudeSwitcherMenuProps & { owner: AccountOwner }): React.JSX.Element | null {
   const t = useTranslate()
@@ -71,14 +73,12 @@ export function ClaudeSwitcherForOwner({
   const activeRuntimeEnvironmentId = runtimeTargetEnvironmentId(runtimeTarget)
   const hasActiveRuntimeEnvironment = activeRuntimeEnvironmentId !== null
   const {
-    inactiveClaudeAccounts,
-    claudeTarget: storedClaudeTarget,
+    chatInactiveClaudeAccounts,
     settings,
     ownHostName,
     accountSettings,
     claudeAccountSyncKey
   } = useClaudeSwitcherState(chatAction, activeRuntimeEnvironmentId)
-  const claudeTarget = usageState?.claudeTarget ?? storedClaudeTarget
   const providerAccountHostLabel = hasActiveRuntimeEnvironment
     ? (ownHostName ?? t('auto.components.status.bar.StatusBar.remoteServerLabel', 'Remote server'))
     : undefined
@@ -93,14 +93,21 @@ export function ClaudeSwitcherForOwner({
       'claude',
       runtimeTarget,
       claudeAccountSyncKey,
-      emptyClaudeAccountsState(),
+      EMPTY_CLAUDE_ACCOUNTS,
       !!chatAction,
-      !hasActiveRuntimeEnvironment || !!chatAction
+      !ownerUsage?.remoteOwner
     )
-  const accountState =
-    hasActiveRuntimeEnvironment && !chatAction
-      ? (usageAccounts ?? emptyClaudeAccountsState())
-      : resolveClaudeStatusAccountState(accountSettings, accounts, activeRuntimeEnvironmentId)
+  const ownerRows = ownerUsage
+    ? getOwnerAccountRows('claude', ownerUsage, accounts, EMPTY_CLAUDE_ACCOUNTS)
+    : null
+  const roster = ownerRows?.roster ?? accounts
+  const inactiveClaudeAccounts = ownerRows?.inactiveAccounts ?? chatInactiveClaudeAccounts
+  const claudeTarget = ownerRows?.usageTarget
+  const accountState = resolveClaudeStatusAccountState(
+    accountSettings,
+    roster,
+    activeRuntimeEnvironmentId
+  )
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean): void => {
@@ -239,18 +246,20 @@ export function ClaudeSwitcherForOwner({
     'claude',
     chatAction,
     accountsLoaded,
-    signedInClaudeAccountCount(accounts),
+    signedInClaudeAccountCount(roster),
     isSwitching
   )
   if (accountControl?.add) {
     return runtimeTarget.kind === 'local' ? accountControl.button : null
   }
 
+  const panelShowsActiveAccount = ownerUsage !== undefined || !hasActiveRuntimeEnvironment
   const openAccountSettings = () => {
     openSettingsTarget({
       pane: 'accounts',
       repoId: null,
       sectionId: 'accounts-claude',
+      // Why: without a scope Settings opens on the default host, not the one these rows belong to.
       hostScope: runtimeTarget,
       ...(chatAction ? { intent: 'native-accounts' as const } : {})
     })
@@ -278,14 +287,11 @@ export function ClaudeSwitcherForOwner({
             accounts={accountState.accounts}
             loaded={
               hasActiveRuntimeEnvironment
-                ? usageAccounts != null
+                ? ownerUsage?.accounts != null
                 : accountsLoaded || accountState.accounts.length > 0
             }
             activeUsage={selectedGroup?.key === selectedRuntimeKey ? claude : null}
-            previews={
-              usageState?.inactiveClaudeAccounts ??
-              (hasActiveRuntimeEnvironment ? [] : inactiveClaudeAccounts)
-            }
+            previews={inactiveClaudeAccounts}
             display={display}
             signingInId={signingInId}
             onSignIn={hasActiveRuntimeEnvironment ? undefined : (id) => void handleSignIn(id)}
@@ -293,12 +299,13 @@ export function ClaudeSwitcherForOwner({
         )
       }
       accountLabel={
-        !hasActiveRuntimeEnvironment
+        panelShowsActiveAccount
           ? (selectedGroup?.targets.find((target) => target.active)?.label ??
             t('auto.components.status.bar.StatusBar.c676918adc', 'System default'))
           : undefined
       }
       topContent={
+        // Why: on a remote owner the toggle only switches which runtime's accounts the panel shows.
         chatAction ? undefined : (
           <AccountRuntimeToggle
             groups={switchGroups}
@@ -315,7 +322,7 @@ export function ClaudeSwitcherForOwner({
         <AccountSwitchSection
           heading={t('auto.components.status.bar.AccountSwitchList.accounts', 'Accounts')}
           targets={selectedGroup?.targets ?? []}
-          panelShowsActiveAccount={!hasActiveRuntimeEnvironment}
+          panelShowsActiveAccount={panelShowsActiveAccount}
           onOpenSettings={openAccountSettings}
         >
           <ClaudeAccountSwitchRows
