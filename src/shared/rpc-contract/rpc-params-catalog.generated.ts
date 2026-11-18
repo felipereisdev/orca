@@ -354,6 +354,13 @@ import {
   DatabaseStartQuery
 } from './database/database-params'
 import {
+  DesktopConfigureParams,
+  DesktopControlSetParams,
+  DesktopStatusParams,
+  DesktopViewerParams,
+  DesktopViewerUnsubscribeParams
+} from './desktop/desktop-params'
+import {
   AttachParams as AttachParamsOfEmulatorParams,
   AxParams,
   ButtonParams,
@@ -1483,7 +1490,12 @@ export const RPC_PARAMS_BY_METHOD = {
   'database.testConnection': DatabaseConfigurationId,
   'database.waitBindingQuery': DatabaseBindingQuery,
   'database.waitQuery': DatabaseQueryId,
+  'desktop.configure': DesktopConfigureParams,
+  'desktop.control.set': DesktopControlSetParams,
   'desktop.openWindowInBackground': null,
+  'desktop.status': DesktopStatusParams,
+  'desktop.viewer': DesktopViewerParams,
+  'desktop.viewer.unsubscribe': DesktopViewerUnsubscribeParams,
   'desktopBrowserBridge.attach': DesktopBrowserBridgeAttachParams,
   'desktopBrowserBridge.result': DesktopBrowserBridgeResultParams,
   'diagnostics.memory': null,

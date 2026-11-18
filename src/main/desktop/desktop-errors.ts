@@ -2,11 +2,13 @@ export type DesktopErrorCode =
   | 'desktop_user_in_control'
   | 'desktop_unavailable'
   | 'desktop_invalid_input'
+  | 'desktop_agent_not_allowed'
 
 const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_user_in_control: 'The user has taken control of the desktop.',
   desktop_unavailable: 'The desktop is not available.',
-  desktop_invalid_input: 'The desktop input is not valid.'
+  desktop_invalid_input: 'The desktop input is not valid.',
+  desktop_agent_not_allowed: 'Agents cannot configure, view or take control of the desktop.'
 }
 
 /** `reason` is a fixed code or caller-supplied text; credentials never go into it. */

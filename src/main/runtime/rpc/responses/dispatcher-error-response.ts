@@ -1,6 +1,7 @@
 import { DatabaseOperationError } from '../../../../shared/database/database-operation-error'
 import { BranchSwitchLandedWithWarningError } from '../../../git/worktrees/checkout/branch-switch'
 import { mapBrowserError } from './browser-error-response'
+import { DesktopError } from '../../../desktop/desktop-errors'
 import { ZodError } from 'zod'
 import {
   InvalidArgumentError,
@@ -41,6 +42,9 @@ export function mapDispatcherError(
     })
   }
   if (error instanceof DatabaseOperationError) {
+    return errorResponse(request.id, meta, error.code, error.message)
+  }
+  if (error instanceof DesktopError) {
     return errorResponse(request.id, meta, error.code, error.message)
   }
   if (error instanceof ZodError) {
