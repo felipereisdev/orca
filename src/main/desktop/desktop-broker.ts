@@ -10,12 +10,11 @@ import {
   type DesktopButton,
   type DesktopPoint
 } from './desktop-agent-actions'
-import { DesktopControlConnection } from './desktop-control-connection'
+import { DesktopControlConnection, type DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
-import { DesktopViewerSession } from './desktop-viewer-session'
+import { DesktopViewerRegistry } from './desktop-viewer-registry'
 import { encodePng } from './rfb/png-encode'
-import type { RfbFramebuffer } from './rfb/rfb-framebuffer'
 
 export type DesktopOwner = 'agent' | 'user'
 
@@ -71,13 +70,23 @@ export class DesktopBroker {
   #retryDelayMs = RETRY_INITIAL_MS
   #owner: DesktopOwner = 'agent'
   #controller: string | undefined
+  /** Bumped on every owner or controller change; agent commands are bound to one value. */
+  #ownerEpoch = 0
   #fallbackTimer: ReturnType<typeof setTimeout> | undefined
-  readonly #viewers = new Map<string, DesktopViewerSession>()
-  readonly #frameListeners = new Set<(fb: RfbFramebuffer) => void>()
-  readonly #agentInput: AgentInputSink = {
-    send: (message) => this.#readyControl().write(message),
-    size: () => this.#readyControl().framebuffer
-  }
+  readonly #viewers = new DesktopViewerRegistry({
+    inControl: (viewerId) => this.#owner === 'user' && this.#controller === viewerId,
+    onRegistered: (viewerId) => {
+      if (this.#controller === viewerId) {
+        clearTimeout(this.#fallbackTimer)
+      }
+    },
+    onClosed: (viewerId) => {
+      if (this.#owner === 'user' && this.#controller === viewerId) {
+        this.#startOwnerFallback()
+      }
+    }
+  })
+  readonly #frameListeners = new Set<(frame: DesktopFrame) => void>()
 
   /** Replaces any previous configuration and reconnects; resolves after the first attempt. */
   async configure(cfg: DesktopBrokerConfig): Promise<void> {
@@ -109,8 +118,8 @@ export class DesktopBroker {
       status.reason = this.#reason
     }
     if (this.#state === 'ready' && this.#control) {
-      status.width = this.#control.framebuffer.width
-      status.height = this.#control.framebuffer.height
+      status.width = this.#control.frame.width
+      status.height = this.#control.frame.height
     }
     return status
   }
@@ -133,69 +142,50 @@ export class DesktopBroker {
     this.#releaseHeldInput()
     this.#owner = owner
     this.#controller = controller
+    this.#ownerEpoch++
     clearTimeout(this.#fallbackTimer)
     if (controller !== undefined && !this.#viewers.has(controller)) {
       this.#startOwnerFallback()
     }
   }
 
+  /** A pending open for the same id is cancelled; control's fallback deadline is not reset. */
   async openViewer(viewerId: string, downstream: Duplex): Promise<void> {
     const target = this.#target
     if (!target) {
       downstream.destroy()
       throw new DesktopError('desktop_unavailable', 'desktop_unconfigured')
     }
-    this.#viewers.get(viewerId)?.close()
-    if (this.#controller === viewerId) {
-      clearTimeout(this.#fallbackTimer)
-    }
     const generation = this.#generation
-    let session: DesktopViewerSession | undefined
-    try {
-      session = await DesktopViewerSession.open(target, downstream, {
-        inputAllowed: () =>
-          this.#owner === 'user' &&
-          this.#controller === viewerId &&
-          this.#viewers.get(viewerId) === session,
-        onClosed: () => this.#onViewerClosed(viewerId, session)
-      })
-    } catch (error) {
-      this.#onViewerClosed(viewerId, undefined)
-      throw new DesktopError('desktop_unavailable', desktopFailureReason(error))
-    }
-    if (generation !== this.#generation) {
-      session.close()
-      throw new DesktopError('desktop_unavailable', 'desktop_reconfigured')
-    }
-    this.#viewers.set(viewerId, session)
+    await this.#viewers.open(target, viewerId, downstream, () => generation === this.#generation)
   }
 
   closeViewer(viewerId: string): void {
-    this.#viewers.get(viewerId)?.close()
+    this.#viewers.close(viewerId)
   }
 
-  async move(x: number, y: number): Promise<void> {
-    agentMove(this.#agentInput, { x, y })
+  move(x: number, y: number): Promise<void> {
+    return this.#agentCommand(async (sink) => agentMove(sink, { x, y }))
   }
 
   click(x: number, y: number, opts: { button: DesktopButton; double?: boolean }): Promise<void> {
-    return agentClick(this.#agentInput, { x, y }, opts)
+    return this.#agentCommand((sink) => agentClick(sink, { x, y }, opts))
   }
 
   drag(from: DesktopPoint, to: DesktopPoint): Promise<void> {
-    return agentDrag(this.#agentInput, from, to)
+    return this.#agentCommand((sink) => agentDrag(sink, from, to))
   }
 
   scroll(x: number, y: number, opts: { dy: number }): Promise<void> {
-    return agentScroll(this.#agentInput, { x, y }, opts)
+    return this.#agentCommand((sink) => agentScroll(sink, { x, y }, opts))
   }
 
   type(text: string): Promise<void> {
-    return agentType(this.#agentInput, text)
+    return this.#agentCommand((sink) => agentType(sink, text))
   }
 
-  async key(combo: string): Promise<void> {
-    agentKey(this.#agentInput, combo)
+  key(combo: string): Promise<void> {
+    return this.#agentCommand(async (sink) => agentKey(sink, combo))
   }
 
   /** Allowed whoever owns the desktop. */
@@ -204,24 +194,44 @@ export class DesktopBroker {
     if (this.#state !== 'ready' || !control) {
       throw new DesktopError('desktop_unavailable', this.#reason)
     }
-    const { width, height } = control.framebuffer
-    return { png: await encodePng(width, height, control.framebuffer.rgba()), width, height }
+    const frame = control.frame
+    const { width, height } = frame
+    return { png: await encodePng(width, height, frame.rgba()), width, height }
   }
 
-  /** Called after every FramebufferUpdate on the control connection. */
-  onFrame(cb: (fb: RfbFramebuffer) => void): () => void {
+  /** Called with each complete frame (a snapshot) from the control connection. */
+  onFrame(cb: (frame: DesktopFrame) => void): () => void {
     this.#frameListeners.add(cb)
     return () => this.#frameListeners.delete(cb)
   }
 
-  // Ownership is checked here, per input event, so a long action stops as soon as control moves.
-  #readyControl(): DesktopControlConnection {
-    if (this.#owner === 'user') {
+  /**
+   * Checks ownership and readiness at entry, then queues the command on the connection it started
+   * on. Every input event re-checks that neither the connection nor the owner changed since.
+   */
+  #agentCommand(run: (sink: AgentInputSink) => Promise<void>): Promise<void> {
+    const control = this.#control
+    const epoch = this.#ownerEpoch
+    try {
+      this.#assertAgentCanAct(control, epoch)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    const bound = (): DesktopControlConnection => this.#assertAgentCanAct(control, epoch)
+    return bound().enqueue(() =>
+      run({ send: (message) => bound().write(message), size: () => bound().frame })
+    )
+  }
+
+  #assertAgentCanAct(
+    control: DesktopControlConnection | undefined,
+    epoch: number
+  ): DesktopControlConnection {
+    if (this.#owner === 'user' || epoch !== this.#ownerEpoch) {
       throw new DesktopError('desktop_user_in_control')
     }
-    const control = this.#control
-    if (this.#state !== 'ready' || !control?.writable) {
-      throw new DesktopError('desktop_unavailable', this.#reason)
+    if (!control || control !== this.#control || this.#state !== 'ready' || !control.writable) {
+      throw new DesktopError('desktop_unavailable', this.#reason ?? 'desktop_reconfigured')
     }
     return control
   }
@@ -246,26 +256,12 @@ export class DesktopBroker {
     }, OWNER_FALLBACK_MS)
   }
 
-  #onViewerClosed(viewerId: string, session: DesktopViewerSession | undefined): void {
-    if (session !== undefined) {
-      if (this.#viewers.get(viewerId) !== session) {
-        return
-      }
-      this.#viewers.delete(viewerId)
-    }
-    if (this.#owner === 'user' && this.#controller === viewerId && !this.#viewers.has(viewerId)) {
-      this.#startOwnerFallback()
-    }
-  }
-
   #disconnect(): void {
     this.#generation++
     clearTimeout(this.#retryTimer)
     this.#control?.close()
     this.#control = undefined
-    for (const session of this.#viewers.values()) {
-      session.close()
-    }
+    this.#viewers.closeAll()
   }
 
   async #connect(generation: number): Promise<void> {

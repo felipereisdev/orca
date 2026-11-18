@@ -51,8 +51,21 @@ function singleRectUpdate(rectHeader: Buffer, payload?: Buffer): Buffer {
   return Buffer.concat(payload ? [header, rectHeader, payload] : [header, rectHeader])
 }
 
+/** A complete desktop image, copied when published; consumers must not mutate `rgba()`. */
+export type DesktopFrame = {
+  readonly width: number
+  readonly height: number
+  rgba(): Buffer
+}
+
+function snapshotFrame(framebuffer: RfbFramebuffer): DesktopFrame {
+  const pixels = framebuffer.rgba()
+  const { width, height } = framebuffer
+  return { width, height, rgba: () => pixels }
+}
+
 type ControlHandlers = {
-  onFrame: (framebuffer: RfbFramebuffer) => void
+  onFrame: (frame: DesktopFrame) => void
   /** Called once if the connection drops on its own (not after `close()`). */
   onLost: (reason: string) => void
 }
@@ -62,9 +75,12 @@ type ControlHandlers = {
  * recording) and carries the agent's input.
  */
 export class DesktopControlConnection {
-  readonly framebuffer: RfbFramebuffer
+  /** Mirrors the server as updates arrive; may be mid-update or blank after a resize. */
+  private readonly framebuffer: RfbFramebuffer
   /** What the agent holds down on this connection. */
   readonly held = new HeldInput()
+  private published: DesktopFrame | undefined
+  private queue: Promise<unknown> = Promise.resolve()
   private closed = false
 
   private constructor(
@@ -93,6 +109,21 @@ export class DesktopControlConnection {
     return connection
   }
 
+  /** The latest complete frame; set before `open` resolves. */
+  get frame(): DesktopFrame {
+    if (!this.published) {
+      throw new RfbError('rfb_protocol_error')
+    }
+    return this.published
+  }
+
+  /** Runs agent commands one after another, so they never interleave on the input stream. */
+  enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(work)
+    this.queue = result.catch(() => undefined)
+    return result
+  }
+
   get writable(): boolean {
     return !this.closed && this.socket.writable
   }
@@ -118,7 +149,9 @@ export class DesktopControlConnection {
     this.socket.write(setPixelFormatMessage())
     this.socket.write(setEncodingsMessage([RFB_ENCODING_RAW, RFB_ENCODING_DESKTOP_SIZE]))
     this.requestFull()
-    this.requestNext(await this.readUntilUpdate())
+    do {
+      this.requestNext(await this.readUntilUpdate())
+    } while (!this.published)
   }
 
   private async readForever(): Promise<void> {
@@ -163,7 +196,10 @@ export class DesktopControlConnection {
       const type = (await readExact(this.socket, 1))[0]
       if (type === RFB_SERVER_FRAMEBUFFER_UPDATE) {
         const resized = await this.readFramebufferUpdate()
-        this.emitFrame()
+        // After a resize the pixels are blank until the full update requested next arrives.
+        if (!resized) {
+          this.publish()
+        }
         return resized
       }
       if (type === RFB_SERVER_SET_COLOUR_MAP_ENTRIES) {
@@ -209,9 +245,10 @@ export class DesktopControlConnection {
     return resized
   }
 
-  private emitFrame(): void {
+  private publish(): void {
+    this.published = snapshotFrame(this.framebuffer)
     try {
-      this.handlers.onFrame(this.framebuffer)
+      this.handlers.onFrame(this.published)
     } catch {
       // A failing frame consumer (e.g. a recorder) must not tear down the VNC session.
     }

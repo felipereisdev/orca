@@ -1,3 +1,4 @@
+import { duplexPair } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   hasUpdateRequest,
@@ -174,5 +175,51 @@ describe('DesktopBroker control ownership', () => {
       [1, 1, 1],
       [0, 1, 1]
     ])
+  })
+
+  it('a pending reconnect does not extend the fallback deadline', async () => {
+    const { broker, openViewer } = await fixture()
+    await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    broker.setOwner('user', 'v1')
+    broker.closeViewer('v1')
+    await vi.advanceTimersByTimeAsync(3_000)
+
+    const [silent] = duplexPair()
+    const pending = broker.openViewer('v1', silent).catch((error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    expect(broker.status().owner).toBe('agent')
+    broker.closeViewer('v1')
+    expect(await pending).toMatchObject({ code: 'desktop_unavailable' })
+  })
+
+  it('closeViewer cancels a viewer that is still connecting', async () => {
+    const { broker } = await fixture()
+    // Frozen clock: only cancellation, not the 10 s handshake timeout, can settle the open.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const [silent] = duplexPair()
+
+    const pending = broker.openViewer('v1', silent)
+    broker.closeViewer('v1')
+
+    await expect(pending).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    expect(silent.destroyed).toBe(true)
+  })
+
+  it('a newer open for the same viewer supersedes one still connecting', async () => {
+    const { broker, server, openViewer } = await fixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const [silent] = duplexPair()
+
+    const first = broker.openViewer('v1', silent).catch((error: unknown) => error)
+    const second = await openViewer('v1')
+    expect(await first).toMatchObject({ code: 'desktop_unavailable' })
+
+    broker.setOwner('user', 'v1')
+    second.pointer(2, 3, 1)
+    second.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+    expect(pointerEvents(server.received)).toEqual([[1, 2, 3]])
   })
 })

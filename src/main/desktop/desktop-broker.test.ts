@@ -1,5 +1,6 @@
 import { duplexPair } from 'node:stream'
 import { inspect } from 'node:util'
+import { inflateSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DesktopBroker } from './desktop-broker'
 import {
@@ -23,6 +24,18 @@ async function fixture(size?: { width: number; height: number }): Promise<Deskto
   const started = await startDesktopBrokerFixture(size)
   cleanups.push(() => started.close())
   return started
+}
+
+/** RGBA of one pixel of an 8-bit RGBA PNG with a single IDAT chunk and no row filters. */
+function pngPixel(png: Buffer, x: number, y: number): number[] {
+  const width = png.readUInt32BE(16)
+  let offset = 8
+  while (png.toString('latin1', offset + 4, offset + 8) !== 'IDAT') {
+    offset += 12 + png.readUInt32BE(offset)
+  }
+  const rows = inflateSync(png.subarray(offset + 8, offset + 8 + png.readUInt32BE(offset)))
+  const start = y * (width * 4 + 1) + 1 + x * 4
+  return [...rows.subarray(start, start + 4)]
 }
 
 function trackedBroker(): DesktopBroker {
@@ -171,5 +184,34 @@ describe('DesktopBroker connection', () => {
     }
     expect(JSON.stringify(broker.status())).not.toContain(secret)
     expect(inspect(broker, { depth: 10, showHidden: true })).not.toContain(secret)
+  })
+
+  it('a resize is published only once the replacement pixels arrive', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const frames: { width: number; height: number }[] = []
+    broker.onFrame((frame) => frames.push({ width: frame.width, height: frame.height }))
+    server.holdUpdates()
+
+    server.setSize(80, 60)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 80)
+    )
+
+    expect(frames).toEqual([])
+    expect(broker.status()).toMatchObject({ width: 64, height: 48 })
+    const before = await broker.screenshot()
+    expect(before).toMatchObject({ width: 64, height: 48 })
+    expect(pngPixel(before.png, 10, 5)).toEqual([10, 5, 0x80, 255])
+
+    const published = new Promise<Buffer>((resolve) =>
+      broker.onFrame((frame) => resolve(frame.rgba()))
+    )
+    server.releaseUpdates()
+    const rgba = await published
+    const offset = (50 * 80 + 70) * 4
+    expect([...rgba.subarray(offset, offset + 4)]).toEqual([70, 50, 0x80, 255])
+    const after = await broker.screenshot()
+    expect(after).toMatchObject({ width: 80, height: 60 })
+    expect(pngPixel(after.png, 70, 50)).toEqual([70, 50, 0x80, 255])
   })
 })

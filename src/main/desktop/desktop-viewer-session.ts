@@ -25,23 +25,34 @@ export class DesktopViewerSession {
     private readonly handlers: ViewerHandlers
   ) {}
 
+  /** `signal` cancels a session that is still connecting (closed or superseded viewer). */
   static async open(
     target: DesktopVncTarget,
     downstream: Duplex,
-    handlers: ViewerHandlers
+    handlers: ViewerHandlers,
+    signal: AbortSignal
   ): Promise<DesktopViewerSession> {
     downstream.on('error', () => {})
     let upstream: Socket | undefined
+    const onAbort = (): void => {
+      upstream?.destroy()
+      downstream.destroy()
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
     try {
-      const connected = await connectRfbUpstream(target)
+      const connected = await connectRfbUpstream(target, undefined, signal)
       upstream = connected.socket
+      signal.throwIfAborted()
       await withSocketTimeout(downstream, () =>
         runRfbServerHandshake(downstream, connected.init.serverInit)
       )
+      signal.throwIfAborted()
     } catch (error) {
       upstream?.destroy()
       downstream.destroy()
       throw error
+    } finally {
+      signal.removeEventListener('abort', onAbort)
     }
     const session = new DesktopViewerSession(downstream, upstream, handlers)
     session.relay()

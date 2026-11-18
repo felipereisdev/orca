@@ -12,6 +12,12 @@ describe('keysymsFor', () => {
       expect.objectContaining({ code: 'desktop_invalid_input' })
     )
   })
+
+  it('does not resolve inherited object properties as key names', () => {
+    expect(() => keysymsFor('constructor')).toThrow(
+      expect.objectContaining({ code: 'desktop_invalid_input' })
+    )
+  })
 })
 
 describe('keysymsForText', () => {

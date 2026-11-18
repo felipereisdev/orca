@@ -30,6 +30,9 @@ export type FakeRfbServer = {
   received: Buffer[]
   /** Resolves once `received` satisfies `predicate`; event-driven, so tests never poll. */
   waitForReceived(predicate: (received: Buffer[]) => boolean): Promise<void>
+  /** Holds back pixel replies to non-incremental requests until `releaseUpdates`. */
+  holdUpdates(): void
+  releaseUpdates(): void
   /**
    * Changes the desktop size. Clients that advertised DesktopSize get the new size in reply to
    * their outstanding (or next) FramebufferUpdateRequest, as a real server does.
@@ -95,6 +98,7 @@ export async function startFakeRfbServer(opts: {
   const waiters = new Set<{ predicate: (received: Buffer[]) => boolean; resolve: () => void }>()
   const sockets = new Set<Socket>()
   const sessions = new Set<FakeRfbSession>()
+  let heldReplies: (() => void)[] | null = null
 
   const record = (message: Buffer): void => {
     received.push(message)
@@ -134,9 +138,13 @@ export async function startFakeRfbServer(opts: {
       width: Math.min(message.readUInt16BE(6), width - x),
       height: Math.min(message.readUInt16BE(8), height - y)
     }
-    session.socket.write(
+    const reply =
       rect.width > 0 && rect.height > 0 ? rawRect(rect, session.format) : updateHeader(0)
-    )
+    if (heldReplies) {
+      heldReplies.push(() => session.socket.write(reply))
+    } else {
+      session.socket.write(reply)
+    }
   }
 
   const handleMessage = (session: FakeRfbSession, message: Buffer): void => {
@@ -227,6 +235,16 @@ export async function startFakeRfbServer(opts: {
       predicate(received)
         ? Promise.resolve()
         : new Promise<void>((resolve) => waiters.add({ predicate, resolve })),
+    holdUpdates() {
+      heldReplies ??= []
+    },
+    releaseUpdates() {
+      const replies = heldReplies ?? []
+      heldReplies = null
+      for (const reply of replies) {
+        reply()
+      }
+    },
     setSize(nextWidth, nextHeight) {
       width = nextWidth
       height = nextHeight

@@ -1,40 +1,40 @@
 import { DesktopError } from './desktop-errors'
 
-const MODIFIER_KEYSYMS: Record<string, number> = {
-  ctrl: 0xffe3,
-  control: 0xffe3,
-  shift: 0xffe1,
-  alt: 0xffe9,
-  meta: 0xffeb,
-  super: 0xffeb,
-  cmd: 0xffeb,
-  win: 0xffeb
-}
+const MODIFIER_KEYSYMS = new Map<string, number>([
+  ['ctrl', 0xffe3],
+  ['control', 0xffe3],
+  ['shift', 0xffe1],
+  ['alt', 0xffe9],
+  ['meta', 0xffeb],
+  ['super', 0xffeb],
+  ['cmd', 0xffeb],
+  ['win', 0xffeb]
+])
 
-const NAMED_KEYSYMS: Record<string, number> = {
-  return: 0xff0d,
-  enter: 0xff0d,
-  tab: 0xff09,
-  escape: 0xff1b,
-  esc: 0xff1b,
-  backspace: 0xff08,
-  delete: 0xffff,
-  del: 0xffff,
-  insert: 0xff63,
-  home: 0xff50,
-  end: 0xff57,
-  left: 0xff51,
-  up: 0xff52,
-  right: 0xff53,
-  down: 0xff54,
-  page_up: 0xff55,
-  pageup: 0xff55,
-  page_down: 0xff56,
-  pagedown: 0xff56,
-  space: 0x20,
-  plus: 0x2b,
-  menu: 0xff67
-}
+const NAMED_KEYSYMS = new Map<string, number>([
+  ['return', 0xff0d],
+  ['enter', 0xff0d],
+  ['tab', 0xff09],
+  ['escape', 0xff1b],
+  ['esc', 0xff1b],
+  ['backspace', 0xff08],
+  ['delete', 0xffff],
+  ['del', 0xffff],
+  ['insert', 0xff63],
+  ['home', 0xff50],
+  ['end', 0xff57],
+  ['left', 0xff51],
+  ['up', 0xff52],
+  ['right', 0xff53],
+  ['down', 0xff54],
+  ['page_up', 0xff55],
+  ['pageup', 0xff55],
+  ['page_down', 0xff56],
+  ['pagedown', 0xff56],
+  ['space', 0x20],
+  ['plus', 0x2b],
+  ['menu', 0xff67]
+])
 
 const RETURN_KEYSYM = 0xff0d
 const TAB_KEYSYM = 0xff09
@@ -54,7 +54,7 @@ function characterKeysym(character: string): number {
 
 function namedKeysym(name: string): number {
   const lower = name.toLowerCase()
-  const named = MODIFIER_KEYSYMS[lower] ?? NAMED_KEYSYMS[lower]
+  const named = MODIFIER_KEYSYMS.get(lower) ?? NAMED_KEYSYMS.get(lower)
   if (named !== undefined) {
     return named
   }

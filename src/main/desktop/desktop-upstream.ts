@@ -46,11 +46,14 @@ export async function withSocketTimeout<T>(
 
 function waitForConnect(socket: Socket): Promise<void> {
   return new Promise((resolve, reject) => {
+    const onClose = (): void => reject(new RfbError('rfb_connection_closed'))
     socket.once('connect', () => {
       socket.off('error', reject)
+      socket.off('close', onClose)
       resolve()
     })
     socket.once('error', reject)
+    socket.once('close', onClose)
   })
 }
 
@@ -60,13 +63,17 @@ function waitForConnect(socket: Socket): Promise<void> {
  */
 export async function connectRfbUpstream(
   target: DesktopVncTarget,
-  afterHandshake?: (socket: Socket, init: RfbServerInit) => Promise<void>
+  afterHandshake?: (socket: Socket, init: RfbServerInit) => Promise<void>,
+  signal?: AbortSignal
 ): Promise<{ socket: Socket; init: RfbServerInit }> {
   const socket = connect({ host: target.host, port: target.port })
   socket.setNoDelay(true)
   // Late errors surface to callers as 'close'; without a listener they would crash main.
   socket.on('error', () => {})
+  const onAbort = (): void => void socket.destroy()
+  signal?.addEventListener('abort', onAbort, { once: true })
   try {
+    signal?.throwIfAborted()
     return await withSocketTimeout(socket, async () => {
       await waitForConnect(socket)
       const init = await performRfbClientHandshake(socket, {
@@ -79,5 +86,7 @@ export async function connectRfbUpstream(
   } catch (error) {
     socket.destroy()
     throw error
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
   }
 }

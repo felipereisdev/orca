@@ -1,0 +1,93 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DesktopBroker } from './desktop-broker'
+import {
+  FIXTURE_PASSWORD,
+  pointerEvents,
+  startDesktopBrokerFixture,
+  type DesktopBrokerFixture
+} from './testing/desktop-broker-fixture'
+import { startFakeRfbServer } from './testing/fake-rfb-server'
+
+const cleanups: (() => Promise<void> | void)[] = []
+
+afterEach(async () => {
+  vi.useRealTimers()
+  while (cleanups.length > 0) {
+    await cleanups.pop()?.()
+  }
+})
+
+async function fixture(): Promise<DesktopBrokerFixture> {
+  const started = await startDesktopBrokerFixture({ width: 64, height: 48 })
+  cleanups.push(() => started.close())
+  return started
+}
+
+describe('DesktopBroker agent commands', () => {
+  it('a paced drag does not resume on a reconfigured desktop', async () => {
+    const { broker, server } = await fixture()
+    const replacement = await startFakeRfbServer({
+      password: FIXTURE_PASSWORD,
+      width: 64,
+      height: 48
+    })
+    cleanups.push(() => replacement.close())
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 20, y: 20 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+    await broker.configure({
+      host: '127.0.0.1',
+      port: replacement.port,
+      password: FIXTURE_PASSWORD
+    })
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    await broker.move(30, 31)
+    await replacement.waitForReceived((received) => pointerEvents(received).length === 1)
+    expect(pointerEvents(replacement.received)).toEqual([[0, 30, 31]])
+  })
+
+  it('a move issued during a drag runs after the drag', async () => {
+    const { broker, server } = await fixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 20, y: 20 })
+    const moving = broker.move(30, 31)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await Promise.all([dragging, moving])
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 9)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 5, 5],
+      [1, 9, 9],
+      [1, 12, 12],
+      [1, 16, 16],
+      [1, 20, 20],
+      [0, 20, 20],
+      [0, 30, 31]
+    ])
+  })
+
+  it('type and key report user control before validating their input', async () => {
+    const { broker, openViewer } = await fixture()
+    await openViewer('v1')
+    broker.setOwner('user', 'v1')
+
+    await expect(broker.type('')).rejects.toMatchObject({ code: 'desktop_user_in_control' })
+    await expect(broker.key('nosuchkey')).rejects.toMatchObject({
+      code: 'desktop_user_in_control'
+    })
+  })
+
+  it('type and key report an unavailable desktop before validating their input', async () => {
+    const broker = new DesktopBroker()
+
+    await expect(broker.type('')).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    await expect(broker.key('nosuchkey')).rejects.toMatchObject({ code: 'desktop_unavailable' })
+  })
+})
