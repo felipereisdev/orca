@@ -177,6 +177,25 @@ describe('DesktopBroker control ownership', () => {
     ])
   })
 
+  it("a viewer's release after the control connection is lost stays inside its own ServerInit bounds", async () => {
+    const { broker, server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+    broker.setOwner('user', 'v1')
+    viewer.pointer(100, 90, 1)
+    await server.waitForReceived((received) => pointerEvents(received).length === 1)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    server.dropConnection(0)
+    await vi.waitFor(() => expect(broker.status().state).toBe('unavailable'))
+
+    broker.setOwner('agent')
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+
+    expect(pointerEvents(server.received)).toEqual([
+      [1, 100, 90],
+      [0, 63, 47]
+    ])
+  })
+
   it("handover mid-drag releases the agent's mouse button", async () => {
     const { broker, server, openViewer } = await fixture()
     await openViewer('v1')

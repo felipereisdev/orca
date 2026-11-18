@@ -206,4 +206,41 @@ describe('DesktopBroker agent commands', () => {
       [0, 15, 11]
     ])
   })
+
+  it('reconfiguring while the agent holds a button after a shrink releases it inside the old bounds', async () => {
+    const { broker, server } = await fixture()
+    const replacement = await startFakeRfbServer({
+      password: FIXTURE_PASSWORD,
+      width: 64,
+      height: 48
+    })
+    cleanups.push(() => replacement.close())
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 60, y: 40 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    await vi.advanceTimersByTimeAsync(10)
+    await server.waitForReceived((received) => pointerEvents(received).length === 4)
+    server.setSize(16, 12)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 16)
+    )
+    await broker.configure({
+      host: '127.0.0.1',
+      port: replacement.port,
+      password: FIXTURE_PASSWORD
+    })
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 5)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 13, 9],
+      [1, 25, 17],
+      [0, 15, 11]
+    ])
+    expect(pointerEvents(replacement.received)).toEqual([])
+  })
 })

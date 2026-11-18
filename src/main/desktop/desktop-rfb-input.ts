@@ -59,14 +59,15 @@ export class HeldInput {
   /**
    * Writes key-ups (latest first) and a button-up for everything held, then clears the record.
    * The button-up goes to the last point clamped into `bounds` (the size the server announced
-   * now), since the desktop may have shrunk under the held pointer.
+   * now), since the desktop may have shrunk under the held pointer; at (0, 0) when unknown.
    */
   release(bounds: DesktopBounds | undefined, write: (message: Buffer) => void): void {
     for (const keysym of [...this.keys].toReversed()) {
       write(keyEventMessage(false, keysym))
     }
     if (this.buttonMask !== 0) {
-      const { x, y } = bounds ? clampedPointer(this.x, this.y, bounds) : { x: this.x, y: this.y }
+      // With no known size, (0, 0) is the only point always inside the desktop.
+      const { x, y } = clampedPointer(this.x, this.y, bounds ?? { width: 1, height: 1 })
       write(pointerEventMessage(0, x, y))
     }
     this.keys.clear()

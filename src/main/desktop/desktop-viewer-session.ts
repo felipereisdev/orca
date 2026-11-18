@@ -19,13 +19,18 @@ type ViewerHandlers = {
  */
 export class DesktopViewerSession {
   private readonly held = new HeldInput()
+  /** The best size known for this desktop: ServerInit, then the broker's announced size. */
+  private knownBounds: DesktopBounds
   private closed = false
 
   private constructor(
     private readonly downstream: Duplex,
     private readonly upstream: Socket,
-    private readonly handlers: ViewerHandlers
-  ) {}
+    private readonly handlers: ViewerHandlers,
+    initialBounds: DesktopBounds
+  ) {
+    this.knownBounds = initialBounds
+  }
 
   /** `signal` cancels a session that is still connecting (closed or superseded viewer). */
   static async open(
@@ -36,6 +41,7 @@ export class DesktopViewerSession {
   ): Promise<DesktopViewerSession> {
     downstream.on('error', () => {})
     let upstream: Socket | undefined
+    let bounds: DesktopBounds | undefined
     const onAbort = (): void => {
       upstream?.destroy()
       downstream.destroy()
@@ -44,6 +50,7 @@ export class DesktopViewerSession {
     try {
       const connected = await connectRfbUpstream(target, undefined, signal)
       upstream = connected.socket
+      bounds = { width: connected.init.width, height: connected.init.height }
       signal.throwIfAborted()
       await withSocketTimeout(downstream, () =>
         runRfbServerHandshake(downstream, connected.init.serverInit)
@@ -56,14 +63,23 @@ export class DesktopViewerSession {
     } finally {
       signal.removeEventListener('abort', onAbort)
     }
-    const session = new DesktopViewerSession(downstream, upstream, handlers)
+    const session = new DesktopViewerSession(downstream, upstream, handlers, bounds)
     session.relay()
     return session
   }
 
   /** Sends key-ups and a button-up (inside the desktop) for whatever this viewer holds. */
   releaseHeld(): void {
-    this.held.release(this.handlers.bounds(), (message) => this.upstream.write(message))
+    this.held.release(this.currentBounds(), (message) => this.upstream.write(message))
+  }
+
+  /** The broker's announced size when it has one, else the last size this session knew. */
+  private currentBounds(): DesktopBounds {
+    const announced = this.handlers.bounds()
+    if (announced) {
+      this.knownBounds = announced
+    }
+    return this.knownBounds
   }
 
   close(): void {
@@ -94,6 +110,7 @@ export class DesktopViewerSession {
         if (!isInputMessage(message)) {
           flushed = this.upstream.write(message)
         } else if (this.handlers.inputAllowed()) {
+          this.currentBounds() // remember the latest announced size while it is known
           this.held.observe(message)
           flushed = this.upstream.write(message)
         }

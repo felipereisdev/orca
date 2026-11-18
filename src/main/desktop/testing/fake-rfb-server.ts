@@ -40,6 +40,8 @@ export type FakeRfbServer = {
    * their outstanding (or next) FramebufferUpdateRequest, as a real server does.
    */
   setSize(width: number, height: number): void
+  /** Destroys the `index`th open client connection (in connection order), as a dropped link. */
+  dropConnection(index: number): void
   close(): Promise<void>
 }
 
@@ -280,6 +282,9 @@ export async function startFakeRfbServer(opts: {
           sendDesktopSize(session)
         }
       }
+    },
+    dropConnection(index) {
+      ;[...sessions][index]?.socket.destroy()
     },
     close: () =>
       new Promise<void>((resolve) => {

@@ -152,6 +152,18 @@ export class DesktopControlConnection {
     this.held.release(this.desktopSize, (message) => this.socket.write(message))
   }
 
+  /** `releaseHeld` if the socket can still take it; a dead socket is ignored. */
+  releaseHeldBestEffort(): void {
+    if (!this.writable) {
+      return
+    }
+    try {
+      this.releaseHeld()
+    } catch {
+      // The socket died under us; nothing left to release on it.
+    }
+  }
+
   close(): void {
     this.closed = true
     this.socket.destroy()

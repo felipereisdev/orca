@@ -270,6 +270,8 @@ export class DesktopBroker {
     clearTimeout(this.#retryTimer)
     // Viewers release held input on close, inside the size the control connection knows.
     this.#viewers.closeAll()
+    // Best effort: the agent's held input is released before the old socket is torn down.
+    this.#control?.releaseHeldBestEffort()
     this.#control?.close()
     this.#control = undefined
   }
