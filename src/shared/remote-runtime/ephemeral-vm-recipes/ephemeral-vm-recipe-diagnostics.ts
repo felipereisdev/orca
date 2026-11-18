@@ -1,5 +1,5 @@
 import { parsePairingCode } from '../pairing/pairing'
-
+import { redactEphemeralVmRecipeDiagnosticText } from './ephemeral-vm-recipe-diagnostic-redaction'
 import {
   getEphemeralVmRecipeResultConnection,
   parseEphemeralVmRecipeResult,
@@ -65,7 +65,10 @@ export function describeEphemeralVmRecipeStdoutForDiagnostics(stdout: string): s
   }
   const parsed = parseEphemeralVmRecipeResult(stdout)
   if (parsed.ok) {
-    return `${JSON.stringify(redactEphemeralVmRecipeResultForDiagnostics(parsed.result))}\n`
+    // The text pass also strips URL credentials that structured redaction keeps in values.
+    return `${redactEphemeralVmRecipeDiagnosticText(
+      JSON.stringify(redactEphemeralVmRecipeResultForDiagnostics(parsed.result))
+    )}\n`
   }
   const bytes = new TextEncoder().encode(stdout).length
   return `[recipe stdout withheld: not a recipe result, ${bytes} bytes]\n`

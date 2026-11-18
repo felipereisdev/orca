@@ -193,7 +193,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           onStdout: (chunk) => provisionEvents.send('stdout', chunk),
           onStderr: (chunk) => provisionEvents.send('stderr', chunk)
         })
-        provisionEvents.finishStdout(result.start.stdout)
+        provisionEvents.finish(result.start.stdout)
         if (!result.ok) {
           return {
             ok: false,
@@ -277,6 +277,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
         }
       } finally {
+        provisionEvents.finish('')
         if (args.provisionId) {
           activeProvisionControllers.delete(args.provisionId)
         }

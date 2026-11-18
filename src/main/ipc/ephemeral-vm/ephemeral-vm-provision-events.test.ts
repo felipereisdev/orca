@@ -35,8 +35,8 @@ describe('createProvisionEventForwarder', () => {
       provisionEvents.send('stdout', chunk)
     }
     expect(events).toEqual([])
-    provisionEvents.finishStdout(result)
-    provisionEvents.finishStdout(result)
+    provisionEvents.finish(result)
+    provisionEvents.finish(result)
 
     expect(events).toHaveLength(1)
     expect(events[0]?.stream).toBe('stdout')
@@ -51,10 +51,22 @@ describe('createProvisionEventForwarder', () => {
     const stdout = `${'x'.repeat(300 * 1024)}{"password":"${PASSWORD}"}`
     provisionEvents.send('stdout', stdout.slice(0, 256 * 1024 + 3))
     provisionEvents.send('stdout', stdout.slice(256 * 1024 + 3))
-    provisionEvents.finishStdout(stdout)
+    provisionEvents.finish(stdout)
 
     expect(events).toEqual([
       { stream: 'stdout', chunk: '[recipe stdout withheld: not a recipe result, 307223 bytes]\n' }
+    ])
+  })
+
+  it('redacts a stderr JSON line whose password spans two chunks', () => {
+    const { events, provisionEvents } = forwarder()
+    provisionEvents.send('stderr', 'debug {"password":"abc')
+    provisionEvents.send('stderr', '12345"}\nnext')
+    provisionEvents.finish('')
+
+    expect(events).toEqual([
+      { stream: 'stderr', chunk: 'debug {"password":"[redacted]"}\n' },
+      { stream: 'stderr', chunk: 'next' }
     ])
   })
 })

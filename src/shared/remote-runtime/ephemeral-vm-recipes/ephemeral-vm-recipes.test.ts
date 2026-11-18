@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { encodePairingOffer } from '../pairing/pairing'
 import { PAIRING_OFFER_VERSION } from '../pairing/mobile-relay-pairing-offer'
 import {
+  describeEphemeralVmRecipeStdoutForDiagnostics,
   getEphemeralVmRecipeResultWarnings,
   redactEphemeralVmRecipeResultForDiagnostics
 } from './ephemeral-vm-recipe-diagnostics'
@@ -197,6 +198,19 @@ describe('parseEphemeralVmRecipeResult', () => {
     expect(redactEphemeralVmRecipeDiagnosticText('{"password":"ab\\"c123","ok":true}')).toBe(
       '{"password":"[redacted]","ok":true}'
     )
+  })
+
+  it('strips URL credentials from a recipe result shown as stdout diagnostics', () => {
+    const stdout = JSON.stringify({
+      ...sshConnectionResult(),
+      userData: { repoUrl: 'https://recipe-user:recipe-token@git.example.com/team/repo.git' }
+    })
+
+    const described = describeEphemeralVmRecipeStdoutForDiagnostics(stdout)
+
+    expect(JSON.parse(described).userData).toEqual({
+      repoUrl: 'https://git.example.com/team/repo.git'
+    })
   })
 })
 
