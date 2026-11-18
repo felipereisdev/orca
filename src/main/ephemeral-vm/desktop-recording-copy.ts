@@ -132,6 +132,8 @@ export async function copyEnvironmentRecording(args: {
     await handle.sync()
     await handle.close()
     closed = true
+    // A cancellation that landed during fsync or close publishes nothing; the catch removes the temp.
+    signal.throwIfAborted()
     await rename(temp, args.destination)
   } catch (error) {
     if (!closed) {

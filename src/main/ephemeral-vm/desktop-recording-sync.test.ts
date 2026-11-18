@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
+import type * as FsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,11 +19,30 @@ import {
 } from './desktop-environment-fake.test-support'
 
 const paths = vi.hoisted(() => ({ userData: '' }))
+// When set, the next `lstat` or `mkdir` waits for the gate before it runs.
+type FsGates = { lstat: Promise<void> | null; mkdir: Promise<void> | null }
+const fsGates = vi.hoisted((): FsGates => ({ lstat: null, mkdir: null }))
 
 vi.mock('electron', () => ({ app: { getPath: () => paths.userData } }))
 vi.mock('../ipc/runtime-environments/requests/runtime-environment-transport-routing', async () =>
   (await import('./desktop-environment-fake.test-support')).fakeTransportRoutingModule()
 )
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>()
+  /** Runs `run` once the gate for `name`, if any, opens; the gate holds only one call. */
+  async function afterGate<T>(name: keyof FsGates, run: () => Promise<T>): Promise<T> {
+    const gate = fsGates[name]
+    fsGates[name] = null
+    await gate
+    return run()
+  }
+  const lstat = (...args: Parameters<typeof actual.lstat>) =>
+    afterGate('lstat', () => actual.lstat(...args))
+  const mkdir = (...args: Parameters<typeof actual.mkdir>) =>
+    afterGate('mkdir', () => actual.mkdir(...args))
+  return { ...actual, lstat, mkdir, default: { ...actual, lstat, mkdir } }
+})
 
 import { syncEnvironmentRecordings } from './desktop-recording-sync'
 import { indexLocalRecordings, localRecordingPath } from './desktop-recording-index'
@@ -67,15 +95,18 @@ describe('syncEnvironmentRecordings', () => {
     }
     vi.useRealTimers()
     warn.mockRestore()
+    fsGates.lstat = null
+    fsGates.mkdir = null
     env.reset()
     await removeTempDirs([paths.userData])
   })
 
+  /** Starts the sync; its first pass runs on start, and `ready` only asks for another. */
   async function connected(): Promise<void> {
     stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
-    await vi.waitFor(() => expect(env.streams).toHaveLength(1))
+    await settleUntil(() => env.streams.length === 1 && listCalls() === 1)
     env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
-    await vi.waitFor(() => expect(listCalls()).toBe(1))
+    await settle()
   }
 
   it('a finished recording is copied to the Mac', async () => {
@@ -192,30 +223,87 @@ describe('syncEnvironmentRecordings', () => {
     expect(listCalls()).toBe(before + 1)
   }
 
-  it('a stale list failure after a newer success arms no retry', async () => {
+  it('the first pass runs on start, before the stream is ready', async () => {
+    const recording = env.finishRecording('a1a1a1a1a1a1a1a1', 1_000)
+    stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
+
+    await settleUntil(() => localRecordingPath(recording.id) !== null)
+    expect(listCalls()).toBe(1)
+  })
+
+  it('a recording finishing during a failing list waits for the retry, then copies once', async () => {
     const release = holdLists()
     env.failLists = 1
     stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
-    await settleUntil(() => env.streams.length === 1)
-    env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
-    await settleUntil(() => listCalls() === 1)
+    await settleUntil(() => env.streams.length === 1 && listCalls() === 1)
     // A recording finishes while the failing list is still out.
     const recording = env.finishRecording('abababababababab', 1_000)
     env.emit(env.streams[0], { type: 'recording-finished', ...recording })
     release()
 
+    await expectNextPassAfter(5_000)
     await settleUntil(() => localRecordingPath(recording.id) !== null)
-    expect(listCalls()).toBe(2)
     await vi.advanceTimersByTimeAsync(10 * 60_000)
     expect(listCalls()).toBe(2)
+  })
+
+  it('live events during a pending backoff do not start a pass before the timer fires', async () => {
+    env.failLists = 1
+    await connected()
+    await settleUntil(() => warn.mock.calls.length === 1)
+    for (const id of ['c1c1c1c1c1c1c1c1', 'c2c2c2c2c2c2c2c2', 'c3c3c3c3c3c3c3c3']) {
+      const recording = env.finishRecording(id, 10)
+      env.emit(env.streams[0], { type: 'recording-finished', ...recording })
+      env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
+      await vi.advanceTimersByTimeAsync(1_000)
+      await settle()
+    }
+    expect(listCalls()).toBe(1)
+
+    await expectNextPassAfter(2_000)
+    await settleUntil(() => localRecordingPath('c3c3c3c3c3c3c3c3') !== null)
+    expect(listCalls()).toBe(2)
+  })
+
+  it('stopping while checking for a local copy creates no directory and indexes nothing', async () => {
+    let release = (): void => {}
+    fsGates.lstat = new Promise<void>((resolve) => (release = resolve))
+    const recording = env.finishRecording('d1d1d1d1d1d1d1d1', 10)
+    const stop = syncEnvironmentRecordings('env-1', WORKSPACE_ID)
+    await settleUntil(() => listCalls() === 1)
+    await settle()
+    stop()
+    release()
+    await settle()
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+    expect(existsSync(workspaceDir())).toBe(false)
+    expect(localRecordingPath(recording.id)).toBeNull()
+    expect(env.methods()).not.toContain('files.resolveTerminalPath')
+    expect(listCalls()).toBe(1)
+  })
+
+  it('stopping while creating the directory copies and indexes nothing', async () => {
+    let release = (): void => {}
+    fsGates.mkdir = new Promise<void>((resolve) => (release = resolve))
+    const recording = env.finishRecording('d2d2d2d2d2d2d2d2', 10)
+    const stop = syncEnvironmentRecordings('env-1', WORKSPACE_ID)
+    await settleUntil(() => listCalls() === 1)
+    await settle()
+    stop()
+    release()
+    await settle()
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+    expect(localRecordingPath(recording.id)).toBeNull()
+    expect(env.methods()).not.toContain('files.resolveTerminalPath')
+    expect(listCalls()).toBe(1)
   })
 
   it('a live recording finishing during a list and failing to copy keeps the backoff growing', async () => {
     const release = holdLists()
     stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
-    await settleUntil(() => env.streams.length === 1)
-    env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
-    await settleUntil(() => listCalls() === 1)
+    await settleUntil(() => env.streams.length === 1 && listCalls() === 1)
     const late = env.finishRecording('bcbcbcbcbcbcbcbc', 1_000)
     env.failReadsFor.set(late.path, 100)
     env.emit(env.streams[0], { type: 'recording-finished', ...late })

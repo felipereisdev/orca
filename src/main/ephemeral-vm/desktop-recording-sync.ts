@@ -51,10 +51,11 @@ function describeError(error: unknown): string {
 
 /**
  * Keeps a copy on this Mac of every recording the environment finishes, through one serialized
- * worker per workspace. Stream `ready`, `recording-finished` and the retry timer only mark a pass
- * as needed and wake the loop; a pass lists the environment's recordings and copies the missing
- * ones one at a time. A pass with any failure doubles the retry delay (5 s up to 5 min); only a
- * pass with none resets it. Only the loop touches the timer and the failure count.
+ * worker per workspace. The first pass runs on start; stream `ready` and `recording-finished` only
+ * mark another pass as needed. A pass lists the environment's recordings and copies the missing
+ * ones one at a time. A pass with any failure arms the retry timer (5 s, doubling up to 5 min) and
+ * only that timer starts the next pass; only a pass with none resets the delay. Once stopped, a
+ * pass checks after every await and returns without touching the disk, the index or the timer.
  */
 export function syncEnvironmentRecordings(
   runtimeEnvironmentId: string,
@@ -110,8 +111,15 @@ export function syncEnvironmentRecordings(
       }
       const destination = join(dir, recordingFileName(recording.id))
       try {
-        if (!(await isCopied(destination))) {
+        const copied = await isCopied(destination)
+        if (signal.aborted) {
+          return failed
+        }
+        if (!copied) {
           await mkdir(dir, { recursive: true, mode: 0o700 })
+          if (signal.aborted) {
+            return failed
+          }
           await copyEnvironmentRecording({
             environmentId: runtimeEnvironmentId,
             workspaceId,
@@ -119,16 +127,20 @@ export function syncEnvironmentRecordings(
             destination,
             signal
           })
+          if (signal.aborted) {
+            return failed
+          }
         }
         noteCopiedRecording(recording.id, destination)
       } catch (error) {
-        failed = true
-        if (!signal.aborted) {
-          console.warn('[desktop] recording copy failed; retrying', {
-            recordingId: recording.id,
-            error: describeError(error)
-          })
+        if (signal.aborted) {
+          return true
         }
+        failed = true
+        console.warn('[desktop] recording copy failed; retrying', {
+          recordingId: recording.id,
+          error: describeError(error)
+        })
       }
     }
     return failed
@@ -147,31 +159,27 @@ export function syncEnvironmentRecordings(
           failedPasses = 0
           continue
         }
+        // Only this timer starts the next pass; events until then only keep `passNeeded` set.
         const delay = Math.min(RETRY_INITIAL_MS * 2 ** failedPasses, RETRY_MAX_MS)
         failedPasses += 1
-        // A wake during the pass already asked for the next one; it runs now instead.
-        if (!passNeeded) {
-          retryTimer = setTimeout(() => {
-            retryTimer = null
-            wake()
-          }, delay)
-        }
+        retryTimer = setTimeout(() => {
+          retryTimer = null
+          requestPass()
+        }, delay)
+        return
       }
     } finally {
       looping = false
     }
   }
 
-  function wake(): void {
+  /** Marks a pass as needed; it starts now unless a pass is running or a retry is pending. */
+  function requestPass(): void {
     if (signal.aborted) {
       return
     }
     passNeeded = true
-    if (retryTimer) {
-      clearTimeout(retryTimer)
-      retryTimer = null
-    }
-    if (!looping) {
+    if (!looping && !retryTimer) {
       void loop()
     }
   }
@@ -180,7 +188,7 @@ export function syncEnvironmentRecordings(
     runtimeEnvironmentId,
     (event) => {
       if (event.type === 'ready' || event.type === 'recording-finished') {
-        wake()
+        requestPass()
       }
     },
     signal
@@ -200,5 +208,7 @@ export function syncEnvironmentRecordings(
     }
   }
   activeSyncs.set(workspaceId, stop)
+  // The list RPC needs no stream; the stream only adds live wakeups.
+  requestPass()
   return stop
 }
