@@ -1,0 +1,178 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  hasUpdateRequest,
+  keyEvents,
+  pointerEvents,
+  startDesktopBrokerFixture,
+  type DesktopBrokerFixture
+} from './testing/desktop-broker-fixture'
+
+const cleanups: (() => Promise<void> | void)[] = []
+
+afterEach(async () => {
+  vi.useRealTimers()
+  while (cleanups.length > 0) {
+    await cleanups.pop()?.()
+  }
+})
+
+async function fixture(): Promise<DesktopBrokerFixture> {
+  const started = await startDesktopBrokerFixture({ width: 64, height: 48 })
+  cleanups.push(() => started.close())
+  return started
+}
+
+describe('DesktopBroker control ownership', () => {
+  it('viewer input is dropped while the agent owns the desktop', async () => {
+    const { server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+
+    viewer.pointer(10, 11, 1)
+    viewer.key(true, 0x61)
+    viewer.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+
+    expect(pointerEvents(server.received)).toEqual([])
+    expect(keyEvents(server.received)).toEqual([])
+  })
+
+  it("viewer input passes after setOwner('user', viewerId)", async () => {
+    const { broker, server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+
+    broker.setOwner('user', 'v1')
+    viewer.pointer(10, 11, 1)
+    viewer.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+
+    expect(broker.status().owner).toBe('user')
+    expect(pointerEvents(server.received)).toEqual([[1, 10, 11]])
+  })
+
+  it("another viewer's input is still dropped while one viewer holds control", async () => {
+    const { broker, server, openViewer } = await fixture()
+    await openViewer('v1')
+    const other = await openViewer('v2')
+
+    broker.setOwner('user', 'v1')
+    other.pointer(3, 4, 1)
+    other.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+
+    expect(pointerEvents(server.received)).toEqual([])
+  })
+
+  it('agent click is refused with desktop_user_in_control while the user owns it and sent as PointerEvent down/up when the agent owns it', async () => {
+    const { broker, server, openViewer } = await fixture()
+    await openViewer('v1')
+
+    broker.setOwner('user', 'v1')
+    await expect(broker.click(5, 6, { button: 'left' })).rejects.toMatchObject({
+      code: 'desktop_user_in_control',
+      message: 'The user has taken control of the desktop.'
+    })
+
+    broker.setOwner('agent')
+    await broker.click(5, 6, { button: 'right' })
+    await server.waitForReceived((received) => pointerEvents(received).length === 3)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 5, 6],
+      [4, 5, 6],
+      [0, 5, 6]
+    ])
+  })
+
+  it('control falls back to agent 5 s after the controlling viewer closes', async () => {
+    const { broker, openViewer } = await fixture()
+    await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    broker.setOwner('user', 'v1')
+
+    broker.closeViewer('v1')
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(broker.status().owner).toBe('user')
+    await vi.advanceTimersByTimeAsync(1)
+
+    expect(broker.status().owner).toBe('agent')
+  })
+
+  it('the same viewer reconnecting within 5 s keeps control', async () => {
+    const { broker, server, openViewer } = await fixture()
+    const first = await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    broker.setOwner('user', 'v1')
+
+    first.socket.end()
+    await vi.advanceTimersByTimeAsync(3_000)
+    const again = await openViewer('v1')
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    expect(broker.status().owner).toBe('user')
+    again.pointer(8, 9, 1)
+    again.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+    expect(pointerEvents(server.received)).toEqual([[1, 8, 9]])
+  })
+
+  it('a long type aborts partway when the user takes control', async () => {
+    const { broker, server, openViewer } = await fixture()
+    await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const typing = broker.type('abcdefghijklmnopqrstuvwxyz')
+    const outcome = expect(typing).rejects.toMatchObject({ code: 'desktop_user_in_control' })
+    await server.waitForReceived((received) => keyEvents(received).length === 2)
+    broker.setOwner('user', 'v1')
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    broker.setOwner('agent')
+    await broker.move(1, 2)
+    await server.waitForReceived((received) => pointerEvents(received).length === 1)
+    expect(keyEvents(server.received)).toEqual([
+      [true, 0x61],
+      [false, 0x61]
+    ])
+  })
+
+  it('handover releases held keys and mouse buttons', async () => {
+    const { broker, server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+    broker.setOwner('user', 'v1')
+    viewer.key(true, 0x61)
+    viewer.pointer(5, 6, 1)
+    await server.waitForReceived((received) => pointerEvents(received).length === 1)
+
+    broker.setOwner('agent')
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+
+    expect(keyEvents(server.received)).toEqual([
+      [true, 0x61],
+      [false, 0x61]
+    ])
+    expect(pointerEvents(server.received)).toEqual([
+      [1, 5, 6],
+      [0, 5, 6]
+    ])
+  })
+
+  it("handover mid-drag releases the agent's mouse button", async () => {
+    const { broker, server, openViewer } = await fixture()
+    await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 20, y: 20 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_user_in_control' })
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+    broker.setOwner('user', 'v1')
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+    await server.waitForReceived((received) => pointerEvents(received).length === 3)
+
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [0, 1, 1]
+    ])
+  })
+})

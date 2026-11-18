@@ -28,7 +28,12 @@ export type FakeRfbServer = {
   port: number
   /** Every client→server message after ClientInit, from all connections, in arrival order. */
   received: Buffer[]
-  /** Changes the desktop size and tells clients that advertised DesktopSize. */
+  /** Resolves once `received` satisfies `predicate`; event-driven, so tests never poll. */
+  waitForReceived(predicate: (received: Buffer[]) => boolean): Promise<void>
+  /**
+   * Changes the desktop size. Clients that advertised DesktopSize get the new size in reply to
+   * their outstanding (or next) FramebufferUpdateRequest, as a real server does.
+   */
   setSize(width: number, height: number): void
   close(): Promise<void>
 }
@@ -37,6 +42,9 @@ type FakeRfbSession = {
   socket: Socket
   format: RfbPixelFormat
   encodings: Set<number>
+  /** An incremental request with nothing to send yet; answered by the next change. */
+  incrementalPending: boolean
+  resizePending: boolean
 }
 
 const FAKE_DESKTOP_NAME = 'Orca fake desktop'
@@ -78,12 +86,58 @@ export async function startFakeRfbServer(opts: {
   password: string
   width: number
   height: number
+  /** Listen on this port instead of an ephemeral one (to bring a server back on the same port). */
+  port?: number
 }): Promise<FakeRfbServer> {
   let width = opts.width
   let height = opts.height
   const received: Buffer[] = []
+  const waiters = new Set<{ predicate: (received: Buffer[]) => boolean; resolve: () => void }>()
   const sockets = new Set<Socket>()
   const sessions = new Set<FakeRfbSession>()
+
+  const record = (message: Buffer): void => {
+    received.push(message)
+    for (const waiter of waiters) {
+      if (waiter.predicate(received)) {
+        waiters.delete(waiter)
+        waiter.resolve()
+      }
+    }
+  }
+
+  const sendDesktopSize = (session: FakeRfbSession): void => {
+    session.resizePending = false
+    session.socket.write(
+      Buffer.concat([
+        updateHeader(1),
+        rectHeader({ x: 0, y: 0, width, height }, RFB_ENCODING_DESKTOP_SIZE)
+      ])
+    )
+  }
+
+  const answerUpdateRequest = (session: FakeRfbSession, message: Buffer): void => {
+    if (session.resizePending) {
+      sendDesktopSize(session)
+      return
+    }
+    if (message[1] !== 0) {
+      session.incrementalPending = true
+      return
+    }
+    session.incrementalPending = false
+    const x = Math.min(message.readUInt16BE(2), width)
+    const y = Math.min(message.readUInt16BE(4), height)
+    const rect = {
+      x,
+      y,
+      width: Math.min(message.readUInt16BE(6), width - x),
+      height: Math.min(message.readUInt16BE(8), height - y)
+    }
+    session.socket.write(
+      rect.width > 0 && rect.height > 0 ? rawRect(rect, session.format) : updateHeader(0)
+    )
+  }
 
   const handleMessage = (session: FakeRfbSession, message: Buffer): void => {
     if (message[0] === RFB_CLIENT_SET_PIXEL_FORMAT) {
@@ -95,25 +149,21 @@ export async function startFakeRfbServer(opts: {
         Array.from({ length: message.readUInt16BE(2) }, (_, i) => message.readInt32BE(4 + i * 4))
       )
     } else if (message[0] === RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST) {
-      const x = Math.min(message.readUInt16BE(2), width)
-      const y = Math.min(message.readUInt16BE(4), height)
-      const rect = {
-        x,
-        y,
-        width: Math.min(message.readUInt16BE(6), width - x),
-        height: Math.min(message.readUInt16BE(8), height - y)
-      }
-      session.socket.write(
-        rect.width > 0 && rect.height > 0 ? rawRect(rect, session.format) : updateHeader(0)
-      )
+      answerUpdateRequest(session, message)
     }
   }
 
   const serve = async (socket: Socket): Promise<void> => {
     socket.write(RFB_PROTOCOL_VERSION)
-    await readExact(socket, 12)
+    if ((await readExact(socket, 12)).toString('latin1') !== RFB_PROTOCOL_VERSION) {
+      socket.destroy()
+      return
+    }
     socket.write(Buffer.from([1, RFB_SECURITY_VNC_AUTH]))
-    await readExact(socket, 1)
+    if ((await readExact(socket, 1))[0] !== RFB_SECURITY_VNC_AUTH) {
+      socket.end(Buffer.concat([rfbUint32(1), rfbString('Security type not offered')]))
+      return
+    }
     const challenge = randomBytes(16)
     socket.write(challenge)
     const response = await readExact(socket, 16)
@@ -136,7 +186,9 @@ export async function startFakeRfbServer(opts: {
     const session: FakeRfbSession = {
       socket,
       format: DEFAULT_RFB_PIXEL_FORMAT,
-      encodings: new Set()
+      encodings: new Set(),
+      incrementalPending: false,
+      resizePending: false
     }
     sessions.add(session)
     socket.once('close', () => sessions.delete(session))
@@ -144,7 +196,7 @@ export async function startFakeRfbServer(opts: {
     socket.on('data', (chunk: Buffer) => {
       try {
         for (const message of filter.push(chunk)) {
-          received.push(message)
+          record(message)
           handleMessage(session, message)
         }
       } catch {
@@ -161,7 +213,7 @@ export async function startFakeRfbServer(opts: {
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => resolve())
+    server.listen(opts.port ?? 0, '127.0.0.1', () => resolve())
   })
   const address = server.address()
   if (address === null || typeof address === 'string') {
@@ -171,15 +223,21 @@ export async function startFakeRfbServer(opts: {
   return {
     port: address.port,
     received,
+    waitForReceived: (predicate) =>
+      predicate(received)
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => waiters.add({ predicate, resolve })),
     setSize(nextWidth, nextHeight) {
       width = nextWidth
       height = nextHeight
-      const rect = { x: 0, y: 0, width, height }
       for (const session of sessions) {
-        if (session.encodings.has(RFB_ENCODING_DESKTOP_SIZE)) {
-          session.socket.write(
-            Buffer.concat([updateHeader(1), rectHeader(rect, RFB_ENCODING_DESKTOP_SIZE)])
-          )
+        if (!session.encodings.has(RFB_ENCODING_DESKTOP_SIZE)) {
+          continue
+        }
+        session.resizePending = true
+        if (session.incrementalPending) {
+          session.incrementalPending = false
+          sendDesktopSize(session)
         }
       }
     },
