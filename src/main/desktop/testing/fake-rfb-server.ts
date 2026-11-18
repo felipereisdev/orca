@@ -30,6 +30,8 @@ export type FakeRfbServer = {
   received: Buffer[]
   /** Resolves once `received` satisfies `predicate`; event-driven, so tests never poll. */
   waitForReceived(predicate: (received: Buffer[]) => boolean): Promise<void>
+  /** The next non-incremental requests get these replies (then the full image again). */
+  scriptFullReplies(replies: FakeFullReply[]): void
   /** Holds back pixel replies to non-incremental requests until `releaseUpdates`. */
   holdUpdates(): void
   releaseUpdates(): void
@@ -40,6 +42,9 @@ export type FakeRfbServer = {
   setSize(width: number, height: number): void
   close(): Promise<void>
 }
+
+/** `empty`: a reply with no rectangles; `partial`: only the top half of the requested region. */
+export type FakeFullReply = 'empty' | 'partial'
 
 type FakeRfbSession = {
   socket: Socket
@@ -99,6 +104,7 @@ export async function startFakeRfbServer(opts: {
   const sockets = new Set<Socket>()
   const sessions = new Set<FakeRfbSession>()
   let heldReplies: (() => void)[] | null = null
+  const scriptedFullReplies: FakeFullReply[] = []
 
   const record = (message: Buffer): void => {
     received.push(message)
@@ -138,8 +144,14 @@ export async function startFakeRfbServer(opts: {
       width: Math.min(message.readUInt16BE(6), width - x),
       height: Math.min(message.readUInt16BE(8), height - y)
     }
+    const scripted = scriptedFullReplies.shift()
+    if (scripted === 'partial') {
+      rect.height = Math.ceil(rect.height / 2)
+    }
     const reply =
-      rect.width > 0 && rect.height > 0 ? rawRect(rect, session.format) : updateHeader(0)
+      scripted !== 'empty' && rect.width > 0 && rect.height > 0
+        ? rawRect(rect, session.format)
+        : updateHeader(0)
     if (heldReplies) {
       heldReplies.push(() => session.socket.write(reply))
     } else {
@@ -235,6 +247,9 @@ export async function startFakeRfbServer(opts: {
       predicate(received)
         ? Promise.resolve()
         : new Promise<void>((resolve) => waiters.add({ predicate, resolve })),
+    scriptFullReplies(replies) {
+      scriptedFullReplies.push(...replies)
+    },
     holdUpdates() {
       heldReplies ??= []
     },

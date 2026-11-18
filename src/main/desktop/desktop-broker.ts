@@ -73,6 +73,8 @@ export class DesktopBroker {
   /** Bumped on every owner or controller change; agent commands are bound to one value. */
   #ownerEpoch = 0
   #fallbackTimer: ReturnType<typeof setTimeout> | undefined
+  /** The control connection attempt in flight; a reconfigure aborts it. */
+  #connectAttempt: AbortController | undefined
   readonly #viewers = new DesktopViewerRegistry({
     inControl: (viewerId) => this.#owner === 'user' && this.#controller === viewerId,
     onRegistered: (viewerId) => {
@@ -218,9 +220,10 @@ export class DesktopBroker {
       return Promise.reject(error)
     }
     const bound = (): DesktopControlConnection => this.#assertAgentCanAct(control, epoch)
-    return bound().enqueue(() =>
-      run({ send: (message) => bound().write(message), size: () => bound().frame })
-    )
+    return bound().enqueue(() => {
+      bound()
+      return run({ send: (message) => bound().write(message), size: () => bound().desktopSize })
+    })
   }
 
   #assertAgentCanAct(
@@ -231,7 +234,10 @@ export class DesktopBroker {
       throw new DesktopError('desktop_user_in_control')
     }
     if (!control || control !== this.#control || this.#state !== 'ready' || !control.writable) {
-      throw new DesktopError('desktop_unavailable', this.#reason ?? 'desktop_reconfigured')
+      const reason = this.#target
+        ? (this.#reason ?? 'desktop_reconfigured')
+        : 'desktop_unconfigured'
+      throw new DesktopError('desktop_unavailable', reason)
     }
     return control
   }
@@ -258,6 +264,8 @@ export class DesktopBroker {
 
   #disconnect(): void {
     this.#generation++
+    this.#connectAttempt?.abort()
+    this.#connectAttempt = undefined
     clearTimeout(this.#retryTimer)
     this.#control?.close()
     this.#control = undefined
@@ -270,20 +278,29 @@ export class DesktopBroker {
       return
     }
     let control: DesktopControlConnection | undefined
+    const attempt = new AbortController()
+    this.#connectAttempt = attempt
     try {
-      control = await DesktopControlConnection.open(target, {
-        onFrame: (fb) => {
-          for (const listener of this.#frameListeners) {
-            listener(fb)
+      control = await DesktopControlConnection.open(
+        target,
+        {
+          onFrame: (frame) => {
+            if (generation !== this.#generation) {
+              return
+            }
+            for (const listener of this.#frameListeners) {
+              listener(frame)
+            }
+          },
+          onLost: (reason) => {
+            if (this.#control === control) {
+              this.#control = undefined
+              this.#fail(generation, reason)
+            }
           }
         },
-        onLost: (reason) => {
-          if (this.#control === control) {
-            this.#control = undefined
-            this.#fail(generation, reason)
-          }
-        }
-      })
+        attempt.signal
+      )
     } catch (error) {
       if (generation === this.#generation) {
         this.#fail(generation, desktopFailureReason(error))

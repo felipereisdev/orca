@@ -51,7 +51,7 @@ function singleRectUpdate(rectHeader: Buffer, payload?: Buffer): Buffer {
   return Buffer.concat(payload ? [header, rectHeader, payload] : [header, rectHeader])
 }
 
-/** A complete desktop image, copied when published; consumers must not mutate `rgba()`. */
+/** A complete desktop image, copied when published; each `rgba()` call returns its own copy. */
 export type DesktopFrame = {
   readonly width: number
   readonly height: number
@@ -61,7 +61,7 @@ export type DesktopFrame = {
 function snapshotFrame(framebuffer: RfbFramebuffer): DesktopFrame {
   const pixels = framebuffer.rgba()
   const { width, height } = framebuffer
-  return { width, height, rgba: () => pixels }
+  return { width, height, rgba: () => Buffer.from(pixels) }
 }
 
 type ControlHandlers = {
@@ -80,6 +80,8 @@ export class DesktopControlConnection {
   /** What the agent holds down on this connection. */
   readonly held = new HeldInput()
   private published: DesktopFrame | undefined
+  /** Raw pixels received since the last DesktopSize; a frame is published once they cover it. */
+  private coveredSinceResize: number | null = 0
   private queue: Promise<unknown> = Promise.resolve()
   private closed = false
 
@@ -95,13 +97,18 @@ export class DesktopControlConnection {
   /** Resolves once the first full frame arrived (inside the handshake timeout). */
   static async open(
     target: DesktopVncTarget,
-    handlers: ControlHandlers
+    handlers: ControlHandlers,
+    signal: AbortSignal
   ): Promise<DesktopControlConnection> {
     let connection: DesktopControlConnection | undefined
-    await connectRfbUpstream(target, async (socket, init) => {
-      connection = new DesktopControlConnection(socket, init, handlers)
-      await connection.start()
-    })
+    await connectRfbUpstream(
+      target,
+      async (socket, init) => {
+        connection = new DesktopControlConnection(socket, init, handlers)
+        await connection.start()
+      },
+      signal
+    )
     if (!connection) {
       throw new RfbError('rfb_connection_closed')
     }
@@ -115,6 +122,11 @@ export class DesktopControlConnection {
       throw new RfbError('rfb_protocol_error')
     }
     return this.published
+  }
+
+  /** The size the server last announced, which may be ahead of `frame` during a resize. */
+  get desktopSize(): { width: number; height: number } {
+    return { width: this.framebuffer.width, height: this.framebuffer.height }
   }
 
   /** Runs agent commands one after another, so they never interleave on the input stream. */
@@ -150,14 +162,14 @@ export class DesktopControlConnection {
     this.socket.write(setEncodingsMessage([RFB_ENCODING_RAW, RFB_ENCODING_DESKTOP_SIZE]))
     this.requestFull()
     do {
-      this.requestNext(await this.readUntilUpdate())
+      await this.readUntilUpdate()
     } while (!this.published)
   }
 
   private async readForever(): Promise<void> {
     try {
       for (;;) {
-        this.requestNext(await this.readUntilUpdate())
+        await this.readUntilUpdate()
       }
     } catch (error) {
       this.lost(desktopFailureReason(error))
@@ -178,29 +190,30 @@ export class DesktopControlConnection {
     this.socket.write(updateRequestMessage(false, width, height))
   }
 
-  private requestNext(resized: boolean): void {
+  // Until the pixels since the last resize cover the frame, keep asking for the full image; a
+  // non-incremental request is answered with the whole screen, so an area count is enough.
+  private afterUpdate(): void {
+    const { width, height } = this.framebuffer
+    if (this.coveredSinceResize !== null && this.coveredSinceResize >= width * height) {
+      this.coveredSinceResize = null
+    }
+    if (this.coveredSinceResize === null) {
+      this.publish()
+    }
     if (this.closed) {
       return
     }
-    if (resized) {
-      this.requestFull()
-    } else {
-      const { width, height } = this.framebuffer
-      this.socket.write(updateRequestMessage(true, width, height))
-    }
+    this.socket.write(updateRequestMessage(this.coveredSinceResize === null, width, height))
   }
 
-  /** Reads server messages until one FramebufferUpdate is applied; true if it resized. */
-  private async readUntilUpdate(): Promise<boolean> {
+  /** Reads server messages until one FramebufferUpdate is applied, then requests the next. */
+  private async readUntilUpdate(): Promise<void> {
     for (;;) {
       const type = (await readExact(this.socket, 1))[0]
       if (type === RFB_SERVER_FRAMEBUFFER_UPDATE) {
-        const resized = await this.readFramebufferUpdate()
-        // After a resize the pixels are blank until the full update requested next arrives.
-        if (!resized) {
-          this.publish()
-        }
-        return resized
+        await this.readFramebufferUpdate()
+        this.afterUpdate()
+        return
       }
       if (type === RFB_SERVER_SET_COLOUR_MAP_ENTRIES) {
         const header = await readExact(this.socket, 5)
@@ -219,15 +232,14 @@ export class DesktopControlConnection {
 
   // Rects are applied one at a time so a DesktopSize mid-update bounds the Raw rects after it,
   // and a Raw rect is checked against the framebuffer before its payload is read.
-  private async readFramebufferUpdate(): Promise<boolean> {
+  private async readFramebufferUpdate(): Promise<void> {
     const rectCount = (await readExact(this.socket, 3)).readUInt16BE(1)
-    let resized = false
     for (let index = 0; index < rectCount; index++) {
       const rect = await readExact(this.socket, 12)
       const encoding = rect.readInt32BE(8)
       if (encoding === RFB_ENCODING_DESKTOP_SIZE) {
         this.framebuffer.apply(singleRectUpdate(rect))
-        resized = true
+        this.coveredSinceResize = 0
         continue
       }
       const [x, y, width, height] = [0, 2, 4, 6].map((offset) => rect.readUInt16BE(offset))
@@ -241,8 +253,10 @@ export class DesktopControlConnection {
       this.framebuffer.apply(
         singleRectUpdate(rect, await readExact(this.socket, width * height * 4))
       )
+      if (this.coveredSinceResize !== null) {
+        this.coveredSinceResize += width * height
+      }
     }
-    return resized
   }
 
   private publish(): void {

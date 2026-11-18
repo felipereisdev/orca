@@ -87,7 +87,48 @@ describe('DesktopBroker agent commands', () => {
   it('type and key report an unavailable desktop before validating their input', async () => {
     const broker = new DesktopBroker()
 
-    await expect(broker.type('')).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    await expect(broker.type('')).rejects.toMatchObject({
+      code: 'desktop_unavailable',
+      reason: 'desktop_unconfigured'
+    })
     await expect(broker.key('nosuchkey')).rejects.toMatchObject({ code: 'desktop_unavailable' })
+  })
+
+  it('a queued command is refused when the user took control before it started', async () => {
+    const { broker, server, openViewer } = await fixture()
+    await openViewer('v1')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 20, y: 20 })
+    const typing = broker.type('')
+    const outcomes = Promise.allSettled([dragging, typing])
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+    broker.setOwner('user', 'v1')
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    const [dragged, typed] = await outcomes
+    expect(dragged).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'desktop_user_in_control' }
+    })
+    expect(typed).toMatchObject({ status: 'rejected', reason: { code: 'desktop_user_in_control' } })
+  })
+
+  it('pointer bounds follow a resize the server announced before its pixels arrive', async () => {
+    const { broker, server } = await fixture()
+    server.holdUpdates()
+    server.setSize(32, 24)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 32)
+    )
+
+    const invalid = { code: 'desktop_invalid_input' }
+    await expect(broker.move(60, 40)).rejects.toMatchObject(invalid)
+    await expect(broker.click(60, 40, { button: 'left' })).rejects.toMatchObject(invalid)
+    await expect(broker.drag({ x: 1, y: 1 }, { x: 60, y: 40 })).rejects.toMatchObject(invalid)
+    await broker.move(30, 20)
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 1)
+    expect(pointerEvents(server.received)).toEqual([[0, 30, 20]])
   })
 })

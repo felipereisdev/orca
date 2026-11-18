@@ -3,6 +3,7 @@ import { inspect } from 'node:util'
 import { inflateSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DesktopBroker } from './desktop-broker'
+import type { DesktopFrame } from './desktop-control-connection'
 import {
   FIXTURE_PASSWORD,
   startDesktopBrokerFixture,
@@ -36,6 +37,11 @@ function pngPixel(png: Buffer, x: number, y: number): number[] {
   const rows = inflateSync(png.subarray(offset + 8, offset + 8 + png.readUInt32BE(offset)))
   const start = y * (width * 4 + 1) + 1 + x * 4
   return [...rows.subarray(start, start + 4)]
+}
+
+function rgbaPixel(frame: DesktopFrame, x: number, y: number): number[] {
+  const offset = (y * frame.width + x) * 4
+  return [...frame.rgba().subarray(offset, offset + 4)]
 }
 
 function trackedBroker(): DesktopBroker {
@@ -213,5 +219,65 @@ describe('DesktopBroker connection', () => {
     const after = await broker.screenshot()
     expect(after).toMatchObject({ width: 80, height: 60 })
     expect(pngPixel(after.png, 70, 50)).toEqual([70, 50, 0x80, 255])
+  })
+
+  it('after a resize, an empty reply keeps the old frame and the full image is requested again', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const first = new Promise<DesktopFrame>((resolve) => broker.onFrame(resolve))
+    server.scriptFullReplies(['empty'])
+
+    server.setSize(80, 60)
+    const frame = await first
+
+    expect([frame.width, frame.height]).toEqual([80, 60])
+    expect(rgbaPixel(frame, 70, 50)).toEqual([70, 50, 0x80, 255])
+  })
+
+  it('after a resize, a partial reply is not published as a complete frame', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const first = new Promise<DesktopFrame>((resolve) => broker.onFrame(resolve))
+    server.scriptFullReplies(['partial'])
+
+    server.setSize(80, 60)
+    const frame = await first
+
+    expect([frame.width, frame.height]).toEqual([80, 60])
+    expect(rgbaPixel(frame, 70, 50)).toEqual([70, 50, 0x80, 255])
+  })
+
+  it('a frame consumer cannot change what screenshots or other consumers see', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const first = new Promise<DesktopFrame>((resolve) => broker.onFrame(resolve))
+    server.setSize(80, 60)
+    const frame = await first
+
+    frame.rgba().fill(0)
+
+    expect(rgbaPixel(frame, 70, 50)).toEqual([70, 50, 0x80, 255])
+    expect(pngPixel((await broker.screenshot()).png, 70, 50)).toEqual([70, 50, 0x80, 255])
+  })
+
+  it('a superseded connection attempt never emits frames', async () => {
+    const stale = await startFakeRfbServer({ password: FIXTURE_PASSWORD, width: 64, height: 48 })
+    cleanups.push(() => stale.close())
+    const { broker } = await fixture({ width: 32, height: 24 })
+    const widths: number[] = []
+    broker.onFrame((frame) => widths.push(frame.width))
+    stale.holdUpdates()
+
+    const superseded = broker.configure({
+      host: '127.0.0.1',
+      port: stale.port,
+      password: FIXTURE_PASSWORD
+    })
+    await stale.waitForReceived((received) => received.some((m) => m[0] === 3 && m[1] === 0))
+    const current = await startFakeRfbServer({ password: FIXTURE_PASSWORD, width: 32, height: 24 })
+    cleanups.push(() => current.close())
+    await broker.configure({ host: '127.0.0.1', port: current.port, password: FIXTURE_PASSWORD })
+    stale.releaseUpdates()
+    await superseded
+
+    expect(widths).not.toContain(64)
+    expect(broker.status()).toMatchObject({ state: 'ready', width: 32 })
   })
 })
