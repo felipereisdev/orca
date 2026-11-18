@@ -93,3 +93,32 @@ export const DesktopRunAckParams = z.object({
   subscriptionId: z.string().min(1, 'Missing required --subscription-id'),
   received: z.number().int().min(0, 'received must be at least 0')
 })
+
+const MiB = 1024 * 1024
+export const DESKTOP_RECORD_DEFAULT_MAX_SECONDS = 600
+export const DESKTOP_RECORD_DEFAULT_MAX_BYTES = 200 * MiB
+
+export const DesktopRecordStartParams = z.object({
+  maxSeconds: z
+    .number()
+    .int('--max-seconds must be an integer')
+    .min(1, '--max-seconds must be at least 1')
+    .max(3600, '--max-seconds must be at most 3600')
+    .optional(),
+  maxBytes: z
+    .number()
+    .int('--max-bytes must be an integer')
+    .min(MiB, '--max-bytes must be at least 1 MB')
+    .max(2 * 1024 * MiB, '--max-bytes must be at most 2 GB')
+    .optional()
+})
+
+export const DesktopRecordStopParams = z.object({})
+
+export const DesktopRecordingsListParams = z.object({})
+
+export const DesktopEventsParams = z.object({})
+
+export const DesktopEventsUnsubscribeParams = z.object({
+  subscriptionId: z.string().min(1, 'Missing required --subscription-id')
+})

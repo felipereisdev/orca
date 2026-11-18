@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { duplexPair } from 'node:stream'
 import { getDesktopBroker, type DesktopBroker } from '../../../../desktop/desktop-broker'
 import { DesktopError } from '../../../../desktop/desktop-errors'
+import { defaultRecordingsDir } from '../../../../desktop/desktop-recording-files'
 import {
   DesktopConfigureParams,
   DesktopControlSetParams,
@@ -13,6 +14,7 @@ import {
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
 import { createDesktopActionMethods } from './desktop-action-methods'
 import { assertDesktopController, claimDesktopController } from './desktop-controller-identity'
+import { createDesktopRecordMethods } from './desktop-record-methods'
 import { createDesktopRunMethods } from './desktop-run-method'
 
 const VIEWER_SUBSCRIPTION_PREFIX = 'desktop-viewer:'
@@ -93,15 +95,18 @@ async function streamViewer(
 export type DesktopMethodsOptions = {
   /** Where default screenshots go, under `orca-desktop/`. */
   tmpDir?: () => string
+  /** Where recordings go on the environment. */
+  recordingsDir?: () => string
 }
 
 export function createDesktopMethods(
   getBroker: () => DesktopBroker = getDesktopBroker,
-  { tmpDir = tmpdir }: DesktopMethodsOptions = {}
+  { tmpDir = tmpdir, recordingsDir = defaultRecordingsDir }: DesktopMethodsOptions = {}
 ) {
   return [
     ...createDesktopActionMethods(getBroker, tmpDir),
     ...createDesktopRunMethods(getBroker),
+    ...createDesktopRecordMethods(getBroker, recordingsDir),
     defineMethod({
       name: 'desktop.configure',
       permission: 'host-admin',

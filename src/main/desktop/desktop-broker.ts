@@ -12,6 +12,7 @@ import {
 } from './desktop-agent-actions'
 import { DesktopControlConnection, type DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
+import { DesktopRecorder, type DesktopRecorderDeps } from './desktop-recorder'
 import { assertValidConfig, type DesktopBrokerConfig } from './desktop-broker-config'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerRegistry } from './desktop-viewer-registry'
@@ -70,6 +71,11 @@ export class DesktopBroker {
     }
   })
   readonly #frameListeners = new Set<(frame: DesktopFrame) => void>()
+  readonly recorder: DesktopRecorder
+
+  constructor({ recorder }: { recorder?: DesktopRecorderDeps } = {}) {
+    this.recorder = new DesktopRecorder(this, recorder)
+  }
 
   /** Replaces any previous configuration and reconnects; resolves after the first attempt. */
   async configure(cfg: DesktopBrokerConfig): Promise<void> {
@@ -83,8 +89,11 @@ export class DesktopBroker {
     await this.#connect(this.#generation)
   }
 
-  /** Drops the configuration, every connection and timer. */
+  /** Drops the configuration, every connection and timer; a recording is finalized. */
   close(): void {
+    if (this.recorder.active()) {
+      void this.recorder.stop().catch(() => {})
+    }
     this.#disconnect()
     this.#target = undefined
     this.#launcher = undefined
@@ -96,7 +105,11 @@ export class DesktopBroker {
   }
 
   status(): DesktopStatus {
-    const status: DesktopStatus = { state: this.#state, owner: this.#owner, recording: false }
+    const status: DesktopStatus = {
+      state: this.#state,
+      owner: this.#owner,
+      recording: this.recorder.active()
+    }
     if (this.#reason !== undefined) {
       status.reason = this.#reason
     }
@@ -180,6 +193,11 @@ export class DesktopBroker {
     const frame = control.frame
     const { width, height } = frame
     return { png: await encodePng(width, height, frame.rgba()), width, height }
+  }
+
+  /** The latest complete frame while the desktop is ready. */
+  currentFrame(): DesktopFrame | undefined {
+    return this.#state === 'ready' ? this.#control?.frame : undefined
   }
 
   /** Called with each complete frame (a snapshot) from the control connection. */

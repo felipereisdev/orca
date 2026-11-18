@@ -7,6 +7,9 @@ export type DesktopErrorCode =
   | 'desktop_launcher_rejected'
   | 'desktop_run_failed'
   | 'desktop_screenshot_failed'
+  | 'desktop_already_recording'
+  | 'desktop_not_recording'
+  | 'desktop_recording_unavailable'
 
 const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_user_in_control: 'The user has taken control of the desktop.',
@@ -16,7 +19,10 @@ const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_run_unavailable: 'No desktop launcher is available to start programs.',
   desktop_launcher_rejected: 'The desktop launcher refused the request.',
   desktop_run_failed: 'The program could not be run on the desktop.',
-  desktop_screenshot_failed: 'The screenshot could not be saved.'
+  desktop_screenshot_failed: 'The screenshot could not be saved.',
+  desktop_already_recording: 'The desktop is already being recorded.',
+  desktop_not_recording: 'The desktop is not being recorded.',
+  desktop_recording_unavailable: 'The desktop cannot be recorded (ffmpeg is required).'
 }
 
 /** `reason` is a fixed code or caller-supplied text; credentials never go into it. */
