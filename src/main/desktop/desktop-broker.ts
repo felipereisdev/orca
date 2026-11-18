@@ -89,11 +89,9 @@ export class DesktopBroker {
     await this.#connect(this.#generation)
   }
 
-  /** Drops the configuration, every connection and timer; a recording is finalized. */
+  /** Drops the configuration, every connection and timer; a recording is finalized, a pending one cancelled. */
   close(): void {
-    if (this.recorder.active()) {
-      void this.recorder.stop().catch(() => {})
-    }
+    this.recorder.close()
     this.#disconnect()
     this.#target = undefined
     this.#launcher = undefined

@@ -1,15 +1,22 @@
-import { chmod, rename, rm } from 'node:fs/promises'
 import { errnoCodeOrUnknown } from '../../shared/errors/errno-code'
 import type { DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
 import {
   ffmpegRecordArgs,
   findFfmpeg as findFfmpegOnPath,
+  recordingMaxrateKbps,
   spawnFfmpeg as spawnRealFfmpeg,
+  waitForFfmpegClose,
   type FfmpegChild,
-  type FfmpegExit,
   type SpawnFfmpeg
 } from './desktop-ffmpeg'
+import { evenCanvas, fitFrame, type RecordingCanvas } from './desktop-recording-canvas'
+import {
+  publishRecording,
+  recordingFailureReason,
+  recordingStopBytes,
+  removePartialRecording
+} from './desktop-recording-outcome'
 import {
   defaultRecordingsDir,
   listRecordings,
@@ -20,20 +27,6 @@ import {
 } from './desktop-recording-files'
 
 const FRAME_INTERVAL_MS = 100
-const FRAMES_PER_SECOND = 1000 / FRAME_INTERVAL_MS
-/** How long ffmpeg may take to finalize the MP4 after stdin closes before it is killed. */
-const FINALIZE_TIMEOUT_MS = 30_000
-const MIN_BYTES_HEADROOM = 256 * 1024
-
-/**
- * ffmpeg's `-fs` stop size, so the finalized file still fits `maxBytes`: the MP4 index and
- * whatever the encoder still buffers land after the muxer stopped.
- */
-export function recordingStopBytes(maxBytes: number): number {
-  const headroom = Math.max(MIN_BYTES_HEADROOM, Math.ceil(maxBytes * 0.02))
-  return maxBytes - Math.min(headroom, Math.floor(maxBytes / 2))
-}
-
 export type DesktopFrameSource = {
   onFrame(cb: (frame: DesktopFrame) => void): () => void
   /** The latest complete frame, if the desktop is ready. */
@@ -64,9 +57,7 @@ type Session = {
   id: string
   path: string
   partialPath: string
-  /** The canvas every frame is fitted to: the starting size, rounded up to even. */
-  width: number
-  height: number
+  canvas: RecordingCanvas
   deadline: number
   maxBytes: number
   child: FfmpegChild
@@ -75,46 +66,10 @@ type Session = {
   /** A frame published since the last write; read only when written (each read copies it). */
   pending: DesktopFrame | undefined
   last: Buffer | undefined
-  blank: Buffer | undefined
   frames: number
   /** A `stop()` caller is waiting on the result, so a failure reaches it directly. */
   joined: boolean
   finishing: Promise<DesktopRecordingResult> | undefined
-}
-
-/** Copies `rgba` onto the session canvas: cropped, and padded with opaque black. */
-function fitFrame(session: Session, frame: DesktopFrame): Buffer {
-  const rgba = frame.rgba()
-  if (frame.width === session.width && frame.height === session.height) {
-    return rgba
-  }
-  if (!session.blank) {
-    session.blank = Buffer.alloc(session.width * session.height * 4)
-    for (let alpha = 3; alpha < session.blank.length; alpha += 4) {
-      session.blank[alpha] = 255
-    }
-  }
-  const fitted = Buffer.from(session.blank)
-  const rowBytes = Math.min(frame.width, session.width) * 4
-  const rows = Math.min(frame.height, session.height)
-  for (let y = 0; y < rows; y++) {
-    const from = y * frame.width * 4
-    rgba.copy(fitted, y * session.width * 4, from, from + rowBytes)
-  }
-  return fitted
-}
-
-function failureReason(exit: FfmpegExit, bytes: number, maxBytes: number): string | undefined {
-  if (exit.signal) {
-    return `encoder_signal_${exit.signal}`
-  }
-  if (exit.code !== 0) {
-    return `encoder_exit_${exit.code ?? 'unknown'}`
-  }
-  if (bytes === 0) {
-    return 'recording_empty'
-  }
-  return bytes > maxBytes ? 'recording_over_max_bytes' : undefined
 }
 
 /**
@@ -126,8 +81,8 @@ export class DesktopRecorder {
   #session: Session | undefined
   /** A background finish that failed, reported to the next `stop()`. */
   #failure: DesktopError | undefined
-  /** A start is between its checks and its spawn; a second start is refused meanwhile. */
-  #starting = false
+  /** A start between its checks and its spawn; `stop()` and `close()` cancel it. */
+  #pending: { cancelled: boolean } | undefined
   readonly #finishedListeners = new Set<(result: DesktopRecordingResult) => void>()
   readonly #findFfmpeg: () => Promise<string | null> | string | null
   readonly #spawnFfmpeg: SpawnFfmpeg
@@ -161,43 +116,73 @@ export class DesktopRecorder {
   }
 
   async start(opts: DesktopRecordingStartOptions): Promise<{ id: string; path: string }> {
-    if (this.#session || this.#starting) {
+    if (this.#session || this.#pending) {
       throw new DesktopError('desktop_already_recording')
     }
-    this.#starting = true
+    const pending = { cancelled: false }
+    this.#pending = pending
     try {
-      return await this.#start(opts)
+      return await this.#start(opts, pending)
     } finally {
-      this.#starting = false
+      if (this.#pending === pending) {
+        this.#pending = undefined
+      }
     }
   }
 
-  async #start({
-    maxSeconds,
-    maxBytes,
-    dir
-  }: DesktopRecordingStartOptions): Promise<{ id: string; path: string }> {
+  /** Ends whatever runs: a pending start never spawns, an active recording is finalized. */
+  close(): void {
+    if (this.#pending) {
+      this.#pending.cancelled = true
+    }
+    if (this.#session) {
+      this.stop().catch(() => {})
+    }
+  }
+
+  async #start(
+    { maxSeconds, maxBytes, dir }: DesktopRecordingStartOptions,
+    pending: { cancelled: boolean }
+  ): Promise<{ id: string; path: string }> {
+    const assertNotCancelled = (): void => {
+      if (pending.cancelled) {
+        throw new DesktopError('desktop_unavailable', 'recording_cancelled')
+      }
+    }
     const ffmpeg = await this.#findFfmpeg()
+    assertNotCancelled()
     if (!ffmpeg) {
       throw new DesktopError('desktop_recording_unavailable', 'ffmpeg_not_found')
     }
+    try {
+      await preparePrivateRecordingsDir(dir)
+    } catch (error) {
+      throw error instanceof DesktopError
+        ? error
+        : new DesktopError('desktop_recording_unavailable', errnoCodeOrUnknown(error))
+    }
+    assertNotCancelled()
+    // Read after the awaits, so the starting size is the desktop's current one.
     const frame = this.source.currentFrame()
     if (!frame) {
       throw new DesktopError('desktop_unavailable')
     }
-    // yuv420p subsamples chroma 2x2: libx264 refuses odd sizes.
-    const width = frame.width + (frame.width % 2)
-    const height = frame.height + (frame.height % 2)
+    const canvas = evenCanvas(frame)
     const stopBytes = recordingStopBytes(maxBytes)
     const { id, path, partialPath } = newRecordingFile(dir)
     let child: FfmpegChild
     try {
-      await preparePrivateRecordingsDir(dir)
-      child = this.#spawnFfmpeg(ffmpeg, ffmpegRecordArgs(width, height, stopBytes, partialPath))
+      child = this.#spawnFfmpeg(
+        ffmpeg,
+        ffmpegRecordArgs({
+          width: canvas.width,
+          height: canvas.height,
+          maxrateKbps: recordingMaxrateKbps(maxBytes, maxSeconds),
+          maxFileBytes: stopBytes,
+          output: partialPath
+        })
+      )
     } catch (error) {
-      if (error instanceof DesktopError) {
-        throw error
-      }
       throw new DesktopError('desktop_recording_unavailable', errnoCodeOrUnknown(error))
     }
     this.#failure = undefined
@@ -207,8 +192,7 @@ export class DesktopRecorder {
       id,
       path,
       partialPath,
-      width,
-      height,
+      canvas,
       deadline: this.#now() + maxSeconds * 1000,
       maxBytes,
       child,
@@ -218,7 +202,6 @@ export class DesktopRecorder {
       }),
       pending: frame,
       last: undefined,
-      blank: undefined,
       frames: 0,
       joined: false,
       finishing: undefined
@@ -236,6 +219,11 @@ export class DesktopRecorder {
 
   stop(): Promise<DesktopRecordingResult> {
     const session = this.#session
+    if (!session && this.#pending) {
+      // Nothing records yet: the start is cancelled and rejects with desktop_unavailable.
+      this.#pending.cancelled = true
+      return Promise.reject(new DesktopError('desktop_not_recording'))
+    }
     if (!session) {
       const failure = this.#failure
       this.#failure = undefined
@@ -262,7 +250,7 @@ export class DesktopRecorder {
     }
     const pending = session.pending
     session.pending = undefined
-    const buffer = pending ? fitFrame(session, pending) : session.last
+    const buffer = pending ? fitFrame(session.canvas, pending) : session.last
     if (buffer) {
       session.last = buffer
       stdin.write(buffer)
@@ -292,24 +280,22 @@ export class DesktopRecorder {
       this.#writeFrame(session)
     }
     session.child.stdin.end()
-    const exit = await this.#closed(session.child)
+    const exit = await waitForFfmpegClose(session.child)
     const bytes = await recordingBytes(session.partialPath)
     const reason =
-      cause === 'encoder_exited' ? 'encoder_exited' : failureReason(exit, bytes, session.maxBytes)
+      cause === 'encoder_exited'
+        ? 'encoder_exited'
+        : recordingFailureReason(exit, bytes, session.maxBytes)
     let failure = reason ? new DesktopError('desktop_recording_failed', reason) : undefined
     if (!failure) {
       try {
-        // ffmpeg created it with its own umask; the 0700 directory kept it private meanwhile.
-        if (process.platform !== 'win32') {
-          await chmod(session.partialPath, 0o600)
-        }
-        await rename(session.partialPath, session.path)
+        await publishRecording(session.partialPath, session.path)
       } catch (error) {
         failure = new DesktopError('desktop_recording_failed', errnoCodeOrUnknown(error))
       }
     }
     if (failure) {
-      await rm(session.partialPath, { force: true })
+      await removePartialRecording(session.partialPath)
     }
     // Settled before anyone hears of the outcome: status, the next stop and the files agree.
     if (this.#session === session) {
@@ -324,7 +310,8 @@ export class DesktopRecorder {
     const result: DesktopRecordingResult = {
       id: session.id,
       path: session.path,
-      seconds: session.frames / FRAMES_PER_SECOND,
+      // What ffmpeg muxed: frames written after -fs stopped the muxer never made it in.
+      seconds: (session.child.outTimeMicros() ?? 0) / 1_000_000,
       bytes,
       stopped: cause === 'limit' ? 'limit' : 'requested'
     }
@@ -332,20 +319,5 @@ export class DesktopRecorder {
       listener(result)
     }
     return result
-  }
-
-  /** Waits for the encoder to close, killing it past the finalize timeout. */
-  async #closed(child: FfmpegChild): Promise<FfmpegExit> {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const timedOut = new Promise<undefined>((resolve) => {
-      timer = setTimeout(() => resolve(undefined), FINALIZE_TIMEOUT_MS)
-    })
-    const exit = await Promise.race([child.exited, timedOut])
-    clearTimeout(timer)
-    if (exit) {
-      return exit
-    }
-    child.kill()
-    return child.exited
   }
 }

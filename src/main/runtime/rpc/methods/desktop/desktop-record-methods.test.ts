@@ -22,14 +22,20 @@ afterEach(async () => {
   }
 })
 
-async function setup({ ffmpegPath = '/usr/bin/ffmpeg' }: { ffmpegPath?: string | null } = {}) {
+async function setup({
+  ffmpegPath = '/usr/bin/ffmpeg',
+  findFfmpeg = () => ffmpegPath
+}: {
+  ffmpegPath?: string | null
+  findFfmpeg?: () => string | null | Promise<string | null>
+} = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-record-rpc-'))
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }))
   const vnc = await startFakeRfbServer({ password: FIXTURE_PASSWORD, width: 64, height: 48 })
   cleanups.push(() => vnc.close())
   const ffmpeg = createFakeFfmpeg()
   const broker = new DesktopBroker({
-    recorder: { findFfmpeg: () => ffmpegPath, spawnFfmpeg: ffmpeg.spawn }
+    recorder: { findFfmpeg, spawnFfmpeg: ffmpeg.spawn }
   })
   const harness = createDesktopRpcHarness(broker, { recordingsDir: () => dir })
   cleanups.push(() => broker.close())
@@ -104,6 +110,32 @@ describe('desktop recording methods', () => {
     expect((await call('desktop.record.start', {}, MAC_AGENT)).error?.code).toBe(
       'desktop_recording_unavailable'
     )
+    expect(ffmpeg.spawns).toEqual([])
+  })
+
+  it('a broker closed while record.start is setting up never spawns ffmpeg', async () => {
+    let resolveFfmpeg = (_path: string): void => {}
+    const lookup = new Promise<string>((resolve) => {
+      resolveFfmpeg = resolve
+    })
+    let reached = (): void => {}
+    const startReachedLookup = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    const { call, configure, vnc, ffmpeg, broker } = await setup({
+      findFfmpeg: () => {
+        reached()
+        return lookup
+      }
+    })
+    await configure(vnc, MAC)
+
+    const starting = call('desktop.record.start', {}, MAC_AGENT)
+    await startReachedLookup
+    broker.close()
+    resolveFfmpeg('/usr/bin/ffmpeg')
+
+    expect((await starting).error?.code).toBe('desktop_unavailable')
     expect(ffmpeg.spawns).toEqual([])
   })
 

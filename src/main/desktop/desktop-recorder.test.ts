@@ -91,7 +91,7 @@ afterEach(() => {
 
 function setup(
   opts: FakeFfmpegOptions & {
-    ffmpegPath?: string | null
+    ffmpegPath?: string | null | Promise<string | null>
     first?: DesktopFrame
     now?: () => number
   } = {}
@@ -125,9 +125,13 @@ describe('DesktopRecorder', () => {
         // -fs: 200 MiB less 2% headroom for buffered output and the MP4 index.
         // prettier-ignore
         args: [
+          '-hide_banner', '-nostats', '-progress', 'pipe:2',
           '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '4x2', '-r', '10', '-i', '-',
-          '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-          '-fs', '205520896', partial
+          '-vf',
+          "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+          // 200 MiB * 8 * 0.85 over 600 s.
+          '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-maxrate', '2376k', '-bufsize', '2376k',
+          '-movflags', '+faststart', '-fs', '205520896', partial
         ]
       }
     ])
@@ -215,8 +219,23 @@ describe('DesktopRecorder', () => {
     expect(recorder.active()).toBe(false)
     expect(existsSync(path)).toBe(false)
     expect(await recorder.list(dir)).toEqual([])
-    await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_recording_failed' })
+    await expect(recorder.stop()).rejects.toMatchObject({
+      code: 'desktop_recording_failed',
+      reason: 'recording_limit_too_small'
+    })
     await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_not_recording' })
+  })
+
+  it('reports the duration ffmpeg muxed, not the frames written to it', async () => {
+    vi.useFakeTimers(INTERVAL_TIMERS)
+    const { ffmpeg, recorder } = setup({ muxLimit: 5 })
+
+    await recorder.start({ ...LIMITS, dir })
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await recorder.stop()
+
+    expect(ffmpeg.frames).toHaveLength(10)
+    expect(result.seconds).toBe(0.5)
   })
 
   it('pads frames to the starting size after a resize', async () => {
@@ -240,7 +259,8 @@ describe('DesktopRecorder', () => {
     await recorder.start({ ...LIMITS, dir })
     await recorder.stop()
 
-    expect(ffmpeg.spawns[0].args.slice(4, 6)).toEqual(['-s', '6x4'])
+    const { args } = ffmpeg.spawns[0]
+    expect(args[args.indexOf('-s') + 1]).toBe('6x4')
     const R = [...RED]
     const K = [...BLACK]
     const row = [...R, ...R, ...R, ...R, ...R, ...K]
@@ -311,6 +331,60 @@ describe('DesktopRecorder', () => {
     expect(await recorder.list(dir)).toEqual([])
     await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_recording_failed' })
     await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_not_recording' })
+  })
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'still fails with desktop_recording_failed when the partial file cannot be removed',
+    async () => {
+      vi.useFakeTimers(INTERVAL_TIMERS)
+      const { recorder } = setup({ exitCode: 1 })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const { id } = await recorder.start({ ...LIMITS, dir })
+      await vi.advanceTimersByTimeAsync(300)
+      const partial = join(dir, `.rec-${id}.partial.mp4`)
+      await vi.waitFor(() => expect(existsSync(partial)).toBe(true))
+      // The directory stops accepting removals: rm fails with EACCES.
+      chmodSync(dir, 0o500)
+      try {
+        await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_recording_failed' })
+      } finally {
+        chmodSync(dir, 0o700)
+      }
+      expect(warn).toHaveBeenCalledWith(expect.any(String), 'EACCES')
+      expect(recorder.active()).toBe(false)
+    }
+  )
+
+  it('a close while the start is still setting up never spawns ffmpeg', async () => {
+    let resolveFfmpeg = (_path: string): void => {}
+    const lookup = new Promise<string>((resolve) => {
+      resolveFfmpeg = resolve
+    })
+    const { ffmpeg, recorder } = setup({ ffmpegPath: lookup })
+
+    const starting = recorder.start({ ...LIMITS, dir })
+    recorder.close()
+    resolveFfmpeg('/usr/bin/ffmpeg')
+
+    await expect(starting).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    expect(ffmpeg.spawns).toEqual([])
+    expect(recorder.active()).toBe(false)
+  })
+
+  it('a stop while the start is still setting up cancels it', async () => {
+    let resolveFfmpeg = (_path: string): void => {}
+    const lookup = new Promise<string>((resolve) => {
+      resolveFfmpeg = resolve
+    })
+    const { ffmpeg, recorder } = setup({ ffmpegPath: lookup })
+
+    const starting = recorder.start({ ...LIMITS, dir })
+    await expect(recorder.stop()).rejects.toMatchObject({ code: 'desktop_not_recording' })
+    resolveFfmpeg('/usr/bin/ffmpeg')
+
+    await expect(starting).rejects.toMatchObject({ code: 'desktop_unavailable' })
+    expect(ffmpeg.spawns).toEqual([])
   })
 
   it('kills an encoder that does not finalize, and waits for it to close', async () => {
@@ -410,7 +484,8 @@ describe('DesktopRecorder', () => {
       const finished: DesktopRecordingResult[] = []
       recorder.onFinished((result) => finished.push(result))
 
-      const { path } = await recorder.start({ ...LIMITS, maxBytes: MiB, dir })
+      // A short maxSeconds raises the bitrate, so the 1 MiB budget fills within the test.
+      const { path } = await recorder.start({ maxSeconds: 10, maxBytes: MiB, dir })
       // Feeds incompressible frames until ffmpeg's -fs stop ends the recording on its own.
       await vi.waitFor(
         async () => {
@@ -425,6 +500,37 @@ describe('DesktopRecorder', () => {
       expect(finished).toEqual([expect.objectContaining({ path, stopped: 'limit' })])
       expect(statSync(path).size).toBeLessThanOrEqual(MiB)
       expect(Number(probe(path, 'format=duration')[0])).toBeGreaterThan(0)
+    },
+    30_000
+  )
+
+  it.skipIf(!encoderAvailable)(
+    'downscales a large noisy desktop and never reports an over-budget success',
+    async () => {
+      vi.useFakeTimers(INTERVAL_TIMERS)
+      const source = frameSource(noise(3840, 2160))
+      const recorder = new DesktopRecorder(source, { spawnFfmpeg })
+
+      const { path } = await recorder.start({ ...LIMITS, maxBytes: MiB, dir })
+      for (let tick = 0; tick < 10; tick++) {
+        await vi.advanceTimersByTimeAsync(100)
+        await new Promise((resolve) => setImmediate(resolve))
+      }
+      const outcome = await recorder.stop().catch((error: unknown) => error)
+
+      if (outcome instanceof Error) {
+        expect(outcome).toMatchObject({
+          code: 'desktop_recording_failed',
+          reason: 'recording_limit_too_small'
+        })
+        expect(existsSync(path)).toBe(false)
+      } else {
+        expect(statSync(path).size).toBeLessThanOrEqual(MiB)
+        const [width, height] = probe(path, 'stream=width,height').map(Number)
+        expect(width).toBeLessThanOrEqual(1920)
+        expect(height).toBeLessThanOrEqual(1080)
+        expect(Number(probe(path, 'format=duration')[0])).toBeGreaterThan(0)
+      }
     },
     30_000
   )

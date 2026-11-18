@@ -11,6 +11,8 @@ export type FakeFfmpegOptions = {
   exitCode?: number
   /** Never exits on its own after stdin closes; only `exit` ends it. */
   hangOnClose?: boolean
+  /** Frames past this many are read but never muxed, so reported progress stops there. */
+  muxLimit?: number
 }
 
 export type FakeFfmpeg = {
@@ -36,7 +38,8 @@ export function createFakeFfmpeg({
   bytesPerFrame = 100,
   indexBytes = 0,
   exitCode = 0,
-  hangOnClose = false
+  hangOnClose = false,
+  muxLimit = Infinity
 }: FakeFfmpegOptions = {}): FakeFfmpeg {
   const spawns: { command: string; args: string[] }[] = []
   const frames: Buffer[] = []
@@ -58,10 +61,12 @@ export function createFakeFfmpeg({
       const fileLimit = fsIndex !== -1 ? Number(args[fsIndex + 1]) : Infinity
       let done = false
       let written = 0
+      let muxed = 0
       /** Output reaches the disk asynchronously, as a real encoder's does. */
       let disk = Promise.resolve()
       const append = (bytes: number): void => {
-        disk = disk.then(() => appendFile(output, Buffer.alloc(bytes)))
+        // A failed write is dropped, as a real encoder would just exit; it must not hang close.
+        disk = disk.then(() => appendFile(output, Buffer.alloc(bytes))).catch(() => {})
       }
       let resolveExited = (_result: FfmpegExit): void => {}
       const exited = new Promise<FfmpegExit>((resolve) => {
@@ -88,6 +93,9 @@ export function createFakeFfmpeg({
             return
           }
           frames.push(Buffer.from(chunk))
+          if (muxed < muxLimit) {
+            muxed++
+          }
           append(bytesPerFrame)
           written += bytesPerFrame
           if (written >= fileLimit) {
@@ -109,6 +117,8 @@ export function createFakeFfmpeg({
       const child: FfmpegChild = {
         stdin,
         exited,
+        // Progress at 10 fps, as ffmpeg's out_time_us reports what it muxed.
+        outTimeMicros: () => (muxed > 0 ? muxed * 100_000 : undefined),
         kill: () => {
           killed = true
         }
