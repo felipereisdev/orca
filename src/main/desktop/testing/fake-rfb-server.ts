@@ -43,8 +43,11 @@ export type FakeRfbServer = {
   close(): Promise<void>
 }
 
-/** `empty`: a reply with no rectangles; `partial`: only the top half of the requested region. */
-export type FakeFullReply = 'empty' | 'partial'
+/**
+ * `empty`: a reply with no rectangles; `partial`: only the top half of the requested region;
+ * `bottom`: only the rest of it.
+ */
+export type FakeFullReply = 'empty' | 'partial' | 'bottom'
 
 type FakeRfbSession = {
   socket: Socket
@@ -145,8 +148,12 @@ export async function startFakeRfbServer(opts: {
       height: Math.min(message.readUInt16BE(8), height - y)
     }
     const scripted = scriptedFullReplies.shift()
+    const topHalf = Math.ceil(rect.height / 2)
     if (scripted === 'partial') {
-      rect.height = Math.ceil(rect.height / 2)
+      rect.height = topHalf
+    } else if (scripted === 'bottom') {
+      rect.y += topHalf
+      rect.height -= topHalf
     }
     const reply =
       scripted !== 'empty' && rect.width > 0 && rect.height > 0

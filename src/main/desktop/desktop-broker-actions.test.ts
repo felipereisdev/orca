@@ -131,4 +131,28 @@ describe('DesktopBroker agent commands', () => {
     await server.waitForReceived((received) => pointerEvents(received).length === 1)
     expect(pointerEvents(server.received)).toEqual([[0, 30, 20]])
   })
+
+  it('a running drag stops with desktop_invalid_input when the desktop shrinks under it', async () => {
+    const { broker, server } = await fixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 60, y: 40 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_invalid_input' })
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+    server.setSize(32, 24)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 32)
+    )
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 5)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 13, 9],
+      [1, 25, 17],
+      [0, 25, 17]
+    ])
+  })
 })

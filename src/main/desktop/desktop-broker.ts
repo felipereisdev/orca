@@ -285,10 +285,11 @@ export class DesktopBroker {
         target,
         {
           onFrame: (frame) => {
-            if (generation !== this.#generation) {
-              return
-            }
+            // A listener may reconfigure; later listeners must not see the superseded frame.
             for (const listener of this.#frameListeners) {
+              if (generation !== this.#generation) {
+                return
+              }
               listener(frame)
             }
           },

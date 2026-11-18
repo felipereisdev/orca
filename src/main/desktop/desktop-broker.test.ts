@@ -280,4 +280,44 @@ describe('DesktopBroker connection', () => {
     expect(widths).not.toContain(64)
     expect(broker.status()).toMatchObject({ state: 'ready', width: 32 })
   })
+
+  it('after a resize, overlapping partial replies publish only once every pixel arrived', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const first = new Promise<DesktopFrame>((resolve) => broker.onFrame(resolve))
+    server.scriptFullReplies(['partial', 'partial', 'bottom'])
+
+    server.setSize(80, 60)
+    const frame = await first
+
+    const fullRequests = server.received.filter(
+      (m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 80
+    )
+    expect(fullRequests).toHaveLength(3)
+    expect(rgbaPixel(frame, 10, 5)).toEqual([10, 5, 0x80, 255])
+    expect(rgbaPixel(frame, 70, 50)).toEqual([70, 50, 0x80, 255])
+  })
+
+  it('a listener that reconfigures mid-dispatch stops the stale frame reaching later listeners', async () => {
+    const { broker, server } = await fixture({ width: 64, height: 48 })
+    const next = await startFakeRfbServer({ password: FIXTURE_PASSWORD, width: 32, height: 24 })
+    cleanups.push(() => next.close())
+    let reconfiguring: Promise<void> | undefined
+    const laterWidths: number[] = []
+    broker.onFrame(() => {
+      reconfiguring ??= broker.configure({
+        host: '127.0.0.1',
+        port: next.port,
+        password: FIXTURE_PASSWORD
+      })
+    })
+    broker.onFrame((frame) => laterWidths.push(frame.width))
+    const reconfigured = new Promise<void>((resolve) => broker.onFrame(() => resolve()))
+
+    server.setSize(80, 60)
+    await reconfigured
+    await reconfiguring
+
+    expect(laterWidths).not.toContain(80)
+    expect(broker.status()).toMatchObject({ state: 'ready', width: 32 })
+  })
 })

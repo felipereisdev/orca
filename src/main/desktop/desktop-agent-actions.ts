@@ -76,11 +76,25 @@ export async function agentDrag(
   const end = checkedPoint(sink, to)
   sink.send(pointerEventMessage(0, start.x, start.y))
   sink.send(pointerEventMessage(BUTTON_MASKS.left, start.x, start.y))
+  let last = start
   for (let step = 1; step <= DRAG_STEPS; step++) {
     await pace()
-    const x = Math.round(start.x + ((end.x - start.x) * step) / DRAG_STEPS)
-    const y = Math.round(start.y + ((end.y - start.y) * step) / DRAG_STEPS)
-    sink.send(pointerEventMessage(BUTTON_MASKS.left, x, y))
+    const next = {
+      x: Math.round(start.x + ((end.x - start.x) * step) / DRAG_STEPS),
+      y: Math.round(start.y + ((end.y - start.y) * step) / DRAG_STEPS)
+    }
+    try {
+      // The desktop may have shrunk since the drag started.
+      checkedPoint(sink, next)
+    } catch (error) {
+      // Lost control is released by the handover; a shrunken desktop needs our own button-up.
+      if (error instanceof DesktopError && error.code === 'desktop_invalid_input') {
+        sink.send(pointerEventMessage(0, last.x, last.y))
+      }
+      throw error
+    }
+    sink.send(pointerEventMessage(BUTTON_MASKS.left, next.x, next.y))
+    last = next
   }
   sink.send(pointerEventMessage(0, end.x, end.y))
 }

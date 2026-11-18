@@ -1,5 +1,6 @@
 import type { Socket } from 'node:net'
 import { connectRfbUpstream, desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
+import { DesktopFrameCoverage } from './desktop-frame-coverage'
 import { HeldInput } from './desktop-rfb-input'
 import type { RfbServerInit } from './rfb/rfb-client-handshake'
 import { RfbFramebuffer } from './rfb/rfb-framebuffer'
@@ -80,8 +81,8 @@ export class DesktopControlConnection {
   /** What the agent holds down on this connection. */
   readonly held = new HeldInput()
   private published: DesktopFrame | undefined
-  /** Raw pixels received since the last DesktopSize; a frame is published once they cover it. */
-  private coveredSinceResize: number | null = 0
+  /** Pixels received since the last resize; null once they covered the frame and it published. */
+  private coverage: DesktopFrameCoverage | null
   private queue: Promise<unknown> = Promise.resolve()
   private closed = false
 
@@ -92,6 +93,7 @@ export class DesktopControlConnection {
   ) {
     // Built for the format requested below; every update after SetPixelFormat uses it.
     this.framebuffer = new RfbFramebuffer(init.width, init.height)
+    this.coverage = new DesktopFrameCoverage(init.width, init.height)
   }
 
   /** Resolves once the first full frame arrived (inside the handshake timeout). */
@@ -190,20 +192,20 @@ export class DesktopControlConnection {
     this.socket.write(updateRequestMessage(false, width, height))
   }
 
-  // Until the pixels since the last resize cover the frame, keep asking for the full image; a
-  // non-incremental request is answered with the whole screen, so an area count is enough.
+  // Until every pixel since the last resize has arrived, keep the old frame and ask again for
+  // the full image; then publish and go incremental.
   private afterUpdate(): void {
-    const { width, height } = this.framebuffer
-    if (this.coveredSinceResize !== null && this.coveredSinceResize >= width * height) {
-      this.coveredSinceResize = null
+    if (this.coverage?.complete) {
+      this.coverage = null
     }
-    if (this.coveredSinceResize === null) {
+    if (this.coverage === null) {
       this.publish()
     }
     if (this.closed) {
       return
     }
-    this.socket.write(updateRequestMessage(this.coveredSinceResize === null, width, height))
+    const { width, height } = this.framebuffer
+    this.socket.write(updateRequestMessage(this.coverage === null, width, height))
   }
 
   /** Reads server messages until one FramebufferUpdate is applied, then requests the next. */
@@ -239,7 +241,7 @@ export class DesktopControlConnection {
       const encoding = rect.readInt32BE(8)
       if (encoding === RFB_ENCODING_DESKTOP_SIZE) {
         this.framebuffer.apply(singleRectUpdate(rect))
-        this.coveredSinceResize = 0
+        this.coverage = new DesktopFrameCoverage(this.framebuffer.width, this.framebuffer.height)
         continue
       }
       const [x, y, width, height] = [0, 2, 4, 6].map((offset) => rect.readUInt16BE(offset))
@@ -253,9 +255,7 @@ export class DesktopControlConnection {
       this.framebuffer.apply(
         singleRectUpdate(rect, await readExact(this.socket, width * height * 4))
       )
-      if (this.coveredSinceResize !== null) {
-        this.coveredSinceResize += width * height
-      }
+      this.coverage?.mark(x, y, width, height)
     }
   }
 
