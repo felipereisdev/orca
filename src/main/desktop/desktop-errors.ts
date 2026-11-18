@@ -6,6 +6,7 @@ export type DesktopErrorCode =
   | 'desktop_run_unavailable'
   | 'desktop_launcher_rejected'
   | 'desktop_run_failed'
+  | 'desktop_run_not_found'
   | 'desktop_screenshot_failed'
   | 'desktop_already_recording'
   | 'desktop_not_recording'
@@ -20,6 +21,7 @@ const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_run_unavailable: 'No desktop launcher is available to start programs.',
   desktop_launcher_rejected: 'The desktop launcher refused the request.',
   desktop_run_failed: 'The program could not be run on the desktop.',
+  desktop_run_not_found: 'No desktop run with that id is running for this caller.',
   desktop_screenshot_failed: 'The screenshot could not be saved.',
   desktop_already_recording: 'The desktop is already being recorded.',
   desktop_not_recording: 'The desktop is not being recorded.',

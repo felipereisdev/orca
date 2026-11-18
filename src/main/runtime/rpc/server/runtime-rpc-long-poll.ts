@@ -64,7 +64,8 @@ export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollCla
   if (request.method === 'browser.clientHost.attach') {
     return 'browser-host'
   }
-  if (request.method === 'terminal.wait') {
+  // Desktop run reads wait up to 25 s for output; a disconnect must release the waiter.
+  if (request.method === 'terminal.wait' || request.method === 'desktop.run.read') {
     return 'wait'
   }
   // Prompt submission waits for lifecycle verification; keep the socket alive.

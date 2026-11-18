@@ -78,21 +78,30 @@ export const DesktopKeyParams = z.object({
   combo: z.string({ error: 'Missing required --combo' }).min(1, 'Missing required --combo')
 })
 
-export const DesktopRunParams = z.object({
+export const DesktopRunStartParams = z.object({
   argv: z.array(z.string()).min(1, 'Missing required command'),
   cwd: z.string().min(1, 'cwd must not be empty').optional(),
   env: z.record(z.string(), z.string()).optional()
 })
 
-export const DesktopRunUnsubscribeParams = z.object({
-  subscriptionId: z.string().min(1, 'Missing required --subscription-id')
+export const DESKTOP_RUN_READ_DEFAULT_WAIT_MS = 20_000
+export const DESKTOP_RUN_READ_MAX_WAIT_MS = 25_000
+
+const DesktopRunId = z.string().min(1, 'Missing required runId').max(64, 'runId is too long')
+
+/** `cursor`: output events the client has consumed so far (cumulative); reading releases them. */
+export const DesktopRunReadParams = z.object({
+  runId: DesktopRunId,
+  cursor: z.number().int('cursor must be an integer').min(0, 'cursor must be at least 0'),
+  waitMs: z
+    .number()
+    .int('waitMs must be an integer')
+    .min(0, 'waitMs must be at least 0')
+    .max(DESKTOP_RUN_READ_MAX_WAIT_MS, `waitMs must be at most ${DESKTOP_RUN_READ_MAX_WAIT_MS}`)
+    .optional()
 })
 
-/** `received`: stdout/stderr events the client has taken so far (cumulative). */
-export const DesktopRunAckParams = z.object({
-  subscriptionId: z.string().min(1, 'Missing required --subscription-id'),
-  received: z.number().int().min(0, 'received must be at least 0')
-})
+export const DesktopRunKillParams = z.object({ runId: DesktopRunId })
 
 const MiB = 1024 * 1024
 export const DESKTOP_RECORD_DEFAULT_MAX_SECONDS = 600

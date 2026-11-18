@@ -4,6 +4,7 @@ import { duplexPair } from 'node:stream'
 import { getDesktopBroker, type DesktopBroker } from '../../../../desktop/desktop-broker'
 import { DesktopError } from '../../../../desktop/desktop-errors'
 import { defaultRecordingsDir } from '../../../../desktop/desktop-recording-files'
+import type { DesktopRunSessions } from '../../../../desktop/desktop-run-sessions'
 import {
   DesktopConfigureParams,
   DesktopControlSetParams,
@@ -97,15 +98,17 @@ export type DesktopMethodsOptions = {
   tmpDir?: () => string
   /** Where recordings go on the environment. */
   recordingsDir?: () => string
+  /** Programs started through `desktop.run.start`; one set per process by default. */
+  runSessions?: DesktopRunSessions
 }
 
 export function createDesktopMethods(
   getBroker: () => DesktopBroker = getDesktopBroker,
-  { tmpDir = tmpdir, recordingsDir = defaultRecordingsDir }: DesktopMethodsOptions = {}
+  { tmpDir = tmpdir, recordingsDir = defaultRecordingsDir, runSessions }: DesktopMethodsOptions = {}
 ) {
   return [
     ...createDesktopActionMethods(getBroker, tmpDir),
-    ...createDesktopRunMethods(getBroker),
+    ...createDesktopRunMethods(getBroker, runSessions),
     ...createDesktopRecordMethods(getBroker, recordingsDir),
     defineMethod({
       name: 'desktop.configure',

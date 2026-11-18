@@ -19,6 +19,8 @@ export type FakeDesktopLauncher = {
   connections: number
   /** Resolves once the connection of run `id` closed (a real launcher kills it then too). */
   waitForClosed(id: string): Promise<void>
+  /** Sends `message` (an output line or `{exit}`) on a `hang` run that is still running. */
+  emit(id: string, message: { stream: 'stdout' | 'stderr'; data: string } | { exit: number }): void
   close(): Promise<void>
 }
 
@@ -48,6 +50,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
   const killed: string[] = []
   const closed: string[] = []
   const closeWaiters: { id: string; resolve: () => void }[] = []
+  const hanging = new Map<string, Socket>()
   let rejected = 0
   let connections = 0
   let nextId = 1
@@ -122,6 +125,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
     socket.once('close', () => {
       sockets.delete(socket)
       if (started) {
+        hanging.delete(started)
         markClosed(started)
       }
     })
@@ -150,8 +154,12 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
           const run = start(socket, request)
           started = run?.id
           running = run?.hanging ? run.id : undefined
+          if (running) {
+            hanging.set(running, socket)
+          }
         } else if (request.op === 'kill' && request.id === running && running) {
           killed.push(running)
+          hanging.delete(running)
           send(socket, { exit: 143 })
           running = undefined
           socket.end()
@@ -181,6 +189,17 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
       closed.includes(id)
         ? Promise.resolve()
         : new Promise<void>((resolve) => closeWaiters.push({ id, resolve })),
+    emit: (id, message) => {
+      const socket = hanging.get(id)
+      if (!socket) {
+        throw new Error(`fake launcher run ${id} is not running`)
+      }
+      send(socket, message)
+      if ('exit' in message) {
+        hanging.delete(id)
+        socket.end()
+      }
+    },
     close: () =>
       new Promise<void>((resolve) => {
         for (const socket of sockets) {
