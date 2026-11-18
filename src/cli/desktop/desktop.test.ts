@@ -182,10 +182,11 @@ describe('orca desktop', () => {
       }
     } as unknown as RuntimeClient
     const out = { write: vi.fn(() => true) }
+    const exit = vi.fn()
 
     const running = runDesktopRun(
       { client, argv: ['hang'], cwd: '/work', json: false },
-      { signals, stdout: out, stderr: out }
+      { signals, stdout: out, stderr: out, exit }
     )
     await vi.waitFor(() => expect(calls.map(([method]) => method)).toContain('desktop.run.read'))
     signals.emit('SIGINT')
@@ -193,6 +194,7 @@ describe('orca desktop', () => {
 
     expect(calls).toContainEqual(['desktop.run.kill', { runId: 'run-b' }])
     expect(exitCode).toBe(130)
+    expect(exit).toHaveBeenCalledWith(130)
     expect(signals.listenerCount('SIGINT')).toBe(0)
     expect(signals.listenerCount('SIGTERM')).toBe(0)
   })
@@ -234,19 +236,41 @@ describe('orca desktop', () => {
     ])
     // A pipe nobody reads: every write reports full and no drain ever comes.
     const stdout = Object.assign(new EventEmitter(), { write: vi.fn(() => false) })
+    const exit = vi.fn()
 
     const running = runDesktopRun(
       { client, argv: ['flood'], cwd: '/work', json: false },
-      { signals, stdout, stderr: stdout }
+      { signals, stdout, stderr: stdout, exit }
     )
     await vi.waitFor(() => expect(stdout.write).toHaveBeenCalled())
     signals.emit('SIGINT')
     const exitCode = await running
 
     expect(exitCode).toBe(130)
+    expect(exit).toHaveBeenCalledWith(130)
     expect(calls).toContain('desktop.run.kill')
     expect(stdout.write).toHaveBeenCalledTimes(1)
-    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 0])
+    // The error handler stays: a write still pending may yet fail with EPIPE.
+    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 1])
+  })
+
+  it('desktop run exits 130, not the program code, when SIGINT interrupts the final JSON write', async () => {
+    const signals = new EventEmitter()
+    const calls: string[] = []
+    const client = fakeRunClient(calls, [{ events: [], cursor: 0, exit: 7 }])
+    const stdout = Object.assign(new EventEmitter(), { write: vi.fn(() => false) })
+    const exit = vi.fn()
+
+    const running = runDesktopRun(
+      { client, argv: ['report'], cwd: '/work', json: true },
+      { signals, stdout, stderr: stdout, exit }
+    )
+    await vi.waitFor(() => expect(stdout.write).toHaveBeenCalledWith('{"exit":7}\n'))
+    signals.emit('SIGINT')
+
+    expect(await running).toBe(130)
+    expect(exit).toHaveBeenCalledWith(130)
+    expect(calls).toContain('desktop.run.kill')
   })
 
   it('desktop run leaves no stream listeners behind across repeated backpressure', async () => {
@@ -267,14 +291,17 @@ describe('orca desktop', () => {
       })
     })
 
+    const exit = vi.fn()
+
     const exitCode = await runDesktopRun(
       { client, argv: ['flood'], cwd: '/work', json: false },
-      { signals, stdout, stderr: stdout }
+      { signals, stdout, stderr: stdout, exit }
     )
 
     expect(exitCode).toBe(3)
+    expect(exit).not.toHaveBeenCalled()
     expect(stdout.write).toHaveBeenCalledTimes(5)
-    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 0])
+    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 1])
   })
 
   it('every desktop command spec has a handler and a manifest route', () => {
