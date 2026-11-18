@@ -8,7 +8,12 @@ import {
   upsertEphemeralVmRuntime
 } from './ephemeral-vm-runtime-store'
 import { getEphemeralVmWriteAheadRuntimeStorePath } from './ephemeral-vm-runtime-write-ahead-store'
-import type { EphemeralVmRuntimeRecord } from './ephemeral-vm-runtimes'
+import { projectRuntimeForRollback } from './ephemeral-vm-runtime-rollback-projection'
+import {
+  requireEphemeralVmRecipeResult,
+  RollbackEphemeralVmRuntimeRecordSchema,
+  type EphemeralVmRuntimeRecord
+} from './ephemeral-vm-runtimes'
 
 function runtimeRecord(
   overrides: Partial<EphemeralVmRuntimeRecord> = {}
@@ -74,5 +79,19 @@ describe('ephemeral VM runtime store rollback projection', () => {
       upsertEphemeralVmRuntime(userDataPath, { ...writeAhead, status: 'provisioning' })
     ).toThrow()
     expect(readFileSync(sidecarPath, 'utf8')).toBe(unreadable)
+  })
+
+  it('rollback projection drops desktop', () => {
+    const runtime = requireEphemeralVmRecipeResult(runtimeRecord())
+    const projected = projectRuntimeForRollback({
+      ...runtime,
+      recipeResult: {
+        ...runtime.recipeResult,
+        desktop: { type: 'vnc', port: 5901, host: '127.0.0.1', password: 'abc12345' }
+      }
+    })
+
+    expect(projected.recipeResult).not.toHaveProperty('desktop')
+    expect(RollbackEphemeralVmRuntimeRecordSchema.safeParse(projected).success).toBe(true)
   })
 })

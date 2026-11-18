@@ -3,6 +3,7 @@ import { parsePairingCode } from '../pairing/pairing'
 import {
   getEphemeralVmRecipeResultConnection,
   type EphemeralVmRecipeConnection,
+  type EphemeralVmRecipeDesktop,
   type EphemeralVmRecipeResult,
   type JsonValue
 } from './ephemeral-vm-recipes'
@@ -39,17 +40,28 @@ export function redactEphemeralVmRecipeResultForDiagnostics(
   result: EphemeralVmRecipeResult
 ): EphemeralVmRecipeResult {
   const userData = result.userData ? redactJsonObject(result.userData) : undefined
+  const desktop = result.desktop ? redactDesktop(result.desktop) : undefined
   if ('connection' in result) {
     return {
       ...result,
       connection: redactConnection(result.connection),
-      ...(userData ? { userData } : {})
+      ...(userData ? { userData } : {}),
+      ...(desktop ? { desktop } : {})
     }
   }
   return {
     ...result,
     pairingCode: 'orca://pair?code=[redacted]',
-    ...(userData ? { userData } : {})
+    ...(userData ? { userData } : {}),
+    ...(desktop ? { desktop } : {})
+  }
+}
+
+function redactDesktop(desktop: EphemeralVmRecipeDesktop): EphemeralVmRecipeDesktop {
+  return {
+    ...desktop,
+    password: '[redacted]',
+    ...(desktop.launcher ? { launcher: { ...desktop.launcher, token: '[redacted]' } } : {})
   }
 }
 

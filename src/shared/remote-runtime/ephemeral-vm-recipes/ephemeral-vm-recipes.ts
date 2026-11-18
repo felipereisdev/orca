@@ -90,12 +90,32 @@ export const EphemeralVmRecipeConnectionSchema = z.discriminatedUnion('type', [
 
 export type EphemeralVmRecipeConnection = z.infer<typeof EphemeralVmRecipeConnectionSchema>
 
+export const EphemeralVmRecipeDesktopSchema = z
+  .object({
+    type: z.literal('vnc'),
+    port: z.number().int().min(1).max(65535),
+    host: z.string().min(1).default('127.0.0.1'),
+    // VNC auth only uses the first 8 bytes of the password.
+    password: z.string().min(6).max(8),
+    launcher: z
+      .object({
+        port: z.number().int().min(1).max(65535),
+        token: z.string().min(32)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+
+export type EphemeralVmRecipeDesktop = z.infer<typeof EphemeralVmRecipeDesktopSchema>
+
 export const EphemeralVmRecipeLegacyResultSchema = z
   .object({
     schemaVersion: z.literal(1),
     pairingCode: z.string().min(1),
     projectRoot: z.string().min(1),
-    userData: z.record(z.string(), JsonValueSchema).optional()
+    userData: z.record(z.string(), JsonValueSchema).optional(),
+    desktop: EphemeralVmRecipeDesktopSchema.optional()
   })
   .strict()
 
@@ -103,7 +123,8 @@ export const EphemeralVmRecipeConnectionResultSchema = z
   .object({
     schemaVersion: z.literal(1),
     connection: EphemeralVmRecipeConnectionSchema,
-    userData: z.record(z.string(), JsonValueSchema).optional()
+    userData: z.record(z.string(), JsonValueSchema).optional(),
+    desktop: EphemeralVmRecipeDesktopSchema.optional()
   })
   .strict()
 
@@ -113,7 +134,8 @@ export const EphemeralVmRecipeProvisionedRootLegacyResultSchema = z
     checkoutMode: z.literal('provisioned-root'),
     pairingCode: z.string().min(1),
     projectRoot: z.string().min(1),
-    userData: z.record(z.string(), JsonValueSchema).optional()
+    userData: z.record(z.string(), JsonValueSchema).optional(),
+    desktop: EphemeralVmRecipeDesktopSchema.optional()
   })
   .strict()
 
@@ -122,7 +144,8 @@ export const EphemeralVmRecipeProvisionedRootConnectionResultSchema = z
     schemaVersion: z.literal(2),
     checkoutMode: z.literal('provisioned-root'),
     connection: EphemeralVmRecipeConnectionSchema,
-    userData: z.record(z.string(), JsonValueSchema).optional()
+    userData: z.record(z.string(), JsonValueSchema).optional(),
+    desktop: EphemeralVmRecipeDesktopSchema.optional()
   })
   .strict()
 
@@ -192,6 +215,12 @@ export function getEphemeralVmRecipeResultConnection(
     pairingCode: result.pairingCode,
     projectRoot: result.projectRoot
   }
+}
+
+export function getEphemeralVmRecipeResultDesktop(
+  result: EphemeralVmRecipeResult
+): EphemeralVmRecipeDesktop | null {
+  return result.desktop ?? null
 }
 
 export function getEphemeralVmRecipeResultProjectRoot(result: EphemeralVmRecipeResult): string {
