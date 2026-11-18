@@ -78,7 +78,7 @@ describe('RfbFramebuffer', () => {
     fb.on('resize', (size) => resizes.push(size))
 
     expect(() =>
-      fb.apply(Buffer.concat([Buffer.from([0, 0, 0, 1]), rectHeader(0, 0, 65535, 65535, -223)]))
+      fb.apply(Buffer.concat([Buffer.from([0, 0, 0, 1]), rectHeader(0, 0, 8193, 1, -223)]))
     ).toThrow(expect.objectContaining({ code: 'rfb_framebuffer_too_large' }))
 
     expect([fb.width, fb.height]).toEqual([1, 1])
@@ -89,6 +89,14 @@ describe('RfbFramebuffer', () => {
   it('rejects a pixel format other than 32bpp true color with 8-bit channels', () => {
     const sixteenBit = Buffer.from([16, 16, 0, 1, 0, 31, 0, 63, 0, 31, 11, 5, 0, 0, 0, 0])
     expect(() => new RfbFramebuffer(2, 2, sixteenBit)).toThrow(
+      expect.objectContaining({ code: 'rfb_unsupported_pixel_format' })
+    )
+    const overlappingShifts = Buffer.from([32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 8, 8, 8, 0, 0, 0])
+    expect(() => new RfbFramebuffer(2, 2, overlappingShifts)).toThrow(
+      expect.objectContaining({ code: 'rfb_unsupported_pixel_format' })
+    )
+    const unalignedShift = Buffer.from([32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 20, 8, 0, 0, 0, 0])
+    expect(() => new RfbFramebuffer(2, 2, unalignedShift)).toThrow(
       expect.objectContaining({ code: 'rfb_unsupported_pixel_format' })
     )
   })

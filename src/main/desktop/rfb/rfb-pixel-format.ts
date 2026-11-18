@@ -60,15 +60,18 @@ export function serializeRfbPixelFormat(format: RfbPixelFormat): Buffer {
   return bytes
 }
 
-/** Only 32bpp true color with 8-bit channels is decoded; the broker asks the server for that format. */
+const BYTE_ALIGNED_SHIFTS = new Set([0, 8, 16, 24])
+
+/** Only 32bpp true color with three independent 8-bit channels is decoded; the broker asks for it. */
 export function assertRfbTrueColor32(format: RfbPixelFormat): void {
-  const channels = [format.redMax, format.greenMax, format.blueMax]
+  const maxes = [format.redMax, format.greenMax, format.blueMax]
   const shifts = [format.redShift, format.greenShift, format.blueShift]
   if (
     format.bitsPerPixel !== 32 ||
     !format.trueColor ||
-    channels.some((max) => max !== 255) ||
-    shifts.some((shift) => shift > 24)
+    maxes.some((max) => max !== 255) ||
+    shifts.some((shift) => !BYTE_ALIGNED_SHIFTS.has(shift)) ||
+    new Set(shifts).size !== shifts.length
   ) {
     throw new RfbError('rfb_unsupported_pixel_format')
   }
