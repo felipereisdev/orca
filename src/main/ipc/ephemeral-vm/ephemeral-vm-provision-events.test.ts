@@ -105,11 +105,11 @@ describe('createProvisionEventForwarder', () => {
     expect(stderrText(events)).toBe(`{\n  "desktop": {\n${WITHHELD}\n${WITHHELD}\n  }\n}\n`)
   })
 
-  it('withholds an incomplete line over the cap with its byte count and discards it to the next newline', () => {
+  it('withholds an incomplete line over the cap with its byte count, discards it to the next newline and withholds the line after it', () => {
     const { events, provisionEvents } = forwarder()
     const long = `${'x'.repeat(256 * 1024)}{"secret-ish":"${PASSWORD}`
     provisionEvents.send('stderr', long)
-    provisionEvents.send('stderr', `${PASSWORD}"}\nafter\n`)
+    provisionEvents.send('stderr', `${PASSWORD}"}\nnext line\nafter\n`)
     provisionEvents.finish('')
 
     expect(events).toEqual([
@@ -117,6 +117,7 @@ describe('createProvisionEventForwarder', () => {
         stream: 'stderr',
         chunk: `[stderr line withheld: ${Buffer.byteLength(long)} bytes without a line break]\n`
       },
+      { stream: 'stderr', chunk: `${WITHHELD}\n` },
       { stream: 'stderr', chunk: 'after\n' }
     ])
   })
@@ -130,6 +131,68 @@ describe('createProvisionEventForwarder', () => {
     expect(events).toEqual([
       { stream: 'stderr', chunk: `${WITHHELD}\n` },
       { stream: 'stderr', chunk: WITHHELD }
+    ])
+  })
+
+  it('withholds the value line after a password key followed by a whitespace run past the cap', () => {
+    const { events, provisionEvents } = forwarder()
+    provisionEvents.send('stderr', 'config password:')
+    provisionEvents.send('stderr', ' '.repeat(300 * 1024))
+    provisionEvents.send('stderr', '\n')
+    provisionEvents.send('stderr', `  ${PASSWORD}\nnext\n`)
+    provisionEvents.finish('')
+
+    const stderr = stderrText(events)
+    expect(stderr).not.toContain(PASSWORD)
+    expect(stderr).toBe(
+      `[stderr line withheld: ${16 + 300 * 1024} bytes without a line break]\n${WITHHELD}\nnext\n`
+    )
+  })
+
+  it('counts the cap in UTF-8 bytes', () => {
+    const { events, provisionEvents } = forwarder()
+    // 100 Ki characters of a 3-byte character: under 256 Ki UTF-16 units, over 256 KiB in UTF-8.
+    const line = '\u20ac'.repeat(100 * 1024)
+    provisionEvents.send('stderr', line)
+    provisionEvents.finish('')
+
+    expect(events).toEqual([
+      {
+        stream: 'stderr',
+        chunk: `[stderr line withheld: ${300 * 1024} bytes without a line break]\n`
+      }
+    ])
+  })
+
+  it('checks a 1 MB line of spaces in linear time', () => {
+    const { events, provisionEvents } = forwarder()
+    const spaces = ' '.repeat(1024 * 1024)
+    const startedAt = performance.now()
+    provisionEvents.send('stderr', `password:${spaces}x\n`)
+    provisionEvents.send('stderr', `progress${spaces}x\n`)
+    provisionEvents.send('stderr', `"token"${spaces}\n`)
+    provisionEvents.send('stderr', `${PASSWORD}\n`)
+    const elapsedMs = performance.now() - startedAt
+
+    expect(elapsedMs).toBeLessThan(200)
+    expect(events.map((event) => event.chunk.length)).toEqual([
+      WITHHELD.length + 1,
+      `progress${spaces}x\n`.length,
+      WITHHELD.length + 1,
+      WITHHELD.length + 1
+    ])
+  })
+
+  it('does not swallow the line after an over-cap line that ends with a bare carriage return', () => {
+    const { events, provisionEvents } = forwarder()
+    const long = 'x'.repeat(256 * 1024 + 1)
+    provisionEvents.send('stderr', `${long}\r`)
+    provisionEvents.send('stderr', 'progress 50%\r')
+    provisionEvents.finish('')
+
+    expect(events).toEqual([
+      { stream: 'stderr', chunk: `${long}\r` },
+      { stream: 'stderr', chunk: 'progress 50%\r' }
     ])
   })
 })
