@@ -232,11 +232,12 @@ export function runtimeFeaturesEqual(
   return JSON.stringify(checkoutFeatures(left)) === JSON.stringify(checkoutFeatures(right))
 }
 
-function checkoutFeatures(
-  runtime: EphemeralVmRuntimeRecord
-): Omit<EphemeralVmRuntimeFeatureEntry, 'resultDesktop'> | null {
-  const { resultDesktop: _resultDesktop, ...checkout } = featureEntryFromRuntime(runtime) ?? {}
-  return 'id' in checkout ? checkout : null
+function checkoutFeatures(runtime: EphemeralVmRuntimeRecord): {
+  recipeCheckoutMode?: EphemeralVmRuntimeFeatureEntry['recipeCheckoutMode']
+  resultCheckoutMode?: EphemeralVmRuntimeFeatureEntry['resultCheckoutMode']
+} {
+  const { recipeCheckoutMode, resultCheckoutMode } = featureEntryFromRuntime(runtime) ?? {}
+  return { recipeCheckoutMode, resultCheckoutMode }
 }
 
 export function featureIdentity(

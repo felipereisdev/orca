@@ -155,4 +155,20 @@ describe('ephemeral VM runtime store rollback projection', () => {
       }
     ])
   })
+
+  it('lets an update add and then remove the desktop of a runtime without a checkout mode', () => {
+    const userDataPath = makeUserDataPath()
+    const runtime = requireEphemeralVmRecipeResult(runtimeRecord())
+    const desktop = { type: 'vnc' as const, port: 5901, host: '127.0.0.1', password: 'abc12345' }
+    upsertEphemeralVmRuntime(userDataPath, runtime)
+
+    upsertEphemeralVmRuntime(userDataPath, {
+      ...runtime,
+      recipeResult: { ...runtime.recipeResult, desktop }
+    })
+    expect(listEphemeralVmRuntimes(userDataPath)[0]?.recipeResult?.desktop).toEqual(desktop)
+
+    upsertEphemeralVmRuntime(userDataPath, runtime)
+    expect(listEphemeralVmRuntimes(userDataPath)[0]?.recipeResult).not.toHaveProperty('desktop')
+  })
 })

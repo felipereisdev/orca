@@ -5,10 +5,7 @@ import {
   getEphemeralVmRecipeResultWarnings,
   redactEphemeralVmRecipeResultForDiagnostics
 } from './ephemeral-vm-recipe-diagnostics'
-import {
-  createEphemeralVmRecipeDiagnosticStreamRedactor,
-  redactEphemeralVmRecipeDiagnosticText
-} from './ephemeral-vm-recipe-diagnostic-redaction'
+import { redactEphemeralVmRecipeDiagnosticText } from './ephemeral-vm-recipe-diagnostic-redaction'
 import {
   getEphemeralVmRecipeResultDesktop,
   parseEphemeralVmRecipeResult
@@ -200,19 +197,6 @@ describe('parseEphemeralVmRecipeResult', () => {
     expect(redactEphemeralVmRecipeDiagnosticText('{"password":"ab\\"c123","ok":true}')).toBe(
       '{"password":"[redacted]","ok":true}'
     )
-  })
-
-  it('redacts a secret split across stream chunks', () => {
-    const redactor = createEphemeralVmRecipeDiagnosticStreamRedactor()
-    const forwarded = [
-      redactor.push('booting\n{"desktop":{"pass'),
-      redactor.push('word":"abc'),
-      redactor.push('12345"}}'),
-      redactor.push('\ndone'),
-      redactor.flush()
-    ].join('')
-
-    expect(forwarded).toBe('booting\n{"desktop":{"password":"[redacted]"}}\ndone')
   })
 })
 

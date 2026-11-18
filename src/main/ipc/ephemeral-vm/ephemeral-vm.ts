@@ -5,6 +5,7 @@ import {
   type EphemeralVmRecipeDoctorResult
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import {
+  describeEphemeralVmRecipeStdoutForDiagnostics,
   getEphemeralVmRecipeResultWarnings,
   type EphemeralVmRecipeResultWarning
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
@@ -192,12 +193,13 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           onStdout: (chunk) => provisionEvents.send('stdout', chunk),
           onStderr: (chunk) => provisionEvents.send('stderr', chunk)
         })
+        provisionEvents.finishStdout(result.start.stdout)
         if (!result.ok) {
           return {
             ok: false,
             error: result.start.error,
             ...pickEphemeralVmFailureCode(result.start),
-            stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
+            stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
             stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
           }
         }
@@ -234,7 +236,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             return {
               ok: false,
               error: error instanceof Error ? error.message : String(error),
-              stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
+              stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
               stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
             }
           }
@@ -257,7 +259,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           return {
             ok: false,
             error: error instanceof Error ? error.message : String(error),
-            stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
+            stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
             stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
           }
         }
@@ -275,7 +277,6 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
         }
       } finally {
-        provisionEvents.flush()
         if (args.provisionId) {
           activeProvisionControllers.delete(args.provisionId)
         }

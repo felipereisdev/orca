@@ -2,6 +2,7 @@ import { parsePairingCode } from '../pairing/pairing'
 
 import {
   getEphemeralVmRecipeResultConnection,
+  parseEphemeralVmRecipeResult,
   type EphemeralVmRecipeConnection,
   type EphemeralVmRecipeDesktop,
   type EphemeralVmRecipeResult,
@@ -55,6 +56,19 @@ export function redactEphemeralVmRecipeResultForDiagnostics(
     ...(userData ? { userData } : {}),
     ...(desktop ? { desktop } : {})
   }
+}
+
+/** Stdout is the result channel, so diagnostics never show it raw: a parsed result redacted, or its size. */
+export function describeEphemeralVmRecipeStdoutForDiagnostics(stdout: string): string {
+  if (!stdout.trim()) {
+    return ''
+  }
+  const parsed = parseEphemeralVmRecipeResult(stdout)
+  if (parsed.ok) {
+    return `${JSON.stringify(redactEphemeralVmRecipeResultForDiagnostics(parsed.result))}\n`
+  }
+  const bytes = new TextEncoder().encode(stdout).length
+  return `[recipe stdout withheld: not a recipe result, ${bytes} bytes]\n`
 }
 
 function redactDesktop(desktop: EphemeralVmRecipeDesktop): EphemeralVmRecipeDesktop {

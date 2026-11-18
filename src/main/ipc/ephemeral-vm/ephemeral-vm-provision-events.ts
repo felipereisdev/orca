@@ -1,27 +1,31 @@
-import { createEphemeralVmRecipeDiagnosticStreamRedactor } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { redactEphemeralVmRecipeDiagnosticText } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { describeEphemeralVmRecipeStdoutForDiagnostics } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
 
 type ProvisionStream = 'stdout' | 'stderr'
 type ProvisionEvent = { provisionId: string; stream: ProvisionStream; chunk: string }
 
-/** Forwards live recipe output redacted per stream, so a secret split across chunks stays hidden. */
+/** Streams stderr live; stdout carries the result and its secrets, so it is shown once, parsed and redacted. */
 export function createProvisionEventForwarder(
   provisionId: string | undefined,
   send: (event: ProvisionEvent) => void
-): { send(stream: ProvisionStream, chunk: string): void; flush(): void } {
-  const redactors = {
-    stdout: createEphemeralVmRecipeDiagnosticStreamRedactor(),
-    stderr: createEphemeralVmRecipeDiagnosticStreamRedactor()
-  }
+): { send(stream: ProvisionStream, chunk: string): void; finishStdout(stdout: string): void } {
+  let stdoutShown = false
   const forward = (stream: ProvisionStream, chunk: string): void => {
     if (provisionId && chunk) {
       send({ provisionId, stream, chunk })
     }
   }
   return {
-    send: (stream, chunk) => forward(stream, redactors[stream].push(chunk)),
-    flush: () => {
-      forward('stdout', redactors.stdout.flush())
-      forward('stderr', redactors.stderr.flush())
+    send: (stream, chunk) => {
+      if (stream === 'stderr') {
+        forward(stream, redactEphemeralVmRecipeDiagnosticText(chunk))
+      }
+    },
+    finishStdout: (stdout) => {
+      if (!stdoutShown) {
+        stdoutShown = true
+        forward('stdout', describeEphemeralVmRecipeStdoutForDiagnostics(stdout))
+      }
     }
   }
 }
