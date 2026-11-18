@@ -2,30 +2,49 @@ import {
   getEphemeralVmRecipeResultDesktop,
   type EphemeralVmRecipeDesktop
 } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
-import { redactEphemeralVmRecipeDiagnosticText } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
 import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { GlobalSettings } from '../../shared/settings/global-settings-types'
+import {
+  RUNTIME_ENVIRONMENT_ASLEEP_ERROR_CODE,
+  RUNTIME_ENVIRONMENT_WAKE_FAILED_ERROR_CODE,
+  RUNTIME_ENVIRONMENT_WAKING_ERROR_CODE
+} from '../../shared/remote-runtime/recipe-vm-wake'
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
-import { syncEnvironmentRecordings } from './desktop-recording-sync'
 
 const CONFIGURE_TIMEOUT_MS = 15_000
 
-type DesktopSettingsSource = { getSettings(): Pick<GlobalSettings, 'experimentalEphemeralVms'> }
-type DesktopRuntime = Pick<
+// Only these codes reach the log: remote and thrown text can echo the password or token.
+const LOGGED_FAILURE_CODES = new Set([
+  'desktop_unavailable',
+  'desktop_invalid_input',
+  'desktop_agent_not_allowed',
+  'method_not_found',
+  'unauthorized',
+  'forbidden',
+  'timeout',
+  'runtime_environment_changed',
+  'runtime_manually_disconnected',
+  'remote_runtime_unavailable',
+  RUNTIME_ENVIRONMENT_WAKING_ERROR_CODE,
+  RUNTIME_ENVIRONMENT_WAKE_FAILED_ERROR_CODE,
+  RUNTIME_ENVIRONMENT_ASLEEP_ERROR_CODE
+])
+
+export type DesktopSettingsSource = {
+  getSettings(): Pick<GlobalSettings, 'experimentalEphemeralVms'>
+}
+export type DesktopRuntime = Pick<
   EphemeralVmRuntimeRecord,
-  'runtimeEnvironmentId' | 'workspaceId' | 'recipeResult'
+  'id' | 'runtimeEnvironmentId' | 'workspaceId' | 'recipeResult'
 >
 
-/** An error text with the desktop's password and launcher token removed, even when echoed raw. */
-function redactDesktopSecrets(text: string, desktop: EphemeralVmRecipeDesktop): string {
-  let redacted = text
-  for (const secret of [desktop.password, desktop.launcher?.token]) {
-    if (secret) {
-      redacted = redacted.split(secret).join('[redacted]')
-    }
-  }
-  return redactEphemeralVmRecipeDiagnosticText(redacted)
+function loggedFailureCode(code: unknown): string {
+  return typeof code === 'string' && LOGGED_FAILURE_CODES.has(code) ? code : 'unknown'
+}
+
+function thrownCode(error: unknown): unknown {
+  return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
 }
 
 /**
@@ -39,7 +58,7 @@ export async function configureEnvironmentDesktop(
   if (!desktop) {
     return 'skipped'
   }
-  let failure: string
+  let code: unknown
   try {
     const response = await callRuntimeEnvironment(
       getRuntimeEnvironmentRegistryRoot(),
@@ -56,21 +75,21 @@ export async function configureEnvironmentDesktop(
     if (response.ok) {
       return 'configured'
     }
-    failure = `${response.error.code}: ${response.error.message}`
+    code = response.error.code
   } catch (error) {
-    failure = error instanceof Error ? error.message : String(error)
+    code = thrownCode(error)
   }
-  console.warn(
-    '[ephemeral-vm] desktop configure failed',
-    runtimeEnvironmentId,
-    redactDesktopSecrets(failure, desktop)
-  )
+  console.warn('[ephemeral-vm] desktop configure failed', {
+    environmentId: runtimeEnvironmentId,
+    code: loggedFailureCode(code)
+  })
   return 'failed'
 }
 
-function runtimeDesktop(
+/** The runtime's environment and desktop when the host should hand it over, else null. */
+export function runtimeDesktop(
   store: DesktopSettingsSource,
-  runtime: DesktopRuntime
+  runtime: Omit<DesktopRuntime, 'id'>
 ): { environmentId: string; desktop: EphemeralVmRecipeDesktop } | null {
   const desktop = runtime.recipeResult
     ? getEphemeralVmRecipeResultDesktop(runtime.recipeResult)
@@ -82,31 +101,4 @@ function runtimeDesktop(
   return store.getSettings().experimentalEphemeralVms === true
     ? { environmentId: runtime.runtimeEnvironmentId, desktop }
     : null
-}
-
-/** After provisioning or resume: configure the desktop, then keep its recordings on this Mac. */
-export async function handOffRecipeEnvironmentDesktop(
-  store: DesktopSettingsSource,
-  runtime: DesktopRuntime
-): Promise<void> {
-  const target = runtimeDesktop(store, runtime)
-  if (!target) {
-    return
-  }
-  const outcome = await configureEnvironmentDesktop(target.environmentId, target.desktop)
-  // Only the identity that configured may subscribe to the desktop's events.
-  if (outcome === 'configured' && runtime.workspaceId) {
-    syncEnvironmentRecordings(target.environmentId, runtime.workspaceId)
-  }
-}
-
-/** A workspace attached to an already configured environment starts copying its recordings. */
-export function startRecipeWorkspaceRecordingSync(
-  store: DesktopSettingsSource,
-  runtime: DesktopRuntime
-): void {
-  const target = runtimeDesktop(store, runtime)
-  if (target && runtime.workspaceId) {
-    syncEnvironmentRecordings(target.environmentId, runtime.workspaceId)
-  }
 }

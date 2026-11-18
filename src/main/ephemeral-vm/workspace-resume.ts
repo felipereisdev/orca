@@ -37,7 +37,7 @@ import {
 import { isRuntimeEnvironmentManuallyDisconnected } from '../ipc/runtime-environments/connectivity/runtime-environment-manual-disconnect'
 import { getRegisteredSshState } from '../ssh/targets/ssh-target-registry'
 import { isRecipeVmLostContact } from './recipe-vm-lost-contact'
-import { handOffRecipeEnvironmentDesktop } from './desktop-configure'
+import { startEnvironmentDesktop } from './desktop-sync-registry'
 
 /** Wakes a workspace's suspended (or lost) recipe VM on this host; callers go through WorkspaceSleepCoordinator.wakeVm. */
 export async function resumeEphemeralVmWorkspace(
@@ -168,6 +168,7 @@ export async function resumeEphemeralVmWorkspace(
     }
   }
   rehandWokenDesktop(store, {
+    id: result.runtime.id,
     runtimeEnvironmentId: runtime.runtimeEnvironmentId,
     workspaceId,
     recipeResult: result.runtime.recipeResult
@@ -178,9 +179,9 @@ export async function resumeEphemeralVmWorkspace(
 /** The broker held its desktop in memory; hand it over again once this wake is no longer pending. */
 function rehandWokenDesktop(
   store: Store,
-  runtime: Parameters<typeof handOffRecipeEnvironmentDesktop>[1]
+  runtime: Parameters<typeof startEnvironmentDesktop>[1]
 ): void {
-  setTimeout(() => void handOffRecipeEnvironmentDesktop(store, runtime), 0)
+  setTimeout(() => void startEnvironmentDesktop(store, runtime), 0)
 }
 
 export const RECIPE_VM_UNREACHABLE_WITHOUT_RESUME_MESSAGE =

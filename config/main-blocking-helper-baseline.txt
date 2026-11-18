@@ -615,7 +615,7 @@
 22 src/main/ipc/diagnostics.ts
 1 src/main/ipc/emulator/emulator-video-stream.ts
 6 src/main/ipc/ephemeral-vm/ephemeral-vm-recipe-context.ts
-7 src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts
+8 src/main/ipc/ephemeral-vm/ephemeral-vm-runtime-handlers.ts # one-shot startup read of the runtime store to restore running recipe desktops (desktop-sync-registry)
 11 src/main/ipc/ephemeral-vm/ephemeral-vm.ts
 15 src/main/ipc/filesystem/access/filesystem-auth.ts
 20 src/main/ipc/filesystem/access/local-file-access-resolution.ts

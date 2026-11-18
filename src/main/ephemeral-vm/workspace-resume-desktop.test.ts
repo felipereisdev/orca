@@ -44,6 +44,9 @@ vi.mock('../ipc/runtime-environments/requests/runtime-environment-transport-rout
   callRuntimeEnvironment: mocks.call,
   subscribeRuntimeEnvironment: mocks.subscribe
 }))
+vi.mock('../ipc/runtime-environments/status/runtime-environment-status-owner', () => ({
+  onRuntimeEnvironmentStatusPublished: () => () => {}
+}))
 vi.mock('../ssh/targets/ssh-target-registry', () => ({ getRegisteredSshState: () => undefined }))
 vi.mock('./runtime-service', () => ({ resumeEphemeralVmRuntime: mocks.resume }))
 vi.mock('./runtime-ssh', () => ({

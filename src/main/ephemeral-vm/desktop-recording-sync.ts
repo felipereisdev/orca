@@ -1,21 +1,19 @@
 import { lstat, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import {
-  callRuntimeEnvironment,
-  subscribeRuntimeEnvironment
-} from '../ipc/runtime-environments/requests/runtime-environment-transport-routing'
+import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { copyEnvironmentRecording, type EnvironmentRecording } from './desktop-recording-copy'
+import { keepDesktopEventsStream } from './desktop-events-stream'
 import {
   noteCopiedRecording,
   RECORDING_ID,
   recordingFileName,
-  recordingsRoot
+  recordingsDirForWorkspace
 } from './desktop-recording-index'
 
 const LIST_TIMEOUT_MS = 15_000
-const RECONNECT_DELAYS_MS = [1_000, 5_000, 15_000, 60_000]
-const SAFE_PATH_SEGMENT = /^[A-Za-z0-9._-]+$/
+const RETRY_INITIAL_MS = 5_000
+const RETRY_MAX_MS = 5 * 60_000
 
 const activeSyncs = new Map<string, () => void>()
 
@@ -39,10 +37,6 @@ function parseRecording(value: unknown): EnvironmentRecording | null {
   return { id: value.id, path: value.path, bytes: value.bytes }
 }
 
-function isSafeWorkspaceSegment(workspaceId: string): boolean {
-  return SAFE_PATH_SEGMENT.test(workspaceId) && workspaceId !== '.' && workspaceId !== '..'
-}
-
 async function isCopied(path: string): Promise<boolean> {
   try {
     return (await lstat(path)).isFile()
@@ -57,33 +51,40 @@ function describeError(error: unknown): string {
 
 /**
  * Keeps a copy on this Mac of every recording the environment finishes: each `recording-finished`
- * event copies that file, and every (re)connect reconciles the environment's list, so recordings
- * finished while disconnected, and copies that failed, are picked up there.
+ * event copies that file, every (re)connect reconciles the environment's list, and a failed list
+ * or copy is retried on a backoff (5 s doubling to 5 min) while the connection stays up.
  */
 export function syncEnvironmentRecordings(
   runtimeEnvironmentId: string,
   workspaceId: string
 ): () => void {
-  if (!isSafeWorkspaceSegment(workspaceId)) {
-    return () => {}
-  }
   activeSyncs.get(workspaceId)?.()
   const controller = new AbortController()
   const { signal } = controller
-  const dir = join(recordingsRoot(), workspaceId)
-  const pending = new Map<string, EnvironmentRecording>()
+  const dir = recordingsDirForWorkspace(workspaceId)
   const inFlight = new Set<string>()
   let copies: Promise<void> = Promise.resolve()
-  let subscription: { close: () => void } | null = null
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  let reconnectAttempt = 0
+  let failedSinceRetry = false
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let retryAttempt = 0
 
-  const copy = (recording: EnvironmentRecording): void => {
-    if (signal.aborted || inFlight.has(recording.id)) {
+  const scheduleRetry = (): void => {
+    if (signal.aborted || retryTimer) {
       return
     }
+    const delay = Math.min(RETRY_INITIAL_MS * 2 ** retryAttempt, RETRY_MAX_MS)
+    retryAttempt += 1
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      void reconcile()
+    }, delay)
+  }
+
+  const copy = (recording: EnvironmentRecording): Promise<void> => {
+    if (signal.aborted || inFlight.has(recording.id)) {
+      return copies
+    }
     inFlight.add(recording.id)
-    pending.delete(recording.id)
     copies = copies
       .then(async () => {
         const destination = join(dir, recordingFileName(recording.id))
@@ -106,18 +107,22 @@ export function syncEnvironmentRecordings(
         if (signal.aborted) {
           return
         }
-        pending.set(recording.id, recording)
-        console.warn('[desktop] recording copy failed; retrying on the next reconcile', {
+        failedSinceRetry = true
+        console.warn('[desktop] recording copy failed; retrying', {
           recordingId: recording.id,
           error: describeError(error)
         })
+        scheduleRetry()
       })
       .finally(() => {
         inFlight.delete(recording.id)
       })
+    return copies
   }
 
-  const reconcile = async (): Promise<void> => {
+  async function reconcile(): Promise<void> {
+    failedSinceRetry = false
+    let listed: unknown
     try {
       const response = await callRuntimeEnvironment(
         getRuntimeEnvironmentRegistryRoot(),
@@ -132,119 +137,59 @@ export function syncEnvironmentRecordings(
       if (!response.ok) {
         throw new Error(response.error.message)
       }
-      const listed = isRecord(response.result) ? response.result.recordings : undefined
-      for (const entry of Array.isArray(listed) ? listed : []) {
-        const recording = parseRecording(entry)
-        if (recording) {
-          copy(recording)
-        }
-      }
+      listed = isRecord(response.result) ? response.result.recordings : undefined
     } catch (error) {
       if (!signal.aborted) {
-        console.warn('[desktop] listing recordings failed', { error: describeError(error) })
+        console.warn('[desktop] listing recordings failed; retrying', {
+          error: describeError(error)
+        })
+        scheduleRetry()
       }
-    }
-  }
-
-  const onStreamEvent = (event: unknown): void => {
-    if (!isRecord(event)) {
       return
     }
-    if (event.type === 'ready') {
-      reconnectAttempt = 0
-      void reconcile()
-      return
-    }
-    if (event.type === 'recording-finished') {
-      const recording = parseRecording(event)
+    let settled: Promise<void> = copies
+    for (const entry of Array.isArray(listed) ? listed : []) {
+      const recording = parseRecording(entry)
       if (recording) {
-        copy(recording)
+        settled = copy(recording)
       }
-      for (const retry of pending.values()) {
-        copy(retry)
-      }
+    }
+    await settled
+    if (!failedSinceRetry) {
+      retryAttempt = 0
     }
   }
 
-  const scheduleReconnect = (): void => {
-    subscription = null
-    if (signal.aborted || reconnectTimer) {
-      return
-    }
-    const delay = RECONNECT_DELAYS_MS[Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)]
-    reconnectAttempt += 1
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null
-      connect()
-    }, delay)
-  }
-
-  function connect(): void {
-    let ended = false
-    const end = (): void => {
-      if (!ended) {
-        ended = true
-        scheduleReconnect()
+  keepDesktopEventsStream(
+    runtimeEnvironmentId,
+    (event) => {
+      if (event.type === 'ready') {
+        void reconcile()
+        return
       }
-    }
-    subscribeRuntimeEnvironment(
-      getRuntimeEnvironmentRegistryRoot(),
-      runtimeEnvironmentId,
-      'desktop.events',
-      {},
-      undefined,
-      {
-        onEvent: (payload) => {
-          if (ended) {
-            return
-          }
-          if (payload.type === 'response' && payload.response.ok) {
-            onStreamEvent(payload.response.result)
-          } else if (payload.type === 'response' || payload.type === 'error') {
-            // A refusal (another controller, no desktop yet) or a midstream failure ends this stream.
-            subscription?.close()
-            end()
-          }
-        },
-        onClose: end
-      },
-      () => !signal.aborted && !ended,
-      signal
-    ).then(
-      (opened) => {
-        if (signal.aborted || ended) {
-          opened.close()
-          return
+      if (event.type === 'recording-finished') {
+        const recording = parseRecording(event)
+        if (recording) {
+          void copy(recording)
         }
-        subscription = opened
-      },
-      (error: unknown) => {
-        if (!signal.aborted) {
-          console.warn('[desktop] recording events unavailable; retrying', {
-            error: describeError(error)
-          })
-        }
-        end()
       }
-    )
-  }
+    },
+    signal
+  )
 
   const stop = (): void => {
     if (signal.aborted) {
       return
     }
     controller.abort()
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
     }
-    subscription?.close()
-    subscription = null
     if (activeSyncs.get(workspaceId) === stop) {
       activeSyncs.delete(workspaceId)
     }
   }
   activeSyncs.set(workspaceId, stop)
-  connect()
   return stop
 }

@@ -3,6 +3,7 @@ import type { Store } from '../persistence/loading-store/store'
 import { findWorkspaceEphemeralVmRuntime } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-workspace-runtime'
 import { suspendEphemeralVmRuntime } from './runtime-service'
 import { disconnectRuntimeOwnedSshTarget } from './runtime-ssh'
+import { stopEnvironmentDesktop } from './desktop-sync-registry'
 import { getRuntimeRecipeContext } from '../ipc/ephemeral-vm/ephemeral-vm-recipe-context'
 import {
   EphemeralVmFailureError,
@@ -30,6 +31,9 @@ export async function suspendEphemeralVmWorkspace(
       error: result.error,
       ...pickEphemeralVmFailureCode(result)
     })
+  }
+  if (!result.skipped) {
+    stopEnvironmentDesktop(runtime.id)
   }
   // A skipped suspend leaves the VM running, so its SSH connection must remain live.
   if (runtime.connectionMode === 'ssh' && !result.skipped) {

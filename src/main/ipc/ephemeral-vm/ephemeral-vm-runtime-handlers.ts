@@ -19,7 +19,11 @@ import {
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { ephemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { attachEphemeralVmRuntimeToWorkspace } from '../../ephemeral-vm/runtime-attachment'
-import { startRecipeWorkspaceRecordingSync } from '../../ephemeral-vm/desktop-configure'
+import {
+  registerEnvironmentDesktopLifecycle,
+  restoreEnvironmentDesktops,
+  startEnvironmentDesktop
+} from '../../ephemeral-vm/desktop-sync-registry'
 import { forgetInterruptedEphemeralVmProvision } from '../../ephemeral-vm/runtime-provisioning-persistence'
 import { pendingVmCheckouts } from '../../ephemeral-vm/pending-vm-checkouts'
 import {
@@ -118,6 +122,8 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:listCredentialEnvNames')
   stopRuntimesChangedBroadcast?.()
   stopRuntimesChangedBroadcast = onEphemeralVmRuntimesChanged(broadcastEphemeralVmRuntimesChanged)
+  registerEnvironmentDesktopLifecycle(store)
+  restoreEnvironmentDesktops(store, listEphemeralVmRuntimes(app.getPath('userData')))
 
   // Names only: the recipe list warns which credentials scripts inherit, never their values.
   ipcMain.handle('ephemeralVm:listCredentialEnvNames', () =>
@@ -136,8 +142,8 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
         runtimeId: args.runtimeId,
         workspaceId: args.workspaceId
       })
-      // Provisioning configured the desktop before the workspace existed; its recordings sync now.
-      startRecipeWorkspaceRecordingSync(store, runtime)
+      // Provisioning ran before the workspace existed; its recordings can sync now.
+      void startEnvironmentDesktop(store, runtime)
       return runtime
     }
   )

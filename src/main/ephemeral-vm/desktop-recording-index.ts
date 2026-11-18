@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
@@ -11,6 +12,12 @@ const copiedRecordings = new Map<string, string>()
 
 export function recordingsRoot(): string {
   return join(app.getPath('userData'), 'desktop-recordings')
+}
+
+/** Workspace ids hold `::` and checkout paths; their directory is named by a digest instead. */
+export function recordingsDirForWorkspace(workspaceId: string): string {
+  const key = createHash('sha256').update(workspaceId).digest('hex').slice(0, 32)
+  return join(recordingsRoot(), key)
 }
 
 export function recordingFileName(id: string): string {

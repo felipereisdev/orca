@@ -13,6 +13,7 @@ import { cleanupEphemeralVmRuntime } from './runtime-service'
 import { removeEphemeralVmRuntimeSshTarget } from './runtime-ssh-cleanup'
 import { removeRuntimeOwnedSshTarget } from './runtime-ssh'
 import { isEphemeralVmProvisionLive } from './runtime-provisioning-persistence'
+import { stopEnvironmentDesktop } from './desktop-sync-registry'
 
 /** Destroys a recorded VM and releases what Orca holds for it. The one path for the desktop's
  *  cleanup and a failed CLI create; concurrent calls share one destroy run. */
@@ -29,6 +30,8 @@ export async function cleanupOwnedEphemeralVmRuntime(
     // Why: don't mark a create in flight as cleanup_failed; its own outcome settles the row.
     throw new Error(`Ephemeral VM runtime is still provisioning: ${runtime.id}`)
   }
+  // The environment is going away; its recordings sync must not keep retrying it.
+  stopEnvironmentDesktop(runtime.id)
   let result
   if (runtime.cleanupStatus === 'succeeded') {
     result = { ok: true as const, runtime, skipped: false }
