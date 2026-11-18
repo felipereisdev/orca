@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
 import { duplexPair } from 'node:stream'
 import { getDesktopBroker, type DesktopBroker } from '../../../../desktop/desktop-broker'
 import { DesktopError } from '../../../../desktop/desktop-errors'
@@ -10,7 +11,9 @@ import {
   DesktopViewerUnsubscribeParams
 } from '../../../../../shared/rpc-contract/desktop/desktop-params'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
+import { createDesktopActionMethods } from './desktop-action-methods'
 import { assertDesktopController, claimDesktopController } from './desktop-controller-identity'
+import { createDesktopRunMethods } from './desktop-run-method'
 
 const VIEWER_SUBSCRIPTION_PREFIX = 'desktop-viewer:'
 
@@ -87,8 +90,18 @@ async function streamViewer(
   }
 }
 
-export function createDesktopMethods(getBroker: () => DesktopBroker = getDesktopBroker) {
+export type DesktopMethodsOptions = {
+  /** Where default screenshots go, under `orca-desktop/`. */
+  tmpDir?: () => string
+}
+
+export function createDesktopMethods(
+  getBroker: () => DesktopBroker = getDesktopBroker,
+  { tmpDir = tmpdir }: DesktopMethodsOptions = {}
+) {
   return [
+    ...createDesktopActionMethods(getBroker, tmpDir),
+    ...createDesktopRunMethods(getBroker),
     defineMethod({
       name: 'desktop.configure',
       permission: 'host-admin',

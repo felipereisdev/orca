@@ -1,0 +1,172 @@
+import { createServer, type Socket } from 'node:net'
+
+/** What a run request carried, minus the token (only whether it matched). */
+export type FakeLauncherRun = {
+  id: string
+  argv: string[]
+  cwd?: string
+  env?: Record<string, string>
+}
+
+export type FakeDesktopLauncher = {
+  port: number
+  runs: FakeLauncherRun[]
+  /** Ids killed by a valid `kill` request. */
+  killed: string[]
+  /** Requests refused for a wrong or missing token. */
+  rejected: number
+  /** Resolves once the connection of run `id` closed (a real launcher kills it then too). */
+  waitForClosed(id: string): Promise<void>
+  close(): Promise<void>
+}
+
+type LauncherRequest = {
+  token?: unknown
+  op?: unknown
+  id?: unknown
+  argv?: unknown
+  cwd?: unknown
+  env?: unknown
+}
+
+function send(socket: Socket, message: unknown): void {
+  socket.write(`${JSON.stringify(message)}\n`)
+}
+
+/**
+ * A TCP launcher speaking the protocol in desktop-launcher-client.ts. Fake commands:
+ * `echo <words…>`, `fail <code> <message>` (stderr, then exit code), `report` (prints the argv,
+ * cwd and env it received as JSON) and `hang` (runs until killed). Anything else fails to spawn.
+ */
+export async function startFakeDesktopLauncher(token: string): Promise<FakeDesktopLauncher> {
+  const sockets = new Set<Socket>()
+  const runs: FakeLauncherRun[] = []
+  const killed: string[] = []
+  const closed: string[] = []
+  const closeWaiters: { id: string; resolve: () => void }[] = []
+  let rejected = 0
+  let nextId = 1
+
+  const markClosed = (id: string): void => {
+    closed.push(id)
+    for (const waiter of closeWaiters.filter((entry) => entry.id === id)) {
+      waiter.resolve()
+    }
+  }
+
+  const start = (
+    socket: Socket,
+    request: LauncherRequest
+  ): { id: string; hanging: boolean } | undefined => {
+    const argv = Array.isArray(request.argv) ? request.argv.map(String) : []
+    const [command, ...args] = argv
+    if (!['echo', 'fail', 'report', 'hang'].includes(command ?? '')) {
+      send(socket, { error: 'spawn_failed' })
+      socket.end()
+      return undefined
+    }
+    const id = `run-${nextId++}`
+    const run: FakeLauncherRun = { id, argv }
+    if (typeof request.cwd === 'string') {
+      run.cwd = request.cwd
+    }
+    if (request.env && typeof request.env === 'object') {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: test fake echoes whatever env object it received.
+      run.env = request.env as Record<string, string>
+    }
+    runs.push(run)
+    send(socket, { id })
+    if (command === 'echo') {
+      send(socket, { stream: 'stdout', data: `${args.join(' ')}\n` })
+      send(socket, { exit: 0 })
+      socket.end()
+    } else if (command === 'fail') {
+      send(socket, { stream: 'stderr', data: `${args.slice(1).join(' ')}\n` })
+      send(socket, { exit: Number(args[0]) })
+      socket.end()
+    } else if (command === 'report') {
+      send(socket, { stream: 'stdout', data: JSON.stringify(run) })
+      send(socket, { exit: 0 })
+      socket.end()
+    } else {
+      send(socket, { stream: 'stdout', data: 'started\n' })
+      return { id, hanging: true }
+    }
+    return { id, hanging: false }
+  }
+
+  const server = createServer((socket) => {
+    sockets.add(socket)
+    let running: string | undefined
+    let started: string | undefined
+    let pending = ''
+    socket.setEncoding('utf8')
+    socket.on('error', () => {})
+    socket.once('close', () => {
+      sockets.delete(socket)
+      if (started) {
+        markClosed(started)
+      }
+    })
+    socket.on('data', (chunk: string) => {
+      pending += chunk
+      let newline = pending.indexOf('\n')
+      while (newline >= 0) {
+        const line = pending.slice(0, newline)
+        pending = pending.slice(newline + 1)
+        newline = pending.indexOf('\n')
+        let request: LauncherRequest
+        try {
+          request = JSON.parse(line)
+        } catch {
+          send(socket, { error: 'bad_request' })
+          socket.end()
+          return
+        }
+        if (request.token !== token) {
+          rejected++
+          send(socket, { error: 'bad_token' })
+          socket.end()
+          return
+        }
+        if (request.op === 'run' && running === undefined) {
+          const run = start(socket, request)
+          started = run?.id
+          running = run?.hanging ? run.id : undefined
+        } else if (request.op === 'kill' && request.id === running && running) {
+          killed.push(running)
+          send(socket, { exit: 143 })
+          running = undefined
+          socket.end()
+        }
+      }
+    })
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => resolve())
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') {
+    throw new Error('fake launcher has no TCP address')
+  }
+  return {
+    port: address.port,
+    runs,
+    killed,
+    get rejected() {
+      return rejected
+    },
+    waitForClosed: (id) =>
+      closed.includes(id)
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => closeWaiters.push({ id, resolve })),
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const socket of sockets) {
+          socket.destroy()
+        }
+        server.close(() => resolve())
+      })
+  }
+}

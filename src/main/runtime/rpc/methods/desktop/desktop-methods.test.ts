@@ -1,24 +1,19 @@
 import type { Duplex } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CLI_AGENT_CALLER_CLIENT_CAPABILITY } from '../../../../../shared/remote-runtime/cli-agent-caller-capability'
-import type { OrcaRuntimeService } from '../../../orca-runtime'
-import type { RpcDispatchStreamingOptions } from '../../dispatch/dispatcher-stream-options'
-import { RpcDispatcher } from '../../dispatcher'
-import { createSubscriptionRegistryDouble } from '../../testing/subscription-registry-test-double'
-import { DesktopBroker } from '../../../../desktop/desktop-broker'
+import type { RpcDispatcher } from '../../dispatcher'
+import type { DesktopBroker } from '../../../../desktop/desktop-broker'
 import { DesktopError } from '../../../../desktop/desktop-errors'
 import { FIXTURE_PASSWORD, pointerEvents } from '../../../../desktop/testing/desktop-broker-fixture'
 import { startFakeRfbServer, type FakeRfbServer } from '../../../../desktop/testing/fake-rfb-server'
 import { connectFakeRfbViewer } from '../../../../desktop/testing/fake-rfb-viewer'
-import { createDesktopMethods } from './desktop-methods'
+import {
+  createDesktopRpcHarness,
+  LOCAL_AGENT,
+  MAC,
+  MAC_AGENT,
+  type DesktopTestTransport as Transport
+} from './desktop-methods-test-harness'
 
-type Transport = Pick<
-  RpcDispatchStreamingOptions,
-  'caller' | 'pairedDeviceId' | 'pairedDeviceParentId' | 'clientKind' | 'clientCapabilities'
->
-
-// Identities resolve from transport fields, as the runtime server stamps them; only IPC sets `caller`.
-const MAC: Transport = { pairedDeviceId: 'mac-1', clientKind: 'runtime' }
 const OTHER_MAC: Transport = { pairedDeviceId: 'mac-2', clientKind: 'runtime' }
 const MAC_PHONE: Transport = {
   pairedDeviceId: 'phone-1',
@@ -30,12 +25,6 @@ const OTHER_PHONE: Transport = {
   pairedDeviceParentId: 'mac-2',
   clientKind: 'mobile'
 }
-const MAC_AGENT: Transport = {
-  pairedDeviceId: 'mac-1',
-  clientKind: 'runtime',
-  clientCapabilities: [CLI_AGENT_CALLER_CLIENT_CAPABILITY]
-}
-const LOCAL_AGENT: Transport = {}
 const HOST_WINDOW: Transport = { caller: { kind: 'desktop' } }
 
 const cleanups: (() => Promise<void> | void)[] = []
@@ -54,24 +43,9 @@ async function vncServer(): Promise<FakeRfbServer> {
 }
 
 function setup() {
-  const broker = new DesktopBroker()
-  cleanups.push(() => broker.close())
-  const subscriptions = createSubscriptionRegistryDouble()
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: these methods only touch getRuntimeId and the subscription registry.
-  const runtime = {
-    getRuntimeId: () => 'runtime-env',
-    ...subscriptions
-  } as unknown as OrcaRuntimeService
-  const dispatcher = new RpcDispatcher({ runtime, methods: createDesktopMethods(() => broker) })
-  const call = (method: string, params: unknown, transport: Transport) =>
-    dispatcher.dispatch({ id: method, authToken: 't', method, params }, transport)
-  const configure = (server: FakeRfbServer, transport: Transport) =>
-    call(
-      'desktop.configure',
-      { host: '127.0.0.1', port: server.port, password: FIXTURE_PASSWORD },
-      transport
-    )
-  return { broker, dispatcher, call, configure }
+  const harness = createDesktopRpcHarness()
+  cleanups.push(() => harness.broker.close())
+  return harness
 }
 
 type ViewerStream = {

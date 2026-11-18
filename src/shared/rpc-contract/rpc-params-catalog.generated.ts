@@ -354,9 +354,18 @@ import {
   DatabaseStartQuery
 } from './database/database-params'
 import {
+  DesktopClickParams,
   DesktopConfigureParams,
   DesktopControlSetParams,
+  DesktopDragParams,
+  DesktopKeyParams,
+  DesktopMoveParams,
+  DesktopRunParams,
+  DesktopRunUnsubscribeParams,
+  DesktopScreenshotParams,
+  DesktopScrollParams,
   DesktopStatusParams,
+  DesktopTypeParams,
   DesktopViewerParams,
   DesktopViewerUnsubscribeParams
 } from './desktop/desktop-params'
@@ -1490,10 +1499,19 @@ export const RPC_PARAMS_BY_METHOD = {
   'database.testConnection': DatabaseConfigurationId,
   'database.waitBindingQuery': DatabaseBindingQuery,
   'database.waitQuery': DatabaseQueryId,
+  'desktop.click': DesktopClickParams,
   'desktop.configure': DesktopConfigureParams,
   'desktop.control.set': DesktopControlSetParams,
+  'desktop.drag': DesktopDragParams,
+  'desktop.key': DesktopKeyParams,
+  'desktop.move': DesktopMoveParams,
   'desktop.openWindowInBackground': null,
+  'desktop.run': DesktopRunParams,
+  'desktop.run.unsubscribe': DesktopRunUnsubscribeParams,
+  'desktop.screenshot': DesktopScreenshotParams,
+  'desktop.scroll': DesktopScrollParams,
   'desktop.status': DesktopStatusParams,
+  'desktop.type': DesktopTypeParams,
   'desktop.viewer': DesktopViewerParams,
   'desktop.viewer.unsubscribe': DesktopViewerUnsubscribeParams,
   'desktopBrowserBridge.attach': DesktopBrowserBridgeAttachParams,

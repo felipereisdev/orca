@@ -3,12 +3,20 @@ export type DesktopErrorCode =
   | 'desktop_unavailable'
   | 'desktop_invalid_input'
   | 'desktop_agent_not_allowed'
+  | 'desktop_run_unavailable'
+  | 'desktop_launcher_rejected'
+  | 'desktop_run_failed'
+  | 'desktop_screenshot_failed'
 
 const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_user_in_control: 'The user has taken control of the desktop.',
   desktop_unavailable: 'The desktop is not available.',
   desktop_invalid_input: 'The desktop input is not valid.',
-  desktop_agent_not_allowed: 'Agents cannot configure, view or take control of the desktop.'
+  desktop_agent_not_allowed: 'Agents cannot configure, view or take control of the desktop.',
+  desktop_run_unavailable: 'No desktop launcher is available to start programs.',
+  desktop_launcher_rejected: 'The desktop launcher refused the request.',
+  desktop_run_failed: 'The program could not be run on the desktop.',
+  desktop_screenshot_failed: 'The screenshot could not be saved.'
 }
 
 /** `reason` is a fixed code or caller-supplied text; credentials never go into it. */
