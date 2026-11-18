@@ -16,6 +16,8 @@ export type CommandSpec = {
   valueFlags?: string[]
   positionalArgs?: string[]
   variadicPositional?: boolean
+  // Everything after a bare `--` reaches the handler unparsed, as `trailingArgs`.
+  trailingArgs?: boolean
   examples?: string[]
   notes?: string[]
   // Takes `--page <browserPageId>`; only the browser spec modules set it.

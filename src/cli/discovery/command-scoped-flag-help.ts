@@ -25,7 +25,39 @@ const BOT_ITEM_TITLE_HELP = "--title <text>         The item's title"
 const AGENT_ID_FLAG_HELP =
   "--id <id>              The agent's orca_session_id: ID; also accepted positionally"
 
+const DESKTOP_POINT_HELP = {
+  x: '--x <x>                Desktop x coordinate in pixels',
+  y: '--y <y>                Desktop y coordinate in pixels'
+}
+
 const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
+  'desktop screenshot': {
+    out: '--out <path>           Where to save the PNG (default a temp file)'
+  },
+  'desktop move': DESKTOP_POINT_HELP,
+  'desktop click': {
+    ...DESKTOP_POINT_HELP,
+    button: '--button <btn>         Mouse button: left (default), middle or right',
+    double: '--double               Double-click'
+  },
+  'desktop drag': {
+    'from-x': '--from-x <x>           Desktop x coordinate to drag from',
+    'from-y': '--from-y <y>           Desktop y coordinate to drag from',
+    'to-x': '--to-x <x>             Desktop x coordinate to drop at',
+    'to-y': '--to-y <y>             Desktop y coordinate to drop at'
+  },
+  'desktop scroll': {
+    ...DESKTOP_POINT_HELP,
+    dy: '--dy <steps>           Wheel steps: positive scrolls down, negative up'
+  },
+  'desktop type': { text: '--text <text>          Text to type (at most 10000 characters)' },
+  'desktop key': {
+    combo: '--combo <combo>        Key or combination, e.g. Return or ctrl+shift+t'
+  },
+  'desktop record start': {
+    'max-seconds': '--max-seconds <n>      Stop by itself after n seconds (default 600, 1-3600)',
+    'max-bytes': '--max-bytes <n>        Stop by itself at n bytes (default 200 MB, 1 MB-2 GB)'
+  },
   'bot item add': {
     title: BOT_ITEM_TITLE_HELP,
     for: '--for bot:<name>       Make the item for another bot'
