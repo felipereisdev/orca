@@ -49,7 +49,8 @@ function formatStatus(status: DesktopStatus): string {
 
 /** The line the agent pastes into its reply so the chat shows the video. */
 export function recordingChatMarkdown(path: string): string {
-  return `![Gravação do teste](${path})`
+  // The `<…>` destination keeps spaces and parentheses; `<`, `>` and `\` are escaped inside it.
+  return `![Gravação do teste](<${path.replace(/[\\<>]/g, (char) => `\\${char}`)}>)`
 }
 
 function formatRecording(recording: Recording): string {
@@ -72,7 +73,8 @@ export const DESKTOP_HANDLERS: Record<string, CommandHandler> = {
     const result = await callDesktop<{ path: string; width: number; height: number }>(
       client,
       'desktop.screenshot',
-      out === undefined ? {} : { out: resolve(cwd, out) }
+      // A paired server interprets --out itself; only a local runtime shares this cwd.
+      out === undefined ? {} : { out: client.isRemote ? out : resolve(cwd, out) }
     )
     printResult(
       result,

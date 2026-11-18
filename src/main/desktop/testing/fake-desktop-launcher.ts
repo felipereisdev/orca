@@ -21,6 +21,8 @@ export type FakeDesktopLauncher = {
   waitForClosed(id: string): Promise<void>
   /** Sends `message` (an output line or `{exit}`) on a `hang` run that is still running. */
   emit(id: string, message: { stream: 'stdout' | 'stderr'; data: string } | { exit: number }): void
+  /** Closes a `hang` run's connection without an exit, as a crashed launcher would. */
+  drop(id: string): void
   close(): Promise<void>
 }
 
@@ -199,6 +201,14 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
         hanging.delete(id)
         socket.end()
       }
+    },
+    drop: (id) => {
+      const socket = hanging.get(id)
+      if (!socket) {
+        throw new Error(`fake launcher run ${id} is not running`)
+      }
+      hanging.delete(id)
+      socket.end()
     },
     close: () =>
       new Promise<void>((resolve) => {

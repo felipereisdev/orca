@@ -44,13 +44,13 @@ export function createDesktopRunMethods(
       handler: async (params, ctx) => {
         const owner = runOwner(ctx)
         const broker = getBroker()
-        const endpoint = broker.launcherEndpoint()
-        if (!endpoint) {
-          throw new DesktopError('desktop_run_unavailable')
-        }
         // Programs already running keep going; new ones wait until the agent has control again.
         if (broker.status().owner === 'user') {
           throw new DesktopError('desktop_user_in_control')
+        }
+        const endpoint = broker.launcherEndpoint()
+        if (!endpoint) {
+          throw new DesktopError('desktop_run_unavailable')
         }
         return { runId: await sessions.start(endpoint, params, owner) }
       }

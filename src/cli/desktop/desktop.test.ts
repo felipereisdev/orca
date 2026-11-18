@@ -2,12 +2,16 @@ import { EventEmitter } from 'node:events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
+const target = vi.hoisted(() => ({ remote: false }))
 
 vi.mock('../runtime/client', () => {
   class RuntimeClient {
     call = callMock
     getCliStatus = vi.fn()
     openOrca = vi.fn()
+    get isRemote() {
+      return target.remote
+    }
   }
   return { RuntimeClient }
 })
@@ -18,7 +22,7 @@ import type { RuntimeClient } from '../runtime/client'
 import { RuntimeRpcFailureError } from '../runtime/connection/types'
 import { okFixture } from '../runtime/fixtures/runtime-rpc-fixtures'
 import { DESKTOP_COMMAND_SPECS } from '../specs/desktop'
-import { DESKTOP_HANDLERS } from './desktop'
+import { DESKTOP_HANDLERS, recordingChatMarkdown } from './desktop'
 import { runDesktopRun } from './desktop-run-command'
 
 function failure(code: string, message: string): RuntimeRpcFailureError {
@@ -28,6 +32,33 @@ function failure(code: string, message: string): RuntimeRpcFailureError {
     error: { code, message },
     _meta: { runtimeId: 'runtime-1' }
   })
+}
+
+/** A client whose reads return `reads` in order, then wait until a kill ends the run. */
+function fakeRunClient(calls: string[], reads: unknown[]): RuntimeClient {
+  let releaseRead = (): void => {}
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: runDesktopRun only calls client.call, which this fake answers with RPC envelopes.
+  return {
+    isRemote: false,
+    call: async (method: string) => {
+      calls.push(method)
+      if (method === 'desktop.run.start') {
+        return okFixture('req', { runId: 'run-f' })
+      }
+      if (method === 'desktop.run.kill') {
+        releaseRead()
+        return okFixture('req', { killed: true })
+      }
+      const next = reads.shift()
+      if (next !== undefined) {
+        return okFixture('req', next)
+      }
+      await new Promise<void>((resolve) => {
+        releaseRead = resolve
+      })
+      throw failure('desktop_run_not_found', 'No desktop run with that id.')
+    }
+  } as unknown as RuntimeClient
 }
 
 function logged(): string {
@@ -44,6 +75,7 @@ describe('orca desktop', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
     process.exitCode = undefined
+    target.remote = false
   })
 
   it('desktop click calls desktop.click with numbers parsed from flags', async () => {
@@ -78,7 +110,7 @@ describe('orca desktop', () => {
 
     expect(callMock).toHaveBeenCalledWith('desktop.record.stop', {})
     expect(logged().split('\n').at(-1)).toBe(
-      '![Gravação do teste](/home/agent/.orca/desktop-recordings/rec-abc.mp4)'
+      '![Gravação do teste](</home/agent/.orca/desktop-recordings/rec-abc.mp4>)'
     )
   })
 
@@ -163,6 +195,86 @@ describe('orca desktop', () => {
     expect(exitCode).toBe(130)
     expect(signals.listenerCount('SIGINT')).toBe(0)
     expect(signals.listenerCount('SIGTERM')).toBe(0)
+  })
+
+  it('the chat line stays a valid Markdown destination for spaces, parentheses and angle brackets', () => {
+    expect(recordingChatMarkdown('/rec/my test (1)<x>.mp4')).toBe(
+      '![Gravação do teste](</rec/my test (1)\\<x\\>.mp4>)'
+    )
+  })
+
+  it('resolves --out and sends cwd only when the CLI targets the local runtime', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const shot = okFixture('req', { path: '/p.png', width: 1, height: 1 })
+    callMock
+      .mockResolvedValueOnce(shot)
+      .mockResolvedValueOnce(shot)
+      .mockResolvedValueOnce(okFixture('req', { runId: 'run-r' }))
+      .mockResolvedValueOnce(okFixture('req', { events: [], cursor: 0, exit: 0 }))
+
+    await main(['desktop', 'screenshot', '--out', 'shots/a.png'], '/work')
+    target.remote = true
+    await main(['desktop', 'screenshot', '--out', 'shots/a.png'], '/work')
+    await main(['desktop', 'run', '--', 'xterm'], '/work')
+
+    expect(callMock.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      ['desktop.screenshot', { out: '/work/shots/a.png' }],
+      ['desktop.screenshot', { out: 'shots/a.png' }],
+      ['desktop.run.start', { argv: ['xterm'] }],
+      ['desktop.run.read', { runId: 'run-r', cursor: 0, waitMs: 20_000 }]
+    ])
+  })
+
+  it('desktop run exits on SIGINT while its output is blocked', async () => {
+    const signals = new EventEmitter()
+    const calls: string[] = []
+    const client = fakeRunClient(calls, [
+      { events: [{ stream: 'stdout', data: 'x' }], cursor: 1 },
+      { events: [{ stream: 'stdout', data: 'never' }], cursor: 2 }
+    ])
+    // A pipe nobody reads: every write reports full and no drain ever comes.
+    const stdout = Object.assign(new EventEmitter(), { write: vi.fn(() => false) })
+
+    const running = runDesktopRun(
+      { client, argv: ['flood'], cwd: '/work', json: false },
+      { signals, stdout, stderr: stdout }
+    )
+    await vi.waitFor(() => expect(stdout.write).toHaveBeenCalled())
+    signals.emit('SIGINT')
+    const exitCode = await running
+
+    expect(exitCode).toBe(130)
+    expect(calls).toContain('desktop.run.kill')
+    expect(stdout.write).toHaveBeenCalledTimes(1)
+    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 0])
+  })
+
+  it('desktop run leaves no stream listeners behind across repeated backpressure', async () => {
+    const signals = new EventEmitter()
+    const event = { stream: 'stdout', data: 'x' }
+    const client = fakeRunClient(
+      [],
+      [
+        { events: [event, event], cursor: 2 },
+        { events: [event, event], cursor: 4 },
+        { events: [event], cursor: 5, exit: 3 }
+      ]
+    )
+    const stdout = Object.assign(new EventEmitter(), {
+      write: vi.fn(() => {
+        setImmediate(() => stdout.emit('drain'))
+        return false
+      })
+    })
+
+    const exitCode = await runDesktopRun(
+      { client, argv: ['flood'], cwd: '/work', json: false },
+      { signals, stdout, stderr: stdout }
+    )
+
+    expect(exitCode).toBe(3)
+    expect(stdout.write).toHaveBeenCalledTimes(5)
+    expect(['drain', 'close', 'error'].map((name) => stdout.listenerCount(name))).toEqual([0, 0, 0])
   })
 
   it('every desktop command spec has a handler and a manifest route', () => {

@@ -158,50 +158,132 @@ describe('desktop.run session', () => {
     expect((await waiting).result).toEqual({ events: [], cursor: 1 })
   })
 
-  it('stops reading the launcher while 1 MiB of output is unread, and resumes on read', async () => {
+  it('never holds more than 1 MiB of unread output, and resumes on read', async () => {
     const { start, read, runSessions } = await setup()
     const lineChars = 64 * 1024
 
     const { runId } = await start({ argv: ['flood', '64', String(lineChars)] })
     // The launcher already wrote all 4 MiB; give the socket turns to deliver more if unpaused.
     await ioTurns()
-    const buffered = runSessions.bufferedEvents(runId) ?? 0
+    const full = runSessions.bufferedCost(runId)
+    const costs: number[] = []
     let cursor = 0
     let chars = 0
     let exit: unknown
     // ast-grep-ignore: test-no-polling-loop -- each read long-polls for the output it releases
     while (exit === undefined) {
       const reply = await read(runId, cursor, MAC_AGENT, 20_000)
+      await ioTurns(5)
+      costs.push(runSessions.bufferedCost(runId) ?? 0)
       const events = replyEvents(reply)
       chars += events.reduce((total, event) => total + event.data.length, 0)
       cursor = Number(reply.result?.cursor)
       exit = reply.result?.exit
     }
 
-    expect(buffered * (lineChars + 256)).toBeLessThanOrEqual(MiB + lineChars + 256)
-    expect(buffered).toBeGreaterThan(0)
+    // The 16th line only partly fits: the buffer fills to the byte.
+    expect(full).toBe(MiB)
+    expect(Math.max(...costs)).toBeLessThanOrEqual(MiB)
     expect(chars).toBe(64 * lineChars)
     expect(exit).toBe(0)
   })
 
-  for (const [label, frameChars, maxFrames] of [
-    ['empty', 0, Math.ceil(MiB / 256) + 1],
-    ['1-byte', 1, Math.ceil(MiB / 257) + 1]
+  for (const [label, frameChars, bound] of [
+    ['empty', 0, MiB],
+    ['1-byte', 1, Math.floor(MiB / 257) * 257]
   ] as const) {
-    it(`a flood of ${label} frames stays within the output budget`, async () => {
+    it(`a flood of ${label} frames fills the budget without passing it`, async () => {
       const { start, runSessions, readAll } = await setup()
       const frames = 20_000
 
       const { runId } = await start({ argv: ['flood', String(frames), String(frameChars)] })
       await ioTurns()
-      const buffered = runSessions.bufferedEvents(runId) ?? 0
+      const full = runSessions.bufferedCost(runId)
       const all = await readAll(runId)
 
-      expect(buffered).toBeLessThanOrEqual(maxFrames)
+      expect(full).toBe(bound)
       expect(all.events).toHaveLength(frames)
       expect(all.exit).toBe(0)
     })
   }
+
+  it('splits a frame bigger than the budget into chunks that fit', async () => {
+    const { start, runSessions, readAll } = await setup()
+    const envelope = JSON.stringify({ stream: 'stdout', data: '' }).length
+    const chars = MiB - envelope
+
+    const { runId } = await start({ argv: ['bigline', String(chars)] })
+    await ioTurns()
+    const full = runSessions.bufferedCost(runId)
+    const all = await readAll(runId)
+
+    expect(full).toBe(MiB)
+    expect(all.events.map((event) => event.data.length)).toEqual([MiB - 256, chars - (MiB - 256)])
+    expect(all.exit).toBe(0)
+  })
+
+  it('returns output buffered before a launcher failure, then the failure', async () => {
+    const { launcher, start, read } = await setup()
+
+    const { runId } = await start({ argv: ['hang'] })
+    await read(runId, 0, MAC_AGENT, 20_000)
+    launcher.emit('run-1', { stream: 'stderr', data: 'trailing\n' })
+    launcher.drop('run-1')
+    await launcher.waitForClosed('run-1')
+    await ioTurns()
+    const last = await read(runId, 1, MAC_AGENT, 20_000)
+    const failed = await read(runId, 2, MAC_AGENT, 20_000)
+
+    expect(last).toMatchObject({
+      ok: true,
+      result: { events: [{ stream: 'stderr', data: 'trailing\n' }], cursor: 2 }
+    })
+    expect(last.result?.exit).toBeUndefined()
+    expect(failed).toMatchObject({
+      ok: false,
+      error: {
+        code: 'desktop_run_failed',
+        message: expect.stringContaining('launcher_connection_lost')
+      }
+    })
+  })
+
+  it('admits at most the cap of pending and running runs; finished runs do not count', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { vnc, launcher } = await servers()
+    const runSessions = new DesktopRunSessions({ maxActiveRuns: 2 })
+    cleanups.push(() => runSessions.close())
+    const harness = createDesktopRpcHarness(undefined, { runSessions })
+    cleanups.push(() => harness.broker.close())
+    await harness.configure(vnc, MAC, { port: launcher.port, token: TOKEN })
+    const start = (argv: string[]) => harness.call('desktop.run.start', { argv }, MAC_AGENT)
+
+    // Started together: the third is refused before the launcher answers the first two.
+    const together = await Promise.all([start(['echo', 'a']), start(['hang']), start(['hang'])])
+    const connectionsTogether = launcher.connections
+    const echoId = String(together[0].result?.runId)
+    let exit: unknown
+    // ast-grep-ignore: test-no-polling-loop -- each read long-polls until the echo exits
+    for (let cursor = 0; exit === undefined;) {
+      const reply = await harness.call(
+        'desktop.run.read',
+        { runId: echoId, cursor, waitMs: 20_000 },
+        MAC_AGENT
+      )
+      cursor = Number(reply.result?.cursor)
+      exit = reply.result?.exit
+    }
+    const afterExit = await start(['hang'])
+    const overCap = await start(['hang'])
+
+    expect(together.map((reply) => reply.ok)).toEqual([true, true, false])
+    expect(together[2]).toMatchObject({
+      error: { code: 'desktop_run_unavailable', message: expect.stringContaining('too_many_runs') }
+    })
+    expect(connectionsTogether).toBe(2)
+    expect(afterExit.ok).toBe(true)
+    expect(overCap).toMatchObject({ ok: false, error: { code: 'desktop_run_unavailable' } })
+  })
 
   it('another caller cannot read or kill a run', async () => {
     const { launcher, start, read, call } = await setup()
@@ -277,6 +359,16 @@ describe('desktop.run session', () => {
     for (const run of [unconfigured, noLauncher]) {
       expect(run.reply).toMatchObject({ ok: false, error: { code: 'desktop_run_unavailable' } })
     }
+  })
+
+  it('is refused while the user owns the desktop even with no launcher configured', async () => {
+    const { vnc, broker, start, configure } = await setup(false)
+    await configure(vnc, MAC)
+    broker.setOwner('user', 'v1')
+
+    const run = await start({ argv: ['echo', 'hi'] })
+
+    expect(run.reply).toMatchObject({ ok: false, error: { code: 'desktop_user_in_control' } })
   })
 
   it('is refused while the user owns the desktop, before reaching the launcher', async () => {

@@ -18,16 +18,37 @@ const OUTPUT_EVENT_OVERHEAD = 256
 const MAX_READ_PAYLOAD_BYTES = 512 * 1024
 const LEASE_MS = 60_000
 const RETAIN_AFTER_EXIT_MS = 60_000
-const MAX_RUNS = 32
+const MAX_ACTIVE_RUNS = 32
 
 const eventCost = (event: DesktopRunEvent): number =>
   Buffer.byteLength(event.data, 'utf8') + OUTPUT_EVENT_OVERHEAD
+
+/** The longest prefix of `data` that is at most `maxBytes` in UTF-8, never splitting a character. */
+function utf8Prefix(data: string, maxBytes: number): string {
+  if (Buffer.byteLength(data, 'utf8') <= maxBytes) {
+    return data
+  }
+  let bytes = 0
+  let end = 0
+  for (const char of data) {
+    const code = char.codePointAt(0) ?? 0
+    const size = code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4
+    if (bytes + size > maxBytes) {
+      break
+    }
+    bytes += size
+    end += char.length
+  }
+  return data.slice(0, end)
+}
 
 type Outcome = { exit: number } | { error: unknown }
 
 class DesktopRunSession {
   /** Events not yet released by a read's cursor; `released` events came before them. */
   readonly events: DesktopRunEvent[] = []
+  /** Output the launcher sent that does not fit the budget yet; the launcher is paused meanwhile. */
+  readonly held: DesktopRunEvent[] = []
   released = 0
   cost = 0
   outcome: Outcome | undefined
@@ -51,13 +72,14 @@ class DesktopRunSession {
     this.waiters.clear()
   }
 
+  /** Every unread event was admitted and the run has ended. */
+  get drained(): boolean {
+    return this.outcome !== undefined && this.held.length === 0
+  }
+
   push(event: DesktopRunEvent): void {
-    this.events.push(event)
-    this.cost += eventCost(event)
-    if (!this.paused && this.cost > MAX_UNREAD_OUTPUT_COST) {
-      this.paused = true
-      this.flow?.pause()
-    }
+    this.held.push(event)
+    this.#admit()
     this.wake()
   }
 
@@ -67,9 +89,35 @@ class DesktopRunSession {
       this.cost -= eventCost(event)
     }
     this.released = cursor
-    if (this.paused && this.cost <= MAX_UNREAD_OUTPUT_COST) {
-      this.paused = false
-      this.flow?.resume()
+    this.#admit()
+  }
+
+  /** Moves held output into the buffer while it fits, splitting a frame at the remaining credit. */
+  #admit(): void {
+    while (this.held.length > 0) {
+      const event = this.held[0]!
+      const credit = MAX_UNREAD_OUTPUT_COST - this.cost - OUTPUT_EVENT_OVERHEAD
+      const data = credit < 0 ? '' : utf8Prefix(event.data, credit)
+      if (credit < 0 || (data.length === 0 && event.data.length > 0)) {
+        break
+      }
+      const admitted = { stream: event.stream, data }
+      this.events.push(admitted)
+      this.cost += eventCost(admitted)
+      if (data.length === event.data.length) {
+        this.held.shift()
+      } else {
+        event.data = event.data.slice(data.length)
+      }
+    }
+    const full = this.held.length > 0
+    if (full !== this.paused) {
+      this.paused = full
+      if (full) {
+        this.flow?.pause()
+      } else {
+        this.flow?.resume()
+      }
     }
   }
 
@@ -98,15 +146,24 @@ class DesktopRunSession {
  */
 export class DesktopRunSessions {
   readonly #runs = new Map<string, DesktopRunSession>()
+  readonly #maxActiveRuns: number
+  /** Runs starting or running; finished runs kept for their exit do not count. */
+  #active = 0
+
+  constructor({ maxActiveRuns = MAX_ACTIVE_RUNS }: { maxActiveRuns?: number } = {}) {
+    this.#maxActiveRuns = maxActiveRuns
+  }
 
   async start(
     endpoint: LauncherEndpoint,
     request: LauncherRunRequest,
     owner: string
   ): Promise<string> {
-    if (this.#runs.size >= MAX_RUNS) {
+    // Taken before the launcher answers, so concurrent starts cannot pass the cap together.
+    if (this.#active >= this.#maxActiveRuns) {
       throw new DesktopError('desktop_run_unavailable', 'too_many_runs')
     }
+    this.#active++
     const runId = randomBytes(16).toString('base64url')
     const session = new DesktopRunSession(owner)
     let onStarted = (): void => {}
@@ -123,13 +180,18 @@ export class DesktopRunSessions {
       },
       onOutput: (stream, data) => session.push({ stream, data })
     })
+    // The launcher run settles on exit, failure or kill: each frees the slot once.
     finished.then(
       (exit) => {
+        this.#active--
         if (exit !== undefined) {
           this.#finish(session, { exit })
         }
       },
-      (error: unknown) => this.#finish(session, { error })
+      (error: unknown) => {
+        this.#active--
+        this.#finish(session, { error })
+      }
     )
     // A refusal before the launcher named the run fails the start itself.
     await Promise.race([started, finished])
@@ -149,7 +211,7 @@ export class DesktopRunSessions {
     }
     session.release(cursor)
     this.#touch(runId, session)
-    if (session.events.length === 0 && session.outcome === undefined && waitMs > 0) {
+    if (session.events.length === 0 && !session.drained && waitMs > 0) {
       await this.#waitForChange(session, waitMs, signal)
       // A kill or the lease may have ended the run while this read waited.
       this.#owned(runId, owner)
@@ -158,8 +220,12 @@ export class DesktopRunSessions {
     const events = session.take()
     const next = cursor + events.length
     const result: DesktopRunReadResult = { events, cursor: next }
-    if (next === session.produced && session.outcome !== undefined) {
+    if (next === session.produced && session.drained && session.outcome !== undefined) {
       if ('error' in session.outcome) {
+        // Output from before the failure goes out first; the next read reports the failure.
+        if (events.length > 0) {
+          return result
+        }
         this.#returnedOutcome(runId, session)
         throw session.outcome.error
       }
@@ -177,9 +243,9 @@ export class DesktopRunSessions {
     return { killed: running }
   }
 
-  /** Unread events held for a run; for tests and diagnostics. */
-  bufferedEvents(runId: string): number | undefined {
-    return this.#runs.get(runId)?.events.length
+  /** What a run's unread buffer costs against its budget; for tests and diagnostics. */
+  bufferedCost(runId: string): number | undefined {
+    return this.#runs.get(runId)?.cost
   }
 
   close(): void {
