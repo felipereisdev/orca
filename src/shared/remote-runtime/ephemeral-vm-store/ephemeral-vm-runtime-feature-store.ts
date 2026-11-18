@@ -9,6 +9,10 @@ import {
 import { writeSecureJsonFileWithinLimit } from '../../secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../secure-storage/secure-file'
 import {
+  EphemeralVmRecipeDesktopSchema,
+  type EphemeralVmRecipeDesktop
+} from '../ephemeral-vm-recipes/ephemeral-vm-recipes'
+import {
   EphemeralVmRuntimeRecordSchema,
   type EphemeralVmRuntimeRecord
 } from './ephemeral-vm-runtimes'
@@ -16,7 +20,7 @@ import {
 const EPHEMERAL_VM_RUNTIME_FEATURES_FILE = 'orca-ephemeral-vm-runtime-features.json'
 export const MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES = 1024 * 1024
 
-const EphemeralVmRuntimeFeatureEntrySchema = z
+const EphemeralVmRuntimeCheckoutFeatureRecordSchema = z
   .object({
     id: z.string().min(1),
     recipeId: z.string().min(1),
@@ -26,7 +30,19 @@ const EphemeralVmRuntimeFeatureEntrySchema = z
   })
   .strict()
 
-export type EphemeralVmRuntimeFeatureEntry = z.infer<typeof EphemeralVmRuntimeFeatureEntrySchema>
+// Separate record: older builds parse checkout records strictly and would drop one carrying `desktop`.
+const EphemeralVmRuntimeDesktopFeatureRecordSchema = z
+  .object({
+    id: z.string().min(1),
+    recipeId: z.string().min(1),
+    createdAt: z.number().finite(),
+    resultDesktop: EphemeralVmRecipeDesktopSchema
+  })
+  .strict()
+
+export type EphemeralVmRuntimeFeatureEntry = z.infer<
+  typeof EphemeralVmRuntimeCheckoutFeatureRecordSchema
+> & { resultDesktop?: EphemeralVmRecipeDesktop }
 
 const EphemeralVmRuntimeFeatureStoreSchema = z
   .object({
@@ -152,7 +168,8 @@ export function featureEntryFromRuntime(
   const recipeCheckoutMode = runtime.recipe?.checkoutMode
   const resultCheckoutMode =
     runtime.recipeResult?.schemaVersion === 2 ? runtime.recipeResult.checkoutMode : undefined
-  if (!recipeCheckoutMode && !resultCheckoutMode) {
+  const resultDesktop = runtime.recipeResult?.desktop
+  if (!recipeCheckoutMode && !resultCheckoutMode && !resultDesktop) {
     return null
   }
   return {
@@ -160,7 +177,8 @@ export function featureEntryFromRuntime(
     recipeId: runtime.recipeId,
     createdAt: runtime.createdAt,
     ...(recipeCheckoutMode ? { recipeCheckoutMode } : {}),
-    ...(resultCheckoutMode ? { resultCheckoutMode } : {})
+    ...(resultCheckoutMode ? { resultCheckoutMode } : {}),
+    ...(resultDesktop ? { resultDesktop } : {})
   }
 }
 
@@ -192,25 +210,33 @@ function restoreRuntimeFeatures(
     ...(runtime.recipe && feature.recipeCheckoutMode
       ? { recipe: { ...runtime.recipe, checkoutMode: feature.recipeCheckoutMode } }
       : {}),
-    ...(feature.resultCheckoutMode && runtime.recipeResult
+    ...(runtime.recipeResult && (feature.resultCheckoutMode || feature.resultDesktop)
       ? {
           recipeResult: {
             ...runtime.recipeResult,
-            schemaVersion: 2,
-            checkoutMode: feature.resultCheckoutMode
+            ...(feature.resultCheckoutMode
+              ? { schemaVersion: 2, checkoutMode: feature.resultCheckoutMode }
+              : {}),
+            ...(feature.resultDesktop ? { desktop: feature.resultDesktop } : {})
           }
         }
       : {})
   })
 }
 
+/** Checkout modes are fixed for a runtime's life; the desktop may be reconfigured. */
 export function runtimeFeaturesEqual(
   left: EphemeralVmRuntimeRecord,
   right: EphemeralVmRuntimeRecord
 ): boolean {
-  return (
-    JSON.stringify(featureEntryFromRuntime(left)) === JSON.stringify(featureEntryFromRuntime(right))
-  )
+  return JSON.stringify(checkoutFeatures(left)) === JSON.stringify(checkoutFeatures(right))
+}
+
+function checkoutFeatures(
+  runtime: EphemeralVmRuntimeRecord
+): Omit<EphemeralVmRuntimeFeatureEntry, 'resultDesktop'> | null {
+  const { resultDesktop: _resultDesktop, ...checkout } = featureEntryFromRuntime(runtime) ?? {}
+  return 'id' in checkout ? checkout : null
 }
 
 export function featureIdentity(
@@ -220,27 +246,43 @@ export function featureIdentity(
 }
 
 function parseFeatureRecords(records: unknown[]): EphemeralVmRuntimeFeatureStoreSnapshot {
-  const features: EphemeralVmRuntimeFeatureEntry[] = []
+  const features = new Map<string, EphemeralVmRuntimeFeatureEntry>()
   const retainedRecords: unknown[] = []
   const identities = new Map<string, string>()
   for (const record of records) {
-    const parsed = EphemeralVmRuntimeFeatureEntrySchema.safeParse(record)
-    if (!parsed.success) {
+    const checkout = EphemeralVmRuntimeCheckoutFeatureRecordSchema.safeParse(record)
+    const desktop = checkout.success
+      ? null
+      : EphemeralVmRuntimeDesktopFeatureRecordSchema.safeParse(record)
+    const parsed = checkout.success ? checkout.data : desktop?.success ? desktop.data : null
+    if (!parsed) {
       retainedRecords.push(record)
       continue
     }
-    const identity = featureIdentity(parsed.data)
-    const serialized = JSON.stringify(parsed.data)
-    const existing = identities.get(identity)
+    const identity = featureIdentity(parsed)
+    const kindIdentity = `${checkout.success ? 'checkout' : 'desktop'}\0${identity}`
+    const serialized = JSON.stringify(parsed)
+    const existing = identities.get(kindIdentity)
     if (existing && existing !== serialized) {
       return { writable: false, features: [], retainedRecords: [] }
     }
     if (!existing) {
-      identities.set(identity, serialized)
-      features.push(parsed.data)
+      identities.set(kindIdentity, serialized)
+      features.set(identity, { ...features.get(identity), ...parsed })
     }
   }
-  return { writable: true, features: sortRuntimeFeatures(features), retainedRecords }
+  return { writable: true, features: sortRuntimeFeatures([...features.values()]), retainedRecords }
+}
+
+function featureEntryToRecords(entry: EphemeralVmRuntimeFeatureEntry): unknown[] {
+  const { resultDesktop, ...checkout } = entry
+  const { id, recipeId, createdAt } = entry
+  return [
+    ...(!resultDesktop || checkout.recipeCheckoutMode || checkout.resultCheckoutMode
+      ? [checkout]
+      : []),
+    ...(resultDesktop ? [{ id, recipeId, createdAt, resultDesktop }] : [])
+  ]
 }
 
 export function sortRuntimeFeatures<T extends { id: string; recipeId: string; createdAt: number }>(
@@ -258,6 +300,9 @@ function runtimeFeatureStoreValue(
 ): { version: 1; records: unknown[] } {
   return {
     version: 1,
-    records: [...sortRuntimeFeatures(features), ...snapshot.retainedRecords]
+    records: [
+      ...sortRuntimeFeatures(features).flatMap(featureEntryToRecords),
+      ...snapshot.retainedRecords
+    ]
   }
 }

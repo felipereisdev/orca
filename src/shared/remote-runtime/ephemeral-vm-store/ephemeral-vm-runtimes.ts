@@ -144,9 +144,10 @@ const RollbackEphemeralVmRuntimeRecipeSchema = z
 
 export const RollbackEphemeralVmRuntimeRecordSchema = EphemeralVmRuntimeRecordSchema.extend({
   recipe: RollbackEphemeralVmRuntimeRecipeSchema.optional(),
+  // Older builds parse recipe results strictly and know no `desktop`.
   recipeResult: z.union([
-    EphemeralVmRecipeLegacyResultSchema,
-    EphemeralVmRecipeConnectionResultSchema
+    EphemeralVmRecipeLegacyResultSchema.omit({ desktop: true }),
+    EphemeralVmRecipeConnectionResultSchema.omit({ desktop: true })
   ])
 })
 

@@ -5,7 +5,10 @@ import {
   getEphemeralVmRecipeResultWarnings,
   redactEphemeralVmRecipeResultForDiagnostics
 } from './ephemeral-vm-recipe-diagnostics'
-import { redactEphemeralVmRecipeDiagnosticText } from './ephemeral-vm-recipe-diagnostic-redaction'
+import {
+  createEphemeralVmRecipeDiagnosticStreamRedactor,
+  redactEphemeralVmRecipeDiagnosticText
+} from './ephemeral-vm-recipe-diagnostic-redaction'
 import {
   getEphemeralVmRecipeResultDesktop,
   parseEphemeralVmRecipeResult
@@ -191,6 +194,25 @@ describe('parseEphemeralVmRecipeResult', () => {
     expect(redactEphemeralVmRecipeDiagnosticText(JSON.stringify({ desktop }))).toBe(
       '{"desktop":{"type":"vnc","port":5901,"host":"127.0.0.1","password":"[redacted]","launcher":{"port":7001,"token":"[redacted]"}}}'
     )
+  })
+
+  it('redacts a secret value that contains an escaped quote', () => {
+    expect(redactEphemeralVmRecipeDiagnosticText('{"password":"ab\\"c123","ok":true}')).toBe(
+      '{"password":"[redacted]","ok":true}'
+    )
+  })
+
+  it('redacts a secret split across stream chunks', () => {
+    const redactor = createEphemeralVmRecipeDiagnosticStreamRedactor()
+    const forwarded = [
+      redactor.push('booting\n{"desktop":{"pass'),
+      redactor.push('word":"abc'),
+      redactor.push('12345"}}'),
+      redactor.push('\ndone'),
+      redactor.flush()
+    ].join('')
+
+    expect(forwarded).toBe('booting\n{"desktop":{"password":"[redacted]"}}\ndone')
   })
 })
 

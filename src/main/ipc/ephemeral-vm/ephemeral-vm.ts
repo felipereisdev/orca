@@ -9,6 +9,7 @@ import {
   type EphemeralVmRecipeResultWarning
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
 import { redactEphemeralVmRecipeDiagnosticText } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { createProvisionEventForwarder } from './ephemeral-vm-provision-events'
 import { getProvisionedRootRecipeRepoUrl } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-repo-url'
 // Import the Node-only doctor directly so browser consumers of the barrel do not bundle fs/path.
 import { doctorEphemeralVmRecipe } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor'
@@ -145,16 +146,9 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
       if (args.provisionId && controller) {
         activeProvisionControllers.set(args.provisionId, controller)
       }
-      const sendProvisionEvent = (stream: 'stdout' | 'stderr', chunk: string): void => {
-        if (!args.provisionId) {
-          return
-        }
-        _event.sender.send('ephemeralVm:provisionEvent', {
-          provisionId: args.provisionId,
-          stream,
-          chunk: redactEphemeralVmRecipeDiagnosticText(chunk)
-        })
-      }
+      const provisionEvents = createProvisionEventForwarder(args.provisionId, (event) =>
+        _event.sender.send('ephemeralVm:provisionEvent', event)
+      )
       // Retain cancellation registration until every signal-consuming provisioning phase settles.
       try {
         let recipeRepoUrl = repo.repo.gitRemoteIdentity?.remoteUrl
@@ -195,8 +189,8 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           ...(sourceRef ? { ref: sourceRef } : {}),
           ...(expectedRefHead ? { expectedRefHead } : {}),
           ...(controller ? { signal: controller.signal } : {}),
-          onStdout: (chunk) => sendProvisionEvent('stdout', chunk),
-          onStderr: (chunk) => sendProvisionEvent('stderr', chunk)
+          onStdout: (chunk) => provisionEvents.send('stdout', chunk),
+          onStderr: (chunk) => provisionEvents.send('stderr', chunk)
         })
         if (!result.ok) {
           return {
@@ -281,6 +275,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
         }
       } finally {
+        provisionEvents.flush()
         if (args.provisionId) {
           activeProvisionControllers.delete(args.provisionId)
         }
