@@ -8,8 +8,15 @@ type DesktopControllerIdentity = { kind: 'desktop' } | { kind: 'paired-device'; 
 
 type CallerContext = Pick<RpcContext, 'caller' | 'pairedDeviceParentId'>
 
-// Keyed by broker so each broker (one per process in production) keeps its own binding.
-const controllers = new WeakMap<DesktopBroker, DesktopControllerIdentity>()
+/** `bound` once a configure succeeded; `generation` names the newest configure from `identity`. */
+type DesktopControllerClaim = {
+  identity: DesktopControllerIdentity
+  generation: number
+  bound: boolean
+}
+
+// Keyed by broker so each broker (one per process in production) keeps its own claim.
+const controllers = new WeakMap<DesktopBroker, DesktopControllerClaim>()
 
 function refused(): DesktopError {
   return new DesktopError('desktop_agent_not_allowed')
@@ -37,17 +44,43 @@ function sameIdentity(a: DesktopControllerIdentity, b: DesktopControllerIdentity
   return a.deviceId === b.deviceId
 }
 
+export type DesktopConfigureClaim = {
+  /** The configure resolved: binds the caller unless a newer configure superseded this one. */
+  bind(): void
+  /** The configure failed: frees an unbound claim unless a newer configure is pending. */
+  release(): void
+}
+
 /**
- * Refuses anyone but the identity already bound; the returned `bind` records the caller once
- * its configure succeeded, so a rejected configure binds no one.
+ * Claims the desktop synchronously, before the configure awaits, so another identity is refused
+ * while it is pending as well as after it is bound.
  */
-export function claimDesktopController(broker: DesktopBroker, ctx: CallerContext): () => void {
+export function claimDesktopController(
+  broker: DesktopBroker,
+  ctx: CallerContext
+): DesktopConfigureClaim {
   const identity = configuringIdentity(ctx)
-  const bound = controllers.get(broker)
-  if (bound && !sameIdentity(bound, identity)) {
+  const current = controllers.get(broker)
+  if (current && !sameIdentity(current.identity, identity)) {
     throw refused()
   }
-  return () => controllers.set(broker, identity)
+  const claim = current ?? { identity, generation: 0, bound: false }
+  const generation = ++claim.generation
+  controllers.set(broker, claim)
+  const isCurrent = (): boolean =>
+    controllers.get(broker) === claim && claim.generation === generation
+  return {
+    bind: () => {
+      if (isCurrent()) {
+        claim.bound = true
+      }
+    },
+    release: () => {
+      if (isCurrent() && !claim.bound) {
+        controllers.delete(broker)
+      }
+    }
+  }
 }
 
 /**
@@ -55,7 +88,8 @@ export function claimDesktopController(broker: DesktopBroker, ctx: CallerContext
  * hand over the desktop. Another device on the same server (an agent can pair one) is refused.
  */
 export function assertDesktopController(broker: DesktopBroker, ctx: CallerContext): void {
-  const bound = controllers.get(broker)
+  const claim = controllers.get(broker)
+  const bound = claim?.bound ? claim.identity : undefined
   const { caller } = ctx
   if (!bound || !caller || isAgentRpcCaller(caller)) {
     throw refused()

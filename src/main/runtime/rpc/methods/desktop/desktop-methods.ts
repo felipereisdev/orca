@@ -95,9 +95,14 @@ export function createDesktopMethods(getBroker: () => DesktopBroker = getDesktop
       params: DesktopConfigureParams,
       handler: async (params, ctx) => {
         const broker = getBroker()
-        const bind = claimDesktopController(broker, ctx)
-        await broker.configure(params)
-        bind()
+        const claim = claimDesktopController(broker, ctx)
+        try {
+          await broker.configure(params)
+        } catch (error) {
+          claim.release()
+          throw error
+        }
+        claim.bind()
         return broker.status()
       }
     }),

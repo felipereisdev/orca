@@ -6,6 +6,7 @@ import type { RpcDispatchStreamingOptions } from '../../dispatch/dispatcher-stre
 import { RpcDispatcher } from '../../dispatcher'
 import { createSubscriptionRegistryDouble } from '../../testing/subscription-registry-test-double'
 import { DesktopBroker } from '../../../../desktop/desktop-broker'
+import { DesktopError } from '../../../../desktop/desktop-errors'
 import { FIXTURE_PASSWORD, pointerEvents } from '../../../../desktop/testing/desktop-broker-fixture'
 import { startFakeRfbServer, type FakeRfbServer } from '../../../../desktop/testing/fake-rfb-server'
 import { connectFakeRfbViewer } from '../../../../desktop/testing/fake-rfb-viewer'
@@ -306,5 +307,81 @@ describe('desktop RPC methods', () => {
       expect(JSON.stringify(response)).not.toContain(FIXTURE_PASSWORD)
       expect(JSON.stringify(response)).not.toContain('launcher-token-91c2')
     }
+  })
+
+  describe('concurrent configure', () => {
+    /** Each broker.configure call waits until the test settles it; `reached(n)` awaits the nth call. */
+    function deferConfigure(broker: DesktopBroker) {
+      const calls: { resolve: () => void; reject: (error: unknown) => void }[] = []
+      const waiters: { count: number; resolve: () => void }[] = []
+      vi.spyOn(broker, 'configure').mockImplementation(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            calls.push({ resolve, reject })
+            for (const waiter of waiters.filter((entry) => entry.count <= calls.length)) {
+              waiter.resolve()
+            }
+          })
+      )
+      const reached = async (count: number) => {
+        if (calls.length < count) {
+          await new Promise<void>((resolve) => waiters.push({ count, resolve }))
+        }
+        return calls[count - 1]
+      }
+      return { calls, reached }
+    }
+    const VNC = { host: '127.0.0.1', port: 5901, password: FIXTURE_PASSWORD }
+    const takeControl = { owner: 'user', viewerId: 'v1' }
+
+    it('refuses a second identity while the first configure is still pending', async () => {
+      const { broker, call } = setup()
+      const configure = deferConfigure(broker)
+
+      const first = call('desktop.configure', VNC, MAC)
+      const firstCall = await configure.reached(1)
+      const second = await call('desktop.configure', VNC, OTHER_MAC)
+      firstCall.resolve()
+      await first
+
+      expect(second).toMatchObject(refused)
+      expect(configure.calls).toHaveLength(1)
+      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject({ ok: true })
+      expect(await call('desktop.control.set', takeControl, OTHER_MAC)).toMatchObject(refused)
+    })
+
+    it('keeps the claim when an identity supersedes its own pending configure and the older one fails', async () => {
+      const { broker, call } = setup()
+      const configure = deferConfigure(broker)
+
+      const older = call('desktop.configure', VNC, MAC)
+      const olderCall = await configure.reached(1)
+      const newer = call('desktop.configure', VNC, MAC)
+      const newerCall = await configure.reached(2)
+      olderCall.reject(new DesktopError('desktop_invalid_input'))
+      await older
+      const stranger = await call('desktop.configure', VNC, OTHER_MAC)
+      newerCall.resolve()
+      await newer
+
+      expect(stranger).toMatchObject(refused)
+      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject({ ok: true })
+    })
+
+    it('releases the claim when the first configure fails, so another identity can configure', async () => {
+      const { broker, call } = setup()
+      const configure = deferConfigure(broker)
+
+      const failed = call('desktop.configure', VNC, MAC)
+      ;(await configure.reached(1)).reject(new DesktopError('desktop_invalid_input'))
+      const failure = await failed
+      const other = call('desktop.configure', VNC, OTHER_MAC)
+      ;(await configure.reached(2)).resolve()
+
+      expect(failure).toMatchObject({ ok: false, error: { code: 'desktop_invalid_input' } })
+      expect(await other).toMatchObject({ ok: true })
+      expect(await call('desktop.control.set', takeControl, OTHER_MAC)).toMatchObject({ ok: true })
+      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject(refused)
+    })
   })
 })
