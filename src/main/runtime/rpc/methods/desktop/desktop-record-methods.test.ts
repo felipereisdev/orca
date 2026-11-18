@@ -56,14 +56,14 @@ describe('desktop recording methods', () => {
     const stopped = await call('desktop.record.stop', {}, MAC_AGENT)
     expect(stopped.result).toEqual({
       ...started.result,
-      seconds: 0,
-      bytes: 0,
+      seconds: 0.1,
+      bytes: 100,
       stopped: 'requested'
     })
     await events.waitForReplies((replies) => replies.length > 1)
     expect(events.replies.map((reply) => reply.result)).toEqual([
       { type: 'ready', subscriptionId: expect.stringMatching(/^desktop-events:/) },
-      { type: 'recording-finished', id: started.result?.id, path: started.result?.path, bytes: 0 }
+      { type: 'recording-finished', id: started.result?.id, path: started.result?.path, bytes: 100 }
     ])
     expect((await call('desktop.status', {}, MAC_AGENT)).result?.recording).toBe(false)
   })

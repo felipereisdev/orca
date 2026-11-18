@@ -1,6 +1,17 @@
-import { appendFileSync } from 'node:fs'
+import { appendFile } from 'node:fs/promises'
 import { Writable } from 'node:stream'
-import type { FfmpegChild, SpawnFfmpeg } from '../desktop-ffmpeg'
+import type { FfmpegChild, FfmpegExit, SpawnFfmpeg } from '../desktop-ffmpeg'
+
+export type FakeFfmpegOptions = {
+  /** Bytes appended to the output per frame read. */
+  bytesPerFrame?: number
+  /** Bytes appended on close, like the MP4 index written at finalize. */
+  indexBytes?: number
+  /** Exit code once stdin closes. */
+  exitCode?: number
+  /** Never exits on its own after stdin closes; only `exit` ends it. */
+  hangOnClose?: boolean
+}
 
 export type FakeFfmpeg = {
   spawn: SpawnFfmpeg
@@ -8,36 +19,80 @@ export type FakeFfmpeg = {
   readonly spawns: { command: string; args: string[] }[]
   /** Every chunk written to stdin of the latest spawn: one per frame. */
   readonly frames: Buffer[]
+  /** Whether the latest spawn was killed. */
+  readonly killed: boolean
   /** Holds write callbacks, so stdin stays undrained until `release`. */
   hold(): void
   release(): void
-  /** Exits as if ffmpeg crashed. */
-  crash(): void
+  /** Ends the latest spawn as if the process closed with this code or signal. */
+  exit(code: number | null, signal?: NodeJS.Signals | null): void
 }
 
-/** Stands in for ffmpeg: appends `bytesPerFrame` bytes to the output path per frame it reads. */
-export function createFakeFfmpeg({ bytesPerFrame = 100 }: { bytesPerFrame?: number } = {}) {
+/**
+ * Stands in for ffmpeg: appends `bytesPerFrame` per frame read, honors `-fs` by finalizing once
+ * the output reaches it, and appends `indexBytes` when it finalizes, as the MP4 index lands last.
+ */
+export function createFakeFfmpeg({
+  bytesPerFrame = 100,
+  indexBytes = 0,
+  exitCode = 0,
+  hangOnClose = false
+}: FakeFfmpegOptions = {}): FakeFfmpeg {
   const spawns: { command: string; args: string[] }[] = []
   const frames: Buffer[] = []
   let held: (() => void)[] | undefined
-  let exit = (): void => {}
-  const fake: FakeFfmpeg = {
+  let killed = false
+  let exit = (_result: FfmpegExit): void => {}
+  return {
     spawns,
     frames,
+    get killed() {
+      return killed
+    },
     spawn: (command, args) => {
       spawns.push({ command, args })
       frames.length = 0
+      killed = false
       const output = args.at(-1) ?? ''
-      let resolveExited = (): void => {}
-      const exited = new Promise<void>((resolve) => {
+      const fsIndex = args.indexOf('-fs')
+      const fileLimit = fsIndex !== -1 ? Number(args[fsIndex + 1]) : Infinity
+      let done = false
+      let written = 0
+      /** Output reaches the disk asynchronously, as a real encoder's does. */
+      let disk = Promise.resolve()
+      const append = (bytes: number): void => {
+        disk = disk.then(() => appendFile(output, Buffer.alloc(bytes)))
+      }
+      let resolveExited = (_result: FfmpegExit): void => {}
+      const exited = new Promise<FfmpegExit>((resolve) => {
         resolveExited = resolve
       })
-      exit = resolveExited
-      const stdin = new Writable({
+      // Closes once everything written reached the disk; stdin goes away with the process.
+      exit = (result) => {
+        done = true
+        queueMicrotask(() => stdin.destroy())
+        void disk.then(() => resolveExited(result))
+      }
+      const finalize = (): void => {
+        if (done) {
+          return
+        }
+        append(indexBytes)
+        exit({ code: exitCode, signal: null })
+      }
+      const stdin: Writable = new Writable({
         highWaterMark: 1,
         write(chunk: Buffer, _encoding, callback) {
+          if (done) {
+            callback()
+            return
+          }
           frames.push(Buffer.from(chunk))
-          appendFileSync(output, Buffer.alloc(bytesPerFrame))
+          append(bytesPerFrame)
+          written += bytesPerFrame
+          if (written >= fileLimit) {
+            finalize()
+          }
           if (held) {
             held.push(callback)
           } else {
@@ -46,10 +101,18 @@ export function createFakeFfmpeg({ bytesPerFrame = 100 }: { bytesPerFrame?: numb
         },
         final(callback) {
           callback()
-          resolveExited()
+          if (!hangOnClose) {
+            finalize()
+          }
         }
       })
-      const child: FfmpegChild = { stdin, exited, kill: () => resolveExited() }
+      const child: FfmpegChild = {
+        stdin,
+        exited,
+        kill: () => {
+          killed = true
+        }
+      }
       return child
     },
     hold: () => {
@@ -62,7 +125,6 @@ export function createFakeFfmpeg({ bytesPerFrame = 100 }: { bytesPerFrame?: numb
         callback()
       }
     },
-    crash: () => exit()
+    exit: (code, signal = null) => exit({ code, signal })
   }
-  return fake
 }

@@ -44,7 +44,7 @@ export function createDesktopRecordMethods(
       name: 'desktop.recordings.list',
       permission: 'workspace',
       params: DesktopRecordingsListParams,
-      handler: async () => ({ recordings: getBroker().recorder.list(recordingsDir()) })
+      handler: async () => ({ recordings: await getBroker().recorder.list(recordingsDir()) })
     }),
     defineStreamingMethod({
       name: 'desktop.events',
