@@ -15,6 +15,8 @@ export type FakeDesktopLauncher = {
   killed: string[]
   /** Requests refused for a wrong or missing token. */
   rejected: number
+  /** TCP connections accepted so far. */
+  connections: number
   /** Resolves once the connection of run `id` closed (a real launcher kills it then too). */
   waitForClosed(id: string): Promise<void>
   close(): Promise<void>
@@ -36,7 +38,9 @@ function send(socket: Socket, message: unknown): void {
 /**
  * A TCP launcher speaking the protocol in desktop-launcher-client.ts. Fake commands:
  * `echo <words…>`, `fail <code> <message>` (stderr, then exit code), `report` (prints the argv,
- * cwd and env it received as JSON) and `hang` (runs until killed). Anything else fails to spawn.
+ * cwd and env it received as JSON), `hang` (runs until killed), `flood <lines> <chars>` (writes
+ * every stdout line at once, ignoring backpressure) and `bigline <chars>` (one stdout line whose
+ * data has that many chars). Anything else fails to spawn.
  */
 export async function startFakeDesktopLauncher(token: string): Promise<FakeDesktopLauncher> {
   const sockets = new Set<Socket>()
@@ -45,6 +49,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
   const closed: string[] = []
   const closeWaiters: { id: string; resolve: () => void }[] = []
   let rejected = 0
+  let connections = 0
   let nextId = 1
 
   const markClosed = (id: string): void => {
@@ -60,7 +65,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
   ): { id: string; hanging: boolean } | undefined => {
     const argv = Array.isArray(request.argv) ? request.argv.map(String) : []
     const [command, ...args] = argv
-    if (!['echo', 'fail', 'report', 'hang'].includes(command ?? '')) {
+    if (!['echo', 'fail', 'report', 'hang', 'flood', 'bigline'].includes(command ?? '')) {
       send(socket, { error: 'spawn_failed' })
       socket.end()
       return undefined
@@ -84,6 +89,17 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
       send(socket, { stream: 'stderr', data: `${args.slice(1).join(' ')}\n` })
       send(socket, { exit: Number(args[0]) })
       socket.end()
+    } else if (command === 'flood') {
+      const line = 'x'.repeat(Number(args[1]))
+      for (let index = 0; index < Number(args[0]); index++) {
+        send(socket, { stream: 'stdout', data: line })
+      }
+      send(socket, { exit: 0 })
+      socket.end()
+    } else if (command === 'bigline') {
+      send(socket, { stream: 'stdout', data: 'x'.repeat(Number(args[0])) })
+      send(socket, { exit: 0 })
+      socket.end()
     } else if (command === 'report') {
       send(socket, { stream: 'stdout', data: JSON.stringify(run) })
       send(socket, { exit: 0 })
@@ -96,6 +112,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
   }
 
   const server = createServer((socket) => {
+    connections++
     sockets.add(socket)
     let running: string | undefined
     let started: string | undefined
@@ -156,6 +173,9 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
     killed,
     get rejected() {
       return rejected
+    },
+    get connections() {
+      return connections
     },
     waitForClosed: (id) =>
       closed.includes(id)

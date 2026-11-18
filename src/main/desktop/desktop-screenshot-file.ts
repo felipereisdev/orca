@@ -1,5 +1,6 @@
-import { chmod, lstat, mkdir, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { chmod, lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 import { errnoCodeOrUnknown } from '../../shared/errors/errno-code'
 import { DesktopError } from './desktop-errors'
 
@@ -32,6 +33,32 @@ async function privateScreenshotDir(tmpDir: string): Promise<string> {
   return dir
 }
 
+/**
+ * A chosen destination is replaced, never opened: an existing entry must be a regular file (not a
+ * symlink, FIFO or device), and the image goes to a fresh 0600 file renamed over it.
+ */
+async function writeChosenDestination(png: Buffer, out: string): Promise<string> {
+  const path = resolve(out)
+  const existing = await lstat(path).catch((error: unknown) => {
+    if (errnoCodeOrUnknown(error) === 'ENOENT') {
+      return undefined
+    }
+    throw error
+  })
+  if (existing && !existing.isFile()) {
+    throw new DesktopError('desktop_invalid_input', '--out must be a regular file or a new path')
+  }
+  const temp = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`)
+  try {
+    await writeFile(temp, png, { mode: 0o600, flag: 'wx' })
+    await rename(temp, path)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
+  return path
+}
+
 /** Writes `png` to `out`, or to a new file in `<tmpDir>/orca-desktop`; returns its path. */
 export async function writeDesktopScreenshot(
   png: Buffer,
@@ -39,9 +66,7 @@ export async function writeDesktopScreenshot(
 ): Promise<string> {
   try {
     if (out !== undefined) {
-      const path = resolve(out)
-      await writeFile(path, png, { mode: 0o600 })
-      return path
+      return await writeChosenDestination(png, out)
     }
     const dir = await privateScreenshotDir(tmpDir)
     const stamp = Date.now()

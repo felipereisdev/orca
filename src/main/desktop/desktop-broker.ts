@@ -12,6 +12,7 @@ import {
 } from './desktop-agent-actions'
 import { DesktopControlConnection, type DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
+import { isLoopbackHost } from './desktop-loopback-host'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerRegistry } from './desktop-viewer-registry'
 import { encodePng } from './rfb/png-encode'
@@ -45,6 +46,9 @@ function validPort(port: number): boolean {
 function assertValidConfig(cfg: DesktopBrokerConfig): void {
   if (typeof cfg.host !== 'string' || cfg.host.length === 0 || !validPort(cfg.port)) {
     throw new DesktopError('desktop_invalid_input', 'host and port are required')
+  }
+  if (!isLoopbackHost(cfg.host)) {
+    throw new DesktopError('desktop_invalid_input', 'host must be a loopback address')
   }
   if (typeof cfg.password !== 'string' || cfg.password.length === 0) {
     throw new DesktopError('desktop_invalid_input', 'a VNC password is required')

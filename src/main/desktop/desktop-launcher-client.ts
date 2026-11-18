@@ -1,5 +1,6 @@
 import { connect, type Socket } from 'node:net'
 import { DesktopError } from './desktop-errors'
+import { launcherLineReader } from './desktop-launcher-line-reader'
 
 /**
  * JSON-lines protocol with the in-environment launcher (runs as user `desktop`), one TCP
@@ -11,21 +12,26 @@ import { DesktopError } from './desktop-errors'
  *   → {"token","op":"kill","id":"<run id>"}     kills the process group; the client then closes
  * Instead of the id, a refusal closes the connection: {"error":"bad_token"} for a wrong token,
  * {"error":"<code>"} otherwise. The launcher also kills a run whose connection closes.
- * The token goes only into request lines: never into errors, logs or events.
+ * Flow control is TCP's: the client stops reading while its consumer is behind, and the launcher
+ * must then stop reading the program's pipes instead of buffering without bound.
+ * The token reaches the launcher only on its stdin and stays in its memory; here it goes only
+ * into request lines: never into errors, logs or events.
  */
 export type LauncherEndpoint = { host: string; port: number; token: string }
 
 export type LauncherRunRequest = { argv: string[]; cwd?: string; env?: Record<string, string> }
 
+/** Pauses and resumes reading the launcher's output. */
+export type LauncherRunFlow = { pause(): void; resume(): void }
+
 export type LauncherRunHandlers = {
   signal: AbortSignal
-  onStarted(): void
+  onStarted(flow: LauncherRunFlow): void
   onOutput(stream: 'stdout' | 'stderr', data: string): void
 }
 
 const START_TIMEOUT_MS = 10_000
 const KILL_FLUSH_MS = 2_000
-const MAX_LINE_CHARS = 1024 * 1024
 
 type LauncherReply = {
   id?: unknown
@@ -33,28 +39,6 @@ type LauncherReply = {
   stream?: unknown
   data?: unknown
   exit?: unknown
-}
-
-/** Splits a socket's text into lines without rescanning, refusing lines over the cap. */
-function lineReader(onLine: (line: string) => void, onOverflow: () => void) {
-  let pending: string[] = []
-  let pendingChars = 0
-  return (chunk: string): void => {
-    const parts = chunk.split('\n')
-    const last = parts.pop() ?? ''
-    for (const part of parts) {
-      pending.push(part)
-      const line = pending.join('')
-      pending = []
-      pendingChars = 0
-      onLine(line)
-    }
-    pending.push(last)
-    pendingChars += last.length
-    if (pendingChars > MAX_LINE_CHARS) {
-      onOverflow()
-    }
-  }
 }
 
 /** Resolves with the exit code, or undefined once `signal` aborted the run. */
@@ -71,6 +55,8 @@ export function runOnLauncher(
     }
     let settled = false
     let runId: string | undefined
+    let paused = false
+    let socketClosed = false
     const socket: Socket = connect({ host: endpoint.host, port: endpoint.port })
     const finish = (outcome: () => void): void => {
       if (settled) {
@@ -115,7 +101,17 @@ export function runOnLauncher(
         } else if (typeof reply.id === 'string' && reply.id.length > 0) {
           runId = reply.id
           clearTimeout(startTimer)
-          handlers.onStarted()
+          handlers.onStarted({
+            pause: () => {
+              paused = true
+              socket.pause()
+            },
+            resume: () => {
+              paused = false
+              socket.resume()
+              drain()
+            }
+          })
         } else {
           protocolError()
         }
@@ -134,28 +130,47 @@ export function runOnLauncher(
         protocolError()
       }
     }
-    const read = lineReader((line) => {
-      if (settled || line.trim() === '') {
-        return
+    const read = launcherLineReader(
+      (line) => {
+        if (settled || line.trim() === '') {
+          return
+        }
+        let reply: LauncherReply
+        try {
+          reply = JSON.parse(line)
+        } catch {
+          protocolError()
+          return
+        }
+        if (reply === null || typeof reply !== 'object') {
+          protocolError()
+          return
+        }
+        onReply(reply)
+      },
+      protocolError,
+      () => paused
+    )
+    // Chunks the socket still delivers after a pause wait here, so output stops at the line.
+    const queue: string[] = []
+    const drain = (): void => {
+      while (!paused && !settled && queue.length > 0) {
+        const rest = read(queue.shift() ?? '')
+        if (rest) {
+          queue.unshift(rest)
+        }
       }
-      let reply: LauncherReply
-      try {
-        reply = JSON.parse(line)
-      } catch {
-        protocolError()
-        return
+      // A close counts only once everything read before it, maybe its exit, was handled.
+      if (socketClosed && queue.length === 0) {
+        fail(new DesktopError('desktop_run_failed', 'launcher_connection_lost'))
       }
-      if (reply === null || typeof reply !== 'object') {
-        protocolError()
-        return
-      }
-      onReply(reply)
-    }, protocolError)
+    }
 
     socket.setEncoding('utf8')
     socket.on('data', (chunk: string) => {
       if (!settled) {
-        read(chunk)
+        queue.push(chunk)
+        drain()
       }
     })
     // Socket errors name the address, never the token; report only a fixed reason.
@@ -166,9 +181,14 @@ export function runOnLauncher(
           : new DesktopError('desktop_run_failed', 'launcher_connection_lost')
       )
     )
-    socket.once('close', () =>
-      fail(new DesktopError('desktop_run_failed', 'launcher_connection_lost'))
-    )
+    socket.once('close', () => {
+      socketClosed = true
+      if (paused && queue.length > 0) {
+        return
+      }
+      queue.length = 0
+      drain()
+    })
     socket.once('connect', () => {
       const run: Record<string, unknown> = { token: endpoint.token, op: 'run', argv: request.argv }
       if (request.cwd !== undefined) {

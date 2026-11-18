@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm, stat, symlink, mkdir } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { chmod, mkdtemp, readFile, rm, stat, symlink, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -127,6 +128,40 @@ describe('desktop agent action methods', () => {
     const shot = await call('desktop.screenshot', {}, MAC_AGENT)
 
     expect(shot).toMatchObject({ ok: false, error: { code: 'desktop_screenshot_failed' } })
+  })
+
+  posixOnly('desktop.screenshot refuses an out path that is a FIFO or a symlink', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const root = await tempRoot()
+    const { call } = await setup(root)
+    const fifo = join(root, 'pipe.png')
+    execFileSync('mkfifo', [fifo])
+    const target = join(root, 'target.txt')
+    await writeFile(target, 'keep')
+    const link = join(root, 'link.png')
+    await symlink(target, link)
+
+    const toFifo = await call('desktop.screenshot', { out: fifo }, MAC_AGENT)
+    const toLink = await call('desktop.screenshot', { out: link }, MAC_AGENT)
+
+    expect(toFifo).toMatchObject({ ok: false, error: { code: 'desktop_invalid_input' } })
+    expect(toLink).toMatchObject({ ok: false, error: { code: 'desktop_invalid_input' } })
+    expect(await readFile(target, 'utf8')).toBe('keep')
+  })
+
+  posixOnly('desktop.screenshot overwriting an existing out file leaves it 0600', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const root = await tempRoot()
+    const { call } = await setup(root)
+    const out = join(root, 'shot.png')
+    await writeFile(out, 'old')
+    await chmod(out, 0o644)
+
+    const shot = await call('desktop.screenshot', { out }, MAC_AGENT)
+
+    expect(shot).toMatchObject({ ok: true, result: { path: out } })
+    expect((await readFile(out)).subarray(0, 8)).toEqual(PNG_SIGNATURE)
+    expect((await stat(out)).mode & 0o777).toBe(0o600)
   })
 
   it('desktop.type rejects text over 10 000 chars', async () => {

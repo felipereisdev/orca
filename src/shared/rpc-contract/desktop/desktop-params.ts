@@ -87,3 +87,9 @@ export const DesktopRunParams = z.object({
 export const DesktopRunUnsubscribeParams = z.object({
   subscriptionId: z.string().min(1, 'Missing required --subscription-id')
 })
+
+/** `received`: total chars of stdout/stderr `data` the client has taken so far (cumulative). */
+export const DesktopRunAckParams = z.object({
+  subscriptionId: z.string().min(1, 'Missing required --subscription-id'),
+  received: z.number().int().min(0, 'received must be at least 0')
+})
