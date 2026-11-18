@@ -94,6 +94,7 @@ function setup(
     ffmpegPath?: string | null | Promise<string | null>
     first?: DesktopFrame
     now?: () => number
+    prepareDir?: (dir: string) => Promise<void>
   } = {}
 ) {
   const source = frameSource(opts.first ?? frame(4, 2, RED))
@@ -101,7 +102,8 @@ function setup(
   const recorder = new DesktopRecorder(source, {
     findFfmpeg: () => (opts.ffmpegPath === undefined ? '/usr/bin/ffmpeg' : opts.ffmpegPath),
     spawnFfmpeg: ffmpeg.spawn,
-    now: opts.now
+    now: opts.now,
+    prepareDir: opts.prepareDir
   })
   const finished: DesktopRecordingResult[] = []
   recorder.onFinished((result) => finished.push(result))
@@ -385,6 +387,59 @@ describe('DesktopRecorder', () => {
 
     await expect(starting).rejects.toMatchObject({ code: 'desktop_unavailable' })
     expect(ffmpeg.spawns).toEqual([])
+  })
+
+  describe.each([
+    ['close', (recorder: DesktopRecorder) => recorder.close()],
+    ['stop', (recorder: DesktopRecorder) => void recorder.stop().catch(() => {})]
+  ])('a %s during directory setup', (_name, cancel) => {
+    function pausedSetup() {
+      let entered = (): void => {}
+      const setupEntered = new Promise<void>((resolve) => {
+        entered = resolve
+      })
+      let finish = (_error?: Error): void => {}
+      const prepareDir = (): Promise<void> => {
+        entered()
+        return new Promise<void>((resolve, reject) => {
+          finish = (error) => (error ? reject(error) : resolve())
+        })
+      }
+      return { setupEntered, prepareDir, finish: (error?: Error) => finish(error) }
+    }
+
+    it('cancels the start when setup then succeeds', async () => {
+      const paused = pausedSetup()
+      const { ffmpeg, recorder } = setup({ prepareDir: paused.prepareDir })
+
+      const starting = recorder.start({ ...LIMITS, dir })
+      await paused.setupEntered
+      cancel(recorder)
+      paused.finish()
+
+      await expect(starting).rejects.toMatchObject({
+        code: 'desktop_unavailable',
+        reason: 'recording_cancelled'
+      })
+      expect(ffmpeg.spawns).toEqual([])
+      expect(recorder.active()).toBe(false)
+    })
+
+    it('still reports the cancellation when setup then fails', async () => {
+      const paused = pausedSetup()
+      const { ffmpeg, recorder } = setup({ prepareDir: paused.prepareDir })
+
+      const starting = recorder.start({ ...LIMITS, dir })
+      await paused.setupEntered
+      cancel(recorder)
+      paused.finish(Object.assign(new Error('mkdir failed'), { code: 'EACCES' }))
+
+      await expect(starting).rejects.toMatchObject({
+        code: 'desktop_unavailable',
+        reason: 'recording_cancelled'
+      })
+      expect(ffmpeg.spawns).toEqual([])
+    })
   })
 
   it('kills an encoder that does not finalize, and waits for it to close', async () => {

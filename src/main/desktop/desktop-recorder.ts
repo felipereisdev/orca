@@ -38,6 +38,8 @@ export type DesktopRecorderDeps = {
   spawnFfmpeg?: SpawnFfmpeg
   /** Monotonic milliseconds for the `maxSeconds` deadline. */
   now?: () => number
+  /** Creates the private recordings directory. */
+  prepareDir?: (dir: string) => Promise<void>
 }
 
 export type DesktopRecordingStartOptions = { maxSeconds: number; maxBytes: number; dir: string }
@@ -72,6 +74,10 @@ type Session = {
   finishing: Promise<DesktopRecordingResult> | undefined
 }
 
+function cancelledStart(): DesktopError {
+  return new DesktopError('desktop_unavailable', 'recording_cancelled')
+}
+
 /**
  * Records the desktop to an MP4 by piping the latest frame to ffmpeg every 100 ms. A tick whose
  * previous frame ffmpeg has not taken yet is skipped, so a slow encoder never queues frames.
@@ -87,15 +93,18 @@ export class DesktopRecorder {
   readonly #findFfmpeg: () => Promise<string | null> | string | null
   readonly #spawnFfmpeg: SpawnFfmpeg
   readonly #now: () => number
+  readonly #prepareDir: (dir: string) => Promise<void>
 
   constructor(
     private readonly source: DesktopFrameSource,
     {
       findFfmpeg = () => findFfmpegOnPath(),
       spawnFfmpeg = spawnRealFfmpeg,
-      now = () => performance.now()
+      now = () => performance.now(),
+      prepareDir = preparePrivateRecordingsDir
     }: DesktopRecorderDeps = {}
   ) {
+    this.#prepareDir = prepareDir
     this.#findFfmpeg = findFfmpeg
     this.#spawnFfmpeg = spawnFfmpeg
     this.#now = now
@@ -123,6 +132,9 @@ export class DesktopRecorder {
     this.#pending = pending
     try {
       return await this.#start(opts, pending)
+    } catch (error) {
+      // Whatever a later await did, a cancelled start reports the cancellation.
+      throw pending.cancelled ? cancelledStart() : error
     } finally {
       if (this.#pending === pending) {
         this.#pending = undefined
@@ -146,7 +158,7 @@ export class DesktopRecorder {
   ): Promise<{ id: string; path: string }> {
     const assertNotCancelled = (): void => {
       if (pending.cancelled) {
-        throw new DesktopError('desktop_unavailable', 'recording_cancelled')
+        throw cancelledStart()
       }
     }
     const ffmpeg = await this.#findFfmpeg()
@@ -155,7 +167,7 @@ export class DesktopRecorder {
       throw new DesktopError('desktop_recording_unavailable', 'ffmpeg_not_found')
     }
     try {
-      await preparePrivateRecordingsDir(dir)
+      await this.#prepareDir(dir)
     } catch (error) {
       throw error instanceof DesktopError
         ? error
