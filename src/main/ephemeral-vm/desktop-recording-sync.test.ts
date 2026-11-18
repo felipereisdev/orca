@@ -19,8 +19,9 @@ import {
 } from './desktop-environment-fake.test-support'
 
 const paths = vi.hoisted(() => ({ userData: '' }))
-// When set, the next `lstat` or `mkdir` waits for the gate before it runs.
-type FsGates = { lstat: Promise<void> | null; mkdir: Promise<void> | null }
+// When set, the next `lstat` or `mkdir` reports it was reached, waits for `open`, then reports it finished.
+type FsHold = { open: Promise<void>; reached: () => void; finished: () => void }
+type FsGates = { lstat: FsHold | null; mkdir: FsHold | null }
 const fsGates = vi.hoisted((): FsGates => ({ lstat: null, mkdir: null }))
 
 vi.mock('electron', () => ({ app: { getPath: () => paths.userData } }))
@@ -30,12 +31,20 @@ vi.mock('../ipc/runtime-environments/requests/runtime-environment-transport-rout
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof FsPromises>()
-  /** Runs `run` once the gate for `name`, if any, opens; the gate holds only one call. */
+  /** Runs `run` once the hold for `name`, if any, opens; the hold covers only one call. */
   async function afterGate<T>(name: keyof FsGates, run: () => Promise<T>): Promise<T> {
-    const gate = fsGates[name]
+    const hold = fsGates[name]
     fsGates[name] = null
-    await gate
-    return run()
+    if (!hold) {
+      return run()
+    }
+    hold.reached()
+    await hold.open
+    try {
+      return await run()
+    } finally {
+      hold.finished()
+    }
   }
   const lstat = (...args: Parameters<typeof actual.lstat>) =>
     afterGate('lstat', () => actual.lstat(...args))
@@ -60,12 +69,36 @@ function copiedPath(id: string): string {
   return join(workspaceDir(), `rec-${id}.mp4`)
 }
 
-/** Waits for file I/O and promises without moving the fake clock, unlike `vi.waitFor`. */
+/**
+ * Waits for file I/O and promises without moving the fake clock, unlike `vi.waitFor`. It counts no
+ * turns: real disk I/O under load takes any number of them, so only the test timeout bounds it.
+ */
 async function settleUntil(condition: () => boolean): Promise<void> {
-  for (let turn = 0; turn < 2_000 && !condition(); turn++) {
+  while (!condition()) {
     await new Promise<void>((resolve) => setImmediate(resolve))
   }
-  expect(condition()).toBe(true)
+}
+
+/** Holds the next `name` call: `reached` once it is called, `finished` once the real call returns. */
+function holdNextFsCall(name: keyof FsGates): {
+  reached: Promise<void>
+  finished: Promise<void>
+  release: () => void
+} {
+  let release = (): void => {}
+  let reached = (): void => {}
+  let finished = (): void => {}
+  const hold: FsHold = {
+    open: new Promise<void>((resolve) => (release = resolve)),
+    reached: () => reached(),
+    finished: () => finished()
+  }
+  fsGates[name] = hold
+  return {
+    reached: new Promise<void>((resolve) => (reached = resolve)),
+    finished: new Promise<void>((resolve) => (finished = resolve)),
+    release
+  }
 }
 
 /** Lets pending file I/O and promises finish, so an assertion that nothing happened means it. */
@@ -266,14 +299,13 @@ describe('syncEnvironmentRecordings', () => {
   })
 
   it('stopping while checking for a local copy creates no directory and indexes nothing', async () => {
-    let release = (): void => {}
-    fsGates.lstat = new Promise<void>((resolve) => (release = resolve))
+    const lstatHold = holdNextFsCall('lstat')
     const recording = env.finishRecording('d1d1d1d1d1d1d1d1', 10)
     const stop = syncEnvironmentRecordings('env-1', WORKSPACE_ID)
-    await settleUntil(() => listCalls() === 1)
-    await settle()
+    await lstatHold.reached
     stop()
-    release()
+    lstatHold.release()
+    await lstatHold.finished
     await settle()
     await vi.advanceTimersByTimeAsync(10 * 60_000)
 
@@ -284,14 +316,13 @@ describe('syncEnvironmentRecordings', () => {
   })
 
   it('stopping while creating the directory copies and indexes nothing', async () => {
-    let release = (): void => {}
-    fsGates.mkdir = new Promise<void>((resolve) => (release = resolve))
+    const mkdirHold = holdNextFsCall('mkdir')
     const recording = env.finishRecording('d2d2d2d2d2d2d2d2', 10)
     const stop = syncEnvironmentRecordings('env-1', WORKSPACE_ID)
-    await settleUntil(() => listCalls() === 1)
-    await settle()
+    await mkdirHold.reached
     stop()
-    release()
+    mkdirHold.release()
+    await mkdirHold.finished
     await settle()
     await vi.advanceTimersByTimeAsync(10 * 60_000)
 
