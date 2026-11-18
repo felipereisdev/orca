@@ -128,4 +128,18 @@ describe('desktop hand-off lifecycle', () => {
     expect(env.closedStreams).toBe(1)
     expect(env.streams).toHaveLength(1)
   })
+
+  it('an environment verified again after retiring gets its desktop and sync back', async () => {
+    await restored()
+    state.statusListeners.forEach((listener) => listener(verified('env-1')))
+    await vi.waitFor(() => expect(configureCalls()).toBe(2))
+
+    // Re-pairing under the same id retires the old status owner, then verifies the new one.
+    state.statusListeners.forEach((listener) => listener(verified('env-1', true)))
+    expect(env.closedStreams).toBe(1)
+    state.statusListeners.forEach((listener) => listener(verified('env-1')))
+
+    await vi.waitFor(() => expect(configureCalls()).toBe(3))
+    await vi.waitFor(() => expect(env.streams).toHaveLength(2))
+  })
 })

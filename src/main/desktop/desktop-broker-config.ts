@@ -29,3 +29,18 @@ export function assertValidConfig(cfg: DesktopBrokerConfig): string {
   }
   return host
 }
+
+/** True when `next` (its host already normalized) is the configuration `current` holds. */
+export function isSameDesktopBrokerConfig(
+  current: DesktopBrokerConfig | undefined,
+  next: DesktopBrokerConfig
+): boolean {
+  return (
+    current !== undefined &&
+    current.host === next.host &&
+    current.port === next.port &&
+    current.password === next.password &&
+    current.launcher?.port === next.launcher?.port &&
+    current.launcher?.token === next.launcher?.token
+  )
+}

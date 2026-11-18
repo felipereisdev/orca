@@ -222,6 +222,20 @@ describe('DesktopBroker connection', () => {
     expect(shot).toMatchObject({ width: 80, height: 60 })
   })
 
+  it('configuring the same desktop again keeps viewers and the connection open', async () => {
+    const { broker, server, openViewer } = await fixture({ width: 64, height: 48 })
+    const viewer = await openViewer('v1')
+    viewer.setEncodings([0])
+    viewer.requestUpdate(false, 64, 48)
+    await viewer.readUpdate()
+
+    await broker.configure({ host: '127.0.0.1', port: server.port, password: FIXTURE_PASSWORD })
+
+    viewer.requestUpdate(false, 64, 48)
+    expect(await viewer.readUpdate()).toEqual([{ x: 0, y: 0, width: 64, height: 48, encoding: 0 }])
+    expect(broker.status()).toMatchObject({ state: 'ready' })
+  })
+
   it('password never appears in status() or thrown error messages', async () => {
     const secret = 'Zq9-secret-pw'
     const server = await startFakeRfbServer({ password: 'other', width: 16, height: 8 })

@@ -16,6 +16,8 @@ type DesktopEntry = {
   workspaceId?: string
   stopSync: (() => void) | null
   configuring: Promise<void> | null
+  /** A start arrived while configuring; it may target a new pairing, so configure once more. */
+  restartQueued: boolean
 }
 
 /** One entry per recipe runtime whose desktop this host handed over. */
@@ -40,7 +42,13 @@ export function startEnvironmentDesktop(
     entry = undefined
   }
   if (!entry) {
-    entry = { runtime, environmentId: target.environmentId, stopSync: null, configuring: null }
+    entry = {
+      runtime,
+      environmentId: target.environmentId,
+      stopSync: null,
+      configuring: null,
+      restartQueued: false
+    }
     entries.set(runtime.id, entry)
   }
   entry.runtime = { ...runtime, workspaceId: runtime.workspaceId ?? entry.workspaceId }
@@ -50,13 +58,19 @@ export function startEnvironmentDesktop(
     entry.workspaceId = runtime.workspaceId
   }
   if (entry.configuring) {
+    entry.restartQueued = true
     return entry.configuring
   }
   const current = entry
   current.configuring = configureEnvironmentDesktop(target.environmentId, target.desktop).then(
-    (outcome) => {
+    async (outcome) => {
       // Cleared here, not in a later `finally`, so an attach arriving now configures again.
       current.configuring = null
+      if (current.restartQueued && entries.get(runtime.id) === current) {
+        current.restartQueued = false
+        await startEnvironmentDesktop(store, current.runtime)
+        return
+      }
       // Only the identity that configured may subscribe to the desktop's events.
       if (
         entries.get(runtime.id) === current &&
@@ -97,7 +111,8 @@ export function restoreEnvironmentDesktops(
 /**
  * Follows the environments of the handed-over desktops for the app's life: a newly verified
  * environment is configured again (its server may have restarted and lost the desktop), and a
- * retired one stops its runtimes' syncs. Suspend and removal stop theirs where they happen.
+ * retired one pauses its runtimes' syncs until it is verified again. Only suspend and removal
+ * drop a runtime's entry, through `stopEnvironmentDesktop`.
  */
 export function registerEnvironmentDesktopLifecycle(store: DesktopSettingsSource): void {
   detachLifecycle?.()
@@ -112,10 +127,13 @@ export function registerEnvironmentDesktopLifecycle(store: DesktopSettingsSource
     }
   })
   detachLifecycle = onRuntimeEnvironmentStatusPublished((snapshot) => {
+    // Retiring is also how a re-pair under the same id swaps status owners: pause the sync but
+    // keep the entry, so the next verified status configures and syncs again.
     if (snapshot.retired) {
-      for (const [runtimeId, entry] of entries) {
+      for (const entry of entries.values()) {
         if (entry.environmentId === snapshot.environmentId) {
-          stopEnvironmentDesktop(runtimeId)
+          entry.stopSync?.()
+          entry.stopSync = null
         }
       }
     }

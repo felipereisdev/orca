@@ -62,9 +62,10 @@ export function syncEnvironmentRecordings(
   const controller = new AbortController()
   const { signal } = controller
   const dir = recordingsDirForWorkspace(workspaceId)
-  const inFlight = new Set<string>()
-  let copies: Promise<void> = Promise.resolve()
-  let failedSinceRetry = false
+  // Each queued copy's outcome, so every reconcile can await the copies it depends on.
+  const inFlight = new Map<string, Promise<boolean>>()
+  let copies: Promise<unknown> = Promise.resolve()
+  let reconcileGeneration = 0
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let retryAttempt = 0
 
@@ -80,16 +81,20 @@ export function syncEnvironmentRecordings(
     }, delay)
   }
 
-  const copy = (recording: EnvironmentRecording): Promise<void> => {
-    if (signal.aborted || inFlight.has(recording.id)) {
-      return copies
+  /** Queues one copy; resolves true once the file is on this Mac, false if this attempt failed. */
+  const copy = (recording: EnvironmentRecording): Promise<boolean> => {
+    const queued = inFlight.get(recording.id)
+    if (queued) {
+      return queued
     }
-    inFlight.add(recording.id)
-    copies = copies
+    if (signal.aborted) {
+      return Promise.resolve(false)
+    }
+    const outcome = copies
       .then(async () => {
         const destination = join(dir, recordingFileName(recording.id))
         if (signal.aborted) {
-          return
+          return false
         }
         if (!(await isCopied(destination))) {
           await mkdir(dir, { recursive: true, mode: 0o700 })
@@ -102,26 +107,30 @@ export function syncEnvironmentRecordings(
           })
         }
         noteCopiedRecording(recording.id, destination)
+        return true
       })
       .catch((error: unknown) => {
-        if (signal.aborted) {
-          return
+        if (!signal.aborted) {
+          console.warn('[desktop] recording copy failed; retrying', {
+            recordingId: recording.id,
+            error: describeError(error)
+          })
+          scheduleRetry()
         }
-        failedSinceRetry = true
-        console.warn('[desktop] recording copy failed; retrying', {
-          recordingId: recording.id,
-          error: describeError(error)
-        })
-        scheduleRetry()
+        return false
       })
       .finally(() => {
         inFlight.delete(recording.id)
       })
-    return copies
+    inFlight.set(recording.id, outcome)
+    copies = outcome
+    return outcome
   }
 
+  /** Lists the environment's recordings and copies the missing ones; only the newest reconcile,
+   *  with every copy it waited on succeeding, resets the retry backoff. */
   async function reconcile(): Promise<void> {
-    failedSinceRetry = false
+    const generation = ++reconcileGeneration
     let listed: unknown
     try {
       const response = await callRuntimeEnvironment(
@@ -147,15 +156,15 @@ export function syncEnvironmentRecordings(
       }
       return
     }
-    let settled: Promise<void> = copies
+    const outcomes: Promise<boolean>[] = []
     for (const entry of Array.isArray(listed) ? listed : []) {
       const recording = parseRecording(entry)
       if (recording) {
-        settled = copy(recording)
+        outcomes.push(copy(recording))
       }
     }
-    await settled
-    if (!failedSinceRetry) {
+    const succeeded = (await Promise.all(outcomes)).every(Boolean)
+    if (succeeded && generation === reconcileGeneration && !signal.aborted) {
       retryAttempt = 0
     }
   }

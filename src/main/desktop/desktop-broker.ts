@@ -13,7 +13,11 @@ import {
 import { DesktopControlConnection, type DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
 import { DesktopRecorder, type DesktopRecorderDeps } from './desktop-recorder'
-import { assertValidConfig, type DesktopBrokerConfig } from './desktop-broker-config'
+import {
+  assertValidConfig,
+  isSameDesktopBrokerConfig,
+  type DesktopBrokerConfig
+} from './desktop-broker-config'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerRegistry } from './desktop-viewer-registry'
 import { encodePng } from './rfb/png-encode'
@@ -77,9 +81,16 @@ export class DesktopBroker {
     this.recorder = new DesktopRecorder(this, recorder)
   }
 
-  /** Replaces any previous configuration and reconnects; resolves after the first attempt. */
+  /**
+   * Replaces any previous configuration and reconnects; resolves after the first attempt. The same
+   * configuration again (a host re-attaching or resuming) changes nothing, so viewers stay open.
+   */
   async configure(cfg: DesktopBrokerConfig): Promise<void> {
     const host = assertValidConfig(cfg)
+    const current = this.#target && { ...this.#target, launcher: this.#launcher }
+    if (this.#state !== 'unconfigured' && isSameDesktopBrokerConfig(current, { ...cfg, host })) {
+      return
+    }
     this.#disconnect()
     this.#target = { host, port: cfg.port, password: cfg.password }
     this.#launcher = cfg.launcher ? { ...cfg.launcher } : undefined

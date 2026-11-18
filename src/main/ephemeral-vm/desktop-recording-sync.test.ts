@@ -32,6 +32,14 @@ function copiedPath(id: string): string {
   return join(workspaceDir(), `rec-${id}.mp4`)
 }
 
+/** Waits for file I/O and promises without moving the fake clock, unlike `vi.waitFor`. */
+async function settleUntil(condition: () => boolean): Promise<void> {
+  for (let turn = 0; turn < 2_000 && !condition(); turn++) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+  expect(condition()).toBe(true)
+}
+
 function listCalls(): number {
   return env.methods().filter((method) => method === 'desktop.recordings.list').length
 }
@@ -153,6 +161,34 @@ describe('syncEnvironmentRecordings', () => {
 
     await vi.waitFor(() => expect(localRecordingPath(recording.id)).toBe(copiedPath(recording.id)))
     expect(listCalls()).toBe(2)
+  })
+
+  it('a copy finishing late does not reset the backoff of a later failing retry', async () => {
+    const first = env.finishRecording('aaaaaaaaaaaaaaaa', 1_000)
+    const slow = env.finishRecording('bbbbbbbbbbbbbbbb', 1_000)
+    env.failReadsFor.set(first.path, 2)
+    let releaseSlow = (): void => {}
+    env.readGates.set(
+      slow.path,
+      new Promise<void>((resolve) => {
+        releaseSlow = resolve
+      })
+    )
+    await connected()
+    await settleUntil(() => warn.mock.calls.length === 1)
+
+    // The retry starts while the first reconcile still waits on the slow copy.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(listCalls()).toBe(2)
+    releaseSlow()
+    await settleUntil(() => warn.mock.calls.length === 2)
+    expect(localRecordingPath(slow.id)).toBe(copiedPath(slow.id))
+
+    // Two failures in a row: the next retry waits 10 s, not 5 s.
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(listCalls()).toBe(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(listCalls()).toBe(3)
   })
 
   it('stopping cancels a pending retry', async () => {

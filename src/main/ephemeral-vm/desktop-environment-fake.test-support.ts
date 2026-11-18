@@ -28,6 +28,10 @@ class DesktopEnvironmentFake {
   recordings: FakeRecording[] = []
   failLists = 0
   failReads = 0
+  /** Reads of these paths fail this many more times. */
+  failReadsFor = new Map<string, number>()
+  /** Reads of these paths wait for the promise; a rejection fails the read. */
+  readGates = new Map<string, Promise<void>>()
   configure: (params: Record<string, unknown>) => FakeResponse = () => ok({ state: 'ready' })
   streams: FakeStreamCallbacks[] = []
   closedStreams = 0
@@ -38,6 +42,8 @@ class DesktopEnvironmentFake {
     this.recordings = []
     this.failLists = 0
     this.failReads = 0
+    this.failReadsFor.clear()
+    this.readGates.clear()
     this.configure = () => ok({ state: 'ready' })
     this.streams = []
     this.closedStreams = 0
@@ -60,9 +66,22 @@ class DesktopEnvironmentFake {
     return this.calls.map((call) => call.method)
   }
 
-  private chunk(path: string, args: Record<string, unknown>): FakeResponse {
-    if (this.failReads > 0) {
-      this.failReads -= 1
+  private async chunk(path: string, args: Record<string, unknown>): Promise<FakeResponse> {
+    const gate = this.readGates.get(path)
+    if (gate) {
+      try {
+        await gate
+      } catch {
+        return failure('io', 'connection reset')
+      }
+    }
+    const failuresLeft = this.failReadsFor.get(path) ?? 0
+    if (this.failReads > 0 || failuresLeft > 0) {
+      if (failuresLeft > 0) {
+        this.failReadsFor.set(path, failuresLeft - 1)
+      } else {
+        this.failReads -= 1
+      }
       return failure('io', 'connection reset')
     }
     const file = this.files.get(path) ?? Buffer.alloc(0)
@@ -75,7 +94,11 @@ class DesktopEnvironmentFake {
     })
   }
 
-  call(environmentId: string, method: string, params: unknown): FakeResponse {
+  call(
+    environmentId: string,
+    method: string,
+    params: unknown
+  ): FakeResponse | Promise<FakeResponse> {
     const args: Record<string, unknown> =
       typeof params === 'object' && params !== null ? { ...params } : {}
     this.calls.push({ environmentId, method, params: args })

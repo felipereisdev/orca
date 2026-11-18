@@ -123,7 +123,12 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   stopRuntimesChangedBroadcast?.()
   stopRuntimesChangedBroadcast = onEphemeralVmRuntimesChanged(broadcastEphemeralVmRuntimesChanged)
   registerEnvironmentDesktopLifecycle(store)
-  restoreEnvironmentDesktops(store, listEphemeralVmRuntimes(app.getPath('userData')))
+  try {
+    restoreEnvironmentDesktops(store, listEphemeralVmRuntimes(app.getPath('userData')))
+  } catch (error) {
+    // An unreadable store must not abort registration; the desktops return on their next resume.
+    console.warn('[ephemeral-vm] Could not restore recipe desktops:', error)
+  }
 
   // Names only: the recipe list warns which credentials scripts inherit, never their values.
   ipcMain.handle('ephemeralVm:listCredentialEnvNames', () =>

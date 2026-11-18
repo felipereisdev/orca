@@ -7,6 +7,7 @@ import { encodePairingOffer } from '../../../shared/remote-runtime/pairing/pairi
 import { PAIRING_OFFER_VERSION } from '../../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
+import { getEphemeralVmRuntimeStorePath } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { desktopEnvironmentFake as desktopEnv } from '../../ephemeral-vm/desktop-environment-fake.test-support'
 
 const handlers = new Map<string, (_event: unknown, args: never) => unknown>()
@@ -182,6 +183,21 @@ describe('registerEphemeralVmHandlers', () => {
     expect(cleaned).toEqual(expect.objectContaining({ status: 'cleaned' }))
     expect(readFileSync(join(repoPath, 'plugin-cleaned.txt'), 'utf8')).toBe('yes')
   })
+  it('an unreadable VM store does not abort handler registration', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const userDataPath = makeDir('orca-ephemeral-vm-bad-store-')
+    getPathMock.mockReturnValue(userDataPath)
+    writeFileSync(getEphemeralVmRuntimeStorePath(userDataPath), '{not json')
+    try {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub store covers every Store method registration and these handlers use.
+      const store = makeStore(makeDir('orca-ephemeral-vm-repo-')) as never
+      expect(() => registerEphemeralVmHandlers(store)).not.toThrow()
+      expect(handlers.has('ephemeralVm:provision')).toBe(true)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   describe('with a recipe desktop', () => {
     const DESKTOP = { type: 'vnc', port: 5901, password: 'abc12345' }
     const SSH_CONNECTION = {
