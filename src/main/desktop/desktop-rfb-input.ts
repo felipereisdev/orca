@@ -17,6 +17,20 @@ export function pointerEventMessage(buttonMask: number, x: number, y: number): B
   return message
 }
 
+export type DesktopBounds = { width: number; height: number }
+
+/** `x`, `y` moved into 0..width-1, 0..height-1, so a release is never dropped as out of bounds. */
+export function clampedPointer(
+  x: number,
+  y: number,
+  bounds: DesktopBounds
+): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.min(x, bounds.width - 1)),
+    y: Math.max(0, Math.min(y, bounds.height - 1))
+  }
+}
+
 /**
  * Keys and mouse buttons one input source currently holds down, learned from the messages it
  * sent, so control can be handed over without leaving anything stuck.
@@ -42,14 +56,20 @@ export class HeldInput {
     }
   }
 
-  /** Key-ups (latest first) and a button-up for everything held; clears the record. */
-  releaseMessages(): Buffer[] {
-    const messages = [...this.keys].toReversed().map((keysym) => keyEventMessage(false, keysym))
+  /**
+   * Writes key-ups (latest first) and a button-up for everything held, then clears the record.
+   * The button-up goes to the last point clamped into `bounds` (the size the server announced
+   * now), since the desktop may have shrunk under the held pointer.
+   */
+  release(bounds: DesktopBounds | undefined, write: (message: Buffer) => void): void {
+    for (const keysym of [...this.keys].toReversed()) {
+      write(keyEventMessage(false, keysym))
+    }
     if (this.buttonMask !== 0) {
-      messages.push(pointerEventMessage(0, this.x, this.y))
+      const { x, y } = bounds ? clampedPointer(this.x, this.y, bounds) : { x: this.x, y: this.y }
+      write(pointerEventMessage(0, x, y))
     }
     this.keys.clear()
     this.buttonMask = 0
-    return messages
   }
 }

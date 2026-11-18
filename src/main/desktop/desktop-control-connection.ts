@@ -143,15 +143,13 @@ export class DesktopControlConnection {
   }
 
   write(message: Buffer): void {
-    this.held.observe(message)
     this.socket.write(message)
+    this.held.observe(message)
   }
 
-  /** Writes without recording it as held input (releases on handover). */
-  writeRelease(messages: Buffer[]): void {
-    for (const message of messages) {
-      this.socket.write(message)
-    }
+  /** Releases everything the agent holds, the pointer inside the announced size (handover). */
+  releaseHeld(): void {
+    this.held.release(this.desktopSize, (message) => this.socket.write(message))
   }
 
   close(): void {

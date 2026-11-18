@@ -77,6 +77,7 @@ export class DesktopBroker {
   #connectAttempt: AbortController | undefined
   readonly #viewers = new DesktopViewerRegistry({
     inControl: (viewerId) => this.#owner === 'user' && this.#controller === viewerId,
+    bounds: () => this.#control?.desktopSize,
     onRegistered: (viewerId) => {
       if (this.#controller === viewerId) {
         clearTimeout(this.#fallbackTimer)
@@ -246,7 +247,7 @@ export class DesktopBroker {
     if (this.#owner === 'agent') {
       const control = this.#control
       if (control?.writable) {
-        control.writeRelease(control.held.releaseMessages())
+        control.releaseHeld()
       }
     } else if (this.#controller !== undefined) {
       this.#viewers.get(this.#controller)?.releaseHeld()
@@ -267,9 +268,10 @@ export class DesktopBroker {
     this.#connectAttempt?.abort()
     this.#connectAttempt = undefined
     clearTimeout(this.#retryTimer)
+    // Viewers release held input on close, inside the size the control connection knows.
+    this.#viewers.closeAll()
     this.#control?.close()
     this.#control = undefined
-    this.#viewers.closeAll()
   }
 
   async #connect(generation: number): Promise<void> {

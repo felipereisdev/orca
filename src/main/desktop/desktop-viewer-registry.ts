@@ -1,11 +1,14 @@
 import type { Duplex } from 'node:stream'
 import { DesktopError } from './desktop-errors'
+import type { DesktopBounds } from './desktop-rfb-input'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerSession } from './desktop-viewer-session'
 
 type ViewerRegistryHooks = {
   /** Whether the viewer with this id holds control. */
   inControl: (viewerId: string) => boolean
+  /** The desktop size the server last announced, if known; releases are clamped into it. */
+  bounds: () => DesktopBounds | undefined
   /** A viewer finished connecting and is now registered. */
   onRegistered: (viewerId: string) => void
   /** A registered viewer closed. */
@@ -48,6 +51,7 @@ export class DesktopViewerRegistry {
         {
           inputAllowed: () =>
             this.hooks.inControl(viewerId) && this.#sessions.get(viewerId) === session,
+          bounds: this.hooks.bounds,
           onClosed: () => {
             if (this.#sessions.get(viewerId) === session) {
               this.#sessions.delete(viewerId)

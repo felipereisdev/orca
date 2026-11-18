@@ -1,6 +1,6 @@
 import type { Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
-import { HeldInput } from './desktop-rfb-input'
+import { HeldInput, type DesktopBounds } from './desktop-rfb-input'
 import { connectRfbUpstream, withSocketTimeout, type DesktopVncTarget } from './desktop-upstream'
 import { isInputMessage, RfbClientMessageFilter } from './rfb/rfb-client-messages'
 import { runRfbServerHandshake } from './rfb/rfb-server-handshake'
@@ -8,6 +8,8 @@ import { runRfbServerHandshake } from './rfb/rfb-server-handshake'
 type ViewerHandlers = {
   /** Whether this viewer's input may reach the desktop right now (checked per message). */
   inputAllowed: () => boolean
+  /** The desktop size the server last announced, if known; releases are clamped into it. */
+  bounds: () => DesktopBounds | undefined
   onClosed: () => void
 }
 
@@ -59,11 +61,9 @@ export class DesktopViewerSession {
     return session
   }
 
-  /** Sends key-ups and a button-up for whatever this viewer holds; used when it loses control. */
+  /** Sends key-ups and a button-up (inside the desktop) for whatever this viewer holds. */
   releaseHeld(): void {
-    for (const message of this.held.releaseMessages()) {
-      this.upstream.write(message)
-    }
+    this.held.release(this.handlers.bounds(), (message) => this.upstream.write(message))
   }
 
   close(): void {

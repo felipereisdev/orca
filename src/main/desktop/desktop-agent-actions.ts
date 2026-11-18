@@ -1,6 +1,6 @@
 import { DesktopError } from './desktop-errors'
 import { keysymsFor, keysymsForText } from './desktop-keysyms'
-import { keyEventMessage, pointerEventMessage } from './desktop-rfb-input'
+import { clampedPointer, keyEventMessage, pointerEventMessage } from './desktop-rfb-input'
 
 /** Gap between input steps, so X clients see separate events (as xdotool's default delay). */
 export const AGENT_INPUT_STEP_MS = 5
@@ -88,8 +88,10 @@ export async function agentDrag(
       checkedPoint(sink, next)
     } catch (error) {
       // Lost control is released by the handover; a shrunken desktop needs our own button-up.
+      // The last point may now be outside the desktop too, so release inside the new bounds.
       if (error instanceof DesktopError && error.code === 'desktop_invalid_input') {
-        sink.send(pointerEventMessage(0, last.x, last.y))
+        const release = clampedPointer(last.x, last.y, sink.size())
+        sink.send(pointerEventMessage(0, release.x, release.y))
       }
       throw error
     }

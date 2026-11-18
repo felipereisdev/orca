@@ -155,4 +155,55 @@ describe('DesktopBroker agent commands', () => {
       [0, 25, 17]
     ])
   })
+
+  it('a drag aborted by a shrink releases the button inside the new bounds', async () => {
+    const { broker, server } = await fixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 60, y: 40 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_invalid_input' })
+    await vi.advanceTimersByTimeAsync(10)
+    await server.waitForReceived((received) => pointerEvents(received).length === 4)
+    server.setSize(16, 12)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 16)
+    )
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 5)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 13, 9],
+      [1, 25, 17],
+      [0, 15, 11]
+    ])
+  })
+
+  it('handing control to the user after a shrink releases the held button inside the new bounds', async () => {
+    const { broker, server } = await fixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+    const dragging = broker.drag({ x: 1, y: 1 }, { x: 60, y: 40 })
+    const outcome = expect(dragging).rejects.toMatchObject({ code: 'desktop_user_in_control' })
+    await vi.advanceTimersByTimeAsync(10)
+    await server.waitForReceived((received) => pointerEvents(received).length === 4)
+    server.setSize(16, 12)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 16)
+    )
+    broker.setOwner('user', 'v1')
+    await vi.advanceTimersByTimeAsync(1_000)
+    await outcome
+
+    await server.waitForReceived((received) => pointerEvents(received).length === 5)
+    expect(pointerEvents(server.received)).toEqual([
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 13, 9],
+      [1, 25, 17],
+      [0, 15, 11]
+    ])
+  })
 })
