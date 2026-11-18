@@ -7,7 +7,7 @@ import type { Repo } from '../../shared/repository/repo-types'
 import {
   getDefaultTaskRepoSelection,
   getTaskEligibleRepos
-} from '../../shared/task-board/task-board-repo-scope'
+} from '../../shared/work-items/task-repo-selection'
 import type { PreflightStatus } from '../preflight/agent-detection'
 
 function repoHostKind(repo: Repo) {
