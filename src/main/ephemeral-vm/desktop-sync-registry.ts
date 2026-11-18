@@ -14,6 +14,8 @@ type DesktopEntry = {
   runtime: DesktopRuntime
   environmentId: string
   workspaceId?: string
+  /** Bumped on retire, stop, suspend and removal; work begun under an older epoch has no effect. */
+  epoch: number
   stopSync: (() => void) | null
   configuring: Promise<void> | null
   /** A start arrived while configuring; it may target a new pairing, so configure once more. */
@@ -23,6 +25,45 @@ type DesktopEntry = {
 /** One entry per recipe runtime whose desktop this host handed over. */
 const entries = new Map<string, DesktopEntry>()
 let detachLifecycle: (() => void) | null = null
+
+/** Ends everything the entry runs now: its sync, its configure's effects, a queued restart. */
+function invalidate(entry: DesktopEntry): void {
+  entry.epoch += 1
+  entry.stopSync?.()
+  entry.stopSync = null
+  entry.configuring = null
+  entry.restartQueued = false
+}
+
+function configure(
+  store: DesktopSettingsSource,
+  runtimeId: string,
+  entry: DesktopEntry,
+  target: NonNullable<ReturnType<typeof runtimeDesktop>>
+): Promise<void> {
+  const epoch = entry.epoch
+  const current = (): boolean => entry.epoch === epoch && entries.get(runtimeId) === entry
+  entry.configuring = (async () => {
+    const outcome = await configureEnvironmentDesktop(target.environmentId, target.desktop)
+    if (!current()) {
+      return
+    }
+    entry.configuring = null
+    if (entry.restartQueued) {
+      entry.restartQueued = false
+      const next = runtimeDesktop(store, entry.runtime)
+      if (next) {
+        await configure(store, runtimeId, entry, next)
+      }
+      return
+    }
+    // Only the identity that configured may subscribe to the desktop's events.
+    if (outcome === 'configured' && entry.workspaceId && !entry.stopSync) {
+      entry.stopSync = syncEnvironmentRecordings(target.environmentId, entry.workspaceId)
+    }
+  })()
+  return entry.configuring
+}
 
 /**
  * Configures the runtime's desktop on its environment and, once configured, keeps its recordings
@@ -45,6 +86,7 @@ export function startEnvironmentDesktop(
     entry = {
       runtime,
       environmentId: target.environmentId,
+      epoch: 0,
       stopSync: null,
       configuring: null,
       restartQueued: false
@@ -53,47 +95,24 @@ export function startEnvironmentDesktop(
   }
   entry.runtime = { ...runtime, workspaceId: runtime.workspaceId ?? entry.workspaceId }
   if (runtime.workspaceId && entry.workspaceId !== runtime.workspaceId) {
-    entry.stopSync?.()
-    entry.stopSync = null
+    invalidate(entry)
     entry.workspaceId = runtime.workspaceId
   }
   if (entry.configuring) {
     entry.restartQueued = true
     return entry.configuring
   }
-  const current = entry
-  current.configuring = configureEnvironmentDesktop(target.environmentId, target.desktop).then(
-    async (outcome) => {
-      // Cleared here, not in a later `finally`, so an attach arriving now configures again.
-      current.configuring = null
-      if (current.restartQueued && entries.get(runtime.id) === current) {
-        current.restartQueued = false
-        await startEnvironmentDesktop(store, current.runtime)
-        return
-      }
-      // Only the identity that configured may subscribe to the desktop's events.
-      if (
-        entries.get(runtime.id) === current &&
-        outcome === 'configured' &&
-        current.workspaceId &&
-        !current.stopSync
-      ) {
-        current.stopSync = syncEnvironmentRecordings(target.environmentId, current.workspaceId)
-      }
-    }
-  )
-  return current.configuring
+  return configure(store, runtime.id, entry, target)
 }
 
-/** Stops the runtime's recording sync and its timers; Task 11's removal calls it too. */
+/** Stops the runtime's recording sync and its timers; suspend, removal and Task 11 call it. */
 export function stopEnvironmentDesktop(runtimeId: string): void {
   const entry = entries.get(runtimeId)
   if (!entry) {
     return
   }
   entries.delete(runtimeId)
-  entry.stopSync?.()
-  entry.stopSync = null
+  invalidate(entry)
 }
 
 /** At startup: hands over the desktop of every recipe runtime still running. */
@@ -132,8 +151,7 @@ export function registerEnvironmentDesktopLifecycle(store: DesktopSettingsSource
     if (snapshot.retired) {
       for (const entry of entries.values()) {
         if (entry.environmentId === snapshot.environmentId) {
-          entry.stopSync?.()
-          entry.stopSync = null
+          invalidate(entry)
         }
       }
     }

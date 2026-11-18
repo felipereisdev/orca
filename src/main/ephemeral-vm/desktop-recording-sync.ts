@@ -50,9 +50,11 @@ function describeError(error: unknown): string {
 }
 
 /**
- * Keeps a copy on this Mac of every recording the environment finishes: each `recording-finished`
- * event copies that file, every (re)connect reconciles the environment's list, and a failed list
- * or copy is retried on a backoff (5 s doubling to 5 min) while the connection stays up.
+ * Keeps a copy on this Mac of every recording the environment finishes, through one serialized
+ * worker per workspace. Stream `ready`, `recording-finished` and the retry timer only mark a pass
+ * as needed and wake the loop; a pass lists the environment's recordings and copies the missing
+ * ones one at a time. A pass with any failure doubles the retry delay (5 s up to 5 min); only a
+ * pass with none resets it. Only the loop touches the timer and the failure count.
  */
 export function syncEnvironmentRecordings(
   runtimeEnvironmentId: string,
@@ -62,40 +64,52 @@ export function syncEnvironmentRecordings(
   const controller = new AbortController()
   const { signal } = controller
   const dir = recordingsDirForWorkspace(workspaceId)
-  // Each queued copy's outcome, so every reconcile can await the copies it depends on.
-  const inFlight = new Map<string, Promise<boolean>>()
-  let copies: Promise<unknown> = Promise.resolve()
-  let reconcileGeneration = 0
+  let passNeeded = false
+  let looping = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
-  let retryAttempt = 0
+  let failedPasses = 0
 
-  const scheduleRetry = (): void => {
-    if (signal.aborted || retryTimer) {
-      return
+  async function listRecordings(): Promise<EnvironmentRecording[]> {
+    const response = await callRuntimeEnvironment(
+      getRuntimeEnvironmentRegistryRoot(),
+      runtimeEnvironmentId,
+      'desktop.recordings.list',
+      {},
+      LIST_TIMEOUT_MS,
+      undefined,
+      undefined,
+      { signal }
+    )
+    if (!response.ok) {
+      throw new Error(response.error.message)
     }
-    const delay = Math.min(RETRY_INITIAL_MS * 2 ** retryAttempt, RETRY_MAX_MS)
-    retryAttempt += 1
-    retryTimer = setTimeout(() => {
-      retryTimer = null
-      void reconcile()
-    }, delay)
+    const listed = isRecord(response.result) ? response.result.recordings : undefined
+    return (Array.isArray(listed) ? listed : []).flatMap((entry) => {
+      const recording = parseRecording(entry)
+      return recording ? [recording] : []
+    })
   }
 
-  /** Queues one copy; resolves true once the file is on this Mac, false if this attempt failed. */
-  const copy = (recording: EnvironmentRecording): Promise<boolean> => {
-    const queued = inFlight.get(recording.id)
-    if (queued) {
-      return queued
+  /** One list-and-copy pass; true when anything in it failed. */
+  async function runPass(): Promise<boolean> {
+    let recordings: EnvironmentRecording[]
+    try {
+      recordings = await listRecordings()
+    } catch (error) {
+      if (!signal.aborted) {
+        console.warn('[desktop] listing recordings failed; retrying', {
+          error: describeError(error)
+        })
+      }
+      return true
     }
-    if (signal.aborted) {
-      return Promise.resolve(false)
-    }
-    const outcome = copies
-      .then(async () => {
-        const destination = join(dir, recordingFileName(recording.id))
-        if (signal.aborted) {
-          return false
-        }
+    let failed = false
+    for (const recording of recordings) {
+      if (signal.aborted) {
+        return failed
+      }
+      const destination = join(dir, recordingFileName(recording.id))
+      try {
         if (!(await isCopied(destination))) {
           await mkdir(dir, { recursive: true, mode: 0o700 })
           await copyEnvironmentRecording({
@@ -107,80 +121,66 @@ export function syncEnvironmentRecordings(
           })
         }
         noteCopiedRecording(recording.id, destination)
-        return true
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
+        failed = true
         if (!signal.aborted) {
           console.warn('[desktop] recording copy failed; retrying', {
             recordingId: recording.id,
             error: describeError(error)
           })
-          scheduleRetry()
         }
-        return false
-      })
-      .finally(() => {
-        inFlight.delete(recording.id)
-      })
-    inFlight.set(recording.id, outcome)
-    copies = outcome
-    return outcome
+      }
+    }
+    return failed
   }
 
-  /** Lists the environment's recordings and copies the missing ones; only the newest reconcile,
-   *  with every copy it waited on succeeding, resets the retry backoff. */
-  async function reconcile(): Promise<void> {
-    const generation = ++reconcileGeneration
-    let listed: unknown
+  async function loop(): Promise<void> {
+    looping = true
     try {
-      const response = await callRuntimeEnvironment(
-        getRuntimeEnvironmentRegistryRoot(),
-        runtimeEnvironmentId,
-        'desktop.recordings.list',
-        {},
-        LIST_TIMEOUT_MS,
-        undefined,
-        undefined,
-        { signal }
-      )
-      if (!response.ok) {
-        throw new Error(response.error.message)
+      while (passNeeded && !signal.aborted) {
+        passNeeded = false
+        const failed = await runPass()
+        if (signal.aborted) {
+          return
+        }
+        if (!failed) {
+          failedPasses = 0
+          continue
+        }
+        const delay = Math.min(RETRY_INITIAL_MS * 2 ** failedPasses, RETRY_MAX_MS)
+        failedPasses += 1
+        // A wake during the pass already asked for the next one; it runs now instead.
+        if (!passNeeded) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null
+            wake()
+          }, delay)
+        }
       }
-      listed = isRecord(response.result) ? response.result.recordings : undefined
-    } catch (error) {
-      if (!signal.aborted) {
-        console.warn('[desktop] listing recordings failed; retrying', {
-          error: describeError(error)
-        })
-        scheduleRetry()
-      }
+    } finally {
+      looping = false
+    }
+  }
+
+  function wake(): void {
+    if (signal.aborted) {
       return
     }
-    const outcomes: Promise<boolean>[] = []
-    for (const entry of Array.isArray(listed) ? listed : []) {
-      const recording = parseRecording(entry)
-      if (recording) {
-        outcomes.push(copy(recording))
-      }
+    passNeeded = true
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
     }
-    const succeeded = (await Promise.all(outcomes)).every(Boolean)
-    if (succeeded && generation === reconcileGeneration && !signal.aborted) {
-      retryAttempt = 0
+    if (!looping) {
+      void loop()
     }
   }
 
   keepDesktopEventsStream(
     runtimeEnvironmentId,
     (event) => {
-      if (event.type === 'ready') {
-        void reconcile()
-        return
-      }
-      if (event.type === 'recording-finished') {
-        const recording = parseRecording(event)
-        if (recording) {
-          void copy(recording)
-        }
+      if (event.type === 'ready' || event.type === 'recording-finished') {
+        wake()
       }
     },
     signal

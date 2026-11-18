@@ -40,6 +40,13 @@ async function settleUntil(condition: () => boolean): Promise<void> {
   expect(condition()).toBe(true)
 }
 
+/** Lets pending file I/O and promises finish, so an assertion that nothing happened means it. */
+async function settle(turns = 50): Promise<void> {
+  for (let turn = 0; turn < turns; turn++) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+}
+
 function listCalls(): number {
   return env.methods().filter((method) => method === 'desktop.recordings.list').length
 }
@@ -163,32 +170,80 @@ describe('syncEnvironmentRecordings', () => {
     expect(listCalls()).toBe(2)
   })
 
-  it('a copy finishing late does not reset the backoff of a later failing retry', async () => {
-    const first = env.finishRecording('aaaaaaaaaaaaaaaa', 1_000)
-    const slow = env.finishRecording('bbbbbbbbbbbbbbbb', 1_000)
-    env.failReadsFor.set(first.path, 2)
-    let releaseSlow = (): void => {}
-    env.readGates.set(
-      slow.path,
-      new Promise<void>((resolve) => {
-        releaseSlow = resolve
-      })
-    )
-    await connected()
-    await settleUntil(() => warn.mock.calls.length === 1)
+  /** Holds list answers until the returned release is called. */
+  function holdLists(): () => void {
+    let release = (): void => {}
+    env.listGate = new Promise<void>((resolve) => {
+      release = () => {
+        env.listGate = null
+        resolve()
+      }
+    })
+    return release
+  }
 
-    // The retry starts while the first reconcile still waits on the slow copy.
-    await vi.advanceTimersByTimeAsync(5_000)
-    expect(listCalls()).toBe(2)
-    releaseSlow()
-    await settleUntil(() => warn.mock.calls.length === 2)
-    expect(localRecordingPath(slow.id)).toBe(copiedPath(slow.id))
-
-    // Two failures in a row: the next retry waits 10 s, not 5 s.
-    await vi.advanceTimersByTimeAsync(9_999)
-    expect(listCalls()).toBe(2)
+  /** Asserts the next pass comes exactly `delayMs` after now, not a millisecond earlier. */
+  async function expectNextPassAfter(delayMs: number): Promise<void> {
+    const before = listCalls()
+    await vi.advanceTimersByTimeAsync(delayMs - 1)
+    await settle()
+    expect(listCalls()).toBe(before)
     await vi.advanceTimersByTimeAsync(1)
-    expect(listCalls()).toBe(3)
+    expect(listCalls()).toBe(before + 1)
+  }
+
+  it('a stale list failure after a newer success arms no retry', async () => {
+    const release = holdLists()
+    env.failLists = 1
+    stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
+    await settleUntil(() => env.streams.length === 1)
+    env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
+    await settleUntil(() => listCalls() === 1)
+    // A recording finishes while the failing list is still out.
+    const recording = env.finishRecording('abababababababab', 1_000)
+    env.emit(env.streams[0], { type: 'recording-finished', ...recording })
+    release()
+
+    await settleUntil(() => localRecordingPath(recording.id) !== null)
+    expect(listCalls()).toBe(2)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(listCalls()).toBe(2)
+  })
+
+  it('a live recording finishing during a list and failing to copy keeps the backoff growing', async () => {
+    const release = holdLists()
+    stops.push(syncEnvironmentRecordings('env-1', WORKSPACE_ID))
+    await settleUntil(() => env.streams.length === 1)
+    env.emit(env.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
+    await settleUntil(() => listCalls() === 1)
+    const late = env.finishRecording('bcbcbcbcbcbcbcbc', 1_000)
+    env.failReadsFor.set(late.path, 100)
+    env.emit(env.streams[0], { type: 'recording-finished', ...late })
+    release()
+    // The first list did not hold it; the pass the event asked for runs next and fails.
+    await settleUntil(() => listCalls() === 2 && warn.mock.calls.length === 1)
+
+    await expectNextPassAfter(5_000)
+    await settleUntil(() => warn.mock.calls.length === 2)
+    await expectNextPassAfter(10_000)
+    await settleUntil(() => warn.mock.calls.length === 3)
+    await expectNextPassAfter(20_000)
+  })
+
+  it('a full successful pass resets the backoff', async () => {
+    env.failLists = 2
+    await connected()
+    await expectNextPassAfter(5_000)
+    await expectNextPassAfter(10_000)
+    // The third pass succeeds; a later failure starts again from 5 s.
+    await settle()
+    env.failLists = 1
+    const recording = env.finishRecording('cdcdcdcdcdcdcdcd', 10)
+    env.emit(env.streams[0], { type: 'recording-finished', ...recording })
+    await settleUntil(() => listCalls() === 4)
+
+    await expectNextPassAfter(5_000)
+    await settleUntil(() => localRecordingPath(recording.id) !== null)
   })
 
   it('stopping cancels a pending retry', async () => {

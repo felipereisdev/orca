@@ -81,6 +81,30 @@ function verified(environmentId: string, retired = false): RuntimeHostStatusSnap
   }
 }
 
+/** Lets pending promises finish, so an assertion that nothing happened means it. */
+async function settle(turns = 50): Promise<void> {
+  for (let turn = 0; turn < turns; turn++) {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+}
+
+/** Holds every configure answer until the returned release is called. */
+function holdConfigures(): () => void {
+  let release = (): void => {}
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  env.configure = async () => {
+    await gate
+    return { id: 'r', ok: true, result: { state: 'ready' }, _meta: { runtimeId: 'vm' } }
+  }
+  return release
+}
+
+function publish(snapshot: RuntimeHostStatusSnapshot): void {
+  state.statusListeners.forEach((listener) => listener(snapshot))
+}
+
 describe('desktop hand-off lifecycle', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -127,6 +151,41 @@ describe('desktop hand-off lifecycle', () => {
 
     expect(env.closedStreams).toBe(1)
     expect(env.streams).toHaveLength(1)
+  })
+
+  it('retiring while a configure is in flight starts no sync until the next verified status', async () => {
+    const release = holdConfigures()
+    registerEnvironmentDesktopLifecycle(STORE)
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+    await settle()
+    expect(configureCalls()).toBe(1)
+
+    publish(verified('env-1', true))
+    release()
+    await settle()
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(env.streams).toHaveLength(0)
+
+    publish(verified('env-1'))
+    await settle()
+    expect(configureCalls()).toBe(2)
+    expect(env.streams).toHaveLength(1)
+  })
+
+  it('retiring with a queued restart pending starts no sync', async () => {
+    const release = holdConfigures()
+    registerEnvironmentDesktopLifecycle(STORE)
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+    await settle()
+    // Verified while the first configure is out: one more configure is queued after it.
+    publish(verified('env-1'))
+    publish(verified('env-1', true))
+    release()
+    await settle()
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+    expect(configureCalls()).toBe(1)
+    expect(env.streams).toHaveLength(0)
   })
 
   it('an environment verified again after retiring gets its desktop and sync back', async () => {

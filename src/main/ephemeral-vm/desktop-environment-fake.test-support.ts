@@ -32,7 +32,10 @@ class DesktopEnvironmentFake {
   failReadsFor = new Map<string, number>()
   /** Reads of these paths wait for the promise; a rejection fails the read. */
   readGates = new Map<string, Promise<void>>()
-  configure: (params: Record<string, unknown>) => FakeResponse = () => ok({ state: 'ready' })
+  /** While set, list answers wait for it; the answer is the snapshot taken when the list began. */
+  listGate: Promise<void> | null = null
+  configure: (params: Record<string, unknown>) => FakeResponse | Promise<FakeResponse> = () =>
+    ok({ state: 'ready' })
   streams: FakeStreamCallbacks[] = []
   closedStreams = 0
   calls: FakeCall[] = []
@@ -44,6 +47,7 @@ class DesktopEnvironmentFake {
     this.failReads = 0
     this.failReadsFor.clear()
     this.readGates.clear()
+    this.listGate = null
     this.configure = () => ok({ state: 'ready' })
     this.streams = []
     this.closedStreams = 0
@@ -94,6 +98,21 @@ class DesktopEnvironmentFake {
     })
   }
 
+  private async list(): Promise<FakeResponse> {
+    // A snapshot, as a server answers: later recordings are not in an earlier answer.
+    const snapshot = this.recordings.map((recording) => ({ ...recording }))
+    const fails = this.failLists > 0
+    if (fails) {
+      this.failLists -= 1
+    }
+    if (this.listGate) {
+      await this.listGate
+    }
+    return fails
+      ? failure('remote_runtime_unavailable', 'unreachable')
+      : ok({ recordings: snapshot })
+  }
+
   call(
     environmentId: string,
     method: string,
@@ -106,12 +125,7 @@ class DesktopEnvironmentFake {
       case 'desktop.configure':
         return this.configure(args)
       case 'desktop.recordings.list':
-        if (this.failLists > 0) {
-          this.failLists -= 1
-          return failure('remote_runtime_unavailable', 'unreachable')
-        }
-        // A snapshot, as a server answers: later recordings are not in an earlier answer.
-        return ok({ recordings: this.recordings.map((recording) => ({ ...recording })) })
+        return this.list()
       case 'files.resolveTerminalPath': {
         const path = String(args.pathText)
         const worktree = String(args.worktree).slice('id:'.length)
