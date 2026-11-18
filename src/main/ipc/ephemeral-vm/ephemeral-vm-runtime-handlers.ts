@@ -19,6 +19,7 @@ import {
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { ephemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { attachEphemeralVmRuntimeToWorkspace } from '../../ephemeral-vm/runtime-attachment'
+import { startRecipeWorkspaceRecordingSync } from '../../ephemeral-vm/desktop-configure'
 import { forgetInterruptedEphemeralVmProvision } from '../../ephemeral-vm/runtime-provisioning-persistence'
 import { pendingVmCheckouts } from '../../ephemeral-vm/pending-vm-checkouts'
 import {
@@ -130,11 +131,14 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.handle(
     'ephemeralVm:attachWorkspace',
     (_event, args: { runtimeId: string; workspaceId: string }): EphemeralVmRuntimeRecord => {
-      return attachEphemeralVmRuntimeToWorkspace({
+      const runtime = attachEphemeralVmRuntimeToWorkspace({
         userDataPath: app.getPath('userData'),
         runtimeId: args.runtimeId,
         workspaceId: args.workspaceId
       })
+      // Provisioning configured the desktop before the workspace existed; its recordings sync now.
+      startRecipeWorkspaceRecordingSync(store, runtime)
+      return runtime
     }
   )
 

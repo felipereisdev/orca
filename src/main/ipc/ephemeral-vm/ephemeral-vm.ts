@@ -41,6 +41,8 @@ import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handl
 import type { PluginService } from '../../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../../plugins/contributions/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../../ephemeral-vm/provisioned-root-source'
+import { handOffRecipeEnvironmentDesktop } from '../../ephemeral-vm/desktop-configure'
+import { indexLocalRecordings } from '../../ephemeral-vm/desktop-recording-index'
 import { getRuntimeEnvironmentRegistryRoot } from '../runtime-environments/catalog/runtime-environment-registry-root'
 import {
   ephemeralVmFailure,
@@ -84,6 +86,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
   ipcMain.removeHandler('ephemeralVm:cancelProvision')
   registerEphemeralVmRuntimeHandlers(store)
   reconcileInterruptedEphemeralVmProvisionsOnStartup(app.getPath('userData'))
+  void indexLocalRecordings().catch((error: unknown) => console.warn('[desktop] index', error))
 
   ipcMain.handle('ephemeralVm:listRecipes', async (_event, args: { repoId: string }) => {
     return listRecipes(store, args.repoId, await getApprovedPluginVmRecipes(pluginService))
@@ -216,6 +219,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
                 runtimeEnvironmentId: ssh.environmentId
               })
             )
+            void handOffRecipeEnvironmentDesktop(store, runtime)
             return {
               ok: true,
               connectionType: 'ssh',
@@ -268,6 +272,8 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             runtimeEnvironmentId: environment.id
           })
         )
+        // In the background: a desktop that cannot be configured never fails the workspace.
+        void handOffRecipeEnvironmentDesktop(store, runtime)
         return {
           ok: true,
           connectionType: 'orca-server',
