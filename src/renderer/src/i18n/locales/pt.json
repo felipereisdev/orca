@@ -25176,5 +25176,36 @@
     "dontSend": "Não enviar",
     "sending": "Enviando…",
     "sendReport": "Enviar relatório"
+  },
+  "desktop": {
+    "tab": {
+      "notice": "Programas no desktop do ambiente podem ver o que é exibido e digitado. Não digite senhas pessoais aqui.",
+      "status": {
+        "connecting": "Conectando…",
+        "unavailable": "Indisponível",
+        "user": "Você no controle",
+        "agent": "Agente no controle"
+      },
+      "unavailableBody": "O desktop do ambiente não está acessível.",
+      "retry": "Tentar de novo",
+      "recording": {
+        "stop": "Parar gravação",
+        "start": "Gravar"
+      },
+      "control": {
+        "handBack": "Devolver ao agente",
+        "take": "Assumir controle"
+      },
+      "errors": {
+        "notAllowed": "Só o computador que configurou este desktop pode vê-lo ou controlá-lo.",
+        "unavailable": "O desktop não está disponível no momento.",
+        "alreadyRecording": "O desktop já está sendo gravado.",
+        "notRecording": "O desktop não está sendo gravado.",
+        "recordingUnavailable": "Este ambiente não consegue gravar o desktop porque o ffmpeg não está instalado.",
+        "recordingFailed": "A gravação falhou e foi descartada.",
+        "unknown": "Algo deu errado. Tente de novo."
+      },
+      "create": "Desktop"
+    }
   }
 }

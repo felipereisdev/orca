@@ -3,7 +3,7 @@ import type { TerminalTab } from '../../../../../shared/workspace-layout/termina
 import type { BrowserWorkspace } from '../../../../../shared/browser/workspaces/browser-workspace-types'
 import type { OpenFile } from '../../../store/slices/editor/types/open-file'
 
-type ContentStripItem<Kind extends 'simulator' | 'database' | 'room'> = {
+type ContentStripItem<Kind extends 'simulator' | 'database' | 'room' | 'desktop'> = {
   type: Kind
   id: string
   unifiedTabId: string
@@ -36,6 +36,7 @@ export type TabBarItem =
   | ContentStripItem<'simulator'>
   | ContentStripItem<'database'>
   | ContentStripItem<'room'>
+  | ContentStripItem<'desktop'>
   | {
       type: 'agent-session'
       id: string

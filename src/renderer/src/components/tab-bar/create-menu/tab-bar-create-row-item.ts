@@ -6,6 +6,7 @@ import type { NewTabMenuArrangeable } from '../../../../../shared/new-tab-menu/n
 export const CREATE_ROW_TERMINAL_ID = 'terminal'
 export const CREATE_ROW_MOBILE_EMULATOR_ID = 'mobile-emulator'
 export const CREATE_ROW_DATABASE_CONNECTIONS_ID = 'database-connections'
+export const CREATE_ROW_DESKTOP_ID = 'desktop'
 
 /** One icon in the + menu's create row. */
 export type TabBarCreateRowItem = NewTabMenuArrangeable & {

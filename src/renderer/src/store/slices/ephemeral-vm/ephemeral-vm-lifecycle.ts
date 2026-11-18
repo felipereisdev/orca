@@ -7,6 +7,7 @@ import {
   type ExecutionHostVmState
 } from '../../../../../shared/execution-host/execution-host-health'
 import type { EphemeralVmFailure } from '../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
+import { getEphemeralVmRecipeResultDesktop } from '../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 
 /** The lifecycle facts the UI reads; recipe results (pairing codes, keys) never enter the store. */
 export type EphemeralVmWorkspaceRuntime = Pick<
@@ -18,6 +19,8 @@ export type EphemeralVmWorkspaceRuntime = Pick<
   failure?: EphemeralVmFailure
   /** False when the recipe snapshot has no suspend step, so Suspend VM would do nothing. */
   canSuspend: boolean
+  /** The recipe result set up a remote desktop, so the workspace can open a Desktop tab. */
+  hasDesktop?: boolean
 }
 
 export type EphemeralVmLifecycleSlice = {
@@ -76,7 +79,10 @@ export function projectEphemeralVmWorkspaceRuntimes(
       ...(failure ? { failure } : {}),
       // Records without a snapshot resolve the recipe from the repo at suspend time.
       // Main only suspends a VM whose repo it can resolve (findWorkspaceEphemeralVmRuntime).
-      canSuspend: Boolean(record.repoId) && (!record.recipe || Boolean(record.recipe.suspend))
+      canSuspend: Boolean(record.repoId) && (!record.recipe || Boolean(record.recipe.suspend)),
+      ...(record.recipeResult && getEphemeralVmRecipeResultDesktop(record.recipeResult)
+        ? { hasDesktop: true }
+        : {})
     }
   }
   return byWorkspaceId
@@ -99,6 +105,7 @@ function sameRuntimes(
       left.status === right.status &&
       left.runtimeEnvironmentId === right.runtimeEnvironmentId &&
       left.canSuspend === right.canSuspend &&
+      left.hasDesktop === right.hasDesktop &&
       left.failure?.error === right.failure?.error &&
       left.failure?.errorCode === right.failure?.errorCode &&
       JSON.stringify(left.failure?.errorParams) === JSON.stringify(right.failure?.errorParams)

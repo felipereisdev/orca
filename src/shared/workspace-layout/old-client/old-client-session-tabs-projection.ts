@@ -176,6 +176,9 @@ function projectTab(tab: LayoutTab, scope: Scope): RuntimeMobileSessionSnapshotT
     // Old clients have no room view; a room reopens from its sidebar row.
     case 'room':
       return []
+    // The remote desktop is drawn by the desktop app; old clients have no view for it.
+    case 'desktop':
+      return []
   }
 }
 

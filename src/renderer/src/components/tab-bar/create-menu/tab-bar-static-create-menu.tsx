@@ -1,5 +1,13 @@
 import React from 'react'
-import { Database, FilePlus, FileText, Globe, Smartphone, TerminalSquare } from 'lucide-react'
+import {
+  Database,
+  FilePlus,
+  FileText,
+  Globe,
+  MonitorPlay,
+  Smartphone,
+  TerminalSquare
+} from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
 import { MobileEmulatorTabIntroCallout } from '../../emulator-pane/tab-intro/MobileEmulatorTabIntroCallout'
 import { NewTabMenuTipSlot } from '../menu-fit/NewTabMenuTipSlot'
@@ -18,12 +26,14 @@ import { TabBarCreateRow } from './TabBarCreateRow'
 import { NEW_TAB_MENU_LAYOUT_SETTING } from '../../../../../shared/new-tab-menu/new-tab-menu-layout'
 import {
   CREATE_ROW_DATABASE_CONNECTIONS_ID,
+  CREATE_ROW_DESKTOP_ID,
   CREATE_ROW_MOBILE_EMULATOR_ID,
   CREATE_ROW_TERMINAL_ID,
   type TabBarCreateRowItem
 } from './tab-bar-create-row-item'
 import { useWorkspaceDatabaseClient } from '../../database/use-workspace-database-connections'
 import { requestDatabaseConnectionPicker } from '@/lib/database/database-connection-picker-request'
+import { openDesktopTab } from '@/lib/desktop/desktop-tabs'
 
 const ICON_CLASS = 'size-4'
 
@@ -69,6 +79,9 @@ export function TabBarStaticCreateMenu({
   const pluginNewFiles = usePluginNewFiles()
   const databaseClient = useWorkspaceDatabaseClient(terminalOnly ? null : props.worktreeId)
   const simulatorAvailable = !terminalOnly && mobileEmulatorEnabled && mobileEmulatorCreationEnabled
+  const workspaceHasDesktop = useAppStore(
+    (state) => state.ephemeralVmRuntimesByWorkspaceId[props.worktreeId]?.hasDesktop === true
+  )
 
   const terminalItems: TabBarCreateRowItem[] =
     windowsShellEntries && onNewTerminalWithShell
@@ -198,6 +211,17 @@ export function TabBarStaticCreateMenu({
           }
         ]
       : []
+  const desktopItems: TabBarCreateRowItem[] =
+    !terminalOnly && workspaceHasDesktop
+      ? [
+          {
+            id: CREATE_ROW_DESKTOP_ID,
+            label: t('desktop.tab.create', 'Desktop'),
+            icon: <MonitorPlay className={ICON_CLASS} />,
+            run: () => openDesktopTab(props.worktreeId, groupId)
+          }
+        ]
+      : []
   const items =
     newTabMenuSurface === 'floating-panel'
       ? [
@@ -206,6 +230,7 @@ export function TabBarStaticCreateMenu({
           ...terminalItems,
           ...browserItems,
           ...databaseItems,
+          ...desktopItems,
           ...simulatorItems
         ]
       : [
@@ -214,6 +239,7 @@ export function TabBarStaticCreateMenu({
           ...markdownItems,
           ...openMarkdownItems,
           ...databaseItems,
+          ...desktopItems,
           ...simulatorItems
         ]
 

@@ -29672,5 +29672,36 @@
     "suggestionUse": "Use",
     "browseOnline": "Browse",
     "browseOnlineLabel": "Browse community translations on orca.dev (opens in your browser)"
+  },
+  "desktop": {
+    "tab": {
+      "notice": "Programs on the environment desktop can see what is shown and typed there. Don't type personal passwords here.",
+      "status": {
+        "connecting": "Connecting…",
+        "unavailable": "Unavailable",
+        "user": "You're in control",
+        "agent": "Agent in control"
+      },
+      "unavailableBody": "The environment desktop is not reachable.",
+      "retry": "Try again",
+      "recording": {
+        "stop": "Stop recording",
+        "start": "Record"
+      },
+      "control": {
+        "handBack": "Hand back to agent",
+        "take": "Take control"
+      },
+      "errors": {
+        "notAllowed": "Only the computer that set up this desktop can view or control it.",
+        "unavailable": "The desktop is not available right now.",
+        "alreadyRecording": "The desktop is already being recorded.",
+        "notRecording": "The desktop is not being recorded.",
+        "recordingUnavailable": "This environment cannot record the desktop because ffmpeg is missing.",
+        "recordingFailed": "The recording failed and was discarded.",
+        "unknown": "Something went wrong. Try again."
+      },
+      "create": "Desktop"
+    }
   }
 }
