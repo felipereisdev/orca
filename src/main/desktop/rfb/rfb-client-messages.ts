@@ -45,25 +45,69 @@ function messageLength(buffer: Buffer): number | null {
   throw new RfbError('rfb_protocol_error')
 }
 
-/** Reassembles a client→server byte stream into whole RFB messages. */
+// messageLength never reads past the ClientCutText header.
+const MAX_HEADER_BYTES = 8
+
+/**
+ * Reassembles a client→server byte stream into whole RFB messages. Fragments are kept as a list
+ * and each complete message is copied once, so a large fragmented message costs linear work.
+ */
 export class RfbClientMessageFilter {
-  private pending: Buffer = Buffer.alloc(0)
+  private chunks: Buffer[] = []
+  private pendingBytes = 0
+  private nextLength: number | null = null
 
   push(chunk: Buffer): Buffer[] {
-    this.pending = this.pending.length === 0 ? chunk : Buffer.concat([this.pending, chunk])
+    if (chunk.length > 0) {
+      this.chunks.push(chunk)
+      this.pendingBytes += chunk.length
+    }
     const messages: Buffer[] = []
     for (;;) {
-      const length = messageLength(this.pending)
-      if (length === null || this.pending.length < length) {
+      this.nextLength ??= messageLength(this.peek(Math.min(MAX_HEADER_BYTES, this.pendingBytes)))
+      if (this.nextLength === null || this.pendingBytes < this.nextLength) {
         break
       }
-      messages.push(Buffer.from(this.pending.subarray(0, length)))
-      this.pending = this.pending.subarray(length)
-    }
-    if (this.pending.length > 0) {
-      this.pending = Buffer.from(this.pending)
+      messages.push(this.take(this.nextLength))
+      this.nextLength = null
     }
     return messages
+  }
+
+  private peek(length: number): Buffer {
+    const first = this.chunks[0]
+    if (first === undefined || first.length >= length) {
+      return first?.subarray(0, length) ?? Buffer.alloc(0)
+    }
+    const header = Buffer.alloc(length)
+    let filled = 0
+    for (const chunk of this.chunks) {
+      if (filled === length) {
+        break
+      }
+      filled += chunk.copy(header, filled, 0, Math.min(chunk.length, length - filled))
+    }
+    return header
+  }
+
+  private take(length: number): Buffer {
+    const message = Buffer.allocUnsafe(length)
+    let filled = 0
+    let consumed = 0
+    while (filled < length) {
+      const chunk = this.chunks[consumed]
+      const count = Math.min(chunk.length, length - filled)
+      chunk.copy(message, filled, 0, count)
+      filled += count
+      if (count === chunk.length) {
+        consumed++
+      } else {
+        this.chunks[consumed] = chunk.subarray(count)
+      }
+    }
+    this.chunks.splice(0, consumed)
+    this.pendingBytes -= length
+    return message
   }
 }
 

@@ -43,4 +43,14 @@ describe('performRfbClientHandshake', () => {
       performRfbClientHandshake(socket, { password: 'wrong', shared: true })
     ).rejects.toMatchObject({ code: 'rfb_auth_failed' })
   })
+
+  it('rejects a ServerInit larger than the framebuffer budget', async () => {
+    const server = await startFakeRfbServer({ password: 'abc12345', width: 9000, height: 600 })
+    cleanups.push(() => server.close())
+    const socket = await connectTo(server.port)
+
+    await expect(
+      performRfbClientHandshake(socket, { password: 'abc12345', shared: true })
+    ).rejects.toMatchObject({ code: 'rfb_framebuffer_too_large' })
+  })
 })

@@ -44,4 +44,52 @@ describe('RfbFramebuffer', () => {
     ])
     expect(() => fb.apply(update)).toThrow(expect.objectContaining({ code: 'rfb_protocol_error' }))
   })
+
+  it('rejects zero dimensions', () => {
+    expect(() => new RfbFramebuffer(0, 5)).toThrow(
+      expect.objectContaining({ code: 'rfb_protocol_error' })
+    )
+    const fb = new RfbFramebuffer(2, 2)
+    expect(() =>
+      fb.apply(Buffer.concat([Buffer.from([0, 0, 0, 1]), rectHeader(0, 0, 4, 0, -223)]))
+    ).toThrow(expect.objectContaining({ code: 'rfb_protocol_error' }))
+    expect([fb.width, fb.height]).toEqual([2, 2])
+  })
+
+  it('rejects a framebuffer over 8192 per side or 33,554,432 pixels', () => {
+    expect(() => new RfbFramebuffer(8193, 1)).toThrow(
+      expect.objectContaining({ code: 'rfb_framebuffer_too_large' })
+    )
+    expect(() => new RfbFramebuffer(8192, 4097)).toThrow(
+      expect.objectContaining({ code: 'rfb_framebuffer_too_large' })
+    )
+  })
+
+  it('keeps the old size and pixels when a DesktopSize is over budget', () => {
+    const fb = new RfbFramebuffer(1, 1)
+    fb.apply(
+      Buffer.concat([
+        Buffer.from([0, 0, 0, 1]),
+        rectHeader(0, 0, 1, 1, 0),
+        Buffer.from([0x30, 0x20, 0x10, 0x00])
+      ])
+    )
+    const resizes: unknown[] = []
+    fb.on('resize', (size) => resizes.push(size))
+
+    expect(() =>
+      fb.apply(Buffer.concat([Buffer.from([0, 0, 0, 1]), rectHeader(0, 0, 65535, 65535, -223)]))
+    ).toThrow(expect.objectContaining({ code: 'rfb_framebuffer_too_large' }))
+
+    expect([fb.width, fb.height]).toEqual([1, 1])
+    expect([...fb.rgba()]).toEqual([0x10, 0x20, 0x30, 255])
+    expect(resizes).toEqual([])
+  })
+
+  it('rejects a pixel format other than 32bpp true color with 8-bit channels', () => {
+    const sixteenBit = Buffer.from([16, 16, 0, 1, 0, 31, 0, 63, 0, 31, 11, 5, 0, 0, 0, 0])
+    expect(() => new RfbFramebuffer(2, 2, sixteenBit)).toThrow(
+      expect.objectContaining({ code: 'rfb_unsupported_pixel_format' })
+    )
+  })
 })

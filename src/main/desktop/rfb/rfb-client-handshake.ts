@@ -1,4 +1,5 @@
 import type { Duplex } from 'node:stream'
+import { assertRfbFramebufferSize } from './rfb-framebuffer'
 import { RFB_PROTOCOL_VERSION, RFB_SECURITY_VNC_AUTH, RfbError } from './rfb-protocol'
 import { readExact, readRfbString } from './rfb-stream-reader'
 import { vncAuthResponse } from './vnc-auth'
@@ -57,6 +58,7 @@ export async function performRfbClientHandshake(
 
   socket.write(Buffer.from([opts.shared ? 1 : 0]))
   const head = await readExact(socket, 20)
+  assertRfbFramebufferSize(head.readUInt16BE(0), head.readUInt16BE(2))
   const name = await readRfbString(socket)
   return {
     serverInit: Buffer.concat([head, name.raw]),

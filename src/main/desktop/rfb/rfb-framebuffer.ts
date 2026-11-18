@@ -16,8 +16,25 @@ import {
 export type RfbFramebufferSize = { width: number; height: number }
 
 const RECT_HEADER_BYTES = 12
+// Peer-supplied sizes are bounded so a bad ServerInit or DesktopSize cannot exhaust main memory.
+const MAX_FRAMEBUFFER_SIDE = 8192
+const MAX_FRAMEBUFFER_PIXELS = 33_554_432
+
+export function assertRfbFramebufferSize(width: number, height: number): void {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    throw new RfbError('rfb_protocol_error')
+  }
+  if (
+    width > MAX_FRAMEBUFFER_SIDE ||
+    height > MAX_FRAMEBUFFER_SIDE ||
+    width * height > MAX_FRAMEBUFFER_PIXELS
+  ) {
+    throw new RfbError('rfb_framebuffer_too_large')
+  }
+}
 
 function blankPixels(width: number, height: number): Buffer {
+  assertRfbFramebufferSize(width, height)
   const pixels = Buffer.alloc(width * height * 4)
   for (let offset = 3; offset < pixels.length; offset += 4) {
     pixels[offset] = 255
@@ -36,9 +53,9 @@ export class RfbFramebuffer extends EventEmitter<{ resize: [RfbFramebufferSize] 
     super()
     this.format = pixelFormat ? parseRfbPixelFormat(pixelFormat) : DEFAULT_RFB_PIXEL_FORMAT
     assertRfbTrueColor32(this.format)
+    this.pixels = blankPixels(width, height)
     this.currentWidth = width
     this.currentHeight = height
-    this.pixels = blankPixels(width, height)
   }
 
   get width(): number {
@@ -114,12 +131,10 @@ export class RfbFramebuffer extends EventEmitter<{ resize: [RfbFramebufferSize] 
   }
 
   private resize(width: number, height: number): void {
-    if (width < 1 || height < 1) {
-      throw new RfbError('rfb_protocol_error')
-    }
+    // Allocate (and budget-check) before committing the new size.
+    this.pixels = blankPixels(width, height)
     this.currentWidth = width
     this.currentHeight = height
-    this.pixels = blankPixels(width, height)
     this.emit('resize', { width, height })
   }
 }

@@ -19,6 +19,8 @@ export type RfbErrorCode =
   | 'rfb_auth_failed'
   | 'rfb_unsupported_security'
   | 'rfb_protocol_error'
+  | 'rfb_unsupported_pixel_format'
+  | 'rfb_framebuffer_too_large'
   | 'rfb_connection_closed'
 
 /** The message is only the code; `detail` holds what the server said, never credentials. */

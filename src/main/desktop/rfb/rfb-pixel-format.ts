@@ -60,7 +60,7 @@ export function serializeRfbPixelFormat(format: RfbPixelFormat): Buffer {
   return bytes
 }
 
-/** Only 32bpp true color with 8-bit channels is decoded; anything else is a protocol error here. */
+/** Only 32bpp true color with 8-bit channels is decoded; the broker asks the server for that format. */
 export function assertRfbTrueColor32(format: RfbPixelFormat): void {
   const channels = [format.redMax, format.greenMax, format.blueMax]
   const shifts = [format.redShift, format.greenShift, format.blueShift]
@@ -70,7 +70,7 @@ export function assertRfbTrueColor32(format: RfbPixelFormat): void {
     channels.some((max) => max !== 255) ||
     shifts.some((shift) => shift > 24)
   ) {
-    throw new RfbError('rfb_protocol_error')
+    throw new RfbError('rfb_unsupported_pixel_format')
   }
 }
 
