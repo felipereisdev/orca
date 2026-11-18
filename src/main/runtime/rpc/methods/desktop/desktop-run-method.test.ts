@@ -41,6 +41,8 @@ function setup() {
 const results = (replies: DesktopReply[]) => replies.map((reply) => reply.result)
 const outputChars = (replies: DesktopReply[]) =>
   replies.reduce((total, reply) => total + String(reply.result?.stdout ?? '').length, 0)
+const outputFrames = (replies: DesktopReply[]) =>
+  replies.filter((reply) => reply.result?.stdout !== undefined).length
 const hasExit = (replies: DesktopReply[]) =>
   replies.some((reply) => reply.result?.exit !== undefined)
 const MiB = 1024 * 1024
@@ -192,7 +194,7 @@ describe('desktop.run', () => {
     const lineChars = 64 * 1024
 
     const run = stream('desktop.run', { argv: ['flood', '64', String(lineChars)] }, MAC_AGENT)
-    await run.waitForReplies((replies) => outputChars(replies) > MiB)
+    await run.waitForReplies((replies) => outputChars(replies) >= MiB)
     // The launcher already wrote all 4 MiB; give the socket turns to deliver more if unpaused.
     // ast-grep-ignore: test-no-polling-loop -- fixed I/O turns, no condition polled
     for (let turn = 0; turn < 50; turn++) {
@@ -208,9 +210,9 @@ describe('desktop.run', () => {
       )
     // ast-grep-ignore: test-no-polling-loop -- each ack waits for the output it releases
     while (!hasExit(run.replies)) {
-      const received = outputChars(run.replies)
+      const received = outputFrames(run.replies)
       await ack(received)
-      await run.waitForReplies((replies) => hasExit(replies) || outputChars(replies) > received)
+      await run.waitForReplies((replies) => hasExit(replies) || outputFrames(replies) > received)
     }
     await run.done
 
@@ -219,6 +221,47 @@ describe('desktop.run', () => {
     expect(outputChars(run.replies)).toBe(64 * lineChars)
     expect(results(run.replies).at(-1)).toEqual({ exit: 0 })
   })
+
+  // Every frame costs its payload bytes plus 256, within a 1 MiB budget.
+  for (const [label, frameChars, maxFrames] of [
+    ['empty', 0, Math.ceil(MiB / 256) + 1],
+    ['1-byte', 1, Math.ceil(MiB / 257) + 1]
+  ] as const) {
+    it(`stops reading a flood of ${label} frames within the output budget`, async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const { vnc, launcher } = await servers()
+      const { call, configure, stream } = setup()
+      await configure(vnc, MAC, { port: launcher.port, token: TOKEN })
+      const frames = 20_000
+
+      const run = stream(
+        'desktop.run',
+        { argv: ['flood', String(frames), String(frameChars)] },
+        MAC_AGENT
+      )
+      await run.waitForReplies((replies) => outputFrames(replies) >= maxFrames - 1)
+      // ast-grep-ignore: test-no-polling-loop -- fixed I/O turns, no condition polled
+      for (let turn = 0; turn < 50; turn++) {
+        await new Promise((resolve) => setImmediate(resolve))
+      }
+      const unacknowledged = outputFrames(run.replies)
+      const subscriptionId = run.replies[0]?.result?.subscriptionId
+      // ast-grep-ignore: test-no-polling-loop -- each ack waits for the output it releases
+      while (!hasExit(run.replies)) {
+        const received = outputFrames(run.replies)
+        await call(
+          'desktop.run.ack',
+          { subscriptionId, received },
+          { ...MAC_AGENT, connectionId: run.connectionId }
+        )
+        await run.waitForReplies((replies) => hasExit(replies) || outputFrames(replies) > received)
+      }
+      await run.done
+
+      expect(unacknowledged).toBeLessThanOrEqual(maxFrames)
+      expect(outputFrames(run.replies)).toBe(frames)
+    })
+  }
 
   it('a launcher line over 1 MiB fails the run', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

@@ -1,16 +1,16 @@
-import { BlockList, isIPv4, isIPv6 } from 'node:net'
+import { isIPv4 } from 'node:net'
 
-const LOOPBACK = new BlockList()
-LOOPBACK.addSubnet('127.0.0.0', 8, 'ipv4')
-LOOPBACK.addAddress('::1', 'ipv6')
-
-/** Only 127.0.0.0/8, ::1 and localhost: the VNC password and launcher token travel in plaintext. */
-export function isLoopbackHost(host: string): boolean {
+/**
+ * The literal loopback address to connect to, or undefined when `host` is not one: the VNC
+ * password and launcher token travel in plaintext. `localhost` becomes 127.0.0.1; otherwise only
+ * literal IPv4 127.x.x.x and `::1` pass (no IPv4-mapped forms, no names), so nothing resolves DNS.
+ */
+export function loopbackLiteral(host: string): string | undefined {
   if (host.toLowerCase() === 'localhost') {
-    return true
+    return '127.0.0.1'
   }
-  if (isIPv4(host)) {
-    return LOOPBACK.check(host, 'ipv4')
+  if (host === '::1' || (isIPv4(host) && host.startsWith('127.'))) {
+    return host
   }
-  return isIPv6(host) && LOOPBACK.check(host, 'ipv6')
+  return undefined
 }

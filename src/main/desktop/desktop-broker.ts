@@ -12,7 +12,7 @@ import {
 } from './desktop-agent-actions'
 import { DesktopControlConnection, type DesktopFrame } from './desktop-control-connection'
 import { DesktopError } from './desktop-errors'
-import { isLoopbackHost } from './desktop-loopback-host'
+import { assertValidConfig, type DesktopBrokerConfig } from './desktop-broker-config'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerRegistry } from './desktop-viewer-registry'
 import { encodePng } from './rfb/png-encode'
@@ -28,35 +28,11 @@ export type DesktopStatus = {
   recording: boolean
 }
 
-export type DesktopBrokerConfig = {
-  host: string
-  port: number
-  password: string
-  launcher?: { port: number; token: string }
-}
+export type { DesktopBrokerConfig } from './desktop-broker-config'
 
 const OWNER_FALLBACK_MS = 5_000
 const RETRY_INITIAL_MS = 1_000
 const RETRY_MAX_MS = 30_000
-
-function validPort(port: number): boolean {
-  return Number.isInteger(port) && port >= 1 && port <= 65_535
-}
-
-function assertValidConfig(cfg: DesktopBrokerConfig): void {
-  if (typeof cfg.host !== 'string' || cfg.host.length === 0 || !validPort(cfg.port)) {
-    throw new DesktopError('desktop_invalid_input', 'host and port are required')
-  }
-  if (!isLoopbackHost(cfg.host)) {
-    throw new DesktopError('desktop_invalid_input', 'host must be a loopback address')
-  }
-  if (typeof cfg.password !== 'string' || cfg.password.length === 0) {
-    throw new DesktopError('desktop_invalid_input', 'a VNC password is required')
-  }
-  if (cfg.launcher && (!validPort(cfg.launcher.port) || typeof cfg.launcher.token !== 'string')) {
-    throw new DesktopError('desktop_invalid_input', 'launcher needs a port and a token')
-  }
-}
 
 /**
  * The only VNC client in the environment. Credentials live in private fields and never reach
@@ -97,9 +73,9 @@ export class DesktopBroker {
 
   /** Replaces any previous configuration and reconnects; resolves after the first attempt. */
   async configure(cfg: DesktopBrokerConfig): Promise<void> {
-    assertValidConfig(cfg)
+    const host = assertValidConfig(cfg)
     this.#disconnect()
-    this.#target = { host: cfg.host, port: cfg.port, password: cfg.password }
+    this.#target = { host, port: cfg.port, password: cfg.password }
     this.#launcher = cfg.launcher ? { ...cfg.launcher } : undefined
     this.#state = 'connecting'
     this.#reason = undefined

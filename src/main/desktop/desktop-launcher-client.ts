@@ -1,9 +1,9 @@
-import { connect, type Socket } from 'node:net'
+import { connect, isIP, type Socket } from 'node:net'
 import { DesktopError } from './desktop-errors'
 import { launcherLineReader } from './desktop-launcher-line-reader'
 
 /**
- * JSON-lines protocol with the in-environment launcher (runs as user `desktop`), one TCP
+ * JSON-lines protocol with the in-environment launcher (starts programs as user `gui`), one TCP
  * connection per program:
  *   → {"token","op":"run","argv":[…],"cwd"?,"env"?}
  *   ← {"id":"<run id>"}                          started, in its own process group
@@ -51,6 +51,11 @@ export function runOnLauncher(
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       resolve(undefined)
+      return
+    }
+    // The broker hands over a literal loopback address; a name would go through DNS with the token.
+    if (isIP(endpoint.host) === 0) {
+      reject(new DesktopError('desktop_run_unavailable', 'launcher_host_not_literal'))
       return
     }
     let settled = false

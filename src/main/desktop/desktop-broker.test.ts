@@ -65,7 +65,17 @@ describe('DesktopBroker connection', () => {
 
   it('configure refuses a non-loopback host before touching the current connection', async () => {
     const { broker, server } = await fixture()
-    const remote = ['192.0.2.10', 'example.com', '10.127.0.1', '2001:db8::1', '::ffff:10.0.0.1']
+    // Names that resolve to loopback are refused too: no DNS resolution happens anywhere.
+    const remote = [
+      '192.0.2.10',
+      'example.com',
+      '10.127.0.1',
+      '2001:db8::1',
+      '::ffff:10.0.0.1',
+      '::ffff:127.0.0.1',
+      'localtest.me',
+      'localhost.localdomain'
+    ]
 
     const refusals = await Promise.all(
       remote.map((host) =>
@@ -87,14 +97,20 @@ describe('DesktopBroker connection', () => {
     expect(broker.launcherEndpoint()).toBeUndefined()
   })
 
-  it('configure accepts loopback hosts', async () => {
+  it('configure accepts loopback hosts and connects localhost to 127.0.0.1', async () => {
     const server = await startFakeRfbServer({ password: FIXTURE_PASSWORD, width: 8, height: 8 })
     cleanups.push(() => server.close())
     const broker = trackedBroker()
 
     for (const host of ['127.0.0.1', 'localhost', 'LocalHost']) {
-      await broker.configure({ host, port: server.port, password: FIXTURE_PASSWORD })
+      await broker.configure({
+        host,
+        port: server.port,
+        password: FIXTURE_PASSWORD,
+        launcher: { port: 5902, token: 'launcher-token' }
+      })
       expect(broker.status().state).toBe('ready')
+      expect(broker.launcherEndpoint()?.host).toBe('127.0.0.1')
     }
   })
 

@@ -149,6 +149,18 @@ describe('desktop agent action methods', () => {
     expect(await readFile(target, 'utf8')).toBe('keep')
   })
 
+  it('desktop.screenshot accepts a destination name of 255 bytes', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const root = await tempRoot()
+    const { call } = await setup(root)
+    const out = join(root, `${'a'.repeat(251)}.png`)
+
+    const shot = await call('desktop.screenshot', { out }, MAC_AGENT)
+
+    expect(shot).toMatchObject({ ok: true, result: { path: out } })
+    expect((await readFile(out)).subarray(0, 8)).toEqual(PNG_SIGNATURE)
+  })
+
   posixOnly('desktop.screenshot overwriting an existing out file leaves it 0600', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const root = await tempRoot()

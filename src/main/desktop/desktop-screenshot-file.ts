@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
-import { chmod, lstat, mkdir, rename, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { chmod, lstat, mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { errnoCodeOrUnknown } from '../../shared/errors/errno-code'
 import { DesktopError } from './desktop-errors'
 
@@ -48,9 +48,16 @@ async function writeChosenDestination(png: Buffer, out: string): Promise<string>
   if (existing && !existing.isFile()) {
     throw new DesktopError('desktop_invalid_input', '--out must be a regular file or a new path')
   }
-  const temp = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`)
+  // A short name, so any destination name that fits the filesystem also fits its temp file.
+  const temp = join(dirname(path), `.orca-${randomBytes(6).toString('hex')}.tmp`)
+  // `wx` refuses an existing entry; only a file this call created is ever removed.
+  const handle = await open(temp, 'wx', 0o600)
   try {
-    await writeFile(temp, png, { mode: 0o600, flag: 'wx' })
+    try {
+      await handle.writeFile(png)
+    } finally {
+      await handle.close()
+    }
     await rename(temp, path)
   } catch (error) {
     await rm(temp, { force: true })

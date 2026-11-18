@@ -10,13 +10,21 @@ import {
 import { defineMethod, defineStreamingMethod } from '../../core'
 
 const RUN_SUBSCRIPTION_PREFIX = 'desktop-run:'
-/** Output chars sent but not yet acknowledged before the launcher stops being read. */
-const MAX_UNACKED_OUTPUT_CHARS = 1024 * 1024
+/** Budget of unacknowledged output; each frame costs its payload bytes plus a fixed overhead. */
+const MAX_UNACKED_OUTPUT_COST = 1024 * 1024
+const OUTPUT_FRAME_OVERHEAD = 256
 
-/** Output credit of one run: reading pauses past the bound and resumes as acks arrive. */
+/**
+ * Output credit of one run, counted in frames: reading pauses once the unacknowledged frames cost
+ * more than the budget, so empty or tiny frames cannot queue without bound, and resumes on acks.
+ */
 class RunOutputCredit {
-  #sent = 0
-  #acked = 0
+  /** Costs of sent frames not yet acknowledged, oldest first; at most budget / overhead + 1. */
+  readonly #unacked: number[] = []
+  #head = 0
+  #unackedCost = 0
+  #sentFrames = 0
+  #ackedFrames = 0
   #flow: LauncherRunFlow | undefined
   #paused = false
 
@@ -26,18 +34,30 @@ class RunOutputCredit {
     this.#flow = flow
   }
 
-  sent(chars: number): void {
-    this.#sent += chars
-    if (!this.#paused && this.#sent - this.#acked > MAX_UNACKED_OUTPUT_CHARS) {
+  sent(data: string): void {
+    const cost = Buffer.byteLength(data, 'utf8') + OUTPUT_FRAME_OVERHEAD
+    this.#unacked.push(cost)
+    this.#unackedCost += cost
+    this.#sentFrames++
+    if (!this.#paused && this.#unackedCost > MAX_UNACKED_OUTPUT_COST) {
       this.#paused = true
       this.#flow?.pause()
     }
   }
 
+  /** `received`: output frames the client has taken so far (cumulative, idempotent). */
   ack(received: number): void {
-    // Cumulative and idempotent; never past what was sent.
-    this.#acked = Math.max(this.#acked, Math.min(received, this.#sent))
-    if (this.#paused && this.#sent - this.#acked <= MAX_UNACKED_OUTPUT_CHARS) {
+    const target = Math.min(received, this.#sentFrames)
+    while (this.#ackedFrames < target) {
+      this.#unackedCost -= this.#unacked[this.#head] ?? 0
+      this.#head++
+      this.#ackedFrames++
+    }
+    if (this.#head > 1024 && this.#head * 2 > this.#unacked.length) {
+      this.#unacked.splice(0, this.#head)
+      this.#head = 0
+    }
+    if (this.#paused && this.#unackedCost <= MAX_UNACKED_OUTPUT_COST) {
       this.#paused = false
       this.#flow?.resume()
     }
@@ -45,10 +65,10 @@ class RunOutputCredit {
 }
 
 /**
- * Starts a GUI program through the in-environment launcher, which runs it as user `desktop`
+ * Starts a GUI program through the in-environment launcher, which runs it as user `gui`
  * (the agent user has no display). Streams `ready`, then `{stdout}`/`{stderr}`, then `{exit}`;
  * unsubscribing, aborting or the connection closing kills the program's process group.
- * Clients acknowledge output with `desktop.run.ack`: past 1 MiB unacknowledged chars the launcher
+ * Clients acknowledge output frames with `desktop.run.ack`: past a 1 MiB budget the launcher
  * is no longer read, so a slow client holds back the program instead of growing memory.
  */
 export function createDesktopRunMethods(getBroker: () => DesktopBroker) {
@@ -87,7 +107,7 @@ export function createDesktopRunMethods(getBroker: () => DesktopBroker) {
             },
             onOutput: (stream, data) => {
               emit({ [stream]: data })
-              credit.sent(data.length)
+              credit.sent(data)
             }
           })
           if (exit !== undefined) {
