@@ -60,16 +60,26 @@ export function createDesktopRpcHarness(
       { id: method, authToken: 't', method, params },
       transport
     )) as unknown as DesktopReply
-  const configure = (
+  let controllerToken: string | undefined
+  /** Configures like the host; a success keeps its controller token for `token()`. */
+  const configure = async (
     server: FakeRfbServer,
     transport: DesktopTestTransport,
-    launcher?: { port: number; token: string }
-  ) =>
-    call(
+    launcher?: { port: number; token: string },
+    password = FIXTURE_PASSWORD
+  ) => {
+    const reply = await call(
       'desktop.configure',
-      { host: '127.0.0.1', port: server.port, password: FIXTURE_PASSWORD, launcher },
+      { host: '127.0.0.1', port: server.port, password, launcher },
       transport
     )
+    const token = reply.result?.controllerToken
+    if (reply.ok && typeof token === 'string') {
+      controllerToken = token
+    }
+    return reply
+  }
+  const token = (): string | undefined => controllerToken
   /** Streams `method` on its own connection; `replies` fills as events arrive. */
   const stream = (
     method: string,
@@ -100,5 +110,5 @@ export function createDesktopRpcHarness(
         : new Promise((resolve) => waiters.add({ predicate, resolve }))
     return { replies, done, connectionId, waitForReplies }
   }
-  return { broker, dispatcher, runtime, subscriptions, call, configure, stream }
+  return { broker, dispatcher, runtime, subscriptions, call, configure, token, stream }
 }

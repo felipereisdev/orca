@@ -34,8 +34,10 @@ class DesktopEnvironmentFake {
   readGates = new Map<string, Promise<void>>()
   /** While set, list answers wait for it; the answer is the snapshot taken when the list began. */
   listGate: Promise<void> | null = null
+  /** Each successful configure answers with a fresh controller token, as the broker does. */
+  configured = 0
   configure: (params: Record<string, unknown>) => FakeResponse | Promise<FakeResponse> = () =>
-    ok({ state: 'ready' })
+    this.configuredReply()
   streams: FakeStreamCallbacks[] = []
   closedStreams = 0
   calls: FakeCall[] = []
@@ -48,10 +50,16 @@ class DesktopEnvironmentFake {
     this.failReadsFor.clear()
     this.readGates.clear()
     this.listGate = null
-    this.configure = () => ok({ state: 'ready' })
+    this.configured = 0
+    this.configure = () => this.configuredReply()
     this.streams = []
     this.closedStreams = 0
     this.calls = []
+  }
+
+  configuredReply(): FakeResponse {
+    this.configured += 1
+    return ok({ state: 'ready', controllerToken: `controller-token-${this.configured}` })
   }
 
   finishRecording(id: string, bytes: number, dir = FAKE_RECORDINGS_DIR): FakeRecording {

@@ -94,6 +94,10 @@ export type EphemeralVmApi = {
   suspendWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
   /** CPU, memory and disk from the recipe's `stats` step (cached 15 s); null when unavailable. */
   runtimeStats: (args: { runtimeId: string }) => Promise<EphemeralVmRecipeStats | null>
+  /** The controller token this Mac's newest desktop configure got; in main's memory only. */
+  desktopControllerToken: (args: { environmentId: string }) => Promise<string | null>
+  /** Runs the desktop configure again for the environment (Retry); true when it now holds a token. */
+  reconfigureDesktop: (args: { environmentId: string }) => Promise<boolean>
   /** Fires after any runtime record write; re-list to read the new lifecycle status. */
   onRuntimesChanged: (callback: () => void) => () => void
   /**

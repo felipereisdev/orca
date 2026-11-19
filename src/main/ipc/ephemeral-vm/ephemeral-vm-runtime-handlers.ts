@@ -22,6 +22,8 @@ import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { ephemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { attachEphemeralVmRuntimeToWorkspace } from '../../ephemeral-vm/runtime-attachment'
 import {
+  desktopControllerToken,
+  reconfigureEnvironmentDesktop,
   registerEnvironmentDesktopLifecycle,
   restoreEnvironmentDesktops,
   startEnvironmentDesktop
@@ -41,6 +43,7 @@ import {
 // Every destroy names the acknowledgement its removal check issued; main decides when it is needed.
 const EphemeralVmCleanupArgs = z.object({ runtimeId: z.string().min(1), ack: z.string() })
 const EphemeralVmRuntimeStatsArgs = z.object({ runtimeId: z.string().min(1) })
+const EphemeralVmDesktopArgs = z.object({ environmentId: z.string().min(1) })
 
 let stopRuntimesChangedBroadcast: (() => void) | null = null
 let runtimesChangedBroadcastQueued = false
@@ -133,6 +136,8 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
   ipcMain.removeHandler('ephemeralVm:listCredentialEnvNames')
   ipcMain.removeHandler('ephemeralVm:runtimeStats')
+  ipcMain.removeHandler('ephemeralVm:desktopControllerToken')
+  ipcMain.removeHandler('ephemeralVm:reconfigureDesktop')
   stopRuntimesChangedBroadcast?.()
   stopRuntimesChangedBroadcast = onEphemeralVmRuntimesChanged(broadcastEphemeralVmRuntimesChanged)
   registerEnvironmentDesktopLifecycle(store)
@@ -159,6 +164,20 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
       return null
     }
     return readEphemeralVmRuntimeStats(parsed.data.runtimeId)
+  })
+
+  // The Desktop tab's viewer and control calls carry this token; it never touches disk.
+  ipcMain.handle('ephemeralVm:desktopControllerToken', (_event, args: unknown) => {
+    const parsed = EphemeralVmDesktopArgs.safeParse(args)
+    return parsed.success && store.getSettings().experimentalEphemeralVms === true
+      ? desktopControllerToken(parsed.data.environmentId)
+      : null
+  })
+  ipcMain.handle('ephemeralVm:reconfigureDesktop', (_event, args: unknown) => {
+    const parsed = EphemeralVmDesktopArgs.safeParse(args)
+    return parsed.success && store.getSettings().experimentalEphemeralVms === true
+      ? reconfigureEnvironmentDesktop(store, parsed.data.environmentId)
+      : false
   })
 
   // With a filter, main picks the records a removal destroys; the renderer never filters them.

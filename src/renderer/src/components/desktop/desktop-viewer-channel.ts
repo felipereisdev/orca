@@ -54,7 +54,12 @@ class DesktopViewerChannel implements WebSocketLike {
   #pending: ArrayBuffer[] = []
   #handle: Awaited<ReturnType<DesktopViewerSubscribe>> | null = null
 
-  constructor(target: RuntimeClientTarget, viewerId: string, subscribe: DesktopViewerSubscribe) {
+  constructor(
+    target: RuntimeClientTarget,
+    viewerId: string,
+    subscribe: DesktopViewerSubscribe,
+    controllerToken: string | undefined
+  ) {
     if (target.kind !== 'environment') {
       queueMicrotask(() => this.#fail())
       return
@@ -63,7 +68,7 @@ class DesktopViewerChannel implements WebSocketLike {
       {
         selector: target.environmentId,
         method: 'desktop.viewer',
-        params: { viewerId },
+        params: { viewerId, ...(controllerToken ? { controllerToken } : {}) },
         timeoutMs: 15_000,
         expectedEnvironmentPairingRevision: getRuntimeEnvironmentRevision(target.environmentId)
       },
@@ -172,7 +177,10 @@ class DesktopViewerChannel implements WebSocketLike {
 export function createDesktopViewerChannel(
   target: RuntimeClientTarget,
   viewerId: string,
-  subscribe: DesktopViewerSubscribe = subscribeRuntimeEnvironment
+  {
+    controllerToken,
+    subscribe = subscribeRuntimeEnvironment
+  }: { controllerToken?: string; subscribe?: DesktopViewerSubscribe } = {}
 ): WebSocketLike {
-  return new DesktopViewerChannel(target, viewerId, subscribe)
+  return new DesktopViewerChannel(target, viewerId, subscribe, controllerToken)
 }

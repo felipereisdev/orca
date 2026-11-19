@@ -1,5 +1,6 @@
 import { DesktopError } from './desktop-errors'
 import { loopbackLiteral } from './desktop-loopback-host'
+import { connectRfbUpstream, desktopFailureReason } from './desktop-upstream'
 
 export type DesktopBrokerConfig = {
   host: string
@@ -43,4 +44,18 @@ export function isSameDesktopBrokerConfig(
     current.launcher?.port === next.launcher?.port &&
     current.launcher?.token === next.launcher?.token
   )
+}
+
+/**
+ * Authenticates once with `cfg` and disconnects: only a caller holding the VNC password (the host,
+ * never the agent) can configure, and a wrong one is refused before anything changes.
+ */
+export async function verifyDesktopCredentials(cfg: DesktopBrokerConfig): Promise<void> {
+  const host = assertValidConfig(cfg)
+  try {
+    const { socket } = await connectRfbUpstream({ host, port: cfg.port, password: cfg.password })
+    socket.destroy()
+  } catch (error) {
+    throw new DesktopError('desktop_unavailable', desktopFailureReason(error))
+  }
 }

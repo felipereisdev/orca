@@ -3,6 +3,7 @@ export type DesktopErrorCode =
   | 'desktop_unavailable'
   | 'desktop_invalid_input'
   | 'desktop_agent_not_allowed'
+  | 'desktop_controller_token_invalid'
   | 'desktop_run_unavailable'
   | 'desktop_launcher_rejected'
   | 'desktop_run_failed'
@@ -19,6 +20,8 @@ const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_unavailable: 'The desktop is not available.',
   desktop_invalid_input: 'The desktop input is not valid.',
   desktop_agent_not_allowed: 'Agents cannot configure, view or take control of the desktop.',
+  desktop_controller_token_invalid:
+    'The desktop controller token is missing or no longer valid; configure the desktop again.',
   desktop_run_unavailable: 'No desktop launcher is available to start programs.',
   desktop_launcher_rejected: 'The desktop launcher refused the request.',
   desktop_run_failed: 'The program could not be run on the desktop.',

@@ -20,13 +20,18 @@ export const DesktopStatusParams = z.object({
   viewerId: z.string().min(1, '--viewer-id must not be empty').optional()
 })
 
+/** The token the newest `desktop.configure` reply carried; only the configuring host has it. */
+const DesktopControllerToken = z.string().max(256, 'controllerToken is too long').optional()
+
 export const DesktopControlSetParams = z.object({
   owner: z.enum(['agent', 'user']),
-  viewerId: z.string().min(1, 'Missing required --viewer-id')
+  viewerId: z.string().min(1, 'Missing required --viewer-id'),
+  controllerToken: DesktopControllerToken
 })
 
 export const DesktopViewerParams = z.object({
-  viewerId: z.string().min(1, 'Missing required --viewer-id')
+  viewerId: z.string().min(1, 'Missing required --viewer-id'),
+  controllerToken: DesktopControllerToken
 })
 
 export const DesktopViewerUnsubscribeParams = z.object({

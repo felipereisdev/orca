@@ -26,7 +26,15 @@ const mocks = vi.hoisted(() => {
     holdControl: boolean
     statusError: { code: string; message: string } | null
   } = { status, controller: null, holdReads: false, holdControl: false, statusError: null }
-  return Object.assign(state, { rpc: vi.fn(), heldReads, heldControl, viewers, channelViewerIds })
+  return Object.assign(state, {
+    rpc: vi.fn(),
+    heldReads,
+    heldControl,
+    viewers,
+    channelViewerIds,
+    channelTokens: [] as (string | undefined)[],
+    reconfigure: vi.fn()
+  })
 })
 
 vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({ callRuntimeRpc: mocks.rpc }))
@@ -34,8 +42,13 @@ vi.mock('@/lib/files/access/file-owner-runtime-target', () => ({
   getRuntimeTargetForWorktreeOwner: () => ({ kind: 'environment', environmentId: 'env-1' })
 }))
 vi.mock('./desktop-viewer-channel', () => ({
-  createDesktopViewerChannel: (_target: unknown, viewerId: string) => {
+  createDesktopViewerChannel: (
+    _target: unknown,
+    viewerId: string,
+    options?: { controllerToken?: string }
+  ) => {
     mocks.channelViewerIds.push(viewerId)
+    mocks.channelTokens.push(options?.controllerToken)
     return { viewerId }
   }
 }))
@@ -94,6 +107,17 @@ describe('DesktopTabBody', () => {
     mocks.holdControl = false
     mocks.statusError = null
     mocks.controller = null
+    mocks.channelTokens.length = 0
+    mocks.reconfigure.mockReset().mockResolvedValue(true)
+    // The controller token lives in main; the tab asks for it through the preload bridge.
+    Object.assign(window, {
+      api: {
+        ephemeralVm: {
+          desktopControllerToken: vi.fn(async () => 'controller-token-1'),
+          reconfigureDesktop: mocks.reconfigure
+        }
+      }
+    })
     mocks.rpc.mockReset().mockImplementation(async (_target, method: string, params: Params) => {
       if (method === 'desktop.status') {
         if (mocks.statusError) {
@@ -138,8 +162,9 @@ describe('DesktopTabBody', () => {
     await flush()
 
     expect(calls('desktop.control.set')).toEqual([
-      { owner: 'user', viewerId: mocks.channelViewerIds[0] }
+      { owner: 'user', viewerId: mocks.channelViewerIds[0], controllerToken: 'controller-token-1' }
     ])
+    expect(mocks.channelTokens).toEqual(['controller-token-1'])
     expect(mocks.viewers[0].viewOnly).toBe(false)
     expect(screen.getByRole('button', { name: 'Hand back to agent' })).toBeTruthy()
   })
@@ -156,7 +181,8 @@ describe('DesktopTabBody', () => {
 
     expect(calls('desktop.control.set').at(-1)).toEqual({
       owner: 'agent',
-      viewerId: mocks.channelViewerIds[0]
+      viewerId: mocks.channelViewerIds[0],
+      controllerToken: 'controller-token-1'
     })
     expect(mocks.viewers[0].viewOnly).toBe(true)
     expect(screen.getByText('Agent in control')).toBeTruthy()
@@ -174,7 +200,7 @@ describe('DesktopTabBody', () => {
     await flush()
 
     expect(calls('desktop.control.set')).toEqual([
-      { owner: 'user', viewerId: mocks.channelViewerIds[0] }
+      { owner: 'user', viewerId: mocks.channelViewerIds[0], controllerToken: 'controller-token-1' }
     ])
     expect(screen.getByText("You're in control")).toBeTruthy()
     expect(mocks.viewers[0].viewOnly).toBe(false)
@@ -195,17 +221,22 @@ describe('DesktopTabBody', () => {
     expect(mocks.viewers).toHaveLength(1)
   })
 
-  it('an unconfigured desktop offers retry and connects once it is set up', async () => {
+  it('retry asks the host to configure the still-connected desktop again, then reads it', async () => {
+    // The host's configure failed once (VNC still starting); nothing else will reconfigure it.
     mocks.status = { state: 'unconfigured', owner: 'agent', recording: false }
+    mocks.reconfigure.mockImplementation(async () => {
+      mocks.status = { state: 'ready', owner: 'agent', recording: false }
+      return true
+    })
     render(<DesktopTabBody worktreeId="repo::/w" />)
     await flush()
     expect(screen.getByText('Not set up yet')).toBeTruthy()
     expect(mocks.viewers).toHaveLength(0)
 
-    mocks.status = { state: 'ready', owner: 'agent', recording: false }
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await flush()
 
+    expect(mocks.reconfigure.mock.calls).toEqual([[{ environmentId: 'env-1' }]])
     expect(mocks.viewers).toHaveLength(1)
   })
 

@@ -40,7 +40,7 @@ describe('desktop viewer channel', () => {
     const channel = createDesktopViewerChannel(
       { kind: 'environment', environmentId: 'env-1' },
       'viewer-1',
-      fake.subscribe
+      { subscribe: fake.subscribe }
     )
     const opened = vi.fn()
     const received: number[][] = []
@@ -89,7 +89,7 @@ describe('desktop viewer channel', () => {
     const channel = createDesktopViewerChannel(
       { kind: 'environment', environmentId: 'env-1' },
       'viewer-1',
-      fake.subscribe
+      { subscribe: fake.subscribe }
     )
     const errored = vi.fn()
     const closed = vi.fn()
@@ -113,7 +113,7 @@ describe('desktop viewer channel', () => {
     const channel = createDesktopViewerChannel(
       { kind: 'environment', environmentId: 'env-1' },
       'viewer-1',
-      fake.subscribe
+      { subscribe: fake.subscribe }
     )
     const closed = vi.fn()
     channel.onclose = closed
@@ -128,7 +128,7 @@ describe('desktop viewer channel', () => {
     const channel = createDesktopViewerChannel(
       { kind: 'environment', environmentId: 'env-1' },
       'viewer-1',
-      fake.subscribe
+      { subscribe: fake.subscribe }
     )
     const events: string[] = []
     channel.onclose = () => events.push('close')

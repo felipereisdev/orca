@@ -19,6 +19,7 @@ const LOGGED_FAILURE_CODES = new Set([
   'desktop_unavailable',
   'desktop_invalid_input',
   'desktop_agent_not_allowed',
+  'desktop_controller_token_invalid',
   'method_not_found',
   'unauthorized',
   'forbidden',
@@ -47,16 +48,31 @@ function thrownCode(error: unknown): unknown {
   return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
 }
 
+export type DesktopConfigureOutcome =
+  | { outcome: 'configured'; controllerToken: string }
+  | { outcome: 'skipped' | 'failed' }
+
+function controllerTokenOf(result: unknown): string | null {
+  return typeof result === 'object' &&
+    result !== null &&
+    'controllerToken' in result &&
+    typeof result.controllerToken === 'string' &&
+    result.controllerToken.length > 0
+    ? result.controllerToken
+    : null
+}
+
 /**
- * Hands the recipe's desktop to the environment's broker over the host's own pairing, which the
- * broker binds as its controller; a failure only loses the desktop, never the workspace.
+ * Hands the recipe's desktop to the environment's broker over the host's own pairing. The broker
+ * binds it as controller only once the VNC password checks out, and answers with the controller
+ * token the host keeps in memory; a failure only loses the desktop, never the workspace.
  */
 export async function configureEnvironmentDesktop(
   runtimeEnvironmentId: string,
   desktop: EphemeralVmRecipeDesktop | null
-): Promise<'configured' | 'skipped' | 'failed'> {
+): Promise<DesktopConfigureOutcome> {
   if (!desktop) {
-    return 'skipped'
+    return { outcome: 'skipped' }
   }
   let code: unknown
   try {
@@ -72,10 +88,12 @@ export async function configureEnvironmentDesktop(
       },
       CONFIGURE_TIMEOUT_MS
     )
-    if (response.ok) {
-      return 'configured'
+    const controllerToken = response.ok ? controllerTokenOf(response.result) : null
+    if (controllerToken) {
+      return { outcome: 'configured', controllerToken }
     }
-    code = response.error.code
+    // A server that answers without a token is from before tokens and can never be viewed.
+    code = response.ok ? 'unknown' : response.error.code
   } catch (error) {
     code = thrownCode(error)
   }
@@ -83,7 +101,7 @@ export async function configureEnvironmentDesktop(
     environmentId: runtimeEnvironmentId,
     code: loggedFailureCode(code)
   })
-  return 'failed'
+  return { outcome: 'failed' }
 }
 
 /** The runtime's environment and desktop when the host should hand it over, else null. */

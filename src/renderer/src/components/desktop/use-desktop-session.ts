@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import {
+  readDesktopControllerToken,
+  reconfigureEnvironmentDesktop
+} from './desktop-controller-token'
+import {
   pollDesktopStatus,
   type DesktopStatus,
   type DesktopStatusPoller
@@ -97,7 +101,7 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
   }, [target, viewerId])
 
   const mutate = useCallback(
-    <T>(method: string, params: unknown, apply: (result: T) => void): void => {
+    <T>(method: string, params: () => Promise<unknown>, apply: (result: T) => void): void => {
       if (!target) {
         return
       }
@@ -105,7 +109,8 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
       setError(null)
       // Reads begun before or during this action may predate it, so their answers are dropped.
       const mutation = pollerRef.current?.beginMutation()
-      callRuntimeRpc<T>(target, method, params)
+      params()
+        .then((resolved) => callRuntimeRpc<T>(target, method, resolved))
         .then(apply, (reason: unknown) => setError(errorCode(reason)))
         .finally(() => {
           setBusy(false)
@@ -116,28 +121,40 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
   )
 
   const setControl = (owner: 'agent' | 'user'): void =>
-    mutate<DesktopStatus>('desktop.control.set', { owner, viewerId }, (next) =>
-      setStatus({ ...next, viewerControl: owner === 'user' ? 'this' : null })
+    mutate<DesktopStatus>(
+      'desktop.control.set',
+      async () => ({
+        owner,
+        viewerId,
+        controllerToken: target ? await readDesktopControllerToken(target) : undefined
+      }),
+      (next) => setStatus({ ...next, viewerControl: owner === 'user' ? 'this' : null })
     )
+  const noParams = async (): Promise<unknown> => ({})
 
   const actions: DesktopActions = {
     takeControl: () => setControl('user'),
     handBack: () => setControl('agent'),
     startRecording: () =>
-      mutate('desktop.record.start', {}, () =>
+      mutate('desktop.record.start', noParams, () =>
         setStatus((current) => current && { ...current, recording: true })
       ),
     stopRecording: () =>
-      mutate('desktop.record.stop', {}, () =>
+      mutate('desktop.record.stop', noParams, () =>
         setStatus((current) => current && { ...current, recording: false })
       ),
     retry: () => {
       setStatus(null)
       setLost(false)
       setError(null)
-      // A new connection opens a new viewer; read now instead of waiting for the next poll.
-      setConnection((current) => current + 1)
-      pollerRef.current?.refresh()
+      // The host hands the desktop over again first: a configure that failed once (or a broker
+      // that restarted and forgot its controller) recovers without a new lifecycle event.
+      const reconfigured = target ? reconfigureEnvironmentDesktop(target) : Promise.resolve(false)
+      void reconfigured.then(() => {
+        // A new connection opens a new viewer; read now instead of waiting for the next poll.
+        setConnection((current) => current + 1)
+        pollerRef.current?.refresh()
+      })
     }
   }
 

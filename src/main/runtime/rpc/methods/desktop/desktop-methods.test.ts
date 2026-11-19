@@ -61,7 +61,8 @@ function streamViewer(
   dispatcher: RpcDispatcher,
   viewerId: string,
   transport: Transport,
-  client?: Duplex
+  client?: Duplex,
+  controllerToken?: string
 ): ViewerStream {
   const replies: ViewerStream['replies'] = []
   const registerBinaryMessageHandler = vi.fn((handler: (bytes: Uint8Array) => void) => {
@@ -70,7 +71,12 @@ function streamViewer(
     return () => client?.off('data', forward)
   })
   const done = dispatcher.dispatchStreaming(
-    { id: `viewer-${viewerId}`, authToken: 't', method: 'desktop.viewer', params: { viewerId } },
+    {
+      id: `viewer-${viewerId}`,
+      authToken: 't',
+      method: 'desktop.viewer',
+      params: { viewerId, controllerToken }
+    },
     (reply) => replies.push(JSON.parse(reply)),
     {
       ...transport,
@@ -91,19 +97,19 @@ describe('desktop RPC methods', () => {
   it('desktop.configure and desktop.control.set refuse an agent caller with desktop_agent_not_allowed', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { broker, call, configure } = setup()
+    const { broker, call, configure, token } = setup()
 
     const localConfigure = await configure(server, LOCAL_AGENT)
     const markedConfigure = await configure(server, MAC_AGENT)
     await configure(server, MAC)
     const localControl = await call(
       'desktop.control.set',
-      { owner: 'user', viewerId: 'v1' },
+      { owner: 'user', viewerId: 'v1', controllerToken: token() },
       LOCAL_AGENT
     )
     const markedControl = await call(
       'desktop.control.set',
-      { owner: 'user', viewerId: 'v1' },
+      { owner: 'user', viewerId: 'v1', controllerToken: token() },
       MAC_AGENT
     )
 
@@ -114,13 +120,86 @@ describe('desktop RPC methods', () => {
     expect(broker.status().owner).toBe('agent')
   })
 
+  it('the configuring identity without the controller token cannot view, take control or reconfigure', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const server = await vncServer()
+    const { broker, dispatcher, call, configure, token } = setup()
+    // An agent on the environment holds the same paired credential, but never the VNC password.
+    await configure(server, MAC)
+    const hostToken = token()
+
+    const noToken = streamViewer(dispatcher, 'v1', MAC)
+    await noToken.done
+    const forged = streamViewer(dispatcher, 'v1', MAC, undefined, 'A'.repeat(43))
+    await forged.done
+    const control = await call('desktop.control.set', { owner: 'user', viewerId: 'v1' }, MAC)
+    const reconfigure = await configure(server, MAC, undefined, 'guessed1')
+
+    const tokenRefused = { ok: false, error: { code: 'desktop_controller_token_invalid' } }
+    expect(noToken.replies).toMatchObject([tokenRefused])
+    expect(forged.replies).toMatchObject([tokenRefused])
+    expect(noToken.registerBinaryMessageHandler).not.toHaveBeenCalled()
+    expect(control).toMatchObject(tokenRefused)
+    expect(reconfigure).toMatchObject({
+      ok: false,
+      error: { code: 'desktop_unavailable', message: expect.stringContaining('rfb_auth_failed') }
+    })
+    expect(JSON.stringify(reconfigure)).not.toContain('controllerToken')
+    expect(broker.status()).toMatchObject({ state: 'ready', owner: 'agent' })
+    // The host's token still works after the refused attempts.
+    const handover = await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'v1', controllerToken: hostToken },
+      MAC
+    )
+    expect(handover).toMatchObject({ ok: true, result: { owner: 'user' } })
+  })
+
+  it('a configure with the wrong VNC password changes nothing and binds no one', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const server = await vncServer()
+    const { broker, configure } = setup()
+
+    const wrong = await configure(server, MAC, undefined, 'guessed1')
+    const statusAfter = broker.status()
+    const other = await configure(server, OTHER_MAC)
+
+    expect(wrong).toMatchObject({ ok: false, error: { code: 'desktop_unavailable' } })
+    expect(statusAfter).toMatchObject({ state: 'unconfigured' })
+    // No claim was left behind, so the identity that does hold the password can configure.
+    expect(other).toMatchObject({ ok: true, result: { state: 'ready' } })
+    expect(other.result?.controllerToken).toEqual(expect.any(String))
+  })
+
+  it('every successful configure answers with a fresh token and retires the previous one', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const server = await vncServer()
+    const { call, configure } = setup()
+
+    const first = await configure(server, MAC)
+    const second = await configure(server, MAC)
+    const take = (reply: typeof first) =>
+      call(
+        'desktop.control.set',
+        { owner: 'user', viewerId: 'v1', controllerToken: reply.result?.controllerToken },
+        MAC
+      )
+
+    expect(second.result?.controllerToken).not.toEqual(first.result?.controllerToken)
+    expect(await take(first)).toMatchObject({
+      ok: false,
+      error: { code: 'desktop_controller_token_invalid' }
+    })
+    expect(await take(second)).toMatchObject({ ok: true })
+  })
+
   it('desktop.viewer refuses an agent caller', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, configure } = setup()
+    const { dispatcher, configure, token } = setup()
     await configure(server, MAC)
 
-    const stream = streamViewer(dispatcher, 'v1', MAC_AGENT)
+    const stream = streamViewer(dispatcher, 'v1', MAC_AGENT, undefined, token())
     await stream.done
 
     expect(stream.replies).toMatchObject([refused])
@@ -130,19 +209,23 @@ describe('desktop RPC methods', () => {
   it('a second paired device cannot open a viewer, set control or end a viewer', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { broker, dispatcher, call, configure } = setup()
+    const { broker, dispatcher, call, configure, token } = setup()
     await configure(server, MAC)
     let own: ViewerStream | undefined
     await connectFakeRfbViewer(async (client) => {
-      own = streamViewer(dispatcher, 'v1', MAC, client)
+      own = streamViewer(dispatcher, 'v1', MAC, client, token())
     })
     const subscriptionId = own!.replies[0]?.result?.subscriptionId
 
-    const stranger = streamViewer(dispatcher, 'v2', OTHER_MAC)
+    const stranger = streamViewer(dispatcher, 'v2', OTHER_MAC, undefined, token())
     await stranger.done
-    const strangersPhone = streamViewer(dispatcher, 'v3', OTHER_PHONE)
+    const strangersPhone = streamViewer(dispatcher, 'v3', OTHER_PHONE, undefined, token())
     await strangersPhone.done
-    const control = await call('desktop.control.set', { owner: 'user', viewerId: 'v2' }, OTHER_MAC)
+    const control = await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'v2', controllerToken: token() },
+      OTHER_MAC
+    )
     const unsubscribe = await call('desktop.viewer.unsubscribe', { subscriptionId }, OTHER_MAC)
 
     expect(stranger.replies).toMatchObject([refused])
@@ -157,15 +240,19 @@ describe('desktop RPC methods', () => {
   it('desktop.viewer relays bytes between the subscription and the broker for the configuring device', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, call, configure } = setup()
+    const { dispatcher, call, configure, token } = setup()
     await configure(server, MAC)
     let stream: ViewerStream | undefined
     const viewer = await connectFakeRfbViewer(async (client) => {
-      stream = streamViewer(dispatcher, 'v1', MAC, client)
+      stream = streamViewer(dispatcher, 'v1', MAC, client, token())
     })
     const subscriptionId = stream!.replies[0]?.result?.subscriptionId
 
-    const control = await call('desktop.control.set', { owner: 'user', viewerId: 'v1' }, MAC)
+    const control = await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'v1', controllerToken: token() },
+      MAC
+    )
     viewer.pointer(10, 11, 1)
     await server.waitForReceived((received) => pointerEvents(received).length > 0)
     const unsubscribed = await call('desktop.viewer.unsubscribe', { subscriptionId }, MAC)
@@ -181,14 +268,18 @@ describe('desktop RPC methods', () => {
   it("the configuring device's paired phone can view and take control", async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, call, configure } = setup()
+    const { dispatcher, call, configure, token } = setup()
     await configure(server, MAC)
     let stream: ViewerStream | undefined
     const viewer = await connectFakeRfbViewer(async (client) => {
-      stream = streamViewer(dispatcher, 'p1', MAC_PHONE, client)
+      stream = streamViewer(dispatcher, 'p1', MAC_PHONE, client, token())
     })
 
-    const control = await call('desktop.control.set', { owner: 'user', viewerId: 'p1' }, MAC_PHONE)
+    const control = await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'p1', controllerToken: token() },
+      MAC_PHONE
+    )
     viewer.pointer(7, 8, 1)
     await server.waitForReceived((received) => pointerEvents(received).length > 0)
 
@@ -220,13 +311,13 @@ describe('desktop RPC methods', () => {
   it('a host window that configured the desktop can view it', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, configure } = setup()
+    const { dispatcher, configure, token } = setup()
     await configure(server, HOST_WINDOW)
 
     const viewer = await connectFakeRfbViewer(async (client) => {
-      streamViewer(dispatcher, 'w1', HOST_WINDOW, client)
+      streamViewer(dispatcher, 'w1', HOST_WINDOW, client, token())
     })
-    const device = streamViewer(dispatcher, 'v2', MAC)
+    const device = streamViewer(dispatcher, 'v2', MAC, undefined, token())
     await device.done
 
     expect(viewer).toMatchObject({ width: 64, height: 48 })
@@ -236,19 +327,23 @@ describe('desktop RPC methods', () => {
   it('a superseded viewer subscription ending leaves the newer viewer with the same id open', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, call, configure } = setup()
+    const { dispatcher, call, configure, token } = setup()
     await configure(server, MAC)
     let first: ViewerStream | undefined
     await connectFakeRfbViewer(async (client) => {
-      first = streamViewer(dispatcher, 'v1', MAC, client)
+      first = streamViewer(dispatcher, 'v1', MAC, client, token())
     })
     let second: ViewerStream | undefined
     const viewer = await connectFakeRfbViewer(async (client) => {
-      second = streamViewer(dispatcher, 'v1', MAC, client)
+      second = streamViewer(dispatcher, 'v1', MAC, client, token())
     })
     await first!.done
 
-    await call('desktop.control.set', { owner: 'user', viewerId: 'v1' }, MAC)
+    await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'v1', controllerToken: token() },
+      MAC
+    )
     viewer.pointer(5, 6, 1)
     await server.waitForReceived((received) => pointerEvents(received).length > 0)
 
@@ -259,17 +354,21 @@ describe('desktop RPC methods', () => {
   it("desktop.status with a viewerId says whether that viewer holds control, never another viewer's id", async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()
-    const { dispatcher, call, configure } = setup()
+    const { dispatcher, call, configure, token } = setup()
     await configure(server, MAC)
     await connectFakeRfbViewer(async (client) => {
-      streamViewer(dispatcher, 'v1', MAC, client)
+      streamViewer(dispatcher, 'v1', MAC, client, token())
     })
     await connectFakeRfbViewer(async (client) => {
-      streamViewer(dispatcher, 'v2', MAC, client)
+      streamViewer(dispatcher, 'v2', MAC, client, token())
     })
 
     const agentOwned = await call('desktop.status', { viewerId: 'v1' }, MAC)
-    await call('desktop.control.set', { owner: 'user', viewerId: 'v1' }, MAC)
+    await call(
+      'desktop.control.set',
+      { owner: 'user', viewerId: 'v1', controllerToken: token() },
+      MAC
+    )
     const mine = await call('desktop.status', { viewerId: 'v1' }, MAC)
     const other = await call('desktop.status', { viewerId: 'v2' }, MAC)
     const plain = await call('desktop.status', {}, MAC)
@@ -314,6 +413,8 @@ describe('desktop RPC methods', () => {
     function deferConfigure(broker: DesktopBroker) {
       const calls: { resolve: () => void; reject: (error: unknown) => void }[] = []
       const waiters: { count: number; resolve: () => void }[] = []
+      // The password is proven here; these cases are about the claim around the configure.
+      vi.spyOn(broker, 'verifyCredentials').mockResolvedValue()
       vi.spyOn(broker, 'configure').mockImplementation(
         () =>
           new Promise<void>((resolve, reject) => {
@@ -332,7 +433,11 @@ describe('desktop RPC methods', () => {
       return { calls, reached }
     }
     const VNC = { host: '127.0.0.1', port: 5901, password: FIXTURE_PASSWORD }
-    const takeControl = { owner: 'user', viewerId: 'v1' }
+    const takeControl = (reply: { result?: Record<string, unknown> }) => ({
+      owner: 'user',
+      viewerId: 'v1',
+      controllerToken: reply.result?.controllerToken
+    })
 
     it('refuses a second identity while the first configure is still pending', async () => {
       const { broker, call } = setup()
@@ -342,12 +447,16 @@ describe('desktop RPC methods', () => {
       const firstCall = await configure.reached(1)
       const second = await call('desktop.configure', VNC, OTHER_MAC)
       firstCall.resolve()
-      await first
+      const configured = await first
 
       expect(second).toMatchObject(refused)
       expect(configure.calls).toHaveLength(1)
-      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject({ ok: true })
-      expect(await call('desktop.control.set', takeControl, OTHER_MAC)).toMatchObject(refused)
+      expect(await call('desktop.control.set', takeControl(configured), MAC)).toMatchObject({
+        ok: true
+      })
+      expect(await call('desktop.control.set', takeControl(configured), OTHER_MAC)).toMatchObject(
+        refused
+      )
     })
 
     it('keeps the claim when an identity supersedes its own pending configure and the older one fails', async () => {
@@ -362,10 +471,12 @@ describe('desktop RPC methods', () => {
       await older
       const stranger = await call('desktop.configure', VNC, OTHER_MAC)
       newerCall.resolve()
-      await newer
+      const configured = await newer
 
       expect(stranger).toMatchObject(refused)
-      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject({ ok: true })
+      expect(await call('desktop.control.set', takeControl(configured), MAC)).toMatchObject({
+        ok: true
+      })
     })
 
     it('releases the claim when the first configure fails, so another identity can configure', async () => {
@@ -378,10 +489,13 @@ describe('desktop RPC methods', () => {
       const other = call('desktop.configure', VNC, OTHER_MAC)
       ;(await configure.reached(2)).resolve()
 
+      const configured = await other
       expect(failure).toMatchObject({ ok: false, error: { code: 'desktop_invalid_input' } })
-      expect(await other).toMatchObject({ ok: true })
-      expect(await call('desktop.control.set', takeControl, OTHER_MAC)).toMatchObject({ ok: true })
-      expect(await call('desktop.control.set', takeControl, MAC)).toMatchObject(refused)
+      expect(configured).toMatchObject({ ok: true })
+      expect(await call('desktop.control.set', takeControl(configured), OTHER_MAC)).toMatchObject({
+        ok: true
+      })
+      expect(await call('desktop.control.set', takeControl(configured), MAC)).toMatchObject(refused)
     })
   })
 })

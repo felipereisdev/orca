@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { duplexPair } from 'node:stream'
-import { getDesktopBroker, type DesktopBroker } from '../../../../desktop/desktop-broker'
+import type { DesktopBroker } from '../../../../desktop/desktop-broker'
+import { getDesktopBroker } from '../../../../desktop/desktop-broker-instance'
 import { DesktopError } from '../../../../desktop/desktop-errors'
 import { defaultRecordingsDir } from '../../../../desktop/desktop-recording-files'
 import type { DesktopRunSessions } from '../../../../desktop/desktop-run-sessions'
@@ -14,7 +15,12 @@ import {
 } from '../../../../../shared/rpc-contract/desktop/desktop-params'
 import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core'
 import { createDesktopActionMethods } from './desktop-action-methods'
-import { assertDesktopController, claimDesktopController } from './desktop-controller-identity'
+import {
+  assertDesktopController,
+  assertDesktopControllerToken,
+  assertMayConfigureDesktop,
+  claimDesktopController
+} from './desktop-controller-identity'
 import { createDesktopRecordMethods } from './desktop-record-methods'
 import { DESKTOP_RECORDING_COPY_METHODS } from './desktop-recording-copy-methods'
 import { createDesktopRunMethods } from './desktop-run-method'
@@ -118,6 +124,9 @@ export function createDesktopMethods(
       params: DesktopConfigureParams,
       handler: async (params, ctx) => {
         const broker = getBroker()
+        assertMayConfigureDesktop(ctx)
+        // Proven before anything is claimed or changed: a wrong password leaves all as it was.
+        await broker.verifyCredentials(params)
         const claim = claimDesktopController(broker, ctx)
         try {
           await broker.configure(params)
@@ -125,8 +134,8 @@ export function createDesktopMethods(
           claim.release()
           throw error
         }
-        claim.bind()
-        return broker.status()
+        const controllerToken = claim.bind()
+        return { ...broker.status(), ...(controllerToken ? { controllerToken } : {}) }
       }
     }),
     defineMethod({
@@ -147,7 +156,7 @@ export function createDesktopMethods(
       params: DesktopControlSetParams,
       handler: async (params, ctx) => {
         const broker = getBroker()
-        assertDesktopController(broker, ctx)
+        assertDesktopControllerToken(broker, ctx, params.controllerToken)
         broker.setOwner(params.owner, params.viewerId)
         return broker.status()
       }
@@ -158,7 +167,7 @@ export function createDesktopMethods(
       params: DesktopViewerParams,
       handler: async (params, ctx, emit) => {
         const broker = getBroker()
-        assertDesktopController(broker, ctx)
+        assertDesktopControllerToken(broker, ctx, params.controllerToken)
         await streamViewer(broker, params.viewerId, ctx, emit)
       }
     }),

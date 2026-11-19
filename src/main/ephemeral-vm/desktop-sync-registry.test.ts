@@ -27,6 +27,8 @@ vi.mock('./desktop-recording-index', async (importOriginal) => ({
 }))
 
 import {
+  desktopControllerToken,
+  reconfigureEnvironmentDesktop,
   registerEnvironmentDesktopLifecycle,
   restoreEnvironmentDesktops,
   stopEnvironmentDesktop
@@ -96,7 +98,7 @@ function holdConfigures(): () => void {
   })
   env.configure = async () => {
     await gate
-    return { id: 'r', ok: true, result: { state: 'ready' }, _meta: { runtimeId: 'vm' } }
+    return env.configuredReply()
   }
   return release
 }
@@ -200,5 +202,38 @@ describe('desktop hand-off lifecycle', () => {
 
     await vi.waitFor(() => expect(configureCalls()).toBe(3))
     await vi.waitFor(() => expect(env.streams).toHaveLength(2))
+  })
+
+  it('keeps the controller token in memory and takes the new one after a broker restart', async () => {
+    await restored()
+    expect(desktopControllerToken('env-1')).toBe('controller-token-1')
+
+    // The environment's server restarted and was verified again: its broker forgot every token.
+    publish(verified('env-1'))
+    await vi.waitFor(() => expect(desktopControllerToken('env-1')).toBe('controller-token-2'))
+    expect(configureCalls()).toBe(2)
+    stopEnvironmentDesktop('vm-1')
+    expect(desktopControllerToken('env-1')).toBeNull()
+  })
+
+  it('a retry configures a still-connected environment again after a transient failure', async () => {
+    registerEnvironmentDesktopLifecycle(STORE)
+    env.configure = () => ({
+      id: 'r',
+      ok: false,
+      error: { code: 'desktop_unavailable', message: 'VNC still starting' }
+    })
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+    await vi.waitFor(() => expect(configureCalls()).toBe(1))
+    await settle()
+    expect(desktopControllerToken('env-1')).toBeNull()
+    expect(env.streams).toHaveLength(0)
+
+    env.configure = () => env.configuredReply()
+    await expect(reconfigureEnvironmentDesktop(STORE, 'env-1')).resolves.toBe(true)
+
+    expect(configureCalls()).toBe(2)
+    expect(desktopControllerToken('env-1')).toBe('controller-token-1')
+    await vi.waitFor(() => expect(env.streams).toHaveLength(1))
   })
 })

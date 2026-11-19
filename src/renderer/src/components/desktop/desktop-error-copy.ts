@@ -8,6 +8,11 @@ export function desktopErrorMessage(code: string, t: Translate): string {
         'desktop.tab.errors.notAllowed',
         'Only the computer that set up this desktop can view or control it.'
       )
+    case 'desktop_controller_token_invalid':
+      return t(
+        'desktop.tab.errors.controllerStale',
+        'This Mac needs to set up the desktop again. Select Try again.'
+      )
     case 'desktop_unavailable':
       return t('desktop.tab.errors.unavailable', 'The desktop is not available right now.')
     case 'desktop_already_recording':

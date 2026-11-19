@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { readDesktopControllerToken } from './desktop-controller-token'
 import { createDesktopViewerChannel } from './desktop-viewer-channel'
 
 type MountedViewer = { setViewOnly: (viewOnly: boolean) => void; dispose: () => void }
@@ -23,23 +24,29 @@ function mountDesktopViewer(
       onLost()
     }
   }
-  void import('@novnc/novnc').then(({ default: Rfb }) => {
-    if (disposed) {
-      return
-    }
-    const rfb = new Rfb(container, createDesktopViewerChannel(target, viewerId))
-    rfb.viewOnly = viewOnly
-    rfb.scaleViewport = true
-    rfb.resizeSession = false
-    rfb.addEventListener('disconnect', lost)
-    setViewOnly = (next) => {
-      rfb.viewOnly = next
-    }
-    dispose = () => {
-      rfb.removeEventListener('disconnect', lost)
-      rfb.disconnect()
-    }
-  }, lost)
+  void Promise.all([import('@novnc/novnc'), readDesktopControllerToken(target)]).then(
+    ([{ default: Rfb }, controllerToken]) => {
+      if (disposed) {
+        return
+      }
+      const rfb = new Rfb(
+        container,
+        createDesktopViewerChannel(target, viewerId, { controllerToken })
+      )
+      rfb.viewOnly = viewOnly
+      rfb.scaleViewport = true
+      rfb.resizeSession = false
+      rfb.addEventListener('disconnect', lost)
+      setViewOnly = (next) => {
+        rfb.viewOnly = next
+      }
+      dispose = () => {
+        rfb.removeEventListener('disconnect', lost)
+        rfb.disconnect()
+      }
+    },
+    lost
+  )
   return {
     setViewOnly: (next) => setViewOnly(next),
     dispose: () => {

@@ -29745,7 +29745,8 @@
         "notRecording": "The desktop is not being recorded.",
         "recordingUnavailable": "This environment cannot record the desktop because ffmpeg is missing.",
         "recordingFailed": "The recording failed and was discarded.",
-        "unknown": "Something went wrong. Try again."
+        "unknown": "Something went wrong. Try again.",
+        "controllerStale": "This Mac needs to set up the desktop again. Select Try again."
       },
       "create": "Desktop",
       "unconfiguredBody": "The environment desktop hasn't been set up yet.",

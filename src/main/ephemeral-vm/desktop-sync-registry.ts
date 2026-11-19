@@ -20,6 +20,8 @@ type DesktopEntry = {
   configuring: Promise<void> | null
   /** A start arrived while configuring; it may target a new pairing, so configure once more. */
   restartQueued: boolean
+  /** The newest configure's controller token; in memory only, gone with the entry. */
+  controllerToken: string | null
 }
 
 /** One entry per recipe runtime whose desktop this host handed over. */
@@ -44,11 +46,15 @@ function configure(
   const epoch = entry.epoch
   const current = (): boolean => entry.epoch === epoch && entries.get(runtimeId) === entry
   entry.configuring = (async () => {
-    const outcome = await configureEnvironmentDesktop(target.environmentId, target.desktop)
+    const configured = await configureEnvironmentDesktop(target.environmentId, target.desktop)
     if (!current()) {
       return
     }
     entry.configuring = null
+    // A failed configure leaves the broker as it was, so the token it last gave stays good.
+    if (configured.outcome === 'configured') {
+      entry.controllerToken = configured.controllerToken
+    }
     if (entry.restartQueued) {
       entry.restartQueued = false
       const next = runtimeDesktop(store, entry.runtime)
@@ -58,7 +64,7 @@ function configure(
       return
     }
     // Only the identity that configured may subscribe to the desktop's events.
-    if (outcome === 'configured' && entry.workspaceId && !entry.stopSync) {
+    if (configured.outcome === 'configured' && entry.workspaceId && !entry.stopSync) {
       entry.stopSync = syncEnvironmentRecordings(target.environmentId, entry.workspaceId)
     }
   })()
@@ -89,7 +95,8 @@ export function startEnvironmentDesktop(
       epoch: 0,
       stopSync: null,
       configuring: null,
-      restartQueued: false
+      restartQueued: false,
+      controllerToken: null
     }
     entries.set(runtime.id, entry)
   }
@@ -103,6 +110,31 @@ export function startEnvironmentDesktop(
     return entry.configuring
   }
   return configure(store, runtime.id, entry, target)
+}
+
+/** The token the environment's broker gave this host's newest configure; null when none. */
+export function desktopControllerToken(environmentId: string): string | null {
+  for (const entry of entries.values()) {
+    if (entry.environmentId === environmentId && entry.controllerToken) {
+      return entry.controllerToken
+    }
+  }
+  return null
+}
+
+/**
+ * Runs the configure again for every runtime on the environment (the Desktop tab's Retry, or a
+ * refused token after the broker restarted); true when a controller token is held afterwards.
+ */
+export async function reconfigureEnvironmentDesktop(
+  store: DesktopSettingsSource,
+  environmentId: string
+): Promise<boolean> {
+  const runtimes = [...entries.values()]
+    .filter((entry) => entry.environmentId === environmentId)
+    .map((entry) => entry.runtime)
+  await Promise.all(runtimes.map((runtime) => startEnvironmentDesktop(store, runtime)))
+  return desktopControllerToken(environmentId) !== null
 }
 
 /** Stops the runtime's recording sync and its timers; suspend, removal and Task 11 call it. */

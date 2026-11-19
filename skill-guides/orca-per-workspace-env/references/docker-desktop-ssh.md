@@ -79,8 +79,16 @@ never uses `--privileged`, the Docker socket, host network, PID or IPC namespace
 The honest limit: Orca's server in the environment runs as `dev`, the same user as the agent. The
 password and token live only in that server's memory, and the environment requires
 `kernel.yama.ptrace_scope` ≥ 1 so the agent cannot attach to the process that started it.
-`create.sh` refuses to start otherwise. This blocks practical workarounds; it is not a boundary
-against code that exploits the kernel. One window remains: if Xvnc or the launcher crashes, the
+`create.sh` refuses to start otherwise. The server also keeps its pairing credential in `dev`'s
+own files, so the agent can call it as the Mac's paired device. That identity alone therefore
+authorizes nothing on the desktop: the broker accepts `desktop.configure` only when the VNC
+password it carries authenticates to Xvnc (a wrong one changes nothing), and answers a successful
+one with a fresh controller token. Viewing the desktop and handing control over need that token
+too. It lives only in the broker's memory and the Mac's (never on disk), so the agent, which knows
+neither the password nor the token, cannot view, take control or reconfigure; after a server
+restart the Mac configures again and gets a new token. Both rest on the same two assumptions as
+the password: `ptrace_scope` ≥ 1, and nothing that reads the server's memory. This blocks
+practical workarounds; it is not a boundary against code that exploits the kernel. One window remains: if Xvnc or the launcher crashes, the
 entrypoint restarts it within about five seconds, and meanwhile the agent could bind the freed
 port. A fake launcher learns nothing (the handshake) and only blocks runs until it exits. A fake
 VNC server, however, would receive the server's answer to a challenge it chose, which allows an

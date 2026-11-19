@@ -31,7 +31,7 @@ describe('configureEnvironmentDesktop', () => {
   })
 
   it('skips when the recipe has no desktop', async () => {
-    expect(await configureEnvironmentDesktop('env-1', null)).toBe('skipped')
+    expect(await configureEnvironmentDesktop('env-1', null)).toEqual({ outcome: 'skipped' })
     expect(env.calls).toEqual([])
   })
 
@@ -41,19 +41,19 @@ describe('configureEnvironmentDesktop', () => {
       ok: false,
       error: { code: 'desktop_unavailable', message: `bad ${TOKEN} ${PASSWORD}` }
     })
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toBe('failed')
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
     env.configure = () => ({
       id: 'r',
       ok: false,
       error: { code: `leak-${PASSWORD}`, message: TOKEN }
     })
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toBe('failed')
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
     env.configure = () => {
       throw Object.assign(new Error(`refused {"password":"${PASSWORD}"} ${TOKEN}`), {
         code: TOKEN
       })
     }
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toBe('failed')
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
 
     expect(warn.mock.calls).toEqual([
       [

@@ -16,6 +16,7 @@ import { DesktopRecorder, type DesktopRecorderDeps } from './desktop-recorder'
 import {
   assertValidConfig,
   isSameDesktopBrokerConfig,
+  verifyDesktopCredentials,
   type DesktopBrokerConfig
 } from './desktop-broker-config'
 import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
@@ -90,6 +91,11 @@ export class DesktopBroker {
     this.#reason = undefined
     this.#retryDelayMs = RETRY_INITIAL_MS
     await this.#connect(this.#generation)
+  }
+
+  /** Proves `cfg` against the VNC server without touching this broker. */
+  verifyCredentials(cfg: DesktopBrokerConfig): Promise<void> {
+    return verifyDesktopCredentials(cfg)
   }
 
   /** Drops the configuration, every connection and timer; a recording is finalized, a pending one cancelled. */
@@ -345,12 +351,4 @@ export class DesktopBroker {
       }
     }, delay)
   }
-}
-
-let broker: DesktopBroker | undefined
-
-/** The process-wide broker of this environment's Orca server. */
-export function getDesktopBroker(): DesktopBroker {
-  broker ??= new DesktopBroker()
-  return broker
 }

@@ -26,6 +26,8 @@ export const ephemeralVmApi = {
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
   suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
   runtimeStats: (args) => ipcRenderer.invoke('ephemeralVm:runtimeStats', args),
+  desktopControllerToken: (args) => ipcRenderer.invoke('ephemeralVm:desktopControllerToken', args),
+  reconfigureDesktop: (args) => ipcRenderer.invoke('ephemeralVm:reconfigureDesktop', args),
   onRuntimesChanged: (callback) => {
     const listener = (): void => callback()
     ipcRenderer.on(EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL, listener)
