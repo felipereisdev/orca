@@ -7,7 +7,8 @@ const STATS_REFRESH_MS = 15_000
 
 /**
  * Each runtime's stats (null when its recipe has none) while the VM rows are mounted, refreshed at
- * most every 15 s and paused while the window is hidden. Main runs no timer; this asks.
+ * most every 15 s and paused while the window is hidden. Main runs no timer; this asks. Main bounds
+ * every answer to 5 s, so a refresh always completes.
  */
 export function useEphemeralVmRuntimeStats(
   runtimeIds: readonly string[]
@@ -22,16 +23,16 @@ export function useEphemeralVmRuntimeStats(
     }
     let disposed = false
     const stop = installWindowVisibilityTimeoutPoller({
+      // Each row updates as its own answer lands; a slow one never holds back the rest.
       run: async () => {
-        const entries = await Promise.all(
+        await Promise.allSettled(
           ids.map(async (runtimeId) => {
             const value = await readStats({ runtimeId }).catch(() => null)
-            return [runtimeId, value] as const
+            if (!disposed) {
+              setStats((previous) => ({ ...previous, [runtimeId]: value }))
+            }
           })
         )
-        if (!disposed) {
-          setStats(Object.fromEntries(entries))
-        }
       },
       getDelayMs: () => STATS_REFRESH_MS,
       cooldownMs: STATS_REFRESH_MS

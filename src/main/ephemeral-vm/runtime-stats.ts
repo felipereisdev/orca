@@ -36,30 +36,44 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
   const inFlight = new Map<string, Promise<EphemeralVmRecipeStats | null>>()
 
   const readOnce = async (runtimeId: string): Promise<EphemeralVmRecipeStats | null> => {
-    try {
-      const target = await deps.resolveTarget(runtimeId)
-      if (!target) {
-        return null
-      }
-      const { runtime, repoPath, recipe } = target
-      return await runEphemeralVmRecipeStats({
-        recipe,
-        repoPath,
-        context: {
-          instanceId: runtime.id,
-          recipeId: runtime.recipeId,
-          projectId: runtime.projectId,
-          workspaceId: runtime.workspaceId,
-          workspaceName: runtime.workspaceName,
-          repoPath
-        },
-        recipeResult: runtime.recipeResult,
-        timeoutMs: STATS_TIMEOUT_MS
-      })
-    } catch {
+    const deadline = Date.now() + STATS_TIMEOUT_MS
+    const target = await deps.resolveTarget(runtimeId)
+    if (!target) {
       return null
     }
+    const { runtime, repoPath, recipe } = target
+    return runEphemeralVmRecipeStats({
+      recipe,
+      repoPath,
+      context: {
+        instanceId: runtime.id,
+        recipeId: runtime.recipeId,
+        projectId: runtime.projectId,
+        workspaceId: runtime.workspaceId,
+        workspaceName: runtime.workspaceName,
+        repoPath
+      },
+      recipeResult: runtime.recipeResult,
+      // The lookup spent part of the budget; the step gets what is left.
+      timeoutMs: Math.max(1, deadline - Date.now())
+    })
   }
+
+  // One budget for the store, orca.yaml and sidecar reads and the step itself.
+  const readWithinDeadline = (runtimeId: string): Promise<EphemeralVmRecipeStats | null> =>
+    new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), STATS_TIMEOUT_MS)
+      readOnce(runtimeId).then(
+        (stats) => {
+          clearTimeout(timer)
+          resolve(stats)
+        },
+        () => {
+          clearTimeout(timer)
+          resolve(null)
+        }
+      )
+    })
 
   return (runtimeId) => {
     const now = Date.now()
@@ -76,7 +90,7 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
     if (pending) {
       return pending
     }
-    const read = readOnce(runtimeId).then((stats) => {
+    const read = readWithinDeadline(runtimeId).then((stats) => {
       inFlight.delete(runtimeId)
       cache.set(runtimeId, { readAt: Date.now(), stats })
       return stats
@@ -87,7 +101,7 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
 }
 
 /** The running runtime and the recipe its lifecycle runs, resolved like getRuntimeRecipeContext
- *  but from async reads, so the main thread never blocks on the store or orca.yaml. */
+ *  but from async reads, so the main thread never blocks on the store, sidecar or orca.yaml. */
 export async function resolveRuntimeStatsTarget(
   store: Store,
   userDataPath: string,
@@ -95,19 +109,29 @@ export async function resolveRuntimeStatsTarget(
 ): Promise<EphemeralVmRuntimeStatsTarget | null> {
   const { runtimes } = await readEphemeralVmRuntimesAsync(userDataPath)
   const runtime = runtimes.find((entry) => entry.id === runtimeId)
-  if (!runtime?.recipeResult || !isEphemeralVmEnvironmentRunning(runtime.status)) {
+  // Only the stats command approved with the recipe at creation may run; none means no stats.
+  const approvedStats = runtime?.recipe?.stats
+  if (
+    !runtime?.recipeResult ||
+    !approvedStats ||
+    !isEphemeralVmEnvironmentRunning(runtime.status)
+  ) {
     return null
   }
   const repo = runtime.repoId ? getRecipeRepo(store, runtime.repoId) : null
   if (repo?.ok) {
     const hooks = await loadHooksAsync(repo.repo.path)
     const recipe = mergeRuntimeRecipe(runtime, hooks?.environmentRecipes ?? [])
-    return recipe ? { runtime, repoPath: repo.repo.path, recipe } : null
+    return recipe
+      ? { runtime, repoPath: repo.repo.path, recipe: { ...recipe, stats: approvedStats } }
+      : null
   }
   if (!runtime.recipe || !runtime.repoPath) {
     return null
   }
   const hooks = await loadHooksAsync(runtime.repoPath)
   const recipe = fallbackRuntimeRecipe(runtime, hooks?.environmentRecipes ?? [])
-  return recipe ? { runtime, repoPath: runtime.repoPath, recipe } : null
+  return recipe
+    ? { runtime, repoPath: runtime.repoPath, recipe: { ...recipe, stats: approvedStats } }
+    : null
 }

@@ -18,8 +18,8 @@ const NO_STAT = '—'
 type EphemeralVmRuntimeRowProps = {
   runtime: EphemeralVmRuntimeRecord
   statusLabel: string
-  /** Running rows only: null until (or unless) the recipe's stats step answers. */
-  stats?: EphemeralVmRecipeStats | null
+  /** Null shows dashes: not running, no stats step, or no answer yet. */
+  stats: EphemeralVmRecipeStats | null
   cleanupFailed: boolean
   cleanupRunning: boolean
   isStopping: boolean
@@ -71,26 +71,24 @@ export function EphemeralVmRuntimeRow({
             ? getEphemeralVmRecipeResultProjectRoot(runtime.recipeResult)
             : runtime.id}
         </p>
-        {stats !== undefined ? (
-          <p
-            className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground"
-            data-testid="runtime-stats"
-          >
-            {[
-              t('auto.components.settings.EphemeralVmRuntimesSection.statsCpu', 'CPU {{value}}', {
-                value: stats ? formatEphemeralVmCpuPercent(stats.cpuPercent) : NO_STAT
-              }),
-              t(
-                'auto.components.settings.EphemeralVmRuntimesSection.statsMemory',
-                'Memory {{value}}',
-                { value: stats ? formatEphemeralVmBytes(stats.memoryBytes) : NO_STAT }
-              ),
-              t('auto.components.settings.EphemeralVmRuntimesSection.statsDisk', 'Disk {{value}}', {
-                value: stats ? formatEphemeralVmBytes(stats.diskBytes) : NO_STAT
-              })
-            ].join(' · ')}
-          </p>
-        ) : null}
+        <p
+          className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground"
+          data-testid="runtime-stats"
+        >
+          {[
+            t('auto.components.settings.EphemeralVmRuntimesSection.statsCpu', 'CPU {{value}}', {
+              value: stats ? formatEphemeralVmCpuPercent(stats.cpuPercent) : NO_STAT
+            }),
+            t(
+              'auto.components.settings.EphemeralVmRuntimesSection.statsMemory',
+              'Memory {{value}}',
+              { value: stats ? formatEphemeralVmBytes(stats.memoryBytes) : NO_STAT }
+            ),
+            t('auto.components.settings.EphemeralVmRuntimesSection.statsDisk', 'Disk {{value}}', {
+              value: stats ? formatEphemeralVmBytes(stats.diskBytes) : NO_STAT
+            })
+          ].join(' · ')}
+        </p>
         {cleanupError ? (
           <p className="mt-0.5 truncate text-xs text-destructive">{cleanupError}</p>
         ) : null}

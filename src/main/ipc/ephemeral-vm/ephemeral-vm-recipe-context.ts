@@ -129,10 +129,11 @@ export function getRuntimeRecipeContext(
 
 /**
  * The recipe a runtime's lifecycle runs: its snapshot plus what snapshots never persist
- * (timeoutSeconds, passEnv, stats), from the repo's recipe of the same id. Legacy runtimes lack
+ * (timeoutSeconds, passEnv), from the repo's recipe of the same id. Legacy runtimes lack
  * snapshots; never substitute a newer same-ID plugin recipe for their repo-owned recipe. Only when
  * the repo recipe has the same create command, so a different recipe that later took this id (e.g.
- * a repo recipe shadowing a plugin one) cannot impose its limits, environment or stats command.
+ * a repo recipe shadowing a plugin one) cannot impose its limits or environment. Never the repo's
+ * stats command: only the one approved at creation (the snapshot's) may run.
  */
 export function mergeRuntimeRecipe(
   runtime: EphemeralVmRuntimeRecord,
@@ -144,10 +145,16 @@ export function mergeRuntimeRecipe(
     ...(sameCreate && repoRecipe.timeoutSeconds
       ? { timeoutSeconds: repoRecipe.timeoutSeconds }
       : {}),
-    ...(sameCreate && repoRecipe.passEnv ? { passEnv: repoRecipe.passEnv } : {}),
-    ...(sameCreate && repoRecipe.stats ? { stats: repoRecipe.stats } : {})
+    ...(sameCreate && repoRecipe.passEnv ? { passEnv: repoRecipe.passEnv } : {})
   }
-  return runtime.recipe ? { ...runtime.recipe, ...fromRepo } : repoRecipe
+  if (runtime.recipe) {
+    return { ...runtime.recipe, ...fromRepo }
+  }
+  if (!repoRecipe) {
+    return undefined
+  }
+  const { stats: _unapprovedStats, ...legacyRecipe } = repoRecipe
+  return legacyRecipe
 }
 
 /**
@@ -169,11 +176,7 @@ export function fallbackRuntimeRecipe(
   if (!snapshot || !sameRecipe) {
     return null
   }
-  return {
-    ...snapshot,
-    ...(sameRecipe.passEnv ? { passEnv: sameRecipe.passEnv } : {}),
-    ...(sameRecipe.stats ? { stats: sameRecipe.stats } : {})
-  }
+  return { ...snapshot, ...(sameRecipe.passEnv ? { passEnv: sameRecipe.passEnv } : {}) }
 }
 
 export function resolveRecipeForRepo(

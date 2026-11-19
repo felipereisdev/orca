@@ -25,12 +25,13 @@ export function getEphemeralVmRecipeTimeoutSeconds(
 }
 
 /** Runtime records keep a recipe snapshot under a strict schema that current and older builds
- * share, so the snapshot never carries timeoutSeconds, passEnv or stats; lifecycle calls re-read
- * them from the repo's orca.yaml instead (see getRuntimeRecipeContext). */
+ * share, so the snapshot never carries timeoutSeconds or passEnv; lifecycle calls re-read them
+ * from the repo's orca.yaml instead (see getRuntimeRecipeContext). The stats command stays: it is
+ * approved with the recipe, and only that command may run (the feature sidecar keeps it). */
 export function toEphemeralVmRuntimeRecipeSnapshot(
   recipe: OrcaVmRecipe
-): Omit<OrcaVmRecipe, 'timeoutSeconds' | 'passEnv' | 'stats'> {
-  const { timeoutSeconds: _timeoutSeconds, passEnv: _passEnv, stats: _stats, ...snapshot } = recipe
+): Omit<OrcaVmRecipe, 'timeoutSeconds' | 'passEnv'> {
+  const { timeoutSeconds: _timeoutSeconds, passEnv: _passEnv, ...snapshot } = recipe
   return snapshot
 }
 

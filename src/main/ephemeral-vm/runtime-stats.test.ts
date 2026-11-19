@@ -136,4 +136,21 @@ describe('readEphemeralVmRuntimeStats', () => {
     ])
     expect(repo.runs()).toBe(1)
   })
+
+  it('a stalled target lookup returns null at the 5 s deadline', async () => {
+    vi.useFakeTimers()
+    const read = createEphemeralVmRuntimeStatsReader({
+      resolveTarget: () => new Promise(() => {})
+    })
+
+    const pending = read(runtime.id)
+    let settled: unknown = 'pending'
+    void pending.then((value) => {
+      settled = value
+    })
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(settled).toBe('pending')
+    await vi.advanceTimersByTimeAsync(1)
+    expect(settled).toBeNull()
+  })
 })

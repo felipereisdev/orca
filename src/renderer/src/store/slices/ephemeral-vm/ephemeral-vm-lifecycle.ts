@@ -1,6 +1,9 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
-import type { EphemeralVmRuntimeRecord } from '../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import {
+  isEphemeralVmEnvironmentRunning,
+  type EphemeralVmRuntimeRecord
+} from '../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   getEphemeralVmHostState,
   type EphemeralVmHostLifecycle,
@@ -26,6 +29,8 @@ export type EphemeralVmWorkspaceRuntime = Pick<
 export type EphemeralVmLifecycleSlice = {
   /** Live (not cleaned up) VM runtimes by the workspace they back. */
   ephemeralVmRuntimesByWorkspaceId: Record<string, EphemeralVmWorkspaceRuntime>
+  /** Provisioned runtimes that are up, across every record (attached or not, several per workspace). */
+  runningEphemeralVmRuntimeCount: number
   /** Workspaces whose VM resume is in flight; the record only flips when it finishes. */
   wakingEphemeralVmWorkspaceIds: Record<string, true>
   refreshEphemeralVmRuntimes: () => Promise<void>
@@ -123,6 +128,7 @@ export const createEphemeralVmLifecycleSlice: StateCreator<
   EphemeralVmLifecycleSlice
 > = (set) => ({
   ephemeralVmRuntimesByWorkspaceId: {},
+  runningEphemeralVmRuntimeCount: 0,
   wakingEphemeralVmWorkspaceIds: {},
   refreshEphemeralVmRuntimes: () => {
     const listRuntimes = window.api?.ephemeralVm?.listRuntimes
@@ -131,16 +137,22 @@ export const createEphemeralVmLifecycleSlice: StateCreator<
     }
     const sequence = ++refreshSequence
     const refresh = (async (): Promise<void> => {
-      const next = projectEphemeralVmWorkspaceRuntimes(await listRuntimes())
+      const records = await listRuntimes()
+      const next = projectEphemeralVmWorkspaceRuntimes(records)
+      const runningCount = records.filter(
+        (record) =>
+          record.recipeResult !== undefined && isEphemeralVmEnvironmentRunning(record.status)
+      ).length
       // Out-of-order replies must not roll a newer lifecycle status back; a superseded caller
       // settles with the newer read, so it never acts on a store that has not caught up.
       if (sequence !== refreshSequence) {
         return latestRefresh
       }
       set((state) =>
-        sameRuntimes(state.ephemeralVmRuntimesByWorkspaceId, next)
+        sameRuntimes(state.ephemeralVmRuntimesByWorkspaceId, next) &&
+        state.runningEphemeralVmRuntimeCount === runningCount
           ? state
-          : { ephemeralVmRuntimesByWorkspaceId: next }
+          : { ephemeralVmRuntimesByWorkspaceId: next, runningEphemeralVmRuntimeCount: runningCount }
       )
     })()
     latestRefresh = refresh

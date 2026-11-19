@@ -4,12 +4,16 @@ import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-r
 import type { EphemeralVmRecipeStats } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { EphemeralVmRuntimeRow } from './EphemeralVmRuntimeRow'
 
-function runtime(id: string, workspaceName: string): EphemeralVmRuntimeRecord {
+function runtime(
+  id: string,
+  workspaceName: string,
+  status: EphemeralVmRuntimeRecord['status']
+): EphemeralVmRuntimeRecord {
   return {
     id,
     recipeId: 'docker-desktop',
     workspaceName,
-    status: 'running',
+    status,
     cleanupStatus: 'not_started',
     createdAt: 1,
     updatedAt: 1,
@@ -24,11 +28,19 @@ function runtime(id: string, workspaceName: string): EphemeralVmRuntimeRecord {
   }
 }
 
-function Row({ name, stats }: { name: string; stats: EphemeralVmRecipeStats | null }) {
+function Row({
+  name,
+  stats,
+  status = 'running'
+}: {
+  name: string
+  stats: EphemeralVmRecipeStats | null
+  status?: EphemeralVmRuntimeRecord['status']
+}) {
   return (
     <EphemeralVmRuntimeRow
-      runtime={runtime(`vm-${name}`, name)}
-      statusLabel="Running"
+      runtime={runtime(`vm-${name}`, name, status)}
+      statusLabel={status}
       stats={stats}
       cleanupFailed={false}
       cleanupRunning={false}
@@ -50,6 +62,7 @@ function Rows() {
         stats={{ cpuPercent: 12.5, memoryBytes: 1_536_000_000, diskBytes: 342_000_000 }}
       />
       <Row name="checkout-bug" stats={null} />
+      <Row name="old-branch" stats={null} status="suspended" />
     </div>
   )
 }

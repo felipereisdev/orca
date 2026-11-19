@@ -27,9 +27,11 @@ export function projectRuntimeForRollback(
   runtime: EphemeralVmProvisionedRuntimeRecord
 ): EphemeralVmRuntimeRecord {
   const recipe = runtime.recipe
-    ? (({ checkoutMode: _checkoutMode, ...rollbackRecipe }) => rollbackRecipe)(runtime.recipe)
+    ? (({ checkoutMode: _checkoutMode, stats: _stats, ...rollbackRecipe }) => rollbackRecipe)(
+        runtime.recipe
+      )
     : undefined
-  // Older builds parse recipe results strictly and know neither `checkoutMode` nor `desktop`.
+  // Older builds parse recipe snapshots and results strictly and know neither `checkoutMode` nor `desktop`.
   const { desktop: _desktop, ...withoutDesktop } = runtime.recipeResult
   const recipeResult =
     withoutDesktop.schemaVersion === 2

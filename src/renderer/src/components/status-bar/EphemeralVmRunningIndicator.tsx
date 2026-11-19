@@ -3,7 +3,6 @@ import { Container } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAppStore } from '@/store/index'
 import { useTranslate } from '@/i18n/use-translate'
-import { isEphemeralVmEnvironmentRunning } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 
 /** "N environments running" for live recipe environments; opens Settings → VMs. Hidden at zero. */
 export function EphemeralVmRunningIndicator({
@@ -13,12 +12,7 @@ export function EphemeralVmRunningIndicator({
 }): React.JSX.Element | null {
   const t = useTranslate()
   const enabled = useAppStore((state) => state.settings?.experimentalEphemeralVms === true)
-  const count = useAppStore(
-    (state) =>
-      Object.values(state.ephemeralVmRuntimesByWorkspaceId).filter((runtime) =>
-        isEphemeralVmEnvironmentRunning(runtime.status)
-      ).length
-  )
+  const count = useAppStore((state) => state.runningEphemeralVmRuntimeCount)
   if (!enabled || count === 0) {
     return null
   }
@@ -42,7 +36,7 @@ export function EphemeralVmRunningIndicator({
           aria-label={label}
         >
           <Container className="size-3 shrink-0" />
-          {!iconOnly ? <span className="text-[11px] tabular-nums">{label}</span> : null}
+          <span className="text-[11px] tabular-nums">{iconOnly ? count : label}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>

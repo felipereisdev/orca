@@ -344,7 +344,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
               key={runtime.id}
               runtime={runtime}
               statusLabel={getEphemeralVmRuntimeStatusLabel(runtime, t)}
-              stats={showsStats(runtime) ? (stats[runtime.id] ?? null) : undefined}
+              stats={showsStats(runtime) ? (stats[runtime.id] ?? null) : null}
               cleanupFailed={hasCleanupFailed(runtime)}
               cleanupRunning={isCleanupRunning(runtime) || cleaningId === runtime.id}
               isStopping={stoppingId === runtime.id}

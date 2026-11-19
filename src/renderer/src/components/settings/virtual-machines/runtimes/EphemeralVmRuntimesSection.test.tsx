@@ -21,6 +21,20 @@ const recipeResult = {
 }
 let originalApi: typeof window.api
 
+async function settle(): Promise<void> {
+  for (let i = 0; i < 10; i += 1) {
+    await act(async () => {})
+  }
+}
+
+function statsOf(name: string): HTMLElement | null {
+  const element = screen.getByText(name).closest<HTMLElement>('[data-runtime-row]')
+  if (!element) {
+    throw new Error(`no row for ${name}`)
+  }
+  return within(element).queryByTestId('runtime-stats')
+}
+
 beforeEach(() => {
   originalApi = window.api
   useAppStore.setState({
@@ -44,7 +58,8 @@ describe('EphemeralVmRuntimesSection', () => {
         createdAt: 1,
         status: 'suspended',
         recipeResult
-      })
+      }),
+      recipeRuntime({ id: 'vm-d', workspaceName: 'delta', createdAt: 0, status: 'provisioning' })
     ])
     const runtimeStats = vi.fn(async ({ runtimeId }: { runtimeId: string }) =>
       runtimeId === 'vm-a'
@@ -59,20 +74,36 @@ describe('EphemeralVmRuntimesSection', () => {
         <EphemeralVmRuntimesSection />
       </TooltipProvider>
     )
-    for (let i = 0; i < 10; i += 1) {
-      await act(async () => {})
-    }
+    await settle()
 
-    const statsOf = (name: string): HTMLElement | null => {
-      const element = screen.getByText(name).closest<HTMLElement>('[data-runtime-row]')
-      if (!element) {
-        throw new Error(`no row for ${name}`)
-      }
-      return within(element).queryByTestId('runtime-stats')
-    }
     expect(statsOf('alpha')?.textContent).toBe('CPU 12.5% · Memory 1.5 GB · Disk 340 MB')
     expect(statsOf('beta')?.textContent).toBe('CPU — · Memory — · Disk —')
-    expect(statsOf('gamma')).toBeNull()
+    expect(statsOf('gamma')?.textContent).toBe('CPU — · Memory — · Disk —')
+    expect(statsOf('delta')?.textContent).toBe('CPU — · Memory — · Disk —')
     expect(runtimeStats.mock.calls.map(([args]) => args.runtimeId).sort()).toEqual(['vm-a', 'vm-b'])
+  })
+
+  it('a row whose stats never answer does not hold back the others', async () => {
+    const bridge = recipeRemovalBridge([
+      recipeRuntime({ id: 'vm-a', workspaceName: 'alpha', createdAt: 2, recipeResult }),
+      recipeRuntime({ id: 'vm-b', workspaceName: 'beta', createdAt: 1, recipeResult })
+    ])
+    const runtimeStats = vi.fn(({ runtimeId }: { runtimeId: string }) =>
+      runtimeId === 'vm-a'
+        ? new Promise<null>(() => {})
+        : Promise.resolve({ cpuPercent: 50, memoryBytes: 2_000_000_000, diskBytes: 1_000_000 })
+    )
+    Object.assign(bridge.ephemeralVm, { runtimeStats })
+    window.api = bridge.api
+
+    render(
+      <TooltipProvider>
+        <EphemeralVmRuntimesSection />
+      </TooltipProvider>
+    )
+    await settle()
+
+    expect(statsOf('beta')?.textContent).toBe('CPU 50% · Memory 2 GB · Disk 1 MB')
+    expect(statsOf('alpha')?.textContent).toBe('CPU — · Memory — · Disk —')
   })
 })
