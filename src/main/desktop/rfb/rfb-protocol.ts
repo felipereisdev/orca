@@ -14,6 +14,15 @@ export const RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST = 3
 export const RFB_CLIENT_KEY_EVENT = 4
 export const RFB_CLIENT_POINTER_EVENT = 5
 export const RFB_CLIENT_CUT_TEXT = 6
+// Community extensions (rfbproto): https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst
+export const RFB_CLIENT_ENABLE_CONTINUOUS_UPDATES = 150
+export const RFB_CLIENT_FENCE = 248
+export const RFB_CLIENT_XVP = 250
+export const RFB_CLIENT_SET_DESKTOP_SIZE = 251
+export const RFB_CLIENT_QEMU = 255
+export const RFB_QEMU_EXTENDED_KEY_EVENT = 0
+/** PointerEvent with this bit in the mask byte carries one more byte of buttons (ExtendedMouseButtons). */
+export const RFB_POINTER_EXTENDED_MARKER = 0x80
 
 export type RfbErrorCode =
   | 'rfb_auth_failed'

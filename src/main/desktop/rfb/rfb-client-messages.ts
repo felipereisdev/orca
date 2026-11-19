@@ -1,10 +1,17 @@
 import {
   RFB_CLIENT_CUT_TEXT,
+  RFB_CLIENT_ENABLE_CONTINUOUS_UPDATES,
+  RFB_CLIENT_FENCE,
   RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST,
   RFB_CLIENT_KEY_EVENT,
   RFB_CLIENT_POINTER_EVENT,
+  RFB_CLIENT_QEMU,
+  RFB_CLIENT_SET_DESKTOP_SIZE,
   RFB_CLIENT_SET_ENCODINGS,
   RFB_CLIENT_SET_PIXEL_FORMAT,
+  RFB_CLIENT_XVP,
+  RFB_POINTER_EXTENDED_MARKER,
+  RFB_QEMU_EXTENDED_KEY_EVENT,
   RfbError
 } from './rfb-protocol'
 
@@ -12,7 +19,18 @@ const FIXED_MESSAGE_LENGTHS = new Map<number, number>([
   [RFB_CLIENT_SET_PIXEL_FORMAT, 20],
   [RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST, 10],
   [RFB_CLIENT_KEY_EVENT, 8],
-  [RFB_CLIENT_POINTER_EVENT, 6]
+  [RFB_CLIENT_ENABLE_CONTINUOUS_UPDATES, 10],
+  [RFB_CLIENT_XVP, 4]
+])
+
+// Messages that act on the desktop, so only the controlling viewer's reach it.
+const INPUT_MESSAGE_TYPES = new Set([
+  RFB_CLIENT_KEY_EVENT,
+  RFB_CLIENT_POINTER_EVENT,
+  RFB_CLIENT_CUT_TEXT,
+  RFB_CLIENT_SET_DESKTOP_SIZE,
+  RFB_CLIENT_QEMU,
+  RFB_CLIENT_XVP
 ])
 
 // Bounds how much a viewer can make us buffer before a cut-text message completes.
@@ -27,6 +45,28 @@ function messageLength(buffer: Buffer): number | null {
   const fixed = FIXED_MESSAGE_LENGTHS.get(type)
   if (fixed !== undefined) {
     return fixed
+  }
+  if (type === RFB_CLIENT_POINTER_EVENT) {
+    if (buffer.length < 2) {
+      return null
+    }
+    return buffer[1] & RFB_POINTER_EXTENDED_MARKER ? 7 : 6
+  }
+  if (type === RFB_CLIENT_QEMU) {
+    if (buffer.length < 2) {
+      return null
+    }
+    // Only the extended key event is defined for clients; any other subtype has no known length.
+    if (buffer[1] !== RFB_QEMU_EXTENDED_KEY_EVENT) {
+      throw new RfbError('rfb_protocol_error')
+    }
+    return 12
+  }
+  if (type === RFB_CLIENT_FENCE) {
+    return buffer.length < 9 ? null : 9 + buffer[8]
+  }
+  if (type === RFB_CLIENT_SET_DESKTOP_SIZE) {
+    return buffer.length < 7 ? null : 8 + 16 * buffer[6]
   }
   if (type === RFB_CLIENT_SET_ENCODINGS) {
     return buffer.length < 4 ? null : 4 + 4 * buffer.readUInt16BE(2)
@@ -45,8 +85,8 @@ function messageLength(buffer: Buffer): number | null {
   throw new RfbError('rfb_protocol_error')
 }
 
-// messageLength never reads past the ClientCutText header.
-const MAX_HEADER_BYTES = 8
+// messageLength never reads past the ClientCutText or ClientFence header.
+const MAX_HEADER_BYTES = 9
 
 /**
  * Reassembles a client→server byte stream into whole RFB messages. Header bytes go into a small
@@ -87,12 +127,7 @@ export class RfbClientMessageFilter {
   }
 }
 
-/** Messages that act on the desktop: key, pointer and clipboard. */
+/** Messages that act on the desktop: keys, pointer, clipboard, resizing and XVP power actions. */
 export function isInputMessage(message: Buffer): boolean {
-  const type = message[0]
-  return (
-    type === RFB_CLIENT_KEY_EVENT ||
-    type === RFB_CLIENT_POINTER_EVENT ||
-    type === RFB_CLIENT_CUT_TEXT
-  )
+  return INPUT_MESSAGE_TYPES.has(message[0])
 }

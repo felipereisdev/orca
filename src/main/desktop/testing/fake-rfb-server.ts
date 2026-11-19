@@ -40,6 +40,8 @@ export type FakeRfbServer = {
    * their outstanding (or next) FramebufferUpdateRequest, as a real server does.
    */
   setSize(width: number, height: number): void
+  /** Sends a ServerFence request to every client that advertised the Fence pseudo-encoding. */
+  sendFence(payload: string): void
   /** Destroys the `index`th open client connection (in connection order), as a dropped link. */
   dropConnection(index: number): void
   close(): Promise<void>
@@ -61,6 +63,20 @@ type FakeRfbSession = {
 }
 
 const FAKE_DESKTOP_NAME = 'Orca fake desktop'
+const RFB_ENCODING_FENCE = -312
+const RFB_ENCODING_CONTINUOUS_UPDATES = -313
+const RFB_SERVER_END_OF_CONTINUOUS_UPDATES = 150
+const RFB_SERVER_FENCE = 248
+const RFB_FENCE_REQUEST = 0x8000_0000
+const RFB_FENCE_BLOCK_BEFORE = 1
+
+function serverFence(payload: string): Buffer {
+  const header = Buffer.alloc(9)
+  header[0] = RFB_SERVER_FENCE
+  header.writeUInt32BE((RFB_FENCE_REQUEST | RFB_FENCE_BLOCK_BEFORE) >>> 0, 4)
+  header[8] = Buffer.byteLength(payload, 'latin1')
+  return Buffer.concat([header, Buffer.from(payload, 'latin1')])
+}
 
 type Rect = { x: number; y: number; width: number; height: number }
 
@@ -177,6 +193,13 @@ export async function startFakeRfbServer(opts: {
       session.encodings = new Set(
         Array.from({ length: message.readUInt16BE(2) }, (_, i) => message.readInt32BE(4 + i * 4))
       )
+      // As TigerVNC does: probe a client that offers fences, and announce continuous updates.
+      if (session.encodings.has(RFB_ENCODING_FENCE)) {
+        session.socket.write(serverFence('probe'))
+      }
+      if (session.encodings.has(RFB_ENCODING_CONTINUOUS_UPDATES)) {
+        session.socket.write(Buffer.from([RFB_SERVER_END_OF_CONTINUOUS_UPDATES]))
+      }
     } else if (message[0] === RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST) {
       answerUpdateRequest(session, message)
     }
@@ -280,6 +303,13 @@ export async function startFakeRfbServer(opts: {
         if (session.incrementalPending) {
           session.incrementalPending = false
           sendDesktopSize(session)
+        }
+      }
+    },
+    sendFence(payload) {
+      for (const session of sessions) {
+        if (session.encodings.has(RFB_ENCODING_FENCE)) {
+          session.socket.write(serverFence(payload))
         }
       }
     },

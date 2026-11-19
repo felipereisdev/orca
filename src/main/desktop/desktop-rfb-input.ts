@@ -1,4 +1,9 @@
-import { RFB_CLIENT_KEY_EVENT, RFB_CLIENT_POINTER_EVENT } from './rfb/rfb-protocol'
+import {
+  RFB_CLIENT_KEY_EVENT,
+  RFB_CLIENT_POINTER_EVENT,
+  RFB_CLIENT_QEMU,
+  RFB_POINTER_EXTENDED_MARKER
+} from './rfb/rfb-protocol'
 
 export function keyEventMessage(down: boolean, keysym: number): Buffer {
   const message = Buffer.alloc(8)
@@ -43,16 +48,25 @@ export class HeldInput {
 
   observe(message: Buffer): void {
     if (message[0] === RFB_CLIENT_KEY_EVENT) {
-      const keysym = message.readUInt32BE(4)
-      if (message[1] !== 0) {
-        this.keys.add(keysym)
-      } else {
-        this.keys.delete(keysym)
-      }
+      this.observeKey(message[1] !== 0, message.readUInt32BE(4))
+    } else if (message[0] === RFB_CLIENT_QEMU) {
+      // QEMU extended key event: down is a u16; a plain key-up for the keysym releases it.
+      this.observeKey(message.readUInt16BE(2) !== 0, message.readUInt32BE(4))
     } else if (message[0] === RFB_CLIENT_POINTER_EVENT) {
-      this.buttonMask = message[1]
+      const extended = (message[1] & RFB_POINTER_EXTENDED_MARKER) !== 0
+      this.buttonMask = extended
+        ? (message[1] & ~RFB_POINTER_EXTENDED_MARKER) | (message[6] << 7)
+        : message[1]
       this.x = message.readUInt16BE(2)
       this.y = message.readUInt16BE(4)
+    }
+  }
+
+  private observeKey(down: boolean, keysym: number): void {
+    if (down) {
+      this.keys.add(keysym)
+    } else {
+      this.keys.delete(keysym)
     }
   }
 

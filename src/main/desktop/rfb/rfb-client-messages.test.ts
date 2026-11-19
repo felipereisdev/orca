@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { isInputMessage, RfbClientMessageFilter } from './rfb-client-messages'
 
+// The exact bytes noVNC 1.7's RFB.messages encoders write (core/rfb.js), one of each.
+const NOVNC = {
+  // clientFence(sock, 3, 'ab'): type, 3 pad, flags u32, length u8, payload
+  clientFence: Buffer.from([248, 0, 0, 0, 0, 0, 0, 3, 2, 0x61, 0x62]),
+  // enableContinuousUpdates(sock, true, 0, 0, 640, 480)
+  enableContinuousUpdates: Buffer.from([150, 1, 0, 0, 0, 0, 2, 0x80, 1, 0xe0]),
+  // setDesktopSize(sock, 800, 600, 7, 0): one screen of 16 bytes
+  setDesktopSize: Buffer.from([
+    251, 0, 3, 0x20, 2, 0x58, 1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 3, 0x20, 2, 0x58, 0, 0, 0, 0
+  ]),
+  // QEMUExtendedKeyEvent(sock, 0x61, 1, 0x1e)
+  qemuKey: Buffer.from([255, 0, 0, 1, 0, 0, 0, 0x61, 0, 0, 0, 0x1e]),
+  // xvpOp(sock, 1, 2)
+  xvp: Buffer.from([250, 0, 1, 2]),
+  // extendedPointerEvent(sock, 10, 20, 1 << 7): marker bit set, one extra byte of buttons
+  extendedPointer: Buffer.from([5, 0x80, 0, 10, 0, 20, 1])
+}
+
 describe('RfbClientMessageFilter', () => {
   it('splits coalesced and partial chunks', () => {
     const setEncodings = Buffer.from([2, 0, 0, 3, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0x21, 0, 0, 0, 1])
@@ -48,19 +66,42 @@ describe('RfbClientMessageFilter', () => {
   })
 
   it('throws rfb_protocol_error on an unknown message type', () => {
-    expect(() => new RfbClientMessageFilter().push(Buffer.from([250, 0, 0, 0]))).toThrow(
+    expect(() => new RfbClientMessageFilter().push(Buffer.from([99, 0, 0, 0]))).toThrow(
+      expect.objectContaining({ code: 'rfb_protocol_error' })
+    )
+  })
+
+  it('frames the extension messages noVNC 1.7 sends, split byte by byte', () => {
+    const stream = Buffer.concat(Object.values(NOVNC))
+    const filter = new RfbClientMessageFilter()
+    const messages = [...stream].flatMap((byte) => filter.push(Buffer.from([byte])))
+
+    expect(messages).toEqual(Object.values(NOVNC))
+  })
+
+  it('rejects a QEMU client message other than the extended key event', () => {
+    expect(() => new RfbClientMessageFilter().push(Buffer.from([255, 1, 0, 0]))).toThrow(
       expect.objectContaining({ code: 'rfb_protocol_error' })
     )
   })
 })
 
 describe('isInputMessage', () => {
-  it('is true for key, pointer and cut text only', () => {
+  it('is true for key, pointer and cut text', () => {
     expect(isInputMessage(Buffer.from([4, 1, 0, 0, 0, 0, 0xff, 0x0d]))).toBe(true)
     expect(isInputMessage(Buffer.from([5, 0, 0, 1, 0, 1]))).toBe(true)
     expect(isInputMessage(Buffer.from([6, 0, 0, 0, 0, 0, 0, 0]))).toBe(true)
     expect(isInputMessage(Buffer.alloc(20))).toBe(false)
     expect(isInputMessage(Buffer.from([2, 0, 0, 0]))).toBe(false)
     expect(isInputMessage(Buffer.from([3, 1, 0, 0, 0, 0, 0, 8, 0, 8]))).toBe(false)
+  })
+
+  it('treats resize, QEMU keys, XVP and extended pointer as input, fence and CU as not', () => {
+    expect(isInputMessage(NOVNC.setDesktopSize)).toBe(true)
+    expect(isInputMessage(NOVNC.qemuKey)).toBe(true)
+    expect(isInputMessage(NOVNC.xvp)).toBe(true)
+    expect(isInputMessage(NOVNC.extendedPointer)).toBe(true)
+    expect(isInputMessage(NOVNC.clientFence)).toBe(false)
+    expect(isInputMessage(NOVNC.enableContinuousUpdates)).toBe(false)
   })
 })
