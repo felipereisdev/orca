@@ -2,7 +2,11 @@ import type { Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { HeldInput, type DesktopBounds } from './desktop-rfb-input'
 import { connectRfbUpstream, withSocketTimeout, type DesktopVncTarget } from './desktop-upstream'
-import { isInputMessage, RfbClientMessageFilter } from './rfb/rfb-client-messages'
+import {
+  isInputMessage,
+  RfbClientMessageFilter,
+  withoutUnsupportedEncodings
+} from './rfb/rfb-client-messages'
 import { runRfbServerHandshake } from './rfb/rfb-server-handshake'
 
 type ViewerHandlers = {
@@ -108,7 +112,7 @@ export class DesktopViewerSession {
       let flushed = true
       for (const message of messages) {
         if (!isInputMessage(message)) {
-          flushed = this.upstream.write(message)
+          flushed = this.upstream.write(withoutUnsupportedEncodings(message))
         } else if (this.handlers.inputAllowed()) {
           this.currentBounds() // remember the latest announced size while it is known
           this.held.observe(message)

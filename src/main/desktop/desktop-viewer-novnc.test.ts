@@ -127,5 +127,14 @@ describe('the real noVNC client through the broker', () => {
 
     expect(disconnects).toEqual([])
     expect(brokerSide.destroyed).toBe(false)
+    // noVNC offers ExtendedMouseButtons and QEMU keys; the broker keeps both from the server.
+    const offered = fixture.server.received
+      .filter((message) => message[0] === 2)
+      .flatMap((message) =>
+        Array.from({ length: message.readUInt16BE(2) }, (_, i) => message.readInt32BE(4 + 4 * i))
+      )
+    expect(offered).toContain(-312)
+    expect(offered).not.toContain(-316)
+    expect(offered).not.toContain(-258)
   })
 })

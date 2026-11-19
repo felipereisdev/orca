@@ -5,13 +5,12 @@ import {
   RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST,
   RFB_CLIENT_KEY_EVENT,
   RFB_CLIENT_POINTER_EVENT,
-  RFB_CLIENT_QEMU,
   RFB_CLIENT_SET_DESKTOP_SIZE,
   RFB_CLIENT_SET_ENCODINGS,
   RFB_CLIENT_SET_PIXEL_FORMAT,
   RFB_CLIENT_XVP,
-  RFB_POINTER_EXTENDED_MARKER,
-  RFB_QEMU_EXTENDED_KEY_EVENT,
+  RFB_ENCODING_EXTENDED_MOUSE_BUTTONS,
+  RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT,
   RfbError
 } from './rfb-protocol'
 
@@ -19,6 +18,7 @@ const FIXED_MESSAGE_LENGTHS = new Map<number, number>([
   [RFB_CLIENT_SET_PIXEL_FORMAT, 20],
   [RFB_CLIENT_FRAMEBUFFER_UPDATE_REQUEST, 10],
   [RFB_CLIENT_KEY_EVENT, 8],
+  [RFB_CLIENT_POINTER_EVENT, 6],
   [RFB_CLIENT_ENABLE_CONTINUOUS_UPDATES, 10],
   [RFB_CLIENT_XVP, 4]
 ])
@@ -29,8 +29,16 @@ const INPUT_MESSAGE_TYPES = new Set([
   RFB_CLIENT_POINTER_EVENT,
   RFB_CLIENT_CUT_TEXT,
   RFB_CLIENT_SET_DESKTOP_SIZE,
-  RFB_CLIENT_QEMU,
   RFB_CLIENT_XVP
+])
+
+/**
+ * Pseudo-encodings a viewer may not negotiate: with them noVNC sends 7-byte pointer events and
+ * keycode-tracked QEMU keys, which the filter would misframe and a handoff could not release.
+ */
+const UNSUPPORTED_ENCODINGS = new Set([
+  RFB_ENCODING_EXTENDED_MOUSE_BUTTONS,
+  RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT
 ])
 
 // Bounds how much a viewer can make us buffer before a cut-text message completes.
@@ -45,22 +53,6 @@ function messageLength(buffer: Buffer): number | null {
   const fixed = FIXED_MESSAGE_LENGTHS.get(type)
   if (fixed !== undefined) {
     return fixed
-  }
-  if (type === RFB_CLIENT_POINTER_EVENT) {
-    if (buffer.length < 2) {
-      return null
-    }
-    return buffer[1] & RFB_POINTER_EXTENDED_MARKER ? 7 : 6
-  }
-  if (type === RFB_CLIENT_QEMU) {
-    if (buffer.length < 2) {
-      return null
-    }
-    // Only the extended key event is defined for clients; any other subtype has no known length.
-    if (buffer[1] !== RFB_QEMU_EXTENDED_KEY_EVENT) {
-      throw new RfbError('rfb_protocol_error')
-    }
-    return 12
   }
   if (type === RFB_CLIENT_FENCE) {
     return buffer.length < 9 ? null : 9 + buffer[8]
@@ -130,4 +122,23 @@ export class RfbClientMessageFilter {
 /** Messages that act on the desktop: keys, pointer, clipboard, resizing and XVP power actions. */
 export function isInputMessage(message: Buffer): boolean {
   return INPUT_MESSAGE_TYPES.has(message[0])
+}
+
+/** A SetEncodings without the unsupported pseudo-encodings; any other message is returned as is. */
+export function withoutUnsupportedEncodings(message: Buffer): Buffer {
+  if (message[0] !== RFB_CLIENT_SET_ENCODINGS) {
+    return message
+  }
+  const encodings = Array.from({ length: message.readUInt16BE(2) }, (_, index) =>
+    message.readInt32BE(4 + 4 * index)
+  )
+  const kept = encodings.filter((encoding) => !UNSUPPORTED_ENCODINGS.has(encoding))
+  if (kept.length === encodings.length) {
+    return message
+  }
+  const rewritten = Buffer.alloc(4 + 4 * kept.length)
+  rewritten[0] = RFB_CLIENT_SET_ENCODINGS
+  rewritten.writeUInt16BE(kept.length, 2)
+  kept.forEach((encoding, index) => rewritten.writeInt32BE(encoding, 4 + 4 * index))
+  return rewritten
 }

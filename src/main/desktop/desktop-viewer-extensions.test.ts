@@ -11,10 +11,10 @@ const ENABLE_CONTINUOUS_UPDATES = Buffer.from([150, 1, 0, 0, 0, 0, 0, 64, 0, 48]
 const SET_DESKTOP_SIZE = Buffer.from([
   251, 0, 0, 80, 0, 60, 1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 80, 0, 60, 0, 0, 0, 0
 ])
-const QEMU_KEY = Buffer.from([255, 0, 0, 1, 0, 0, 0, 0x61, 0, 0, 0, 0x1e])
 const XVP = Buffer.from([250, 0, 1, 2])
-const EXTENDED_POINTER = Buffer.from([5, 0x80, 0, 10, 0, 20, 1])
-const INPUT = [SET_DESKTOP_SIZE, QEMU_KEY, XVP, EXTENDED_POINTER]
+// Button 8 sets the PointerEvent mask's top bit; still a plain 6-byte message.
+const BUTTON_8_POINTER = Buffer.from([5, 0x80, 0, 10, 0, 20])
+const INPUT = [SET_DESKTOP_SIZE, XVP, BUTTON_8_POINTER]
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -29,7 +29,7 @@ async function fixture(): Promise<DesktopBrokerFixture> {
   return started
 }
 
-const EXTENSION_TYPES = new Set([248, 150, 251, 255, 250, 5])
+const EXTENSION_TYPES = new Set([248, 150, 251, 250, 5])
 
 /** The extension messages (and pointer events) the server got, in arrival order. */
 function forwarded(received: Buffer[]): Buffer[] {
@@ -71,5 +71,21 @@ describe('noVNC extension messages through the broker', () => {
     await server.waitForReceived(hasUpdateRequest(7, 5))
 
     expect(forwarded(server.received)).toEqual(INPUT)
+  })
+
+  it('removes ExtendedMouseButtons and QEMU Extended Key Event from a SetEncodings', async () => {
+    const { server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+
+    viewer.setEncodings([0, -258, -312, -316, -223])
+    viewer.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+
+    const fromViewer = server.received.filter(
+      (message) => message[0] === 2 && message.readInt32BE(4 + 4 * 1) === -312
+    )
+    expect(fromViewer).toEqual([
+      Buffer.from([2, 0, 0, 3, 0, 0, 0, 0, 0xff, 0xff, 0xfe, 0xc8, 0xff, 0xff, 0xff, 0x21])
+    ])
   })
 })

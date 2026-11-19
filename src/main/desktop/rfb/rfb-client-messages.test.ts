@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isInputMessage, RfbClientMessageFilter } from './rfb-client-messages'
+import {
+  isInputMessage,
+  RfbClientMessageFilter,
+  withoutUnsupportedEncodings
+} from './rfb-client-messages'
 
 // The exact bytes noVNC 1.7's RFB.messages encoders write (core/rfb.js), one of each.
 const NOVNC = {
@@ -11,12 +15,8 @@ const NOVNC = {
   setDesktopSize: Buffer.from([
     251, 0, 3, 0x20, 2, 0x58, 1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 3, 0x20, 2, 0x58, 0, 0, 0, 0
   ]),
-  // QEMUExtendedKeyEvent(sock, 0x61, 1, 0x1e)
-  qemuKey: Buffer.from([255, 0, 0, 1, 0, 0, 0, 0x61, 0, 0, 0, 0x1e]),
   // xvpOp(sock, 1, 2)
-  xvp: Buffer.from([250, 0, 1, 2]),
-  // extendedPointerEvent(sock, 10, 20, 1 << 7): marker bit set, one extra byte of buttons
-  extendedPointer: Buffer.from([5, 0x80, 0, 10, 0, 20, 1])
+  xvp: Buffer.from([250, 0, 1, 2])
 }
 
 describe('RfbClientMessageFilter', () => {
@@ -79,10 +79,21 @@ describe('RfbClientMessageFilter', () => {
     expect(messages).toEqual(Object.values(NOVNC))
   })
 
-  it('rejects a QEMU client message other than the extended key event', () => {
-    expect(() => new RfbClientMessageFilter().push(Buffer.from([255, 1, 0, 0]))).toThrow(
+  it('rejects QEMU client messages: the broker never lets that extension be negotiated', () => {
+    // QEMUExtendedKeyEvent(sock, 0x61, 1, 0x1e)
+    const qemuKey = Buffer.from([255, 0, 0, 1, 0, 0, 0, 0x61, 0, 0, 0, 0x1e])
+    expect(() => new RfbClientMessageFilter().push(qemuKey)).toThrow(
       expect.objectContaining({ code: 'rfb_protocol_error' })
     )
+  })
+
+  it('frames a button-8 PointerEvent as 6 bytes, then the next message', () => {
+    // pointerEvent(sock, 10, 20, 0x80): button 8 sets the mask's top bit.
+    const pointer = Buffer.from([5, 0x80, 0, 10, 0, 20])
+    const request = Buffer.from([3, 1, 0, 0, 0, 0, 0, 64, 0, 48])
+    const filter = new RfbClientMessageFilter()
+
+    expect(filter.push(Buffer.concat([pointer, request]))).toEqual([pointer, request])
   })
 })
 
@@ -96,12 +107,35 @@ describe('isInputMessage', () => {
     expect(isInputMessage(Buffer.from([3, 1, 0, 0, 0, 0, 0, 8, 0, 8]))).toBe(false)
   })
 
-  it('treats resize, QEMU keys, XVP and extended pointer as input, fence and CU as not', () => {
+  it('treats resize and XVP as input, fence and CU as not', () => {
     expect(isInputMessage(NOVNC.setDesktopSize)).toBe(true)
-    expect(isInputMessage(NOVNC.qemuKey)).toBe(true)
     expect(isInputMessage(NOVNC.xvp)).toBe(true)
-    expect(isInputMessage(NOVNC.extendedPointer)).toBe(true)
     expect(isInputMessage(NOVNC.clientFence)).toBe(false)
     expect(isInputMessage(NOVNC.enableContinuousUpdates)).toBe(false)
+  })
+})
+
+describe('withoutUnsupportedEncodings', () => {
+  function setEncodings(encodings: number[]): Buffer {
+    const message = Buffer.alloc(4 + 4 * encodings.length)
+    message[0] = 2
+    message.writeUInt16BE(encodings.length, 2)
+    encodings.forEach((encoding, index) => message.writeInt32BE(encoding, 4 + 4 * index))
+    return message
+  }
+
+  it('drops ExtendedMouseButtons and QEMU Extended Key Event and corrects the count', () => {
+    // Raw, DesktopSize, QEMU Extended Key Event, Fence, ExtendedMouseButtons, ContinuousUpdates
+    const rewritten = withoutUnsupportedEncodings(setEncodings([0, -223, -258, -312, -316, -313]))
+
+    expect(rewritten).toEqual(setEncodings([0, -223, -312, -313]))
+  })
+
+  it('leaves other messages and encodings lists as they are', () => {
+    const plain = setEncodings([0, -223])
+    const pointer = Buffer.from([5, 0x80, 0, 10, 0, 20])
+
+    expect(withoutUnsupportedEncodings(plain)).toBe(plain)
+    expect(withoutUnsupportedEncodings(pointer)).toBe(pointer)
   })
 })

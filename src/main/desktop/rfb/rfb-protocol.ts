@@ -19,10 +19,8 @@ export const RFB_CLIENT_ENABLE_CONTINUOUS_UPDATES = 150
 export const RFB_CLIENT_FENCE = 248
 export const RFB_CLIENT_XVP = 250
 export const RFB_CLIENT_SET_DESKTOP_SIZE = 251
-export const RFB_CLIENT_QEMU = 255
-export const RFB_QEMU_EXTENDED_KEY_EVENT = 0
-/** PointerEvent with this bit in the mask byte carries one more byte of buttons (ExtendedMouseButtons). */
-export const RFB_POINTER_EXTENDED_MARKER = 0x80
+export const RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT = -258
+export const RFB_ENCODING_EXTENDED_MOUSE_BUTTONS = -316
 
 export type RfbErrorCode =
   | 'rfb_auth_failed'
