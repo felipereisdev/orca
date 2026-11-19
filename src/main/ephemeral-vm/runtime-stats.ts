@@ -33,8 +33,11 @@ export type EphemeralVmRuntimeStatsTarget = {
 export function createEphemeralVmRuntimeStatsReader(deps: {
   resolveTarget: (runtimeId: string) => Promise<EphemeralVmRuntimeStatsTarget | null>
   runStats?: typeof runEphemeralVmRecipeStats
+  /** Monotonic, so a clock change cannot keep a stale sample. */
+  cacheClock?: () => number
 }): (runtimeId: string) => Promise<EphemeralVmRecipeStats | null> {
   const runStats = deps.runStats ?? runEphemeralVmRecipeStats
+  const cacheClock = deps.cacheClock ?? (() => performance.now())
   const cache = new Map<string, { readAt: number; stats: EphemeralVmRecipeStats | null }>()
   const inFlight = new Map<string, Promise<EphemeralVmRecipeStats | null>>()
 
@@ -86,7 +89,7 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
     })
 
   return (runtimeId) => {
-    const now = Date.now()
+    const now = cacheClock()
     for (const [id, entry] of cache) {
       if (now - entry.readAt >= STATS_CACHE_MS) {
         cache.delete(id)
@@ -102,7 +105,7 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
     }
     const read = readWithinDeadline(runtimeId).then((stats) => {
       inFlight.delete(runtimeId)
-      cache.set(runtimeId, { readAt: Date.now(), stats })
+      cache.set(runtimeId, { readAt: cacheClock(), stats })
       return stats
     })
     inFlight.set(runtimeId, read)

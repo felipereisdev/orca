@@ -68,8 +68,11 @@ function statsRepo(output: string, exitCode = 0): { repoPath: string; runs: () =
   }
 }
 
+let cacheClockMs = 0
+
 function readerFor(repoPath: string, recipe: Partial<OrcaVmRecipe> = {}) {
   return createEphemeralVmRuntimeStatsReader({
+    cacheClock: () => cacheClockMs,
     resolveTarget: async (runtimeId) =>
       runtimeId === runtime.id
         ? {
@@ -94,11 +97,12 @@ describe('readEphemeralVmRuntimeStats', () => {
 
     const expected = { cpuPercent: 12.5, memoryBytes: 1048576, diskBytes: 2048 }
     await expect(read(runtime.id)).resolves.toEqual(expected)
-    vi.setSystemTime(new Date('2026-11-19T12:00:14Z'))
+    cacheClockMs += 14_000
+    vi.setSystemTime(new Date('2026-11-19T11:00:00Z'))
     await expect(read(runtime.id)).resolves.toEqual(expected)
     expect(repo.runs()).toBe(1)
 
-    vi.setSystemTime(new Date('2026-11-19T12:00:16Z'))
+    cacheClockMs += 2_000
     await expect(read(runtime.id)).resolves.toEqual(expected)
     expect(repo.runs()).toBe(2)
   })
