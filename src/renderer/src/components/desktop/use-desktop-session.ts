@@ -26,6 +26,8 @@ export type DesktopActions = {
   startRecording: () => void
   stopRecording: () => void
   retry: () => void
+  /** Pastes the Mac's clipboard text into the desktop; offered while this viewer holds control. */
+  paste?: () => void
 }
 
 function errorCode(error: unknown): string {

@@ -29752,7 +29752,8 @@
       },
       "create": "Desktop",
       "unconfiguredBody": "The environment desktop hasn't been set up yet.",
-      "disabled": "Desktop disabled (experiment off)"
+      "disabled": "Desktop disabled (experiment off)",
+      "paste": "Paste text"
     }
   }
 }

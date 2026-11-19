@@ -14,7 +14,9 @@ type Params = { owner?: 'agent' | 'user'; viewerId?: string }
 
 const mocks = vi.hoisted(() => {
   const status: DesktopStatus = { state: 'ready', owner: 'agent', recording: false }
-  const viewers: { viewOnly: boolean; channel: unknown }[] = []
+  const viewers: { viewOnly: boolean; channel: unknown; target: HTMLElement }[] = []
+  // What each viewer sent to the desktop, in order: clipboard text and key events.
+  const sentToDesktop: unknown[][] = []
   const channelViewerIds: string[] = []
   // Status reads held back by a test, answered later with whatever it chooses.
   const heldReads: ((status: unknown) => void)[] = []
@@ -33,6 +35,8 @@ const mocks = vi.hoisted(() => {
     viewers,
     channelViewerIds,
     channelTokens: [] as (string | undefined)[],
+    sentToDesktop,
+    clipboardText: 'hello from the mac',
     reconfigure: vi.fn()
   })
 })
@@ -58,9 +62,22 @@ vi.mock('@novnc/novnc', () => ({
     scaleViewport = false
     resizeSession = false
     channel: unknown
-    constructor(_target: HTMLElement, channel: unknown) {
+    target: HTMLElement
+    constructor(target: HTMLElement, channel: unknown) {
       this.channel = channel
+      this.target = target
       mocks.viewers.push(this)
+    }
+    // Like noVNC, a view-only client sends nothing.
+    clipboardPasteFrom(text: string): void {
+      if (!this.viewOnly) {
+        mocks.sentToDesktop.push(['clipboard', text])
+      }
+    }
+    sendKey(keysym: number, code: string, down: boolean): void {
+      if (!this.viewOnly) {
+        mocks.sentToDesktop.push(['key', keysym, code, down])
+      }
     }
     addEventListener(): void {}
     removeEventListener(): void {}
@@ -108,6 +125,7 @@ describe('DesktopTabBody', () => {
     mocks.statusError = null
     mocks.controller = null
     mocks.channelTokens.length = 0
+    mocks.sentToDesktop.length = 0
     mocks.reconfigure.mockReset().mockResolvedValue(true)
     // The controller token lives in main; the tab asks for it through the preload bridge.
     Object.assign(window, {
@@ -115,7 +133,8 @@ describe('DesktopTabBody', () => {
         ephemeralVm: {
           desktopControllerToken: vi.fn(async () => 'controller-token-1'),
           reconfigureDesktop: mocks.reconfigure
-        }
+        },
+        ui: { readClipboardText: vi.fn(async () => mocks.clipboardText) }
       }
     })
     mocks.rpc.mockReset().mockImplementation(async (_target, method: string, params: Params) => {
@@ -167,6 +186,46 @@ describe('DesktopTabBody', () => {
     expect(mocks.channelTokens).toEqual(['controller-token-1'])
     expect(mocks.viewers[0].viewOnly).toBe(false)
     expect(screen.getByRole('button', { name: 'Hand back to agent' })).toBeTruthy()
+  })
+
+  const PASTED = [
+    ['clipboard', 'hello from the mac'],
+    ['key', 0xffe3, 'ControlLeft', true],
+    ['key', 0x76, 'KeyV', true],
+    ['key', 0x76, 'KeyV', false],
+    ['key', 0xffe3, 'ControlLeft', false]
+  ]
+
+  it("Paste text puts the Mac's clipboard on the desktop, then presses ctrl+v there", async () => {
+    mocks.status = { state: 'ready', owner: 'agent', recording: false }
+    render(<DesktopTabBody worktreeId="repo::/w" />)
+    await flush()
+    expect(screen.queryByRole('button', { name: 'Paste text' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take control' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Paste text' }))
+    await flush()
+
+    expect(mocks.sentToDesktop).toEqual(PASTED)
+  })
+
+  it('the paste shortcut pastes only while this window holds control', async () => {
+    mocks.status = { state: 'ready', owner: 'agent', recording: false }
+    render(<DesktopTabBody worktreeId="repo::/w" />)
+    await flush()
+    const mac = navigator.userAgent.includes('Mac')
+    const shortcut = { key: 'v', code: 'KeyV', metaKey: mac, ctrlKey: !mac }
+    fireEvent.keyDown(mocks.viewers[0].target, shortcut)
+    await flush()
+    expect(mocks.sentToDesktop).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take control' }))
+    await flush()
+    fireEvent.keyDown(mocks.viewers[0].target, shortcut)
+    await flush()
+
+    expect(mocks.sentToDesktop).toEqual(PASTED)
   })
 
   it('Devolver ao agente sets owner agent', async () => {

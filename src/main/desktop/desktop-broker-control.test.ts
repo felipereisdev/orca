@@ -50,6 +50,29 @@ describe('DesktopBroker control ownership', () => {
     expect(pointerEvents(server.received)).toEqual([[1, 10, 11]])
   })
 
+  it('pasted clipboard text reaches the desktop only from the viewer holding control', async () => {
+    const { broker, server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+    const cutText = (text: string): Buffer => {
+      const message = Buffer.alloc(8 + text.length)
+      message[0] = 6
+      message.writeUInt32BE(text.length, 4)
+      message.write(text, 8, 'latin1')
+      return message
+    }
+
+    viewer.socket.write(cutText('before'))
+    viewer.requestUpdate(false, 7, 5)
+    await server.waitForReceived(hasUpdateRequest(7, 5))
+    broker.setOwner('user', 'v1')
+    viewer.socket.write(cutText('after'))
+    await server.waitForReceived((received) => received.some((m) => m[0] === 6))
+
+    expect(
+      server.received.filter((m) => m[0] === 6).map((m) => m.subarray(8).toString('latin1'))
+    ).toEqual(['after'])
+  })
+
   it("another viewer's input is still dropped while one viewer holds control", async () => {
     const { broker, server, openViewer } = await fixture()
     await openViewer('v1')

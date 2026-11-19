@@ -2,8 +2,15 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { readDesktopControllerToken } from './desktop-controller-token'
 import { createDesktopViewerChannel } from './desktop-viewer-channel'
+import { isDesktopPasteShortcut, pasteIntoDesktop } from './desktop-paste'
 
-type MountedViewer = { setViewOnly: (viewOnly: boolean) => void; dispose: () => void }
+/** What the tab can do with a mounted viewer. */
+export type DesktopViewerControls = { paste: (text: string) => void }
+
+type MountedViewer = DesktopViewerControls & {
+  setViewOnly: (viewOnly: boolean) => void
+  dispose: () => void
+}
 
 /** Opens noVNC on `container` once it loads (on first open, so it stays out of the initial bundle). */
 function mountDesktopViewer(
@@ -19,6 +26,7 @@ function mountDesktopViewer(
   let setViewOnly = (next: boolean): void => {
     viewOnly = next
   }
+  let paste = (_text: string): void => {}
   const lost = (): void => {
     if (!disposed) {
       onLost()
@@ -40,6 +48,7 @@ function mountDesktopViewer(
       setViewOnly = (next) => {
         rfb.viewOnly = next
       }
+      paste = (text) => pasteIntoDesktop(rfb, text)
       dispose = () => {
         rfb.removeEventListener('disconnect', lost)
         rfb.disconnect()
@@ -49,6 +58,7 @@ function mountDesktopViewer(
   )
   return {
     setViewOnly: (next) => setViewOnly(next),
+    paste: (text) => paste(text),
     dispose: () => {
       disposed = true
       dispose()
@@ -61,12 +71,17 @@ export function DesktopViewer({
   target,
   viewerId,
   viewOnly,
-  onLost
+  onLost,
+  onPasteShortcut,
+  controlsRef
 }: {
   target: RuntimeClientTarget
   viewerId: string
   viewOnly: boolean
   onLost: () => void
+  /** Cmd/Ctrl+V while this viewer holds control: the tab pastes the Mac's clipboard. */
+  onPasteShortcut: () => void
+  controlsRef: { current: DesktopViewerControls | null }
 }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<MountedViewer | null>(null)
@@ -87,11 +102,30 @@ export function DesktopViewer({
       lost()
     )
     viewerRef.current = viewer
+    controlsRef.current = viewer
     return () => {
       viewerRef.current = null
+      if (controlsRef.current === viewer) {
+        controlsRef.current = null
+      }
       viewer.dispose()
     }
-  }, [target, viewerId])
+  }, [target, viewerId, controlsRef])
 
-  return <div ref={containerRef} className="absolute inset-0 overflow-hidden bg-black" />
+  const onKeyDownCapture = (event: React.KeyboardEvent): void => {
+    // Captured before noVNC's canvas sees it, which would send the Mac's own chord to the guest.
+    if (!viewOnly && isDesktopPasteShortcut(event, navigator.userAgent.includes('Mac'))) {
+      event.preventDefault()
+      event.stopPropagation()
+      onPasteShortcut()
+    }
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 overflow-hidden bg-black"
+      onKeyDownCapture={onKeyDownCapture}
+    />
+  )
 }

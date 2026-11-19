@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
@@ -6,7 +6,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import { getRuntimeTargetForWorktreeOwner } from '@/lib/files/access/file-owner-runtime-target'
 import { createNonSecureContextUuid } from '../../../../shared/identifiers/non-secure-context-uuid'
 import { DesktopToolbar } from './DesktopToolbar'
-import { DesktopViewer } from './DesktopViewer'
+import { DesktopViewer, type DesktopViewerControls } from './DesktopViewer'
 import { desktopErrorMessage } from './desktop-error-copy'
 import { useDesktopSession, type DesktopActions, type DesktopView } from './use-desktop-session'
 
@@ -82,12 +82,20 @@ function DesktopSession({ worktreeId }: { worktreeId: string }): React.JSX.Eleme
   const [viewerId] = useState(createNonSecureContextUuid)
   const session = useDesktopSession(target, viewerId)
   const viewOnly = session.view.kind !== 'ready' || session.view.control !== 'this'
+  const viewerControls = useRef<DesktopViewerControls | null>(null)
+  // The Mac's clipboard goes to the guest only on this explicit action, never on its own.
+  const paste = (): void => {
+    void window.api.ui.readClipboardText().then(
+      (text) => viewerControls.current?.paste(text),
+      () => {}
+    )
+  }
   return (
     <DesktopTabLayout
       view={session.view}
       busy={session.busy}
       error={session.error}
-      actions={session.actions}
+      actions={{ ...session.actions, paste }}
       viewer={
         target ? (
           <DesktopViewer
@@ -96,6 +104,8 @@ function DesktopSession({ worktreeId }: { worktreeId: string }): React.JSX.Eleme
             viewerId={viewerId}
             viewOnly={viewOnly}
             onLost={session.markLost}
+            onPasteShortcut={paste}
+            controlsRef={viewerControls}
           />
         ) : null
       }

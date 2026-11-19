@@ -15,5 +15,9 @@ declare module '@novnc/novnc' {
     scaleViewport: boolean
     resizeSession: boolean
     disconnect(): void
+    /** Sets the server's clipboard (ClientCutText); nothing while view-only. */
+    clipboardPasteFrom(text: string): void
+    /** Sends one key event; nothing while view-only. */
+    sendKey(keysym: number, code: string, down: boolean): void
   }
 }

@@ -25261,7 +25261,8 @@
       },
       "create": "Desktop",
       "unconfiguredBody": "O desktop do ambiente ainda não foi configurado.",
-      "disabled": "Desktop desativado (experimento desligado)"
+      "disabled": "Desktop desativado (experimento desligado)",
+      "paste": "Colar texto"
     }
   }
 }

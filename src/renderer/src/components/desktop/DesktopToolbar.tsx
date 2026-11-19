@@ -1,4 +1,4 @@
-import { AppWindow, Bot, Circle, Hand, Square, UserRound } from 'lucide-react'
+import { AppWindow, Bot, Circle, ClipboardPaste, Hand, Square, UserRound } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
@@ -83,6 +83,12 @@ export function DesktopToolbar({
       ) : null}
       {ready ? (
         <div className="ml-auto flex items-center gap-1.5">
+          {mine && actions.paste ? (
+            <Button variant="outline" size="xs" onClick={actions.paste}>
+              <ClipboardPaste />
+              {t('desktop.tab.paste', 'Paste text')}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="xs"
