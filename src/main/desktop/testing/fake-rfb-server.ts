@@ -14,6 +14,7 @@ import {
   RFB_CLIENT_SET_ENCODINGS,
   RFB_CLIENT_SET_PIXEL_FORMAT,
   RFB_ENCODING_DESKTOP_SIZE,
+  RFB_ENCODING_EXTENDED_CLIPBOARD,
   RFB_ENCODING_RAW,
   RFB_PROTOCOL_VERSION,
   RFB_SECURITY_VNC_AUTH,
@@ -23,6 +24,7 @@ import {
 } from '../rfb/rfb-protocol'
 import { readExact } from '../rfb/rfb-stream-reader'
 import { vncAuthResponse } from '../rfb/vnc-auth'
+import { extendedClipboardCaps, serverFence } from './fake-rfb-server-messages'
 
 export type FakeRfbServer = {
   port: number
@@ -66,18 +68,6 @@ const FAKE_DESKTOP_NAME = 'Orca fake desktop'
 const RFB_ENCODING_FENCE = -312
 const RFB_ENCODING_CONTINUOUS_UPDATES = -313
 const RFB_SERVER_END_OF_CONTINUOUS_UPDATES = 150
-const RFB_SERVER_FENCE = 248
-const RFB_FENCE_REQUEST = 0x8000_0000
-const RFB_FENCE_BLOCK_BEFORE = 1
-
-function serverFence(payload: string): Buffer {
-  const header = Buffer.alloc(9)
-  header[0] = RFB_SERVER_FENCE
-  header.writeUInt32BE((RFB_FENCE_REQUEST | RFB_FENCE_BLOCK_BEFORE) >>> 0, 4)
-  header[8] = Buffer.byteLength(payload, 'latin1')
-  return Buffer.concat([header, Buffer.from(payload, 'latin1')])
-}
-
 type Rect = { x: number; y: number; width: number; height: number }
 
 function updateHeader(rectCount: number): Buffer {
@@ -193,7 +183,10 @@ export async function startFakeRfbServer(opts: {
       session.encodings = new Set(
         Array.from({ length: message.readUInt16BE(2) }, (_, i) => message.readInt32BE(4 + i * 4))
       )
-      // As TigerVNC does: probe a client that offers fences, and announce continuous updates.
+      // As TigerVNC does: announce Extended Clipboard, probe fences, announce continuous updates.
+      if (session.encodings.has(RFB_ENCODING_EXTENDED_CLIPBOARD)) {
+        session.socket.write(extendedClipboardCaps())
+      }
       if (session.encodings.has(RFB_ENCODING_FENCE)) {
         session.socket.write(serverFence('probe'))
       }

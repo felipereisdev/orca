@@ -69,11 +69,17 @@ vi.mock('@novnc/novnc', () => ({
       this.target = target
       mocks.viewers.push(this)
     }
-    // Like noVNC, a view-only client sends nothing.
+    /** Server Extended Clipboard caps; the broker strips the pseudo-encoding, so none arrive. */
+    extendedClipboardCaps = false
+    // As noVNC 1.7: view-only sends nothing; with Extended Clipboard only a notify goes out and
+    // the text waits for the server's request, otherwise the text goes out now as ClientCutText.
     clipboardPasteFrom(text: string): void {
-      if (!this.viewOnly) {
-        mocks.sentToDesktop.push(['clipboard', text])
+      if (this.viewOnly) {
+        return
       }
+      mocks.sentToDesktop.push(
+        this.extendedClipboardCaps ? ['clipboard-notify'] : ['clipboard', text]
+      )
     }
     sendKey(keysym: number, code: string, down: boolean): void {
       if (!this.viewOnly) {

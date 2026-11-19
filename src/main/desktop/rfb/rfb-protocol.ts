@@ -21,6 +21,8 @@ export const RFB_CLIENT_XVP = 250
 export const RFB_CLIENT_SET_DESKTOP_SIZE = 251
 export const RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT = -258
 export const RFB_ENCODING_EXTENDED_MOUSE_BUTTONS = -316
+/** 0xC0A1E5CE as a signed encoding number. */
+export const RFB_ENCODING_EXTENDED_CLIPBOARD = -1063131698
 
 export type RfbErrorCode =
   | 'rfb_auth_failed'

@@ -9,6 +9,7 @@ import {
   RFB_CLIENT_SET_ENCODINGS,
   RFB_CLIENT_SET_PIXEL_FORMAT,
   RFB_CLIENT_XVP,
+  RFB_ENCODING_EXTENDED_CLIPBOARD,
   RFB_ENCODING_EXTENDED_MOUSE_BUTTONS,
   RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT,
   RfbError
@@ -35,10 +36,13 @@ const INPUT_MESSAGE_TYPES = new Set([
 /**
  * Pseudo-encodings a viewer may not negotiate: with them noVNC sends 7-byte pointer events and
  * keycode-tracked QEMU keys, which the filter would misframe and a handoff could not release.
+ * With Extended Clipboard a paste only notifies and sends its text once the server asks, after
+ * the ctrl+v that follows it; plain ClientCutText carries the text before it.
  */
 const UNSUPPORTED_ENCODINGS = new Set([
   RFB_ENCODING_EXTENDED_MOUSE_BUTTONS,
-  RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT
+  RFB_ENCODING_QEMU_EXTENDED_KEY_EVENT,
+  RFB_ENCODING_EXTENDED_CLIPBOARD
 ])
 
 // Bounds how much a viewer can make us buffer before a cut-text message completes.

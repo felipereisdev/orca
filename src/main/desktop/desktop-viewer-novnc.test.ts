@@ -137,4 +137,49 @@ describe('the real noVNC client through the broker', () => {
     expect(offered).not.toContain(-316)
     expect(offered).not.toContain(-258)
   })
+
+  it('a paste reaches the desktop as its text, then ctrl+v, though the server offers Extended Clipboard', async () => {
+    const { default: RFB } = await import('@novnc/novnc')
+    const fixture = await startDesktopBrokerFixture({ width: 64, height: 48 })
+    cleanups.push(() => fixture.close())
+    const [brokerSide, viewerSide] = duplexPair()
+    const channel = streamChannel(viewerSide)
+    const opening = fixture.broker.openViewer('v1', brokerSide)
+    channel.readyState = 1
+    const target = document.createElement('div')
+    document.body.append(target)
+    const rfb = new RFB(target, channel)
+    cleanups.push(() => rfb.disconnect())
+    await opening
+    // Fences come after the server's Extended Clipboard caps would have: noVNC has read them.
+    await fixture.server.waitForReceived((received) => received.some((m) => m[0] === 248))
+    fixture.broker.setOwner('user', 'v1')
+
+    // What the Desktop tab's paste does: the text, then ctrl+v.
+    rfb.clipboardPasteFrom('hello desktop')
+    rfb.sendKey(0xffe3, 'ControlLeft', true)
+    rfb.sendKey(0x76, 'KeyV', true)
+    rfb.sendKey(0x76, 'KeyV', false)
+    rfb.sendKey(0xffe3, 'ControlLeft', false)
+    await fixture.server.waitForReceived(
+      (received) => received.filter((m) => m[0] === 4).length === 4
+    )
+
+    const input = fixture.server.received
+      .filter((m) => m[0] === 4 || m[0] === 6)
+      .map((m) =>
+        m[0] === 4
+          ? `key ${m.readUInt32BE(4).toString(16)} ${m[1] === 1 ? 'down' : 'up'}`
+          : m.readInt32BE(4) < 0
+            ? 'extended clipboard message'
+            : `text ${m.subarray(8).toString('latin1')}`
+      )
+    expect(input).toEqual([
+      'text hello desktop',
+      'key ffe3 down',
+      'key 76 down',
+      'key 76 up',
+      'key ffe3 up'
+    ])
+  })
 })

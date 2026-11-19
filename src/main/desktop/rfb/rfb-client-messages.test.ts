@@ -124,9 +124,12 @@ describe('withoutUnsupportedEncodings', () => {
     return message
   }
 
-  it('drops ExtendedMouseButtons and QEMU Extended Key Event and corrects the count', () => {
-    // Raw, DesktopSize, QEMU Extended Key Event, Fence, ExtendedMouseButtons, ContinuousUpdates
-    const rewritten = withoutUnsupportedEncodings(setEncodings([0, -223, -258, -312, -316, -313]))
+  it('drops ExtendedMouseButtons, QEMU Extended Key Event and Extended Clipboard and corrects the count', () => {
+    // Raw, DesktopSize, QEMU Extended Key Event, Fence, ExtendedMouseButtons, ContinuousUpdates,
+    // Extended Clipboard (0xC0A1E5CE)
+    const rewritten = withoutUnsupportedEncodings(
+      setEncodings([0, -223, -258, -312, -316, -313, -1063131698])
+    )
 
     expect(rewritten).toEqual(setEncodings([0, -223, -312, -313]))
   })
