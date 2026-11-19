@@ -6,6 +6,7 @@ import {
   MAX_EPHEMERAL_VM_RUNTIME_STORE_FILE_BYTES
 } from './ephemeral-vm-runtime-store'
 import {
+  featureIdentity,
   getEphemeralVmRuntimeFeatureStorePath,
   MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES,
   parseEphemeralVmRuntimeFeatureStoreText,
@@ -41,9 +42,12 @@ const UNREADABLE = Symbol('unreadable')
  * the feature store exists but can't be read or holds a record it can't parse, so a record may be
  * missing its desktop.
  */
-export async function readEphemeralVmRuntimesAsync(
-  userDataPath: string
-): Promise<{ runtimes: EphemeralVmRuntimeRecord[]; complete: boolean }> {
+export async function readEphemeralVmRuntimesAsync(userDataPath: string): Promise<{
+  runtimes: EphemeralVmRuntimeRecord[]
+  complete: boolean
+  /** Each runtime's approved stats command by feature identity; empty when the sidecar is unreadable. */
+  statsCommands: ReadonlyMap<string, string>
+}> {
   const path = getEphemeralVmRuntimeStorePath(userDataPath)
   const [mainText, featureText, writeAheadText] = await Promise.all([
     readTextIfPresent(path, MAX_EPHEMERAL_VM_RUNTIME_STORE_FILE_BYTES),
@@ -89,6 +93,11 @@ export async function readEphemeralVmRuntimesAsync(
       compareRuntimeRecords
     ),
     // A record parse dropped (malformed, or from a newer build) may be one runtime's desktop.
-    complete: featureStore?.writable === true && featureStore.retainedRecords.length === 0
+    complete: featureStore?.writable === true && featureStore.retainedRecords.length === 0,
+    statsCommands: new Map(
+      features.flatMap((entry) =>
+        entry.recipeStats ? [[featureIdentity(entry), entry.recipeStats] as const] : []
+      )
+    )
   }
 }

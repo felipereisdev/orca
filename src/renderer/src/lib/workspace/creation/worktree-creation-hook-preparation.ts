@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/index'
 import type { WorktreeCreationRequest } from './pending-worktree-creation'
 import { setupHooksCreateSource } from '../../../../../shared/worktree/setup-hooks-create-source'
 import {
-  ensureHooksConfirmed,
+  ensureHooksApproved,
   readAndConfirmRuntimeIssueCommand
 } from '../../../runtime/repo-hooks/ensure-hooks-confirmed'
 import { confirmWorkspaceSetupDecision } from './setup/workspace-setup-trust'
@@ -24,18 +24,6 @@ export async function prepareWorktreeCreationHooks(
 
   const trustContext = request.ephemeralVmRecipe ? 'vm' : 'workspace'
   const isCancelled = (): boolean => !useAppStore.getState().pendingWorktreeCreations[creationId]
-  const confirmHook = (kind: 'setup' | 'vmRecipe'): Promise<'run' | 'skip'> =>
-    ensureHooksConfirmed(
-      useAppStore.getState,
-      request.repoId,
-      kind,
-      preparation.executionHostId,
-      undefined,
-      isCancelled,
-      undefined,
-      undefined,
-      trustContext
-    )
   const confirmed = await confirmWorkspaceSetupDecision(
     useAppStore.getState,
     request.repoId,
@@ -71,15 +59,28 @@ export async function prepareWorktreeCreationHooks(
     })
   }
 
+  // Main runs the recipe only while orca.yaml still hashes to what the user approved here.
+  let approvedVmRecipeHash: string | undefined
   if (preparation.confirmVmRecipe) {
-    const decision = await confirmHook('vmRecipe')
+    const approval = await ensureHooksApproved(
+      useAppStore.getState,
+      request.repoId,
+      'vmRecipe',
+      preparation.executionHostId,
+      undefined,
+      isCancelled,
+      undefined,
+      undefined,
+      trustContext
+    )
     if (isCancelled()) {
       return null
     }
-    if (decision === 'skip') {
+    if (approval.decision === 'skip') {
       useAppStore.getState().removePendingWorktreeCreation(creationId)
       return null
     }
+    approvedVmRecipeHash = approval.approvedContentHash
   }
 
   const prepared: WorktreeCreationRequest = {
@@ -88,6 +89,7 @@ export async function prepareWorktreeCreationHooks(
     executionHostId: request.executionHostId ?? preparation.executionHostId,
     setupDecision,
     ...pickApprovedSetupHashes(confirmed),
+    ...(approvedVmRecipeHash ? { approvedVmRecipeHash } : {}),
     issueCommand
   }
   useAppStore.getState().updatePendingWorktreeCreation(creationId, {

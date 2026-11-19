@@ -51,6 +51,8 @@ export type EphemeralVmApi = {
     branch?: string
     ref?: string
     provisionId?: string
+    /** The vmRecipe trust hash the user approved; main refuses `recipe_changed_since_approval` when orca.yaml no longer matches. */
+    approvedRecipeHash?: string
   }) => Promise<
     | {
         ok: true

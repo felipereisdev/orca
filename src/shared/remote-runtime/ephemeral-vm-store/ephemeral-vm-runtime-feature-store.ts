@@ -158,8 +158,7 @@ export function featureEntryFromRuntime(
   const resultCheckoutMode =
     runtime.recipeResult?.schemaVersion === 2 ? runtime.recipeResult.checkoutMode : undefined
   const resultDesktop = runtime.recipeResult?.desktop
-  const recipeStats = runtime.recipe?.stats
-  if (!recipeCheckoutMode && !resultCheckoutMode && !resultDesktop && !recipeStats) {
+  if (!recipeCheckoutMode && !resultCheckoutMode && !resultDesktop) {
     return null
   }
   return {
@@ -168,8 +167,7 @@ export function featureEntryFromRuntime(
     createdAt: runtime.createdAt,
     ...(recipeCheckoutMode ? { recipeCheckoutMode } : {}),
     ...(resultCheckoutMode ? { resultCheckoutMode } : {}),
-    ...(resultDesktop ? { resultDesktop } : {}),
-    ...(recipeStats ? { recipeStats } : {})
+    ...(resultDesktop ? { resultDesktop } : {})
   }
 }
 
@@ -198,14 +196,8 @@ function restoreRuntimeFeatures(
   }
   return EphemeralVmRuntimeRecordSchema.parse({
     ...runtime,
-    ...(runtime.recipe && (feature.recipeCheckoutMode || feature.recipeStats)
-      ? {
-          recipe: {
-            ...runtime.recipe,
-            ...(feature.recipeCheckoutMode ? { checkoutMode: feature.recipeCheckoutMode } : {}),
-            ...(feature.recipeStats ? { stats: feature.recipeStats } : {})
-          }
-        }
+    ...(runtime.recipe && feature.recipeCheckoutMode
+      ? { recipe: { ...runtime.recipe, checkoutMode: feature.recipeCheckoutMode } }
       : {}),
     ...(runtime.recipeResult && (feature.resultCheckoutMode || feature.resultDesktop)
       ? {
@@ -221,7 +213,7 @@ function restoreRuntimeFeatures(
   })
 }
 
-/** Checkout modes and the approved stats command are fixed for a runtime's life; the desktop may be reconfigured. */
+/** Checkout modes are fixed for a runtime's life; the desktop may be reconfigured. */
 export function runtimeFeaturesEqual(
   left: EphemeralVmRuntimeRecord,
   right: EphemeralVmRuntimeRecord
@@ -231,13 +223,9 @@ export function runtimeFeaturesEqual(
 
 function checkoutFeatures(
   runtime: EphemeralVmRuntimeRecord
-): Pick<
-  EphemeralVmRuntimeFeatureEntry,
-  'recipeCheckoutMode' | 'resultCheckoutMode' | 'recipeStats'
-> {
-  const { recipeCheckoutMode, resultCheckoutMode, recipeStats } =
-    featureEntryFromRuntime(runtime) ?? {}
-  return { recipeCheckoutMode, resultCheckoutMode, recipeStats }
+): Pick<EphemeralVmRuntimeFeatureEntry, 'recipeCheckoutMode' | 'resultCheckoutMode'> {
+  const { recipeCheckoutMode, resultCheckoutMode } = featureEntryFromRuntime(runtime) ?? {}
+  return { recipeCheckoutMode, resultCheckoutMode }
 }
 
 function runtimeFeatureStoreValue(

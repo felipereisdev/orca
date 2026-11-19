@@ -65,6 +65,7 @@ async function prepareEphemeralVmRecipeRequest(
           }
         : {}),
       provisionId: creationId,
+      ...(request.approvedVmRecipeHash ? { approvedRecipeHash: request.approvedVmRecipeHash } : {}),
       setupExistingFolder: async (args) => {
         const setup = await store.setupProjectExistingFolder(args)
         if (setup) {

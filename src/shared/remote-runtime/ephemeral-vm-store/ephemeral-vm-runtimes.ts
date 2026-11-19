@@ -48,9 +48,7 @@ const EphemeralVmRuntimeRecipeSchema = z
     suspend: z.string().min(1).optional(),
     resume: z.string().min(1).optional(),
     destroy: z.string().min(1).optional(),
-    destroyDisabled: z.boolean().optional(),
-    /** Approved at creation with the rest; persisted only in the feature sidecar (older builds parse strictly). */
-    stats: z.string().min(1).optional()
+    destroyDisabled: z.boolean().optional()
   })
   .strict()
 

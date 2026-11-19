@@ -15,6 +15,8 @@ export type EphemeralVmRecipeStatsArgs = {
   context: EphemeralVmRecipeContext
   recipeResult?: EphemeralVmRecipeResult
   timeoutMs: number
+  /** Stops the step, and keeps a step not yet started from launching. */
+  signal?: AbortSignal
   spawnCommand?: typeof spawn
 }
 
@@ -38,6 +40,7 @@ export async function runEphemeralVmRecipeStats(args: EphemeralVmRecipeStatsArgs
     ...(args.recipe.passEnv ? { passEnv: args.recipe.passEnv } : {}),
     maxCaptureBytes: STATS_MAX_CAPTURE_BYTES,
     timeoutMs: args.timeoutMs,
+    ...(args.signal ? { signal: args.signal } : {}),
     spawnCommand: args.spawnCommand
   })
   if (result.timedOut || result.aborted || result.exitCode !== 0) {

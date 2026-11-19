@@ -24708,7 +24708,8 @@
       "cleanupInterrupted": "A limpeza foi interrompida. Tente a limpeza novamente para continuar.",
       "sshTargetRemoveFailed": "Não foi possível remover o destino SSH oculto.",
       "recipeExitedWithoutCode": "A receita terminou com um código desconhecido.",
-      "destroyExitedWithoutCode": "A destruição terminou com um código desconhecido."
+      "destroyExitedWithoutCode": "A destruição terminou com um código desconhecido.",
+      "recipeChangedSinceApproval": "A receita do ambiente no orca.yaml mudou depois que você a aprovou. Crie o workspace de novo para revisar a nova receita."
     }
   },
   "installDirAcl": {

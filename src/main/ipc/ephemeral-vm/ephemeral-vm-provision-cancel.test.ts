@@ -78,7 +78,9 @@ function makeStore(repoPath: string) {
   return {
     getRepo: vi.fn((id: string) => (id === repo.id ? repo : null)),
     getRepos: vi.fn(() => [repo]),
-    getSettings: vi.fn(() => ({ activeRuntimeEnvironmentId: null }))
+    getSettings: vi.fn(() => ({ activeRuntimeEnvironmentId: null })),
+    // Repo-wide trust: the approval binding has its own tests.
+    getUI: vi.fn(() => ({ trustedOrcaHooks: { [repo.id]: { all: { approvedAt: 0 } } } }))
   }
 }
 

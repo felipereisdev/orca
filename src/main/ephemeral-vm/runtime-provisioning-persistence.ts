@@ -119,13 +119,18 @@ export async function persistProvisionedEphemeralVmRuntime(
 ): Promise<EphemeralVmRuntimeRecord> {
   const connection = getEphemeralVmRecipeResultConnection(start.result)
   try {
-    const runtime = upsertEphemeralVmRuntime(args.userDataPath, {
-      ...baseRuntimeRecord(args, writeAhead),
-      status: 'running',
-      connectionMode: connection.type,
-      updatedAt: args.now ?? Date.now(),
-      recipeResult: start.result
-    })
+    const runtime = upsertEphemeralVmRuntime(
+      args.userDataPath,
+      {
+        ...baseRuntimeRecord(args, writeAhead),
+        status: 'running',
+        connectionMode: connection.type,
+        updatedAt: args.now ?? Date.now(),
+        recipeResult: start.result
+      },
+      // Best effort: a sidecar that cannot take it leaves the row at "—", never a failed provision.
+      args.recipe.stats ? { approvedStatsCommand: args.recipe.stats } : {}
+    )
     if (!runtime.workspaceId) {
       noteUnattachedProvision(runtime.id)
     }

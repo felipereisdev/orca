@@ -1,6 +1,7 @@
 import type { Store } from '../persistence/loading-store/store'
 import type { EphemeralVmRecipeStats } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { runEphemeralVmRecipeStats } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-stats-step'
+import { featureIdentity } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
 import { readEphemeralVmRuntimesAsync } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store-read'
 import {
   isEphemeralVmEnvironmentRunning,
@@ -31,18 +32,24 @@ export type EphemeralVmRuntimeStatsTarget = {
  */
 export function createEphemeralVmRuntimeStatsReader(deps: {
   resolveTarget: (runtimeId: string) => Promise<EphemeralVmRuntimeStatsTarget | null>
+  runStats?: typeof runEphemeralVmRecipeStats
 }): (runtimeId: string) => Promise<EphemeralVmRecipeStats | null> {
+  const runStats = deps.runStats ?? runEphemeralVmRecipeStats
   const cache = new Map<string, { readAt: number; stats: EphemeralVmRecipeStats | null }>()
   const inFlight = new Map<string, Promise<EphemeralVmRecipeStats | null>>()
 
-  const readOnce = async (runtimeId: string): Promise<EphemeralVmRecipeStats | null> => {
+  const readOnce = async (
+    runtimeId: string,
+    signal: AbortSignal
+  ): Promise<EphemeralVmRecipeStats | null> => {
     const deadline = Date.now() + STATS_TIMEOUT_MS
     const target = await deps.resolveTarget(runtimeId)
-    if (!target) {
+    // A lookup that outlived the deadline must not launch anything: its answer is already null.
+    if (!target || signal.aborted) {
       return null
     }
     const { runtime, repoPath, recipe } = target
-    return runEphemeralVmRecipeStats({
+    return runStats({
       recipe,
       repoPath,
       context: {
@@ -54,25 +61,25 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
         repoPath
       },
       recipeResult: runtime.recipeResult,
-      // The lookup spent part of the budget; the step gets what is left.
-      timeoutMs: Math.max(1, deadline - Date.now())
+      // The lookup spent part of the budget; the step gets what is left, and the deadline stops it.
+      timeoutMs: Math.max(1, deadline - Date.now()),
+      signal
     })
   }
 
   // One budget for the store, orca.yaml and sidecar reads and the step itself.
   const readWithinDeadline = (runtimeId: string): Promise<EphemeralVmRecipeStats | null> =>
     new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), STATS_TIMEOUT_MS)
-      readOnce(runtimeId).then(
-        (stats) => {
-          clearTimeout(timer)
-          resolve(stats)
-        },
-        () => {
-          clearTimeout(timer)
-          resolve(null)
-        }
-      )
+      const deadline = new AbortController()
+      const timer = setTimeout(() => {
+        deadline.abort()
+        resolve(null)
+      }, STATS_TIMEOUT_MS)
+      const settle = (stats: EphemeralVmRecipeStats | null): void => {
+        clearTimeout(timer)
+        resolve(stats)
+      }
+      readOnce(runtimeId, deadline.signal).then(settle, () => settle(null))
     })
 
   return (runtimeId) => {
@@ -107,10 +114,11 @@ export async function resolveRuntimeStatsTarget(
   userDataPath: string,
   runtimeId: string
 ): Promise<EphemeralVmRuntimeStatsTarget | null> {
-  const { runtimes } = await readEphemeralVmRuntimesAsync(userDataPath)
+  const { runtimes, statsCommands } = await readEphemeralVmRuntimesAsync(userDataPath)
   const runtime = runtimes.find((entry) => entry.id === runtimeId)
-  // Only the stats command approved with the recipe at creation may run; none means no stats.
-  const approvedStats = runtime?.recipe?.stats
+  // Only the stats command approved with the recipe at creation may run, read from the sidecar
+  // alone; none (or an unreadable sidecar) means no stats.
+  const approvedStats = runtime ? statsCommands.get(featureIdentity(runtime)) : undefined
   if (
     !runtime?.recipeResult ||
     !approvedStats ||

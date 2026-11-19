@@ -34,13 +34,13 @@ import {
   getRecipeRepo,
   listRecipeCatalog,
   listRecipes,
-  resolveRecipeForRepo,
   type EphemeralVmRecipeCatalogEntry
 } from './ephemeral-vm-recipe-context'
 import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handlers'
 import type { PluginService } from '../../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../../plugins/contributions/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../../ephemeral-vm/provisioned-root-source'
+import { resolveApprovedProvisionRecipe } from '../../ephemeral-vm/provision-recipe-approval'
 import { startEnvironmentDesktop } from '../../ephemeral-vm/desktop-sync-registry'
 import { getRuntimeEnvironmentRegistryRoot } from '../runtime-environments/catalog/runtime-environment-registry-root'
 import {
@@ -130,20 +130,19 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
         branch?: string
         ref?: string
         provisionId?: string
+        approvedRecipeHash?: unknown
       }
     ): Promise<EphemeralVmProvisionIpcResult> => {
       const repo = getRecipeRepo(store, args.repoId)
       if (!repo.ok) {
         return provisionFailure(repo.failure)
       }
-      const recipe = resolveRecipeForRepo(
-        repo.repo.path,
-        args.recipeId,
-        await getApprovedPluginVmRecipes(pluginService)
-      )
-      if (!recipe) {
-        return provisionFailure(ephemeralVmFailure('recipeNotFound', { recipeId: args.recipeId }))
+      const plugins = await getApprovedPluginVmRecipes(pluginService)
+      const approved = await resolveApprovedProvisionRecipe(store, repo.repo, args, plugins)
+      if (!approved.ok) {
+        return provisionFailure(approved.failure)
       }
+      const { recipe } = approved
       const controller = args.provisionId ? new AbortController() : null
       if (args.provisionId && controller) {
         activeProvisionControllers.set(args.provisionId, controller)

@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { removeTempDirs } from '../../shared/testing/remove-temp-dirs.test-support'
 import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
-import { createEphemeralVmRuntimeStatsReader } from './runtime-stats'
+import {
+  createEphemeralVmRuntimeStatsReader,
+  type EphemeralVmRuntimeStatsTarget
+} from './runtime-stats'
 
 const roots: string[] = []
 
@@ -152,5 +155,30 @@ describe('readEphemeralVmRuntimeStats', () => {
     expect(settled).toBe('pending')
     await vi.advanceTimersByTimeAsync(1)
     expect(settled).toBeNull()
+  })
+
+  it('a lookup that resolves after the 5 s deadline never launches the step', async () => {
+    vi.useFakeTimers()
+    const runStats = vi.fn(async () => ({ cpuPercent: 1, memoryBytes: 1, diskBytes: 1 }))
+    let answerLookup: (target: EphemeralVmRuntimeStatsTarget) => void = () => {}
+    const read = createEphemeralVmRuntimeStatsReader({
+      resolveTarget: () =>
+        new Promise((resolve) => {
+          answerLookup = resolve
+        }),
+      runStats
+    })
+
+    const pending = read(runtime.id)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await expect(pending).resolves.toBeNull()
+    answerLookup({
+      runtime,
+      repoPath: '/repo',
+      recipe: { id: 'docker', name: 'Docker', create: './create.sh', stats: './stats.sh' }
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(runStats).not.toHaveBeenCalled()
   })
 })

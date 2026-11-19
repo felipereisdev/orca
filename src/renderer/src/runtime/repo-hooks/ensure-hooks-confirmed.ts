@@ -6,7 +6,7 @@ import { resolveHookCommandSourcePolicy } from '../../../../shared/workspace-set
 import { getSetupTrustContent } from '../../../../shared/workspace-setup/hooks/orca-hook-setup-config'
 import { hashOrcaHookScript } from './orca-hook-trust'
 import type { OrcaHookTrustKind } from '../../../../shared/workspace-setup/hooks/orca-hook-trust-entries'
-import { getVmRecipeTrustContent } from './vm-recipe-trust-content'
+import { getVmRecipeTrustContent } from '../../../../shared/workspace-setup/hooks/vm-recipe-trust-content'
 import type { SetupHooksCreateSource } from '../../../../shared/worktree/setup-hooks-create-source'
 import { getIssueCommandTrustContent, isUserOwnedIssueCommand } from './issue-command-trust-content'
 import {

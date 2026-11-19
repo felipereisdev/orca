@@ -1,20 +1,46 @@
+import '../../shared/remote-runtime/host-store/environment-store-worker-test-fixture'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { removeTempDirs } from '../../shared/testing/remove-temp-dirs.test-support'
 import {
   getEphemeralVmRuntimeStorePath,
-  upsertEphemeralVmRuntime
+  listEphemeralVmRuntimes,
+  updateEphemeralVmRuntimeStatus
 } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
-import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
+import { getEphemeralVmRuntimeFeatureStorePath } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
+import { getEphemeralVmWriteAheadRuntimeStorePath } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-write-ahead-store'
 import type { OrcaVmRecipe } from '../../shared/workspace-setup/orca-yaml-hook-types'
 import type { Store } from '../persistence/loading-store/store'
+import { provisionEphemeralVmRuntime } from './runtime-service'
+import { beginEphemeralVmProvisioning } from './runtime-provisioning-persistence'
 import { createEphemeralVmRuntimeStatsReader, resolveRuntimeStatsTarget } from './runtime-stats'
+
+// The recipe snapshot schema of the build before stats existed (abf28c0c5b3), which parses strictly.
+const PreviousBuildRecipeSnapshotSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    create: z.string().min(1),
+    checkoutMode: z.enum(['orca-worktree', 'provisioned-root']).optional(),
+    description: z.string().min(1).optional(),
+    suspend: z.string().min(1).optional(),
+    resume: z.string().min(1).optional(),
+    destroy: z.string().min(1).optional(),
+    destroyDisabled: z.boolean().optional()
+  })
+  .strict()
+const PreviousBuildStoreFileSchema = z.object({
+  version: z.literal(1),
+  runtimes: z.array(z.object({ recipe: PreviousBuildRecipeSnapshotSchema.optional() }))
+})
 
 const roots: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await removeTempDirs(roots.splice(0))
 })
 
@@ -24,12 +50,25 @@ function tempDir(prefix: string): string {
   return dir
 }
 
-/** A repo with two stats scripts that log their own name, and an orca.yaml naming `yamlStats`. */
-function setup(approvedStats: string | undefined) {
+/** A repo whose create prints an SSH result, with stats scripts that log their own name. */
+function makeRepo() {
   const repoPath = tempDir('orca-vm-stats-approval-repo-')
   const userDataPath = tempDir('orca-vm-stats-approval-data-')
   const logPath = join(repoPath, 'runs.log')
   writeFileSync(logPath, '')
+  writeFileSync(
+    join(repoPath, 'create.js'),
+    `process.stdout.write(${JSON.stringify(
+      JSON.stringify({
+        schemaVersion: 1,
+        connection: {
+          type: 'ssh',
+          target: { label: 'env', host: '127.0.0.1', port: 2222, username: 'dev' },
+          projectRoot: '/workspace'
+        }
+      })
+    )})\n`
+  )
   for (const name of ['approved', 'changed']) {
     writeFileSync(
       join(repoPath, `${name}.js`),
@@ -38,40 +77,11 @@ function setup(approvedStats: string | undefined) {
     )
   }
   const command = (name: string): string => `"${process.execPath}" ${name}.js`
-  writeFileSync(
-    join(repoPath, 'orca.yaml'),
-    [
-      'environmentRecipes:',
-      '  - id: docker',
-      '    name: Docker',
-      '    create: ./create.sh',
-      `    stats: '${command('changed')}'`
-    ].join('\n')
-  )
-  const recipe: OrcaVmRecipe = {
+  const recipe = (stats?: string): OrcaVmRecipe => ({
     id: 'docker',
     name: 'Docker',
-    create: './create.sh',
-    ...(approvedStats ? { stats: command(approvedStats) } : {})
-  }
-  upsertEphemeralVmRuntime(userDataPath, {
-    id: 'orca-runtime-1',
-    recipeId: 'docker',
-    recipe: toEphemeralVmRuntimeRecipeSnapshot(recipe),
-    repoId: 'repo-1',
-    workspaceId: 'workspace-1',
-    status: 'running',
-    cleanupStatus: 'not_started',
-    createdAt: 1,
-    updatedAt: 1,
-    recipeResult: {
-      schemaVersion: 1,
-      connection: {
-        type: 'ssh',
-        target: { label: 'env', host: '127.0.0.1', port: 2222, username: 'dev' },
-        projectRoot: '/workspace'
-      }
-    }
+    create: command('create'),
+    ...(stats ? { stats: command(stats) } : {})
   })
   const store = {
     getRepo: (id: string) =>
@@ -84,31 +94,111 @@ function setup(approvedStats: string | undefined) {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the resolver only calls getRepo.
       resolveRuntimeStatsTarget(store as unknown as Store, userDataPath, runtimeId)
   })
-  return {
-    read,
-    runs: () => readFileSync(logPath, 'utf8').split('\n').filter(Boolean),
-    mainStoreText: () => readFileSync(getEphemeralVmRuntimeStorePath(userDataPath), 'utf8')
+  /** orca.yaml as the user edits it after the approval: the same create, another stats command. */
+  const editYamlStats = (): void =>
+    writeFileSync(
+      join(repoPath, 'orca.yaml'),
+      [
+        'environmentRecipes:',
+        '  - id: docker',
+        '    name: Docker',
+        `    create: '${command('create')}'`,
+        `    stats: '${command('changed')}'`
+      ].join('\n')
+    )
+  const provision = async (approvedRecipe: OrcaVmRecipe) => {
+    const result = await provisionEphemeralVmRuntime({
+      userDataPath,
+      repoPath,
+      repoId: 'repo-1',
+      recipe: approvedRecipe
+    })
+    if (!result.ok) {
+      throw new Error(result.start.error)
+    }
+    return result.runtime.id
   }
+  return {
+    userDataPath,
+    recipe,
+    read,
+    provision,
+    editYamlStats,
+    runs: () => readFileSync(logPath, 'utf8').split('\n').filter(Boolean)
+  }
+}
+
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf8'))
 }
 
 describe('runtime stats approval', () => {
   it('a runtime created with an approved stats command runs exactly that one', async () => {
-    const env = setup('approved')
+    const env = makeRepo()
+    const runtimeId = await env.provision(env.recipe('approved'))
+    env.editYamlStats()
+    // Later lifecycle writes rewrite the sidecar; the approved command must survive them.
+    updateEphemeralVmRuntimeStatus(env.userDataPath, runtimeId, { updatedAt: 2 })
 
-    await expect(env.read('orca-runtime-1')).resolves.toEqual({
+    await expect(env.read(runtimeId)).resolves.toEqual({
       cpuPercent: 1,
       memoryBytes: 2,
       diskBytes: 3
     })
     expect(env.runs()).toEqual(['approved'])
-    // Older builds parse the main file's recipe snapshot strictly; the command lives in the sidecar.
-    expect(env.mainStoreText()).not.toContain('approved.js')
   })
 
   it('a stats command added to orca.yaml after creation never runs', async () => {
-    const env = setup(undefined)
+    const env = makeRepo()
+    const runtimeId = await env.provision(env.recipe())
+    env.editYamlStats()
 
-    await expect(env.read('orca-runtime-1')).resolves.toBeNull()
+    await expect(env.read(runtimeId)).resolves.toBeNull()
     expect(env.runs()).toEqual([])
+  })
+
+  it('the main and write-ahead files still parse with the previous build schema', async () => {
+    const env = makeRepo()
+    await env.provision(env.recipe('approved'))
+    // An interrupted provision: its write-ahead record never got a result.
+    beginEphemeralVmProvisioning({
+      userDataPath: env.userDataPath,
+      repoPath: tempDir('orca-vm-stats-interrupted-'),
+      recipe: env.recipe('approved')
+    })
+
+    const main = PreviousBuildStoreFileSchema.safeParse(
+      readJson(getEphemeralVmRuntimeStorePath(env.userDataPath))
+    )
+    const writeAhead = PreviousBuildStoreFileSchema.safeParse(
+      readJson(getEphemeralVmWriteAheadRuntimeStorePath(env.userDataPath))
+    )
+    expect(main.success && main.data.runtimes).toHaveLength(1)
+    expect(writeAhead.success && writeAhead.data.runtimes).toHaveLength(1)
+  })
+
+  it('an unreadable sidecar gives no stats', async () => {
+    const env = makeRepo()
+    const runtimeId = await env.provision(env.recipe('approved'))
+    writeFileSync(getEphemeralVmRuntimeFeatureStorePath(env.userDataPath), '{ not json')
+
+    await expect(env.read(runtimeId)).resolves.toBeNull()
+    expect(env.runs()).toEqual([])
+  })
+
+  it('a failed stats write warns once and never fails the provision', async () => {
+    const env = makeRepo()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // A sidecar this build cannot read is never overwritten, so the stats write fails.
+    writeFileSync(getEphemeralVmRuntimeFeatureStorePath(env.userDataPath), '{ not json')
+
+    const runtimeId = await env.provision(env.recipe('approved'))
+
+    expect(listEphemeralVmRuntimes(env.userDataPath)).toMatchObject([
+      { id: runtimeId, status: 'running' }
+    ])
+    expect(warn).toHaveBeenCalledOnce()
+    expect(String(warn.mock.calls[0]?.join(' '))).not.toContain('approved.js')
+    await expect(env.read(runtimeId)).resolves.toBeNull()
   })
 })
