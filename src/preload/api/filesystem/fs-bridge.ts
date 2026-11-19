@@ -82,6 +82,10 @@ export const fsApi = {
     isImage?: true
     size?: number
   } | null> => ipcRenderer.invoke('fs:grantRuntimeFilePreview', args),
+  grantDesktopRecordingPreview: (args: {
+    recordingId: string
+  }): Promise<{ mediaUrl: string; mimeType: string } | null> =>
+    ipcRenderer.invoke('fs:grantDesktopRecordingPreview', args),
   readLocalLogTail: (args: LocalLogTailReadArgs): Promise<LocalLogTailReadResult> =>
     ipcRenderer.invoke('fs:readLocalLogTail', args),
   startLocalLogTail: (args: LocalLogTailWatchArgs): Promise<void> =>

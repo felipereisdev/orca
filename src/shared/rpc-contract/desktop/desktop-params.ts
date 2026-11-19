@@ -129,6 +129,21 @@ export const DesktopRecordStopParams = z.object({})
 
 export const DesktopRecordingsListParams = z.object({})
 
+const RecordingId = z.string().regex(/^[0-9a-f]{16}$/, 'Invalid recording id')
+
+/** The Mac's copy of a recording, by id: what a phone plays once its environment is gone. */
+export const DesktopRecordingCopyStatParams = z.object({ recordingId: RecordingId })
+
+export const DesktopRecordingCopyReadChunkParams = z.object({
+  recordingId: RecordingId,
+  offset: z.number().int().nonnegative(),
+  length: z
+    .number()
+    .int()
+    .positive()
+    .max(512 * 1024)
+})
+
 export const DesktopEventsParams = z.object({})
 
 export const DesktopEventsUnsubscribeParams = z.object({

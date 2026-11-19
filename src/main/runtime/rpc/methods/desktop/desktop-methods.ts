@@ -16,6 +16,7 @@ import { defineMethod, defineStreamingMethod, type RpcContext } from '../../core
 import { createDesktopActionMethods } from './desktop-action-methods'
 import { assertDesktopController, claimDesktopController } from './desktop-controller-identity'
 import { createDesktopRecordMethods } from './desktop-record-methods'
+import { DESKTOP_RECORDING_COPY_METHODS } from './desktop-recording-copy-methods'
 import { createDesktopRunMethods } from './desktop-run-method'
 
 const VIEWER_SUBSCRIPTION_PREFIX = 'desktop-viewer:'
@@ -110,6 +111,7 @@ export function createDesktopMethods(
     ...createDesktopActionMethods(getBroker, tmpDir),
     ...createDesktopRunMethods(getBroker, runSessions),
     ...createDesktopRecordMethods(getBroker, recordingsDir),
+    ...DESKTOP_RECORDING_COPY_METHODS,
     defineMethod({
       name: 'desktop.configure',
       permission: 'host-admin',

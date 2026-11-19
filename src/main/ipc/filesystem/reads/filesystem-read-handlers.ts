@@ -28,6 +28,7 @@ import type { FilesystemHandlerContext } from '../filesystem-handler-context'
 import { registerFilesystemChunkReadHandler } from './filesystem-chunk-read-handler'
 import { grantRemoteFilePreview, readLocalFilePreview } from '../../../media/media-preview-protocol'
 import { readPreviewGrantRange } from '../../../media/preview-grant-range-read'
+import { grantDesktopRecordingPreview } from '../../../media/desktop-recording-preview'
 import { windowsFsPath } from '../../../wsl/filesystem/wsl-unc-drive-fs-path'
 import {
   assertWslUncPathRunning,
@@ -147,6 +148,16 @@ export function registerFilesystemReadHandlers(context: FilesystemHandlerContext
     }
     return grantRemoteFilePreview(event, remote, store)
   })
+
+  ipcMain.handle('fs:grantDesktopRecordingPreview', (event, args: unknown) =>
+    grantDesktopRecordingPreview(
+      event,
+      typeof args === 'object' && args !== null && 'recordingId' in args
+        ? String(args.recordingId)
+        : '',
+      store
+    )
+  )
 
   ipcMain.handle(
     'fs:listMarkdownDocuments',

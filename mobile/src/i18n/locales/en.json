@@ -3313,7 +3313,9 @@
     "nativeChatProse": {
       "attachedImage": "Attached image",
       "image": "image",
-      "openImageHint": "Opens the image full size"
+      "openImageHint": "Opens the image full size",
+      "playVideoHint": "Downloads and plays the video",
+      "video": "Video"
     },
     "nativeChatToolLine": {
       "durationMilliseconds": "{{milliseconds}}ms",

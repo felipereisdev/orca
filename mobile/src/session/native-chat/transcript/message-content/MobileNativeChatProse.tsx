@@ -26,6 +26,8 @@ import { useMobileColorScheme } from '../../../../theme/use-mobile-color-scheme'
 import { useMobileTranslation } from '../../../../i18n/use-mobile-translation'
 import { nativeChatHostStatusCopy } from '../notices/native-chat-notice-copy'
 import { pressedStyle } from '../../../../theme/mobile-theme'
+import { isNativeChatVideoPath } from '../../../../../../src/shared/native-chat/media/native-chat-video-path'
+import { MobileNativeChatVideoAttachment } from './MobileNativeChatVideoAttachment'
 
 /** A user message's text as Prose draws it: a Slack message's drawn form in place of the readable
  *  text the message keeps for copy. */
@@ -72,6 +74,15 @@ export function Prose({
   const renderImage = useCallback(
     (href: string, alt: string): React.ReactNode => {
       const image = mobileNativeChatMarkdownImageBlock(href, alt)
+      if (image?.path && isNativeChatVideoPath(image.path)) {
+        return (
+          <MobileNativeChatVideoAttachment
+            path={image.path}
+            alt={image.alt}
+            onLongPress={onLongPress}
+          />
+        )
+      }
       return image ? (
         <ImageAttachment block={image} fontScale={fontScale} onLongPress={onLongPress} />
       ) : null
