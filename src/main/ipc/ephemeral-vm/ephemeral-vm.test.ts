@@ -258,14 +258,16 @@ describe('registerEphemeralVmHandlers', () => {
         }
       ])
       registerEphemeralVmHandlers(makeStore(repoPath) as never, pluginService as never)
+      const provisionArgs = {
+        repoId: 'repo-1',
+        recipeId: 'desktop-cloud',
+        ...(options.provisionId ? { provisionId: options.provisionId } : {})
+      }
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument and result types; these are the provision handler's.
       const provisioned = (await handlers.get('ephemeralVm:provision')?.(
         options.sender ? { sender: options.sender } : null,
-        {
-          repoId: 'repo-1',
-          recipeId: 'desktop-cloud',
-          ...(options.provisionId ? { provisionId: options.provisionId } : {})
-        } as never
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the provision handler takes these arguments; the map erases their type.
+        provisionArgs as never
       )) as {
         ok: boolean
         stderr: string

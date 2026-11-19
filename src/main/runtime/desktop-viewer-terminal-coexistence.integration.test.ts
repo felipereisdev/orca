@@ -11,7 +11,6 @@ import {
   type PairedRuntimeConnection
 } from '../../shared/remote-runtime/pairing/paired-runtime-connection'
 import { parsePairingCode } from '../../shared/remote-runtime/pairing/pairing'
-import '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { sendRemoteRuntimeRequestOnSocket } from '../../shared/remote-runtime/requests/remote-runtime-request-socket'
 import { subscribeRemoteRuntimeTransport } from '../../shared/remote-runtime/requests/remote-runtime-subscription-transport'
 import type { RemoteRuntimeTransportSubscription } from '../../shared/remote-runtime/requests/remote-runtime-subscription-contract'

@@ -279,8 +279,8 @@ export async function copyRecordingsBeforeRemoval(
   if (target.hasDesktop) {
     await stopRecordingInProgress(target, ports)
   }
-  // Assigned inside the deadline callback, so declared wide for the reads after it.
-  let knownPending = null as EnvironmentRecordings | null
+  // Set inside the deadline callback; a holder keeps TypeScript from narrowing it to null.
+  const known: { pending: EnvironmentRecordings | null } = { pending: null }
   const outcome = await withDeadline(
     timeoutMs,
     async (signal): Promise<CopyBeforeRemovalOutcome | 'pending'> => {
@@ -288,7 +288,7 @@ export async function copyRecordingsBeforeRemoval(
       for (let pass = 0; pass <= MAX_COPY_PASSES; pass += 1) {
         const pending = await listPendingRecordings(target, ports, signal)
         if (!pending.ok) {
-          if (knownPending) {
+          if (known.pending) {
             return 'pending'
           }
           return {
@@ -299,7 +299,7 @@ export async function copyRecordingsBeforeRemoval(
         if (pending.value.recordings.length === 0 && !pending.value.inProgress) {
           return { ok: true, copied }
         }
-        knownPending = pending.value
+        known.pending = pending.value
         if (pass === MAX_COPY_PASSES) {
           return 'pending'
         }
@@ -318,6 +318,7 @@ export async function copyRecordingsBeforeRemoval(
   if (outcome !== 'pending' && outcome !== 'timeout') {
     return outcome
   }
+  const knownPending = known.pending
   if (!knownPending) {
     return { ok: false, reason: 'timeout' }
   }

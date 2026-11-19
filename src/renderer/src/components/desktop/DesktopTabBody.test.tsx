@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
   const viewers: { viewOnly: boolean; channel: unknown; target: HTMLElement }[] = []
   // What each viewer sent to the desktop, in order: clipboard text and key events.
   const sentToDesktop: unknown[][] = []
+  const channelTokens: (string | undefined)[] = []
   const channelViewerIds: string[] = []
   // Status reads held back by a test, answered later with whatever it chooses.
   const heldReads: ((status: unknown) => void)[] = []
@@ -34,7 +35,7 @@ const mocks = vi.hoisted(() => {
     heldControl,
     viewers,
     channelViewerIds,
-    channelTokens: [] as (string | undefined)[],
+    channelTokens,
     sentToDesktop,
     clipboardText: 'hello from the mac',
     reconfigure: vi.fn()
