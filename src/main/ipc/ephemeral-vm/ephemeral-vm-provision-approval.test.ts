@@ -80,7 +80,12 @@ function setup(repoWideTrust = false) {
     )
     return `"${process.execPath}" "${file}"`
   }
-  const yaml = (create: string, stats: string, description?: string): string =>
+  const yaml = (
+    create: string,
+    stats: string,
+    description?: string,
+    timeoutSeconds?: number
+  ): string =>
     [
       'environmentRecipes:',
       '  - id: docker',
@@ -88,6 +93,7 @@ function setup(repoWideTrust = false) {
       ...(description === undefined ? [] : [`    description: ${JSON.stringify(description)}`]),
       `    create: ${JSON.stringify(create.startsWith('"') ? create : script(create))}`,
       `    stats: ${JSON.stringify(script(stats))}`,
+      ...(timeoutSeconds === undefined ? [] : [`    timeoutSeconds: ${timeoutSeconds}`]),
       '    destroy: none'
     ].join('\n')
   const repo = { id: 'repo-1', path: repoPath, displayName: 'Repo', addedAt: 0 }
@@ -170,5 +176,20 @@ describe('ephemeralVm:provision approval binding', () => {
       errorCode: 'recipe_changed_since_approval'
     })
     expect(existsSync(env.marker('create'))).toBe(false)
+  })
+
+  it('refuses a recipe whose create timeout changed after approval', async () => {
+    const env = setup()
+    const approved = env.yaml('create', 'stats', undefined, 60)
+    env.writeYaml(approved)
+    const hash = approvedHashOf(approved)
+    env.writeYaml(env.yaml('create', 'stats', undefined, 3600))
+
+    await expect(env.provision(hash)).resolves.toMatchObject({
+      ok: false,
+      errorCode: 'recipe_changed_since_approval'
+    })
+    expect(existsSync(env.marker('create'))).toBe(false)
+    expect(listEphemeralVmRuntimes(env.userDataPath)).toEqual([])
   })
 })

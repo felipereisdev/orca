@@ -42,11 +42,12 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
     runtimeId: string,
     signal: AbortSignal
   ): Promise<EphemeralVmRecipeStats | null> => {
-    const deadline = Date.now() + STATS_TIMEOUT_MS
+    // Monotonic, so a wall-clock adjustment neither skips a sample nor stretches the budget.
+    const deadline = performance.now() + STATS_TIMEOUT_MS
     const target = await deps.resolveTarget(runtimeId)
     // A lookup that outlived the deadline must not launch anything: its answer is already null.
     // The clock decides, since the deadline timer may not have run yet.
-    const remainingMs = deadline - Date.now()
+    const remainingMs = deadline - performance.now()
     if (!target || signal.aborted || remainingMs <= 0) {
       return null
     }

@@ -19,6 +19,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
   await removeTempDirs(roots.splice(0))
 })
 
@@ -183,7 +184,9 @@ describe('readEphemeralVmRuntimeStats', () => {
   })
 
   it('a lookup answered past the deadline, before its timer runs, never launches', async () => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    let monotonicMs = 1_000
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicMs)
     const runStats = vi.fn(async () => ({ cpuPercent: 1, memoryBytes: 1, diskBytes: 1 }))
     let answerLookup: (target: EphemeralVmRuntimeStatsTarget) => void = () => {}
     const read = createEphemeralVmRuntimeStatsReader({
@@ -195,8 +198,8 @@ describe('readEphemeralVmRuntimeStats', () => {
     })
 
     const pending = read(runtime.id)
-    // The clock passes the deadline while the deadline timer has not fired yet.
-    vi.setSystemTime(Date.now() + 5_001)
+    // The monotonic clock passes the deadline while the deadline timer has not fired yet.
+    monotonicMs += 5_001
     answerLookup({
       runtime,
       repoPath: '/repo',
@@ -209,5 +212,30 @@ describe('readEphemeralVmRuntimeStats', () => {
     expect(runStats).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(5_000)
     await expect(pending).resolves.toBeNull()
+  })
+
+  it('a forward wall-clock jump during the lookup does not skip the sample', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    vi.spyOn(performance, 'now').mockImplementation(() => 1_000)
+    const runStats = vi.fn(async () => ({ cpuPercent: 1, memoryBytes: 2, diskBytes: 3 }))
+    let answerLookup: (target: EphemeralVmRuntimeStatsTarget) => void = () => {}
+    const read = createEphemeralVmRuntimeStatsReader({
+      resolveTarget: () =>
+        new Promise((resolve) => {
+          answerLookup = resolve
+        }),
+      runStats
+    })
+
+    const pending = read(runtime.id)
+    vi.setSystemTime(Date.now() + 60_000)
+    answerLookup({
+      runtime,
+      repoPath: '/repo',
+      recipe: { id: 'docker', name: 'Docker', create: './create.sh', stats: './stats.sh' }
+    })
+
+    await expect(pending).resolves.toEqual({ cpuPercent: 1, memoryBytes: 2, diskBytes: 3 })
+    expect(runStats).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,29 +1,29 @@
 import type { OrcaHooks } from '../orca-yaml-hook-types'
 
 /**
- * The environment recipe content a vmRecipe trust approval covers, as canonical JSON: fixed key
- * order and every field JSON-encoded, so no two different recipes share a text (a newline in one
- * field can't pose as another field's start). The trust dialog shows it and main re-hashes it.
+ * The environment recipe content a vmRecipe trust approval covers: every parsed recipe, whole, as
+ * canonical JSON (keys sorted at every level, every value JSON-encoded). No field list to keep in
+ * step, so a field added later is approved too, and no two recipes share a text. The trust dialog
+ * shows it and main re-hashes it.
  */
 export function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
   const recipes = yamlHooks?.environmentRecipes ?? []
   if (recipes.length === 0) {
     return ''
   }
-  return JSON.stringify(
-    recipes.map((recipe) => ({
-      id: recipe.id,
-      name: recipe.name,
-      description: recipe.description ?? null,
-      checkoutMode: recipe.checkoutMode ?? null,
-      create: recipe.create,
-      suspend: recipe.suspend ?? null,
-      resume: recipe.resume ?? null,
-      stats: recipe.stats ?? null,
-      destroy: recipe.destroyDisabled ? 'none' : (recipe.destroy ?? null),
-      passEnv: recipe.passEnv ?? null
-    })),
-    null,
-    2
+  return JSON.stringify(sortKeysDeep(recipes), null, 2)
+}
+
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeysDeep)
+  }
+  if (value === null || typeof value !== 'object') {
+    return value
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, entry]) => [key, sortKeysDeep(entry)])
   )
 }
