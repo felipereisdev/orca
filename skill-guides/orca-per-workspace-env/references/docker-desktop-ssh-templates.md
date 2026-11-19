@@ -588,7 +588,9 @@ function readStdinLine() {
 // (the launcher refused our proof), server_proof_mismatch (the listener proved another token or
 // sent a malformed proof), no_handshake (it answered without a proof), unverified_run (it ran a
 // program for a probe that could not check it), unreachable, protocol_error. An empty token cannot
-// check the listener and sends a proof made with no token; it expects `rejected`.
+// check the listener and sends a proof made with no token; it expects `rejected`. The worst outcome
+// wins: run evidence makes it unverified_run in any order, so a refusal counts only if none came
+// before close.
 function probe(token) {
   const socket = net.connect({ host: HOST, port: PORT })
   const result = { result: 'unknown', stdout: '' }
@@ -596,7 +598,9 @@ function probe(token) {
   let authenticated = false
   let verified = false
   let stopped = false
-  // The first failure is final: later lines, even in the same chunk, cannot replace it.
+  let refusal = null
+  let ran = false
+  // A failure is final: later lines, even in the same chunk, cannot replace it.
   const stop = (outcome) => {
     stopped = true
     result.result = outcome
@@ -642,12 +646,17 @@ function probe(token) {
           socket.write(
             `${JSON.stringify({ op: 'run', proof: proof(key, 'orca-launcher-client', reply.nonce, broker), argv: ['id', '-un'] })}\n`
           )
-        } else if (reply.error === 'bad_token') stop('rejected')
-        else if (typeof reply.error === 'string') stop(`refused:${reply.error}`)
-        else if (!verified) stop('unverified_run')
-        else if (typeof reply.id === 'string') result.result = 'started'
-        else if (reply.stream === 'stdout') result.stdout += reply.data
-        else if (typeof reply.exit === 'number') result.exit = reply.exit
+        } else if (typeof reply.error === 'string') {
+          if (ran) return stop('unverified_run')
+          refusal ??= reply.error === 'bad_token' ? 'rejected' : `refused:${reply.error}`
+          result.result = refusal
+        } else {
+          if (!verified || refusal) return stop('unverified_run')
+          ran = true
+          if (typeof reply.id === 'string') result.result = 'started'
+          else if (reply.stream === 'stdout') result.stdout += reply.data
+          else if (typeof reply.exit === 'number') result.exit = reply.exit
+        }
       },
       () => socket.destroy()
     )
@@ -1172,14 +1181,15 @@ Security checks on top of `orca vm recipe doctor`.
 #                                                    create.sh, runs every check, destroys it
 #   doctor-extra.sh --container NAME [--known ID]... checks a running environment (no secret checks)
 # --known names an instance id Orca still lists (Settings > VMs); other labeled containers are
-# reported as orphans. Every denial must show the expected refusal, not just any failure; secrets
-# never enter a process run as dev or gui. Exit status 1 when any check fails.
+# reported as orphans. Every denial must show the expected refusal, not just any failure, between two
+# passes of a positive control on the same listener; secrets never enter a process run as dev or gui.
+# Every check prints its line; exit status 1 when any check fails.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=orca-docker-desktop.sh
 . "$here/orca-docker-desktop.sh"
 
-container='' known=() failures=0 password='' token='' instance=''
+container='' known=() failures=0 passes=0 warnings=0 password='' token='' instance=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --container) container="$2" && shift 2 ;;
@@ -1199,7 +1209,11 @@ trap cleanup EXIT
 
 report() { # <pass|FAIL|warn> <id> <message>
   printf '%-4s  %-26s %s\n' "$1" "$2" "$3"
-  [ "$1" != FAIL ] || failures=$((failures + 1))
+  case "$1" in
+    pass) passes=$((passes + 1)) ;;
+    FAIL) failures=$((failures + 1)) ;;
+    *) warnings=$((warnings + 1)) ;;
+  esac
 }
 check() { # <id> <message> <command...>
   local id="$1" message="$2"
@@ -1214,11 +1228,12 @@ as() { # <user> <command...>, in the container
 }
 
 # The command ran inside the container as <user> (it printed a marker first), failed, and said
-# <refusal>, the message of that very command. A Docker, SSH or exec error has no marker.
+# <refusal>, the message of that very command. A Docker, SSH or exec error has no marker. Both
+# streams merge inside the container: docker exec carries them apart and may reorder them.
 refused() { # <refusal text> <user> <command...>
   local refusal="$1" user="$2" output
   shift 2
-  if output="$(as "$user" sh -c 'echo "orca-probe-ran-as:$(id -un)"; exec "$@"' probe "$@" 2>&1)"; then
+  if output="$(as "$user" sh -c 'exec 2>&1; echo "orca-probe-ran-as:$(id -un)"; exec "$@"' probe "$@" 2>&1)"; then
     printf '  unexpectedly succeeded: %s\n' "$output" >&2
     return 1
   fi
@@ -1226,6 +1241,42 @@ refused() { # <refusal text> <user> <command...>
     *"orca-probe-ran-as:$user"*"$refusal"*) return 0 ;;
     *) printf '  no "%s" after running as %s: %s\n' "$refusal" "$user" "$output" >&2 && return 1 ;;
   esac
+}
+
+# Positive controls ride out a supervised restart: up to 5 tries, 1 s apart; the last try's
+# diagnostics are shown.
+retried() { # <command...>
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    "$@" 2>"$work/retry.err" && return 0
+    [ "$attempt" -eq 5 ] || sleep 1
+  done
+  cat "$work/retry.err" >&2
+  return 1
+}
+
+# <denial> counts only between two passes of <control> that name the same listener: a service that
+# is down cannot satisfy it, and one that restarted meanwhile makes the whole bracket run again.
+bracketed() { # <control> <denial...>
+  local control="$1" before after status attempt
+  shift
+  for attempt in 1 2 3 4 5; do
+    before="$(retried "$control")" || { printf '  control %s failed before the denial\n' "$control" >&2 && return 1; }
+    status=0
+    "$@" || status=$?
+    if after="$("$control")" && [ "$after" = "$before" ]; then return "$status"; fi
+    printf '  control %s failed or changed listener after the denial (try %s)\n' "$control" "$attempt" >&2
+    [ "$attempt" -eq 5 ] || sleep 1
+  done
+  return 1
+}
+
+# Prints the inode of the loopback listener on <port> owned by <user>; fails when there is none.
+listener_inode() { # <port> <user>
+  local uid
+  uid="$(as root id -u "$2")" || return 1
+  as root ss -Hltne "sport = :$1" |
+    sed -n "s/.* 127\.0\.0\.1:$1 .* uid:$uid ino:\([0-9][0-9]*\) .*/\1/p" | grep -x '[0-9]\{1,\}'
 }
 
 # 1 when neither secret is in <file>, 0 when one is, anything else when grep failed.
@@ -1296,9 +1347,11 @@ desktop_ports_held() {
 }
 
 gui_opens_display() {
-  dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" xdpyinfo >/dev/null
+  dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" timeout 5 xdpyinfo >/dev/null
 }
-dev_cannot_open_display() { refused 'xdpyinfo:  unable to open display ":1".' dev env DISPLAY=:1 xdpyinfo; }
+# Xvnc holds 5901 as vnc and serves X requests to gui; prints the listener.
+xvnc_control() { listener_inode 5901 vnc && gui_opens_display; }
+dev_cannot_open_display() { refused 'xdpyinfo:  unable to open display ":1".' dev env DISPLAY=:1 timeout 5 xdpyinfo; }
 dev_cannot_read_cookie() { refused 'cat: /home/gui/.Xauthority: Permission denied' dev cat /home/gui/.Xauthority; }
 dev_cannot_list_x_sockets() {
   refused "ls: cannot open directory '/tmp/.X11-unix': Permission denied" dev ls /tmp/.X11-unix
@@ -1325,6 +1378,11 @@ launcher_refuses_dev() {
 launcher_runs_as_gui_for_root() {
   [ "$(printf '%s\n' "$token" | launcher_probe root)" = '{"result":"started","stdout":"gui\n","exit":0}' ]
 }
+# The launcher holds 5902 as gui and, with the token, runs a program as gui; prints the listener.
+launcher_control() {
+  listener_inode 5902 gui || return 1
+  [ -z "$token" ] || launcher_runs_as_gui_for_root
+}
 
 # The inspect must succeed and describe this container; an empty or failed one proves nothing.
 secrets_not_in_inspect() {
@@ -1341,10 +1399,21 @@ secrets_not_in_processes() {
   fi
   as root ps -A -ww -o args >"$work/container-ps"
   for user in root vnc gui dev; do
-    # Each user reads its own processes' environments (root lacks CAP_SYS_PTRACE for the others).
-    as "$user" sh -c \
-      'for f in /proc/[0-9]*/environ /proc/[0-9]*/cmdline; do { tr "\0" "\n" < "$f"; } 2>/dev/null; done' \
-      >"$work/proc-$user"
+    # Each user reads every cmdline and its own processes' environments (root lacks CAP_SYS_PTRACE
+    # for the others). Only a process that exited meanwhile is skipped; any other error fails.
+    as "$user" bash -c 'err="$(mktemp)" || exit 1
+      for pid in /proc/[0-9]*; do
+        files=("$pid/cmdline")
+        [ ! -O "$pid" ] || files+=("$pid/environ")
+        for f in "${files[@]}"; do
+          tr "\0" "\n" 2>"$err" <"$f" && continue
+          if grep -Eq "(No such file or directory|No such process)$" "$err" && [ ! -e "$pid" ]; then continue; fi
+          echo "  $(id -un): $(cat "$err")" >&2
+          rm -f "$err"
+          exit 1
+        done
+      done
+      rm -f "$err"' >"$work/proc-$user" || return 1
     [ -s "$work/proc-$user" ] || return 1
   done
   [ -s "$work/host-ps" ] && [ -s "$work/container-ps" ] &&
@@ -1357,14 +1426,17 @@ secrets_not_in_readable_files() {
   local user
   for user in dev gui; do
     # find's own exit status counts: a partial listing must not pass for a full scan.
-    as "$user" sh -c 'list="$(mktemp)" || exit 1
+    # Read one file at a time: a file removed since find listed it is skipped, any other error fails.
+    as "$user" bash -c 'list="$(mktemp)" && err="$(mktemp)" || exit 1
+      trap "rm -f \"\$list\" \"\$err\"" EXIT
       find /home /tmp /run /work /etc /var/tmp /opt -xdev \
-        \( -type d \( ! -readable -o ! -executable \) -prune \) -o \( -type f -readable -print0 \) >"$list"
-      status=$?
-      [ "$status" -eq 0 ] && xargs -0 -r cat -- <"$list"
-      status=$((status ? status : $?))
-      rm -f "$list"
-      exit "$status"' >"$work/files-$user" 2>"$work/files-$user.err" ||
+        \( -type d \( ! -readable -o ! -executable \) -prune \) -o \( -type f -readable -print0 \) >"$list" || exit
+      while IFS= read -r -d "" f; do
+        cat -- "$f" 2>"$err" && continue
+        if grep -q "No such file or directory$" "$err" && [ ! -e "$f" ] && [ ! -L "$f" ]; then continue; fi
+        cat "$err" >&2
+        exit 1
+      done <"$list"' >"$work/files-$user" 2>"$work/files-$user.err" ||
       { sed 's/^/  /' "$work/files-$user.err" >&2; return 1; }
     [ -s "$work/files-$user" ] && secrets_absent_from "$work/files-$user" || return 1
   done
@@ -1407,16 +1479,16 @@ check container.hardening 'the container runs with exactly those flags' host_con
 check kernel.ptrace_scope 'kernel.yama.ptrace_scope >= 1' ptrace_scope_ok
 check users.dev_groups 'dev is only in dev and work (not vnc, gui or xdisplay)' dev_groups_ok
 check users.no_sudo 'no sudo and no xdotool in the image' no_sudo_or_xdotool
-check desktop.ports 'VNC (5901) is held by vnc and the launcher (5902) by gui, on loopback only' desktop_ports_held
-check display.gui_allowed 'gui opens DISPLAY=:1 with its cookie (control)' gui_opens_display
-check display.dev_denied 'dev cannot open DISPLAY=:1 ("unable to open display")' dev_cannot_open_display
+check desktop.ports 'VNC (5901) is held by vnc and the launcher (5902) by gui, on loopback only' retried desktop_ports_held
+check display.gui_allowed 'gui opens DISPLAY=:1 with its cookie (control)' retried gui_opens_display
+check display.dev_denied 'dev cannot open DISPLAY=:1 ("unable to open display")' bracketed xvnc_control dev_cannot_open_display
 check display.dev_no_cookie "dev cannot read gui's X cookie (Permission denied)" dev_cannot_read_cookie
 check display.dev_no_socket 'dev cannot list /tmp/.X11-unix (Permission denied)' dev_cannot_list_x_sockets
 check vnc.password_file 'VNC password file is vnc 0600; dev and gui get Permission denied' vnc_password_file_private
-check vnc.wrong_password 'VNC offers only VNC auth and refuses a wrong answer from dev' vnc_refuses_wrong_answer
-check launcher.dev_refused 'from dev: no token is refused, a wrong token fails the handshake' launcher_refuses_dev
+check vnc.wrong_password 'VNC offers only VNC auth and refuses a wrong answer from dev' bracketed xvnc_control vnc_refuses_wrong_answer
+check launcher.dev_refused 'from dev: no token is refused, a wrong token fails the handshake' bracketed launcher_control launcher_refuses_dev
 if [ -n "$token" ]; then
-  check launcher.with_token 'from root with the token: runs `id -un` as gui' launcher_runs_as_gui_for_root
+  check launcher.with_token 'from root with the token: runs `id -un` as gui' retried launcher_runs_as_gui_for_root
   check secrets.inspect 'password and token absent from docker inspect' secrets_not_in_inspect
   check secrets.processes 'password and token absent from ps, cmdlines and environments' secrets_not_in_processes
   check secrets.files 'password and token absent from files dev or gui can read' secrets_not_in_readable_files
@@ -1425,6 +1497,7 @@ else
 fi
 list_orphans
 
+log "$passes pass, $failures FAIL, $warnings warn"
 if [ "$failures" -gt 0 ]; then
   log "$failures check(s) failed"
   exit 1

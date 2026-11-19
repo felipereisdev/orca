@@ -204,9 +204,16 @@ token it runs `id -un` as `gui`; the password and token appear in neither `docke
 `ps`, command lines or environments on the hosts and in the container, nor any file `dev` or `gui`
 can read (the files are streamed to this machine and searched here). Each denial must show its
 expected refusal after a marker proving it ran as that user, so a Docker, SSH or exec error fails
-the check; the launcher probe accepts a run only after the launcher proved the token; an empty or
-failed `docker inspect` and a failed `find` fail their checks; and the secrets never enter a process
-run as `dev` or `gui`. Exit status 1 means a check failed.
+the check; the launcher probe accepts a run only after the launcher proved the token, and any run
+evidence outweighs a refusal in either order (`unverified_run`); an empty or failed `docker inspect`
+and a failed `find` fail their checks; and the secrets never enter a process run as `dev` or `gui`.
+The positive controls (the ports, `gui` on the display, the launcher with the token) retry up to
+five times, one second apart, to ride out a supervised restart. Each denial of the display, the
+VNC server or the launcher runs between two passes of its control that name the same listener, so
+a service that is down or an impostor on its port fails the check, and a restart in between makes
+the bracket run again. The process and file scans skip only a process or file that disappeared
+during the scan; any other read error fails. Every check prints its line, then a
+`<n> pass, <n> FAIL, <n> warn` summary; exit status 1 means a check failed.
 
 ## Electron apps
 
