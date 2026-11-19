@@ -59,8 +59,16 @@ function hostSettings(experimentalEphemeralVms: boolean): {
   return { settings: { experimentalEphemeralVms, compactWorktreeCards: false } }
 }
 
-function hostClient(host: { experiment: boolean; size: number }) {
+type Host = {
+  experiment: boolean
+  size: number
+  /** While set, `settings.get` waits for this before it answers. */
+  settingsGate?: Promise<void>
+}
+
+function hostClient(host: Host) {
   const { size } = host
+  const eventListeners = new Set<(payload: unknown) => void>()
   const sent: { method: string; params: Record<string, unknown> }[] = []
   const results: Record<string, (params: Record<string, unknown>) => unknown> = {
     'settings.get': () => hostSettings(host.experiment),
@@ -79,18 +87,32 @@ function hostClient(host: { experiment: boolean; size: number }) {
     }
   }
   const client = stubRpcClient({
-    sendRequest: (method, params) => {
+    sendRequest: async (method, params) => {
       const record: Record<string, unknown> = Object(params)
       sent.push({ method, params: record })
+      if (method === 'settings.get') {
+        await host.settingsGate
+      }
       const result = results[method]
-      return Promise.resolve(
-        result
-          ? { id: method, ok: true, result: result(record) }
-          : { id: method, ok: false, error: { code: 'method_not_found', message: method } }
-      )
+      return result
+        ? { id: method, ok: true, result: result(record) }
+        : { id: method, ok: false, error: { code: 'method_not_found', message: method } }
+    },
+    // The host's `runtime.clientEvents` stream, as the shared client-events wire opens it.
+    subscribe: (method, _params, onData) => {
+      if (method !== 'runtime.clientEvents.subscribe') {
+        return () => {}
+      }
+      eventListeners.add(onData)
+      return () => eventListeners.delete(onData)
     }
   })
-  return { client, sent }
+  const emit = (event: unknown): void => {
+    for (const listener of eventListeners) {
+      listener(event)
+    }
+  }
+  return { client, sent, emit }
 }
 
 function textOf(node: ReactTestInstance | string): string {
@@ -173,21 +195,45 @@ describe('a desktop recording in a chat message', () => {
     expect(sent.some((call) => call.method.startsWith('files.'))).toBe(false)
   })
 
-  it('an open transcript follows the experiment being turned off within the refresh window', async () => {
+  it("a settingsChanged event turning the experiment off removes a mounted row's player", async () => {
+    const host: Host = { experiment: true, size: 1000 }
+    const { client, emit } = hostClient(host)
+    const root = await renderLine(client)
+    expect(playButtons(root)).not.toHaveLength(0)
+
+    host.experiment = false
+    await act(async () => {
+      emit({ type: 'settingsChanged', keys: ['experimentalEphemeralVms'] })
+    })
+
+    expect(playButtons(root)).toHaveLength(0)
+    expect(textOf(root)).toContain('Gravação do teste')
+  })
+
+  it('reopening a transcript after a minute re-reads a value its read stored after unmount', async () => {
     vi.useFakeTimers()
     try {
-      const host = { experiment: true, size: 1000 }
+      let answer!: () => void
+      const host: Host = {
+        experiment: true,
+        size: 1000,
+        settingsGate: new Promise((resolve) => (answer = resolve))
+      }
       const { client } = hostClient(host)
-      const root = await renderLine(client)
-      expect(playButtons(root)).not.toHaveLength(0)
+      await renderLine(client)
+      // The row closes while its read is still out; the read then lands with nobody listening.
+      act(() => renderer?.unmount())
+      renderer = null
+      await act(async () => answer())
+      host.settingsGate = undefined
 
       host.experiment = false
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(60_000)
+        await vi.advanceTimersByTimeAsync(61_000)
       })
+      const root = await renderLine(client)
 
       expect(playButtons(root)).toHaveLength(0)
-      expect(textOf(root)).toContain('Gravação do teste')
     } finally {
       vi.useRealTimers()
     }

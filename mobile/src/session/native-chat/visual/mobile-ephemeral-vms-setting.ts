@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { bindDeferredRpcOperation, defineRpcOperation } from '../../../transport/rpc/rpc-operation'
 import type { RpcCompatibleReader } from '../../../transport/rpc/rpc-operation-contract'
 import type { RpcClient } from '../../../transport/rpc/rpc-client-contract'
+import { subscribeSharedClientEvents } from '../../../transport/connection/shared-client-events'
 import { settingsField, settingsMember } from '../../../settings/mobile-settings-projection'
 
 // Older hosts omit the setting; only an explicit true turns the experiment on.
@@ -27,17 +28,20 @@ const ephemeralVmsRead = bindDeferredRpcOperation(
   })
 )
 
-const REFRESH_MS = 60_000
+// A value older than this is re-read by the next row that mounts; mounted rows hear changes live.
+const MAX_AGE_MS = 60_000
+const SETTING_KEY = 'experimentalEphemeralVms'
 
 type ClientEntry = {
   enabled: boolean | null
-  reading: Promise<boolean> | null
+  /** When the read behind `enabled` went out; settingsChanged resets it to "never". */
+  readAt: number
+  /** Bumped by every read and invalidation, so an older read cannot land over a newer answer. */
+  version: number
   listeners: Set<() => void>
-  timer: ReturnType<typeof setTimeout> | null
+  stopEvents: (() => void) | null
 }
 
-// One read per host connection a minute, however many chat rows show it; rows still mounted when
-// the minute ends get the new value, so an open transcript follows a changed setting.
 let entries = new WeakMap<RpcClient, ClientEntry>()
 
 export function resetMobileEphemeralVmsSettingCache(): void {
@@ -47,14 +51,16 @@ export function resetMobileEphemeralVmsSettingCache(): void {
 function entryFor(client: RpcClient): ClientEntry {
   let entry = entries.get(client)
   if (!entry) {
-    entry = { enabled: null, reading: null, listeners: new Set(), timer: null }
+    entry = { enabled: null, readAt: -Infinity, version: 0, listeners: new Set(), stopEvents: null }
     entries.set(client, entry)
   }
   return entry
 }
 
-function read(client: RpcClient, entry: ClientEntry): Promise<boolean> {
-  entry.reading ??= ephemeralVmsRead
+function read(client: RpcClient, entry: ClientEntry): void {
+  const version = ++entry.version
+  const readAt = Date.now()
+  void ephemeralVmsRead
     .request(client)
     .then((reply) => {
       const result = ephemeralVmsRead.interpret(reply)
@@ -62,30 +68,34 @@ function read(client: RpcClient, entry: ClientEntry): Promise<boolean> {
     })
     .catch(() => false)
     .then((enabled) => {
-      entry.reading = null
+      if (version !== entry.version) {
+        return
+      }
       entry.enabled = enabled
+      entry.readAt = readAt
       for (const listener of entry.listeners) {
         listener()
       }
-      scheduleRefresh(client, entry)
-      return enabled
     })
-  return entry.reading
 }
 
-function scheduleRefresh(client: RpcClient, entry: ClientEntry): void {
-  if (entry.timer || entry.listeners.size === 0) {
-    return
-  }
-  entry.timer = setTimeout(() => {
-    entry.timer = null
-    if (entry.listeners.size > 0) {
-      void read(client, entry)
-    } else {
-      // Nobody shows it now: the next row to mount reads afresh.
-      entry.enabled = null
+function isFresh(entry: ClientEntry): boolean {
+  return entry.enabled !== null && Date.now() - entry.readAt < MAX_AGE_MS
+}
+
+/** Mounted rows follow the host's settingsChanged events on the shared client-events stream. */
+function listen(client: RpcClient, entry: ClientEntry): void {
+  entry.stopEvents = subscribeSharedClientEvents(client, (event) => {
+    const changed =
+      event.type === 'settingsChanged' &&
+      (!Array.isArray(event.keys) || event.keys.includes(SETTING_KEY))
+    // A replayed ready means events were missed while the stream was down.
+    const missed = event.type === 'ready' && 'replayed' in event && event.replayed === true
+    if (changed || missed) {
+      entry.readAt = -Infinity
+      read(client, entry)
     }
-  }, REFRESH_MS)
+  })
 }
 
 /** The desktop's `experimentalEphemeralVms` setting, read from the paired Mac; false until known. */
@@ -102,14 +112,20 @@ export function useMobileEphemeralVmsEnabled(client: RpcClient | undefined): boo
       }
     }
     entry.listeners.add(update)
-    if (entry.enabled === null) {
-      void read(client, entry)
-    } else {
+    if (!entry.stopEvents) {
+      listen(client, entry)
+    }
+    if (isFresh(entry)) {
       update()
-      scheduleRefresh(client, entry)
+    } else {
+      read(client, entry)
     }
     return () => {
       entry.listeners.delete(update)
+      if (entry.listeners.size === 0) {
+        entry.stopEvents?.()
+        entry.stopEvents = null
+      }
     }
   }, [client])
   return state !== null && state.client === client && state.enabled
