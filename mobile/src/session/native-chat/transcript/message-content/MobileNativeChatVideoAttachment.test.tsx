@@ -66,6 +66,8 @@ type Host = {
   settingsGate?: Promise<void>
   /** While set, each `settings.get` waits here until the test answers it with a flag or a failure. */
   heldReads?: ((answer: boolean | Error) => void)[]
+  /** While set, `settings.get` answers with this RPC refusal instead of the settings. */
+  settingsRefusal?: { code: string; message: string }
 }
 
 function hostClient(host: Host) {
@@ -101,6 +103,9 @@ function hostClient(host: Host) {
             throw answer
           }
           return { id: method, ok: true, result: hostSettings(answer) }
+        }
+        if (host.settingsRefusal) {
+          return { id: method, ok: false, error: host.settingsRefusal }
         }
       }
       const result = results[method]
@@ -312,5 +317,17 @@ describe('a desktop recording in a chat message', () => {
     await act(async () => older!(true))
 
     expect(playButtons(root)).toHaveLength(0)
+  })
+
+  it('a refused replacement read keeps the last value the host gave', async () => {
+    const host: Host = { experiment: true, size: 1000 }
+    const { client, emit } = hostClient(host)
+    const root = await renderLine(client)
+    expect(playButtons(root)).not.toHaveLength(0)
+
+    host.settingsRefusal = { code: 'internal_error', message: 'settings unavailable' }
+    await act(async () => emit({ type: 'settingsChanged', keys: ['experimentalEphemeralVms'] }))
+
+    expect(playButtons(root)).not.toHaveLength(0)
   })
 })

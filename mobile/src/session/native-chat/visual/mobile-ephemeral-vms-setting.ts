@@ -69,7 +69,7 @@ function storeFor(client: RpcClient): SettingStore {
   return store
 }
 
-/** Replaces any read in flight; a failed read keeps the last good value. */
+/** Replaces any read in flight; a failed or refused read keeps the last good value. */
 function revalidate(client: RpcClient, store: SettingStore): void {
   const generation = ++store.generation
   const readAt = Date.now()
@@ -89,7 +89,8 @@ function revalidate(client: RpcClient, store: SettingStore): void {
   store.inFlight = ephemeralVmsRead.request(client).then(
     (reply) => {
       const result = ephemeralVmsRead.interpret(reply)
-      settle(result.accepted && result.value)
+      // A refusal is a failed read, not an answer: keep the last good value.
+      settle(result.accepted ? result.value : null)
     },
     () => settle(null)
   )
