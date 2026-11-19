@@ -595,6 +595,13 @@ function probe(token) {
   const broker = newNonce()
   let authenticated = false
   let verified = false
+  let stopped = false
+  // The first failure is final: later lines, even in the same chunk, cannot replace it.
+  const stop = (outcome) => {
+    stopped = true
+    result.result = outcome
+    socket.destroy()
+  }
   const finish = () => {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     process.exit(0)
@@ -609,24 +616,25 @@ function probe(token) {
     'data',
     lineSplitter(
       (line) => {
+        if (stopped) return
         let reply
         try {
           reply = JSON.parse(line)
         } catch {
-          result.result = 'protocol_error'
-          return socket.destroy()
+          return stop('protocol_error')
+        }
+        if (reply === null || typeof reply !== 'object' || Array.isArray(reply)) {
+          return stop('protocol_error')
         }
         if (!authenticated) {
           if (typeof reply.nonce !== 'string' || !NONCE.test(reply.nonce)) {
-            result.result = 'no_handshake'
-            return socket.destroy()
+            return stop('no_handshake')
           }
           if (
             token &&
             !proofMatches(proof(token, 'orca-launcher-server', broker, reply.nonce), reply.proof)
           ) {
-            result.result = 'server_proof_mismatch'
-            return socket.destroy()
+            return stop('server_proof_mismatch')
           }
           authenticated = true
           verified = Boolean(token)
@@ -634,12 +642,10 @@ function probe(token) {
           socket.write(
             `${JSON.stringify({ op: 'run', proof: proof(key, 'orca-launcher-client', reply.nonce, broker), argv: ['id', '-un'] })}\n`
           )
-        } else if (reply.error === 'bad_token') result.result = 'rejected'
-        else if (typeof reply.error === 'string') result.result = `refused:${reply.error}`
-        else if (!verified) {
-          result.result = 'unverified_run'
-          return socket.destroy()
-        } else if (typeof reply.id === 'string') result.result = 'started'
+        } else if (reply.error === 'bad_token') stop('rejected')
+        else if (typeof reply.error === 'string') stop(`refused:${reply.error}`)
+        else if (!verified) stop('unverified_run')
+        else if (typeof reply.id === 'string') result.result = 'started'
         else if (reply.stream === 'stdout') result.stdout += reply.data
         else if (typeof reply.exit === 'number') result.exit = reply.exit
       },

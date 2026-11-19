@@ -73,6 +73,7 @@ export function runOnLauncher(
     let settled = false
     const brokerNonce = newLauncherNonce()
     let authenticated = false
+    let connected = false
     let runId: string | undefined
     let paused = false
     let socketClosed = false
@@ -216,9 +217,14 @@ export function runOnLauncher(
           queue.unshift(rest)
         }
       }
-      // A close counts only once everything read before it, maybe its exit, was handled.
+      // A close counts only once everything read before it, maybe its exit, was handled. A peer
+      // that closes before proving the token (even mid-frame) is rejected, not a lost run.
       if (socketClosed && queue.length === 0) {
-        fail(new DesktopError('desktop_run_failed', 'launcher_connection_lost'))
+        fail(
+          authenticated
+            ? new DesktopError('desktop_run_failed', 'launcher_connection_lost')
+            : new DesktopError('desktop_launcher_rejected')
+        )
       }
     }
 
@@ -232,9 +238,13 @@ export function runOnLauncher(
     // Socket errors name the address, never the token; report only a fixed reason.
     socket.on('error', () =>
       fail(
-        runId === undefined
+        !connected
           ? new DesktopError('desktop_run_unavailable', 'launcher_unreachable')
-          : new DesktopError('desktop_run_failed', 'launcher_connection_lost')
+          : !authenticated
+            ? new DesktopError('desktop_launcher_rejected')
+            : runId === undefined
+              ? new DesktopError('desktop_run_unavailable', 'launcher_unreachable')
+              : new DesktopError('desktop_run_failed', 'launcher_connection_lost')
       )
     )
     socket.once('close', () => {
@@ -246,6 +256,7 @@ export function runOnLauncher(
       drain()
     })
     socket.once('connect', () => {
+      connected = true
       socket.write(`${JSON.stringify({ op: 'hello', nonce: brokerNonce })}\n`)
     })
   })

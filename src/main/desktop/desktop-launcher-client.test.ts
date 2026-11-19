@@ -14,7 +14,8 @@ afterEach(async () => {
 
 /** A listener on the launcher port that does not know the token. */
 async function startImpostor(
-  reply: (line: string) => unknown
+  reply: (line: string) => unknown,
+  options: { closeAfterReply?: boolean } = {}
 ): Promise<{ port: number; received: () => string }> {
   let received = ''
   const sockets = new Set<Socket>()
@@ -27,6 +28,9 @@ async function startImpostor(
       for (const line of chunk.split('\n').filter(Boolean)) {
         const answer = reply(line)
         socket.write(typeof answer === 'string' ? answer : `${JSON.stringify(answer)}\n`)
+        if (options.closeAfterReply) {
+          socket.end()
+        }
       }
     })
   })
@@ -111,6 +115,17 @@ describe('runOnLauncher', () => {
       run({ host: '127.0.0.1', port: impostor.port, token: TOKEN }, ['echo', 'hi'])
     ).rejects.toMatchObject({ code: 'desktop_launcher_rejected' })
     expect(impostor.received().split('\n').filter(Boolean)).toHaveLength(1)
+  })
+
+  it.each([
+    ['an unterminated malformed frame and then closes', '{"bad'],
+    ['nothing after hello and then closes', '']
+  ])('refuses a listener that sends %s as desktop_launcher_rejected', async (_label, answer) => {
+    const impostor = await startImpostor(() => answer, { closeAfterReply: true })
+
+    await expect(
+      run({ host: '127.0.0.1', port: impostor.port, token: TOKEN }, ['echo', 'hi'])
+    ).rejects.toMatchObject({ code: 'desktop_launcher_rejected' })
   })
 
   it('runs on the real launcher without the token ever crossing the connection', async () => {
