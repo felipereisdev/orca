@@ -69,12 +69,19 @@ function copiedPath(id: string): string {
   return join(workspaceDir(), `rec-${id}.mp4`)
 }
 
+// Bumped at teardown: a wait left by a timed-out test stops scheduling instead of spinning on.
+let settleGeneration = 0
+
 /**
  * Waits for file I/O and promises without moving the fake clock, unlike `vi.waitFor`. It counts no
  * turns: real disk I/O under load takes any number of them, so only the test timeout bounds it.
  */
 async function settleUntil(condition: () => boolean): Promise<void> {
+  const generation = settleGeneration
   while (!condition()) {
+    if (generation !== settleGeneration) {
+      throw new Error('settleUntil cancelled at teardown')
+    }
     await new Promise<void>((resolve) => setImmediate(resolve))
   }
 }
@@ -123,6 +130,7 @@ describe('syncEnvironmentRecordings', () => {
   })
 
   afterEach(async () => {
+    settleGeneration += 1
     for (const stop of stops.splice(0)) {
       stop()
     }
