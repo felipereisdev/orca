@@ -45,7 +45,10 @@ export function mapDispatcherError(
     return errorResponse(request.id, meta, error.code, error.message)
   }
   if (error instanceof DesktopError) {
-    return errorResponse(request.id, meta, error.code, error.message)
+    // The reason tells a caller whether VNC is only not up yet; it is a fixed code, no credential.
+    const data =
+      error.code === 'desktop_unavailable' && error.reason ? { reason: error.reason } : undefined
+    return errorResponse(request.id, meta, error.code, error.message, data)
   }
   if (error instanceof ZodError) {
     return invalidArgumentResponse(request, meta, formatZodError(error))

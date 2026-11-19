@@ -4,11 +4,29 @@ import { trackRuntimeEnvironmentVerifiedTransitions } from '../ipc/runtime-envir
 import {
   configureEnvironmentDesktop,
   runtimeDesktop,
+  type DesktopConfigureRetry,
   type DesktopRuntime,
   type DesktopSettingsSource
 } from './desktop-configure'
 import { indexLocalRecordings } from './desktop-recording-index'
 import { syncEnvironmentRecordings } from './desktop-recording-sync'
+
+const RETRY_FIRST_DELAY_MS = 2_000
+const RETRY_MAX_DELAY_MS = 30_000
+/** Retries stop once their delays add up to this; a later start or Retry begins anew. */
+const RETRY_BUDGET_MS = 5 * 60_000
+
+/** A failed configure tried again on a self-rescheduling timeout, while the entry stays current. */
+type ConfigureRetry = {
+  timer: ReturnType<typeof setTimeout> | null
+  nextDelayMs: number
+  spentMs: number
+  authRetried: boolean
+}
+
+function freshRetry(): ConfigureRetry {
+  return { timer: null, nextDelayMs: RETRY_FIRST_DELAY_MS, spentMs: 0, authRetried: false }
+}
 
 type DesktopEntry = {
   runtime: DesktopRuntime
@@ -22,6 +40,7 @@ type DesktopEntry = {
   restartQueued: boolean
   /** The newest configure's controller token; in memory only, gone with the entry. */
   controllerToken: string | null
+  retry: ConfigureRetry
 }
 
 /** One entry per recipe runtime whose desktop this host handed over. */
@@ -30,11 +49,48 @@ let detachLifecycle: (() => void) | null = null
 
 /** Ends everything the entry runs now: its sync, its configure's effects, a queued restart. */
 function invalidate(entry: DesktopEntry): void {
+  resetRetry(entry)
   entry.epoch += 1
   entry.stopSync?.()
   entry.stopSync = null
   entry.configuring = null
   entry.restartQueued = false
+}
+
+function resetRetry(entry: DesktopEntry): void {
+  if (entry.retry.timer) {
+    clearTimeout(entry.retry.timer)
+  }
+  entry.retry = freshRetry()
+}
+
+/** VNC may still be starting while the environment stays verified: no transition would come. */
+function scheduleRetry(
+  store: DesktopSettingsSource,
+  runtimeId: string,
+  entry: DesktopEntry,
+  kind: DesktopConfigureRetry
+): void {
+  const { retry, epoch } = entry
+  if (kind === 'auth') {
+    if (retry.authRetried) {
+      return
+    }
+    retry.authRetried = true
+  }
+  const delay = retry.nextDelayMs
+  if (retry.timer || retry.spentMs + delay > RETRY_BUDGET_MS) {
+    return
+  }
+  retry.spentMs += delay
+  retry.nextDelayMs = Math.min(delay * 2, RETRY_MAX_DELAY_MS)
+  retry.timer = setTimeout(() => {
+    retry.timer = null
+    const target = runtimeDesktop(store, entry.runtime)
+    if (entry.epoch === epoch && entries.get(runtimeId) === entry && !entry.configuring && target) {
+      void configure(store, runtimeId, entry, target)
+    }
+  }, delay)
 }
 
 function configure(
@@ -54,6 +110,7 @@ function configure(
     // A failed configure leaves the broker as it was, so the token it last gave stays good.
     if (configured.outcome === 'configured') {
       entry.controllerToken = configured.controllerToken
+      resetRetry(entry)
     }
     if (entry.restartQueued) {
       entry.restartQueued = false
@@ -62,6 +119,9 @@ function configure(
         await configure(store, runtimeId, entry, next)
       }
       return
+    }
+    if (configured.outcome === 'failed' && configured.retry) {
+      scheduleRetry(store, runtimeId, entry, configured.retry)
     }
     // Only the identity that configured may subscribe to the desktop's events.
     if (configured.outcome === 'configured' && entry.workspaceId && !entry.stopSync) {
@@ -96,7 +156,8 @@ export function startEnvironmentDesktop(
       stopSync: null,
       configuring: null,
       restartQueued: false,
-      controllerToken: null
+      controllerToken: null,
+      retry: freshRetry()
     }
     entries.set(runtime.id, entry)
   }
@@ -109,6 +170,8 @@ export function startEnvironmentDesktop(
     entry.restartQueued = true
     return entry.configuring
   }
+  // A start (resume, verified again, Retry) configures now and begins any backoff anew.
+  resetRetry(entry)
   return configure(store, runtime.id, entry, target)
 }
 

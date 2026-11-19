@@ -41,19 +41,28 @@ describe('configureEnvironmentDesktop', () => {
       ok: false,
       error: { code: 'desktop_unavailable', message: `bad ${TOKEN} ${PASSWORD}` }
     })
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({
+      outcome: 'failed',
+      retry: null
+    })
     env.configure = () => ({
       id: 'r',
       ok: false,
       error: { code: `leak-${PASSWORD}`, message: TOKEN }
     })
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({
+      outcome: 'failed',
+      retry: null
+    })
     env.configure = () => {
       throw Object.assign(new Error(`refused {"password":"${PASSWORD}"} ${TOKEN}`), {
         code: TOKEN
       })
     }
-    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({ outcome: 'failed' })
+    expect(await configureEnvironmentDesktop('env-1', DESKTOP)).toEqual({
+      outcome: 'failed',
+      retry: null
+    })
 
     expect(warn.mock.calls).toEqual([
       [

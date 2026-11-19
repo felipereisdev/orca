@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import {
   getEphemeralVmRecipeResultDesktop,
   type EphemeralVmRecipeDesktop
@@ -48,9 +49,32 @@ function thrownCode(error: unknown): unknown {
   return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
 }
 
+/**
+ * `reachability`: VNC is not listening yet (still starting, or restarting); `auth`: it refused the
+ * password, which a VNC still setting its password up can do once.
+ */
+export type DesktopConfigureRetry = 'reachability' | 'auth'
+
 export type DesktopConfigureOutcome =
   | { outcome: 'configured'; controllerToken: string }
-  | { outcome: 'skipped' | 'failed' }
+  | { outcome: 'skipped' }
+  | { outcome: 'failed'; retry: DesktopConfigureRetry | null }
+
+const UnavailableData = z.object({ reason: z.string() })
+const VNC_NOT_UP_REASONS = new Set([
+  'desktop_vnc_unreachable',
+  'desktop_vnc_timeout',
+  'rfb_connection_closed'
+])
+
+function retryFor(code: string, data: unknown): DesktopConfigureRetry | null {
+  const reason =
+    code === 'desktop_unavailable' ? UnavailableData.safeParse(data).data?.reason : null
+  if (reason === 'rfb_auth_failed') {
+    return 'auth'
+  }
+  return reason && VNC_NOT_UP_REASONS.has(reason) ? 'reachability' : null
+}
 
 function controllerTokenOf(result: unknown): string | null {
   return typeof result === 'object' &&
@@ -75,6 +99,7 @@ export async function configureEnvironmentDesktop(
     return { outcome: 'skipped' }
   }
   let code: unknown
+  let retry: DesktopConfigureRetry | null = null
   try {
     const response = await callRuntimeEnvironment(
       getRuntimeEnvironmentRegistryRoot(),
@@ -94,6 +119,7 @@ export async function configureEnvironmentDesktop(
     }
     // A server that answers without a token is from before tokens and can never be viewed.
     code = response.ok ? 'unknown' : response.error.code
+    retry = response.ok ? null : retryFor(response.error.code, response.error.data)
   } catch (error) {
     code = thrownCode(error)
   }
@@ -101,7 +127,7 @@ export async function configureEnvironmentDesktop(
     environmentId: runtimeEnvironmentId,
     code: loggedFailureCode(code)
   })
-  return { outcome: 'failed' }
+  return { outcome: 'failed', retry }
 }
 
 /** The runtime's environment and desktop when the host should hand it over, else null. */

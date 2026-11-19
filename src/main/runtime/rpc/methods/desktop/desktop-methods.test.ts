@@ -164,7 +164,11 @@ describe('desktop RPC methods', () => {
     const statusAfter = broker.status()
     const other = await configure(server, OTHER_MAC)
 
-    expect(wrong).toMatchObject({ ok: false, error: { code: 'desktop_unavailable' } })
+    // The reason tells the host this is not worth retrying on a schedule, unlike an unreachable VNC.
+    expect(wrong).toMatchObject({
+      ok: false,
+      error: { code: 'desktop_unavailable', data: { reason: 'rfb_auth_failed' } }
+    })
     expect(statusAfter).toMatchObject({ state: 'unconfigured' })
     // No claim was left behind, so the identity that does hold the password can configure.
     expect(other).toMatchObject({ ok: true, result: { state: 'ready' } })

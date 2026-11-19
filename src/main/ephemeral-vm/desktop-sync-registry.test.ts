@@ -236,4 +236,55 @@ describe('desktop hand-off lifecycle', () => {
     expect(desktopControllerToken('env-1')).toBe('controller-token-1')
     await vi.waitFor(() => expect(env.streams).toHaveLength(1))
   })
+
+  /** The broker's answer while Xvnc is not listening yet, or refuses the password. */
+  function vncFailure(reason: 'desktop_vnc_unreachable' | 'rfb_auth_failed') {
+    return {
+      id: 'r',
+      ok: false as const,
+      error: { code: 'desktop_unavailable', message: 'unavailable', data: { reason } }
+    }
+  }
+
+  it('keeps configuring while VNC is still starting, with no Retry and no transition', async () => {
+    registerEnvironmentDesktopLifecycle(STORE)
+    let failures = 3
+    env.configure = () =>
+      failures-- > 0 ? vncFailure('desktop_vnc_unreachable') : env.configuredReply()
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    await settle()
+
+    expect(configureCalls()).toBe(4)
+    expect(desktopControllerToken('env-1')).toBe('controller-token-1')
+    await vi.waitFor(() => expect(env.streams).toHaveLength(1))
+    // Configured: nothing is retried any more.
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(configureCalls()).toBe(4)
+  })
+
+  it('stopping the desktop cancels the retries', async () => {
+    registerEnvironmentDesktopLifecycle(STORE)
+    env.configure = () => vncFailure('desktop_vnc_unreachable')
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+    await settle()
+    expect(configureCalls()).toBe(1)
+
+    stopEnvironmentDesktop('vm-1')
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+
+    expect(configureCalls()).toBe(1)
+  })
+
+  it('a refused VNC password is tried once more, never in a loop', async () => {
+    registerEnvironmentDesktopLifecycle(STORE)
+    env.configure = () => vncFailure('rfb_auth_failed')
+    restoreEnvironmentDesktops(STORE, [runningRuntime()])
+
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    await settle()
+
+    expect(configureCalls()).toBe(2)
+  })
 })

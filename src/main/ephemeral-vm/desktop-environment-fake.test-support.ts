@@ -8,7 +8,7 @@ export type FakeStreamCallbacks = {
 type FakeCall = { environmentId: string; method: string; params: Record<string, unknown> }
 type FakeResponse =
   | { id: string; ok: true; result: unknown; _meta: { runtimeId: string } }
-  | { id: string; ok: false; error: { code: string; message: string } }
+  | { id: string; ok: false; error: { code: string; message: string; data?: unknown } }
 
 /** The checkout on the environment; files under it resolve as workspace files. */
 export const FAKE_CHECKOUT = '/workspace/repo'
