@@ -13,6 +13,8 @@ import { observeTranscriptVisibility } from '../images/native-chat-image-visibil
 import { useNativeChatMediaHref } from '../images/use-native-chat-media-href'
 import { resolveNativeChatFileLink } from '../../links/actions/native-chat-file-link'
 import { readDesktopRecordingCopy, readNativeChatVideoSrc } from './native-chat-video-src'
+import { desktopRecordingIdFromPath } from '../../../../../../shared/native-chat/media/native-chat-video-path'
+import { isRuntimePathAbsolute } from '../../../../../../shared/file-access/cross-platform-path'
 
 type VideoState = { path: string; url: string | null; fromCopy: boolean }
 
@@ -41,7 +43,16 @@ export function NativeChatMarkdownVideo({
     active,
     retryKey: 0
   })
-  const absolutePath = resolveNativeChatFileLink(media.href, fileLinkContext)?.absolutePath
+  const resolvedPath = resolveNativeChatFileLink(media.href, fileLinkContext)?.absolutePath
+  // A recording names itself by id: its Mac copy plays even when the workspace route is gone.
+  const recordingPath =
+    route.kind === 'file' &&
+    isRuntimePathAbsolute(route.pathText) &&
+    desktopRecordingIdFromPath(route.pathText)
+      ? route.pathText
+      : undefined
+  const absolutePath = resolvedPath ?? recordingPath
+  const hostContext = resolvedPath ? runtimeContext : null
   const [video, setVideo] = useState<VideoState>()
   useEffect(() => {
     const element = frameRef.current
@@ -52,7 +63,7 @@ export function NativeChatMarkdownVideo({
       return
     }
     let cancelled = false
-    void readNativeChatVideoSrc(runtimeContext, absolutePath).then((result) => {
+    void readNativeChatVideoSrc(hostContext, absolutePath).then((result) => {
       if (!cancelled) {
         setVideo({ path: absolutePath, ...result })
       }
@@ -60,7 +71,7 @@ export function NativeChatMarkdownVideo({
     return () => {
       cancelled = true
     }
-  }, [absolutePath, active, runtimeContext])
+  }, [absolutePath, active, hostContext])
   const current = video && video.path === absolutePath ? video : undefined
   const title =
     alt?.trim() ||

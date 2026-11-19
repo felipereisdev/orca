@@ -41,6 +41,7 @@ import { useNativeChatMediaHref } from './use-native-chat-media-href'
 import { useNativeChatLinkClick } from '../../links/actions/native-chat-link-click-context'
 import { isNativeChatVideoPath } from '../../../../../../shared/native-chat/media/native-chat-video-path'
 import { NativeChatMarkdownVideo } from '../video/NativeChatMarkdownVideo'
+import { useAppStore } from '@/store'
 
 export const NativeChatMarkdownImageLinkContext = createContext<string | undefined>(undefined)
 const IMAGE_ACCESS = chatImageAccess()
@@ -52,6 +53,8 @@ type MarkdownImageProps = {
 
 export function NativeChatMarkdownImage(props: MarkdownImageProps): React.JSX.Element | null {
   const owner = useContext(NativeChatMarkdownImageOwnerContext)
+  // Global, not per workspace: a transcript can outlive the workspace that recorded its videos.
+  const videosEnabled = useAppStore((state) => state.settings?.experimentalEphemeralVms === true)
   if (!props.src) {
     return props.alt ? <span>{props.alt}</span> : null
   }
@@ -63,7 +66,7 @@ export function NativeChatMarkdownImage(props: MarkdownImageProps): React.JSX.El
     return <GitHubUserAttachmentImage src={props.src} alt={props.alt} />
   }
   const route = routeNativeChatHref(src)
-  if (route.kind === 'file' && isNativeChatVideoPath(route.pathText)) {
+  if (videosEnabled && route.kind === 'file' && isNativeChatVideoPath(route.pathText)) {
     return (
       <NativeChatMarkdownVideo key={[owner?.sessionId, src].join('\0')} src={src} alt={props.alt} />
     )

@@ -3315,7 +3315,8 @@
       "image": "image",
       "openImageHint": "Opens the image full size",
       "playVideoHint": "Downloads and plays the video",
-      "video": "Video"
+      "video": "Video",
+      "videoTooLarge": "Recording too large to play on the phone — open it on the computer"
     },
     "nativeChatToolLine": {
       "durationMilliseconds": "{{milliseconds}}ms",

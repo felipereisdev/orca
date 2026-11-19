@@ -4,7 +4,10 @@ import { Play } from 'lucide-react-native'
 import { MobileMediaPlayback } from '../../../../files/media/MobileMediaPlayback'
 import { mobileFileMediaMime } from '../../../../files/media/mobile-file-media'
 import { createMobileMediaSink } from '../../../../files/media/mobile-media-preview-cache'
-import type { MobileMediaSink } from '../../../../files/media/mobile-file-media-download'
+import {
+  MobileMediaTooLargeError,
+  type MobileMediaSink
+} from '../../../../files/media/mobile-file-media-download'
 import { formatPreviewByteLength } from '../../../../files/preview/mobile-file-preview-response'
 import { MobileNativeChatRowOverlaysContext } from '../message-actions/mobile-native-chat-row-overlays'
 import { downloadHostChatVideo } from '../../visual/mobile-native-chat-video-read'
@@ -18,6 +21,7 @@ type State =
   | { kind: 'loading'; bytes: number; total: number }
   | { kind: 'ready'; uri: string }
   | { kind: 'failed' }
+  | { kind: 'tooLarge' }
 
 /** A host video the agent named as an image; it downloads only once the user asks to play it. */
 export function MobileNativeChatVideoAttachment({
@@ -59,9 +63,9 @@ export function MobileNativeChatVideoAttachment({
           setState({ kind: 'ready', uri })
         }
       },
-      () => {
+      (error: unknown) => {
         if (!controller.signal.aborted) {
-          setState({ kind: 'failed' })
+          setState({ kind: error instanceof MobileMediaTooLargeError ? 'tooLarge' : 'failed' })
         }
       }
     )
@@ -74,6 +78,18 @@ export function MobileNativeChatVideoAttachment({
     return (
       <View style={styles.videoFrame}>
         <MobileMediaPlayback key={state.uri} uri={state.uri} mimeType={mimeType} title={label} />
+      </View>
+    )
+  }
+  if (state.kind === 'tooLarge') {
+    return (
+      <View style={styles.videoThumb} accessibilityLabel={label}>
+        <Text style={styles.videoThumbText}>
+          {t(
+            'chat.nativeChatProse.videoTooLarge',
+            'Recording too large to play on the phone — open it on the computer'
+          )}
+        </Text>
       </View>
     )
   }

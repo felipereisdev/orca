@@ -102,6 +102,14 @@ export function downloadMobileFileMedia(
 }
 
 /** Pages a media file into `sink` chunk by chunk, so no reply ever carries the whole file. */
+/** Past the phone's cap; checked from the stat before any byte is read. */
+export class MobileMediaTooLargeError extends Error {
+  constructor() {
+    super('Files larger than 256 MB cannot be previewed on mobile')
+    this.name = 'MobileMediaTooLargeError'
+  }
+}
+
 export async function downloadMobileMedia(
   source: MobileMediaByteSource,
   sink: MobileMediaSink,
@@ -116,7 +124,7 @@ export async function downloadMobileMedia(
       throw new Error('This file has no playable media')
     }
     if (stat.size > MOBILE_MEDIA_MAX_BYTES) {
-      throw new Error('Files larger than 256 MB cannot be previewed on mobile')
+      throw new MobileMediaTooLargeError()
     }
     let offset = 0
     while (offset < stat.size) {

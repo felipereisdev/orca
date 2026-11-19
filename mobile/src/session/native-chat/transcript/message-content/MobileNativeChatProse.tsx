@@ -1,5 +1,8 @@
 import { useNativeChatProseText } from '../../preferences/native-chat-text-settings'
-import { mobileNativeChatMarkdownImageBlock } from './mobile-native-chat-markdown-image-block'
+import {
+  mobileNativeChatMarkdownImageBlock,
+  mobileNativeChatMarkdownVideoPath
+} from './mobile-native-chat-markdown-image-block'
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { Image, Pressable, Text, View } from 'react-native'
 import { INLINE_TEXT_SELECTION } from '../../../../platform/text-selection/inline-text-selection'
@@ -26,7 +29,7 @@ import { useMobileColorScheme } from '../../../../theme/use-mobile-color-scheme'
 import { useMobileTranslation } from '../../../../i18n/use-mobile-translation'
 import { nativeChatHostStatusCopy } from '../notices/native-chat-notice-copy'
 import { pressedStyle } from '../../../../theme/mobile-theme'
-import { isNativeChatVideoPath } from '../../../../../../src/shared/native-chat/media/native-chat-video-path'
+import { useMobileEphemeralVmsEnabled } from '../../visual/mobile-ephemeral-vms-setting'
 import { MobileNativeChatVideoAttachment } from './MobileNativeChatVideoAttachment'
 
 /** A user message's text as Prose draws it: a Slack message's drawn form in place of the readable
@@ -71,23 +74,27 @@ export function Prose({
   useMobileColorScheme()
   const t = useMobileTranslation()
   const prose = useNativeChatProseText(fontScale)
+  const { imageSource } = useContext(MobileNativeChatRowOverlaysContext)
+  const videosEnabled = useMobileEphemeralVmsEnabled(imageSource?.client)
   const renderImage = useCallback(
     (href: string, alt: string): React.ReactNode => {
-      const image = mobileNativeChatMarkdownImageBlock(href, alt)
-      if (image?.path && isNativeChatVideoPath(image.path)) {
+      // Gated globally, not per workspace: a transcript can outlive the workspace that recorded it.
+      const videoPath = videosEnabled ? mobileNativeChatMarkdownVideoPath(href) : null
+      if (videoPath) {
         return (
           <MobileNativeChatVideoAttachment
-            path={image.path}
-            alt={image.alt}
+            path={videoPath}
+            alt={alt.trim() ? alt : undefined}
             onLongPress={onLongPress}
           />
         )
       }
+      const image = mobileNativeChatMarkdownImageBlock(href, alt)
       return image ? (
         <ImageAttachment block={image} fontScale={fontScale} onLongPress={onLongPress} />
       ) : null
     },
-    [fontScale, onLongPress]
+    [fontScale, onLongPress, videosEnabled]
   )
   if (isTextBlock(block)) {
     if (isAgentSessionHostStatusPresentation(block.presentation)) {

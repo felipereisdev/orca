@@ -6,8 +6,7 @@ import { isKnownRasterImageMimeType } from '../../../../../../src/shared/file-pr
 import { isSvgFilePath } from '../../../../../../src/shared/file-preview/svg-document'
 import { isNativeChatVideoPath } from '../../../../../../src/shared/native-chat/media/native-chat-video-path'
 
-/** Raster https, data and absolute-path images draw on the phone (paths through the chat's host), and
- *  absolute-path videos play there; anything else stays a link.
+/** Raster https, data and absolute-path images draw on the phone (paths through the chat's host); anything else stays a link.
  *  The shell's CSP refuses plain http, and React Native's Image cannot draw SVG. */
 export function mobileNativeChatMarkdownImageBlock(
   href: string,
@@ -28,7 +27,17 @@ export function mobileNativeChatMarkdownImageBlock(
   }
   return route.kind === 'file' &&
     isRuntimePathAbsolute(route.pathText) &&
-    (isRasterImagePath(route.pathText) || isNativeChatVideoPath(route.pathText))
+    isRasterImagePath(route.pathText)
     ? { type: 'image-ref', path: route.pathText, ...label }
+    : null
+}
+
+/** An absolute host video path a markdown image names, which plays inline; null for anything else. */
+export function mobileNativeChatMarkdownVideoPath(href: string): string | null {
+  const route = routeNativeChatHref(href.trim())
+  return route.kind === 'file' &&
+    isRuntimePathAbsolute(route.pathText) &&
+    isNativeChatVideoPath(route.pathText)
+    ? route.pathText
     : null
 }

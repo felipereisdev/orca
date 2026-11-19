@@ -3,6 +3,7 @@ import {
   downloadMobileMedia,
   mediaFileChunkSchema,
   mediaFileStatSchema,
+  MobileMediaTooLargeError,
   type MobileMediaByteSource,
   type MobileMediaSink
 } from '../../../files/media/mobile-file-media-download'
@@ -149,7 +150,8 @@ export async function downloadHostChatVideo(
     )
   } catch (error) {
     const recordingId = desktopRecordingIdFromPath(path)
-    if (!recordingId || signal.aborted) {
+    // The Mac's copy is the same size, so it is no way around the cap.
+    if (!recordingId || signal.aborted || error instanceof MobileMediaTooLargeError) {
       throw error
     }
     return downloadMobileMedia(

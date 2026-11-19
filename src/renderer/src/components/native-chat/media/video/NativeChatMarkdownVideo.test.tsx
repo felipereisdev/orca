@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../images/native-chat-markdown-image-owner'
+import { useAppStore } from '@/store'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 
 const mocks = vi.hoisted(() => ({
   readNativeChatVideoSrc: vi.fn(),
@@ -30,17 +32,26 @@ const owner = {
   sessionId: 'session-1'
 }
 
-function Transcript({ content }: { content: string }) {
+type Owner = typeof owner | { fileLinkContext: null; runtimeContext: null; isVisible: boolean }
+
+function Transcript({ content, value = owner }: { content: string; value?: Owner }) {
   return (
     <TooltipProvider>
-      <NativeChatMarkdownImageOwnerContext.Provider value={owner}>
+      <NativeChatMarkdownImageOwnerContext.Provider value={value}>
         <NativeChatMarkdown content={content} variant="document" />
       </NativeChatMarkdownImageOwnerContext.Provider>
     </TooltipProvider>
   )
 }
 
+function setExperiment(enabled: boolean): void {
+  useAppStore.setState({
+    settings: { ...getDefaultSettings('/tmp/orca-test'), experimentalEphemeralVms: enabled }
+  })
+}
+
 beforeEach(() => {
+  setExperiment(true)
   vi.stubGlobal('IntersectionObserver', undefined)
   mocks.readNativeChatVideoSrc.mockResolvedValue({
     url: 'orca-media://file/env-copy',
@@ -81,5 +92,31 @@ describe('video in a chat message', () => {
       expect(container.querySelector('video')).toHaveAttribute('src', 'orca-media://file/mac-copy')
     )
     expect(mocks.readDesktopRecordingCopy).toHaveBeenCalledWith(RECORDING)
+  })
+
+  it('a retained transcript with no runtime context still plays from the Mac copy', async () => {
+    // The workspace is gone: its route no longer resolves, so the owner has no context.
+    const { container } = render(
+      <Transcript
+        value={{ fileLinkContext: null, runtimeContext: null, isVisible: true }}
+        content={`![Gravação do teste](<${RECORDING}>)`}
+      />
+    )
+
+    await waitFor(() =>
+      expect(container.querySelector('video')).toHaveAttribute('src', 'orca-media://file/env-copy')
+    )
+    expect(mocks.readNativeChatVideoSrc).toHaveBeenCalledWith(null, RECORDING)
+  })
+
+  it('renders a video link as before while the environments experiment is off', async () => {
+    setExperiment(false)
+    const { container } = render(<Transcript content={`![Gravação do teste](<${RECORDING}>)`} />)
+
+    await waitFor(() =>
+      expect(container.querySelector('[role="status"], img, button')).not.toBeNull()
+    )
+    expect(container.querySelector('video')).toBeNull()
+    expect(mocks.readNativeChatVideoSrc).not.toHaveBeenCalled()
   })
 })
