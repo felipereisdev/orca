@@ -87,6 +87,35 @@ describe('recipe removal acknowledgements', () => {
     })
   })
 
+  it('cancelling overlapping removal sessions releases each of their recording fences', async () => {
+    const heldFences = new Set<string>()
+    const createFence = (id: string) => ({
+      hold: async () => {
+        heldFences.add(id)
+        return true
+      },
+      release: async () => {
+        heldFences.delete(id)
+      },
+      mayBeHeld: () => heldFences.has(id)
+    })
+    const first = createFence('first')
+    const second = createFence('second')
+    await first.hold()
+    await second.hold()
+    const firstAck = issueRecipeRemovalAck(binding, true, 'session-first', 'unknown', first)
+    const secondAck = issueRecipeRemovalAck(binding, true, 'session-second', 'unknown', second)
+    expect(claimRecipeRemovalAck(firstAck, binding)).toEqual({ ok: true })
+    expect(claimRecipeRemovalAck(secondAck, binding)).toEqual({ ok: true })
+
+    await revokeRecipeRemovalSession('session-first')
+    const heldAfterFirstCancel = [...heldFences]
+    await revokeRecipeRemovalSession('session-second')
+
+    expect(heldAfterFirstCancel).toEqual(['second'])
+    expect([...heldFences]).toEqual([])
+  })
+
   it('a copy that finishes after its session was revoked gets an ack that authorizes nothing', () => {
     revokeRecipeRemovalSession('session-late')
     const late = issueRecipeRemovalAck(binding, true, 'session-late')

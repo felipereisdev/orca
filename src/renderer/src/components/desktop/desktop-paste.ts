@@ -2,6 +2,18 @@ import { keysymForCodePoint } from '../../../../shared/desktop-keysyms'
 
 const XK_CONTROL_L = 0xffe3
 const XK_V = 0x0076
+const MODIFIER_KEYSYMS = [
+  XK_CONTROL_L,
+  0xffe4,
+  0xffe1,
+  0xffe2,
+  0xffe9,
+  0xffea,
+  0xffe7,
+  0xffe8,
+  0xffeb,
+  0xffec
+]
 
 /** The parts of noVNC's RFB client a paste uses; both send nothing while it is view-only. */
 export type DesktopPasteTarget = {
@@ -16,6 +28,10 @@ export type DesktopPasteTarget = {
 export function pasteIntoDesktop(rfb: DesktopPasteTarget, text: string): void {
   if (!text) {
     return
+  }
+  // noVNC may have already forwarded the paste shortcut's modifier keydown.
+  for (const keysym of MODIFIER_KEYSYMS) {
+    rfb.sendKey(keysym, '', false)
   }
   if (/[\u0100-\u{10ffff}]/u.test(text)) {
     for (const character of text.replace(/\r\n?/g, '\n')) {
