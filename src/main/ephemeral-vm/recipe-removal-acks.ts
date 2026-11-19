@@ -38,6 +38,12 @@ const claims = new Map<
   RecipeRemovalAckBinding & Session & { ack: string; adopted: boolean; expiresAt: number }
 >()
 
+/**
+ * Dialog sessions already closed, until a claim from them would have expired: work still in flight
+ * for one (a copy) must not mint an ack after the cancel.
+ */
+const revokedSessions = new Map<string, number>()
+
 function recordKey(runtimeId: string, createdAt: number): string {
   return `${runtimeId}\0${createdAt}`
 }
@@ -49,6 +55,11 @@ function live(ack: string) {
       if (entry.expiresAt <= now) {
         store.delete(key)
       }
+    }
+  }
+  for (const [sessionId, expiresAt] of revokedSessions) {
+    if (expiresAt <= now) {
+      revokedSessions.delete(sessionId)
     }
   }
   return acks.get(ack)
@@ -69,6 +80,9 @@ export function issueRecipeRemovalAck(
 ): string {
   live('')
   const ack = randomBytes(16).toString('hex')
+  if (sessionId && revokedSessions.has(sessionId)) {
+    return ack
+  }
   acks.set(ack, {
     ...binding,
     ...(sessionId ? { sessionId } : {}),
@@ -106,6 +120,7 @@ export function revokeRecipeRemovalAck(ack: string): void {
 
 /** The dialog closed or retargeted: its answers and every claim the store didn't adopt end. */
 export function revokeRecipeRemovalSession(sessionId: string): void {
+  revokedSessions.set(sessionId, Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS)
   for (const [ack, entry] of acks) {
     if (entry.sessionId === sessionId) {
       acks.delete(ack)

@@ -87,6 +87,14 @@ describe('recipe removal acknowledgements', () => {
     })
   })
 
+  it('a copy that finishes after its session was revoked gets an ack that authorizes nothing', () => {
+    revokeRecipeRemovalSession('session-late')
+    const late = issueRecipeRemovalAck(binding, true, 'session-late')
+    expect(confirmRecipeRemovalAck(late)).toBe(false)
+    expect(claimRecipeRemovalAck(late, binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+    expect(() => consumeRecipeRemovalAck(late, runtime)).toThrow('not confirmed')
+  })
+
   it('a claim the store adopted outlives its session; other sessions cannot adopt it', () => {
     const ack = issueRecipeRemovalAck(binding, true, 'session-b')
     expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
