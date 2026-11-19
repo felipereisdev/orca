@@ -11,6 +11,7 @@ import {
   claimRecipeRemovalAck,
   confirmRecipeRemovalAck,
   issueRecipeRemovalAck,
+  releaseRecipeRemovalClaim,
   revokeRecipeRemovalAck
 } from './recipe-removal-acks'
 import { currentRecipeOwner } from './recipe-removal-target'
@@ -22,6 +23,7 @@ const ClaimArgs = z.object({
   hostId: z.string().min(1),
   workspaceId: z.string().min(1)
 })
+const ReleaseArgs = ClaimArgs.omit({ ack: true })
 const RollbackArgs = z.object({ runtimeId: z.string().min(1) })
 
 /** Holds the workspace's environment for the removal that is about to delete its checkout. */
@@ -87,6 +89,7 @@ export function registerRecipeRemovalAckHandlers(store: DesktopSettingsSource): 
     'ephemeralVm:confirmRemoval',
     'ephemeralVm:revokeRemoval',
     'ephemeralVm:claimRemoval',
+    'ephemeralVm:releaseRemoval',
     'ephemeralVm:rollbackRemovalAck'
   ]) {
     ipcMain.removeHandler(channel)
@@ -100,6 +103,10 @@ export function registerRecipeRemovalAckHandlers(store: DesktopSettingsSource): 
   ipcMain.handle('ephemeralVm:claimRemoval', (_event, args: unknown) =>
     claimRecipeRemoval(store, app.getPath('userData'), args)
   )
+  ipcMain.handle('ephemeralVm:releaseRemoval', (_event, args: unknown) => {
+    const { hostId, workspaceId } = ReleaseArgs.parse(args)
+    releaseRecipeRemovalClaim(hostId, workspaceId)
+  })
   ipcMain.handle('ephemeralVm:rollbackRemovalAck', (_event, args: unknown) =>
     rollbackRecipeRemovalAck(app.getPath('userData'), args)
   )

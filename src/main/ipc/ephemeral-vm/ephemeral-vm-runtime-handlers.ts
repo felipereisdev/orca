@@ -12,6 +12,7 @@ import {
 } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store-events'
 import type { EphemeralVmRuntimeRecord } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { cleanupOwnedEphemeralVmRuntime } from '../../ephemeral-vm/owned-runtime-cleanup'
+import { listRuntimesForRemoval } from '../../ephemeral-vm/removal-runtime-match'
 import { stopEphemeralVmRuntimeCleanup } from '../../ephemeral-vm/runtime-cleanup-control'
 import {
   buildEphemeralVmRecipeCleanupCommand,
@@ -141,9 +142,14 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
     listCredentialLikeEnvNames(process.env)
   )
 
-  ipcMain.handle('ephemeralVm:listRuntimes', (): EphemeralVmRuntimeRecord[] => {
-    return listEphemeralVmRuntimes(app.getPath('userData'))
-  })
+  // With a filter, main picks the records a removal destroys; the renderer never filters them.
+  ipcMain.handle(
+    'ephemeralVm:listRuntimes',
+    (_event, filter: unknown): EphemeralVmRuntimeRecord[] | Promise<EphemeralVmRuntimeRecord[]> =>
+      filter === undefined
+        ? listEphemeralVmRuntimes(app.getPath('userData'))
+        : listRuntimesForRemoval(app.getPath('userData'), filter)
+  )
 
   ipcMain.handle(
     'ephemeralVm:attachWorkspace',

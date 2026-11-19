@@ -21,7 +21,7 @@ export const ephemeralVmApi = {
     ipcRenderer.on('ephemeralVm:provisionEvent', listener)
     return () => ipcRenderer.removeListener('ephemeralVm:provisionEvent', listener)
   },
-  listRuntimes: () => ipcRenderer.invoke('ephemeralVm:listRuntimes'),
+  listRuntimes: (filter) => ipcRenderer.invoke('ephemeralVm:listRuntimes', filter),
   attachWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:attachWorkspace', args),
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
   suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
@@ -36,6 +36,7 @@ export const ephemeralVmApi = {
   confirmRemoval: (args) => ipcRenderer.invoke('ephemeralVm:confirmRemoval', args),
   revokeRemoval: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemoval', args),
   claimRemoval: (args) => ipcRenderer.invoke('ephemeralVm:claimRemoval', args),
+  releaseRemoval: (args) => ipcRenderer.invoke('ephemeralVm:releaseRemoval', args),
   rollbackRemovalAck: (args) => ipcRenderer.invoke('ephemeralVm:rollbackRemovalAck', args),
   copyRecordingsBeforeRemoval: (args) =>
     ipcRenderer.invoke('ephemeralVm:copyRecordingsBeforeRemoval', args),

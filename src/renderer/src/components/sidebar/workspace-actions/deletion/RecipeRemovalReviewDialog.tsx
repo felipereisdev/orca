@@ -36,7 +36,7 @@ export function RecipeRemovalReviewDialog(): JSX.Element | null {
         <RecipeRemovalResultsPanel
           results={review.results}
           single={review.single}
-          onRemove={(acks) => review.settle(acks)}
+          onRemove={async (acks) => review.settle(acks)}
           onBusyChange={setCopying}
         />
       </DialogContent>

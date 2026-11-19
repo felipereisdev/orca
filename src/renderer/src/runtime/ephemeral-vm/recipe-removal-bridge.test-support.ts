@@ -42,9 +42,10 @@ export function recipeRemovalBridge(runtimes: EphemeralVmRuntimeRecord[]) {
       ok: true,
       required: true
     })),
+    releaseRemoval: vi.fn(async (_args: { hostId: string; workspaceId: string }) => {}),
     rollbackRemovalAck: vi.fn(async () => ''),
     copyRecordingsBeforeRemoval: vi.fn(),
-    listRuntimes: vi.fn(async () => runtimes),
+    listRuntimes: vi.fn(async (_filter?: unknown) => runtimes),
     cleanup: vi.fn(async (args: { runtimeId: string; ack: string }) => ({
       ...(runtimes.find((runtime) => runtime.id === args.runtimeId) ?? recipeRuntime({})),
       status: 'cleaned',

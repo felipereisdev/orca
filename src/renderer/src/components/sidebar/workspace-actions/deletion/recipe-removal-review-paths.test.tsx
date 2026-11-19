@@ -94,6 +94,36 @@ describe('removals outside the delete dialog review recipe work first', () => {
     })
   })
 
+  it('a Cloud VMs review copies the recordings by runtime id, then destroys', async () => {
+    const recording = { id: 'aaaaaaaaaaaaaaaa', path: '/rec/a.mp4', bytes: 10 }
+    bridge.ephemeralVm.removalPreflight.mockResolvedValue({
+      status: 'unsafe',
+      recordingsNotCopied: [recording],
+      dirtyFiles: 0,
+      unpushedCommits: 0,
+      ack: 'ack-unsafe'
+    })
+    bridge.ephemeralVm.copyRecordingsBeforeRemoval.mockResolvedValue({
+      ok: true,
+      copied: 1,
+      ack: 'ack-copy'
+    })
+    render(
+      <TooltipProvider>
+        <EphemeralVmRuntimesSection />
+      </TooltipProvider>
+    )
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
+    await settle()
+    expect(bridge.ephemeralVm.copyRecordingsBeforeRemoval).toHaveBeenCalledWith({
+      runtimeId: 'vm-a'
+    })
+    expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'vm-a', ack: 'ack-copy' })
+  })
+
   it('cancelling the Cloud VMs review revokes its ack, and a retry reviews again', async () => {
     render(
       <TooltipProvider>
@@ -165,6 +195,10 @@ describe('removals outside the delete dialog review recipe work first', () => {
       useAppStore.getState().removeProject
     )
     await removeAnywayFromReview()
+    // Main picks the records by the target; the renderer only names it.
+    expect(bridge.ephemeralVm.listRuntimes).toHaveBeenCalledWith(
+      expect.objectContaining({ runtimeOwnedSshTargetIds: [TARGET] })
+    )
     expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({
       runtimeId: 'vm-a',
       ack: 'ack-unsafe'

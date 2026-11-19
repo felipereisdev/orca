@@ -4,6 +4,7 @@ import {
   confirmRecipeRemovalAck,
   consumeRecipeRemovalAck,
   issueRecipeRemovalAck,
+  releaseRecipeRemovalClaim,
   revokeRecipeRemovalAck
 } from './recipe-removal-acks'
 
@@ -53,8 +54,25 @@ describe('recipe removal acknowledgements', () => {
 
     const claimed = issueRecipeRemovalAck(binding, true)
     expect(claimRecipeRemovalAck(claimed, binding)).toEqual({ ok: true })
-    vi.setSystemTime(Date.now() + 9 * 60_000)
+    // Checkout removal and its polling can take long; only the destroy or a release ends a claim.
+    vi.setSystemTime(Date.now() + 59 * 60_000)
     expect(() => consumeRecipeRemovalAck(claimed, runtime)).not.toThrow()
+  })
+
+  it('cancelling a decision revokes the claim already made from it', () => {
+    const ack = issueRecipeRemovalAck(binding, false)
+    expect(confirmRecipeRemovalAck(ack)).toBe(true)
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    revokeRecipeRemovalAck(ack)
+    expect(claimRecipeRemovalAck('', binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+  })
+
+  it('a removal that failed after its claim releases it', () => {
+    const ack = issueRecipeRemovalAck(binding, true)
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    releaseRecipeRemovalClaim(binding.hostId, binding.workspaceId)
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
   })
 
   it('refuses an ack issued for another runtime instance, host or workspace', () => {

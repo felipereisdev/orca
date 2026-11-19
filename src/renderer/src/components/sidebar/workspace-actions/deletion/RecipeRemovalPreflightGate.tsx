@@ -3,10 +3,7 @@ import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
 import { DialogCancel } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
-import {
-  claimRecipeRemovalAcks,
-  type RecipeRemovalAcks
-} from '@/runtime/ephemeral-vm/recipe-removal-preflights'
+import type { RecipeRemovalAcks } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { RecipeRemovalResultsPanel } from './RecipeRemovalPanels'
 import { useRecipeRemovalPreflight } from './use-recipe-removal-preflight'
 
@@ -28,7 +25,7 @@ export function RecipeRemovalPreflightGate({
   children: ReactNode
 }): JSX.Element {
   const t = useTranslate()
-  const { check, refresh } = useRecipeRemovalPreflight(targets)
+  const { check, refresh, claim } = useRecipeRemovalPreflight(targets)
   if (check.kind === 'loading') {
     return (
       <>
@@ -52,10 +49,13 @@ export function RecipeRemovalPreflightGate({
   }
   // The decision is claimed now, right before the removal starts; an answer that expired or whose
   // environment changed meanwhile is checked again and shown again unless it is now clean.
-  const removeWith = (acks: RecipeRemovalAcks): void => {
-    void claimRecipeRemovalAcks(check.candidates, acks).then((claimed) =>
-      claimed ? onRemove() : refresh()
-    )
+  const removeWith = async (acks: RecipeRemovalAcks): Promise<void> => {
+    const outcome = await claim(acks)
+    if (outcome === 'claimed') {
+      onRemove()
+    } else if (outcome === 'refused') {
+      refresh()
+    }
   }
   return (
     <RecipeRemovalResultsPanel

@@ -142,6 +142,19 @@ function rpcFailure(response: Extract<RuntimeRpcResponse<unknown>, { ok: false }
   )
 }
 
+type RecipeWorkspaceRemovalPorts = {
+  call: (
+    environmentId: string,
+    method: string,
+    params: unknown
+  ) => Promise<RuntimeRpcResponse<unknown>>
+  cleanup: (runtimeId: string, ack: string) => Promise<EphemeralVmRuntimeRecord>
+  /** Checks the workspace first: its ack when clean; refuses when work isn't safe yet. */
+  confirm: () => Promise<string>
+  /** Ends the claim `confirm` made, once this removal will not destroy (a no-op after it did). */
+  release: () => void
+}
+
 /**
  * The provisioning host runs the destroy; the environment's own Orca still owns Git and process
  * teardown. Only a positive answer from the environment counts as removed, and the destroy runs
@@ -150,16 +163,7 @@ function rpcFailure(response: Extract<RuntimeRpcResponse<unknown>, { ok: false }
 export async function removeRecipeWorkspace(
   userDataPath: string,
   params: RecipeWorkspaceRemoveParams,
-  ports: {
-    call: (
-      environmentId: string,
-      method: string,
-      params: unknown
-    ) => Promise<RuntimeRpcResponse<unknown>>
-    cleanup: (runtimeId: string, ack: string) => Promise<EphemeralVmRuntimeRecord>
-    /** Checks the workspace first: its ack when clean; refuses when work isn't safe yet. */
-    confirm: () => Promise<string>
-  },
+  ports: RecipeWorkspaceRemovalPorts,
   /** Orders the destroy behind the workspace's in-flight VM wake or suspend. */
   orderDestroy: <T>(destroy: () => Promise<T>) => Promise<T> = (destroy) => destroy(),
   waitForRemoval: CheckoutRemovalWait = DEFAULT_CHECKOUT_REMOVAL_WAIT
@@ -171,6 +175,38 @@ export async function removeRecipeWorkspace(
   const environmentId = runtime.runtimeEnvironmentId
   // Before anything is removed: a phone can't review unsafe work, so only a clean check goes on.
   const ack = await ports.confirm()
+  try {
+    return await removeCheckoutThenDestroy({
+      runtime,
+      environmentId,
+      params,
+      ack,
+      ports,
+      orderDestroy,
+      waitForRemoval
+    })
+  } finally {
+    ports.release()
+  }
+}
+
+async function removeCheckoutThenDestroy({
+  runtime,
+  environmentId,
+  params,
+  ack,
+  ports,
+  orderDestroy,
+  waitForRemoval
+}: {
+  runtime: EphemeralVmRuntimeRecord
+  environmentId: string
+  params: RecipeWorkspaceRemoveParams
+  ack: string
+  ports: Pick<RecipeWorkspaceRemovalPorts, 'call' | 'cleanup'>
+  orderDestroy: <T>(destroy: () => Promise<T>) => Promise<T>
+  waitForRemoval: CheckoutRemovalWait
+}): Promise<RecipeWorkspaceRemoval> {
   const { destroyHost: _destroyHost, ...forwarded } = params
   let checkoutResult: Record<string, unknown> = {}
   // A provisioned root is the VM's primary checkout, protected from ordinary Git deletion.

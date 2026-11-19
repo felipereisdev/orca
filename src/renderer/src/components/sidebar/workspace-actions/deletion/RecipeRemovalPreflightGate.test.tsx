@@ -6,9 +6,16 @@ import { useAppStore } from '@/store'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import type {
   RecipeRemovalCheckResult,
-  RecipeRemovalCopyResult,
-  RecipeRemovalPreflight
+  RecipeRemovalClaimResult,
+  RecipeRemovalCopyResult
 } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import {
+  claimRecipeRemovalAck,
+  confirmRecipeRemovalAck,
+  consumeRecipeRemovalAck,
+  issueRecipeRemovalAck,
+  revokeRecipeRemovalAck
+} from '../../../../../../main/ephemeral-vm/recipe-removal-acks'
 import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 
 const WORKSPACE = 'repo::/workspace/repo-task'
@@ -24,9 +31,12 @@ const OTHER_TASK = {
 type Workspace = { id: string; hostId: string; displayName: string }
 
 const api = {
-  confirmRemoval: vi.fn(async () => true),
-  revokeRemoval: vi.fn(async () => {}),
-  claimRemoval: vi.fn(async () => ({ ok: true as const, required: true as const })),
+  confirmRemoval: vi.fn(async (_args: { ack: string }) => true),
+  revokeRemoval: vi.fn(async (_args: { ack: string }) => {}),
+  claimRemoval: vi.fn(async (_args: { ack: string }): Promise<RecipeRemovalClaimResult> => ({
+    ok: true,
+    required: true
+  })),
   removalPreflight: vi.fn<(args: unknown) => Promise<RecipeRemovalCheckResult | null>>(),
   copyRecordingsBeforeRemoval: vi.fn<(args: unknown) => Promise<RecipeRemovalCopyResult>>()
 }
@@ -57,7 +67,7 @@ function seed(options: { experiment?: boolean; recipe?: boolean } = {}): void {
   })
 }
 
-function preflight(overrides: Partial<RecipeRemovalPreflight>): RecipeRemovalCheckResult {
+function preflight(overrides: Partial<RecipeRemovalCheckResult>): RecipeRemovalCheckResult {
   return {
     ack: 'ack-1',
     status: 'clean',
@@ -96,6 +106,9 @@ describe('RecipeRemovalPreflightGate', () => {
     window.api = { ...window.api, ephemeralVm: { ...window.api?.ephemeralVm, ...api } }
     api.removalPreflight.mockReset()
     api.copyRecordingsBeforeRemoval.mockReset()
+    api.confirmRemoval.mockClear()
+    api.revokeRemoval.mockClear()
+    api.claimRemoval.mockClear()
     seed()
   })
   afterEach(() => {
@@ -253,5 +266,79 @@ describe('RecipeRemovalPreflightGate', () => {
     expect(api.confirmRemoval).toHaveBeenCalled()
     expect(api.claimRemoval).toHaveBeenCalled()
     expect(onRemove).toHaveBeenCalledTimes(1)
+  })
+
+  describe('with main deciding the acks', () => {
+    const binding = {
+      hostId: 'runtime:env-a',
+      workspaceId: WORKSPACE,
+      runtimeId: 'vm-a',
+      runtimeCreatedAt: 1
+    }
+    const record = { id: 'vm-a', createdAt: 1, hostIds: ['runtime:env-a'], workspaceId: WORKSPACE }
+    let replyToClaim: () => void = () => {}
+
+    beforeEach(() => {
+      api.removalPreflight.mockResolvedValue(
+        preflight({
+          status: 'unsafe',
+          unpushedCommits: 1,
+          ack: issueRecipeRemovalAck(binding, false)
+        })
+      )
+      api.confirmRemoval.mockImplementation(async ({ ack }) => confirmRecipeRemovalAck(ack))
+      api.revokeRemoval.mockImplementation(async ({ ack }) => revokeRecipeRemovalAck(ack))
+      // Main records the claim at once; its reply reaches the renderer only when the test says.
+      api.claimRemoval.mockImplementation(async ({ ack }) => {
+        const claimed = claimRecipeRemovalAck(ack, binding)
+        await new Promise<void>((resolve) => {
+          replyToClaim = resolve
+        })
+        return claimed.ok ? { ok: true, required: true } : claimed
+      })
+    })
+    afterEach(() => {
+      api.confirmRemoval.mockReset().mockResolvedValue(true)
+      api.revokeRemoval.mockReset().mockResolvedValue(undefined)
+      api.claimRemoval.mockReset().mockResolvedValue({ ok: true, required: true })
+    })
+
+    it('closing while the claim is in flight never removes, and the destroy refuses', async () => {
+      const onRemove = vi.fn()
+      const onBusyChange = vi.fn()
+      const view = render(
+        <Harness targets={[TASK]} onRemove={onRemove} onBusyChange={onBusyChange} />
+      )
+      await act(async () => {})
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+      })
+      // Still busy while the claim is out, so the dialog can't be dismissed under it.
+      expect(api.claimRemoval).toHaveBeenCalled()
+      expect(onBusyChange).toHaveBeenLastCalledWith(true)
+
+      view.rerender(<Harness targets={null} onRemove={onRemove} onBusyChange={onBusyChange} />)
+      await act(async () => {
+        replyToClaim()
+      })
+      expect(onRemove).not.toHaveBeenCalled()
+      expect(() => consumeRecipeRemovalAck('', record)).toThrow('not confirmed')
+    })
+
+    it('a claimed decision outlives the dialog closing, for the destroy that follows', async () => {
+      const onRemove = vi.fn()
+      const view = render(<Harness targets={[TASK]} onRemove={onRemove} />)
+      await act(async () => {})
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+      })
+      await act(async () => {
+        replyToClaim()
+      })
+      expect(onRemove).toHaveBeenCalledTimes(1)
+      view.rerender(<Harness targets={null} onRemove={onRemove} />)
+      await act(async () => {})
+      expect(() => consumeRecipeRemovalAck('', record)).not.toThrow()
+    })
   })
 })

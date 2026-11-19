@@ -90,6 +90,8 @@ export function createRemoveWorktree(
       }
     }))
 
+    // Set while this removal holds its recipe environment but hasn't deleted the checkout yet.
+    let releaseClaim: (() => void) | null = null
     try {
       // forget-local touches no remote/archive hooks; read current trust so concurrent same-repo deletes share one approval.
       const skipArchive = policy.forgetLocalOnly
@@ -119,7 +121,9 @@ export function createRemoveWorktree(
       if (unprovableRemoteRouting) {
         throw new Error(unprovableRemoteRouting)
       }
-      await authorizeWorktreeRemoval(get, removalTarget, worktreeBeforeRemoval)
+      releaseClaim = await authorizeWorktreeRemoval(get, removalTarget, () =>
+        findWorktreeOnConfirmedHost(get, worktreeId, requiredExecutionHostId)
+      )
       let removalResult: RemoveWorktreeResult
       let snapshotPruneHandledByLocalMain = policy.forgetLocalOnly || target.kind === 'local'
       try {
@@ -170,6 +174,8 @@ export function createRemoveWorktree(
         }
       }
 
+      // The checkout is gone; the environment's destroy spends the claim from here.
+      releaseClaim = null
       retireRemovedWorktreeCommitDrafts(worktreeId, requiredExecutionHostId ?? hostId)
       beforeRemoval = retireWorktreeDraftOwners(beforeRemoval)
 
@@ -283,6 +289,7 @@ export function createRemoveWorktree(
           }
         : { ok: true as const }
     } catch (err) {
+      releaseClaim?.()
       // Why: git refusing a non-force delete for dirty/untracked files is a handled user decision, not an app error.
       console.warn('Failed to remove worktree:', err)
       // Strip IPC/channel wrappers so the user-facing refusal leads the toast.

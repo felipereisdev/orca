@@ -1,10 +1,7 @@
 import {
   isRuntimeOwnedSshTargetId,
-  toRuntimeExecutionHostId,
-  toSshExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host/execution-host'
-import { composeWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import { reviewRecipeRemoval } from './recipe-removal-preflights'
 import { refreshRuntimeEnvironmentCatalog } from '@/runtime/rpc/environment-revisions/runtime-environment-pairing-refresh'
 
@@ -34,37 +31,12 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
   const destroyedSshTargetIds = new Set<string>()
   const retainedSshTargetIds = new Set<string>()
   try {
-    const workspaceIdSet = new Set(args.workspaceIds ?? [])
-    const sshTargetIdSet = new Set(
-      (args.runtimeOwnedSshTargetIds ?? []).filter((id) => isRuntimeOwnedSshTargetId(id))
-    )
-    const hostScopedWorkspaceIdentities = new Set(
-      (args.hostScopedWorkspaces ?? []).map((target) =>
-        composeWorktreeHostIdentity(target.executionHostId, target.workspaceId)
-      )
-    )
-    const runtimes = await window.api.ephemeralVm.listRuntimes()
-    const matchingRuntimes = runtimes.filter(
-      (runtime) =>
-        (runtime.cleanupStatus !== 'succeeded' || runtime.sshTargetId !== undefined) &&
-        ((runtime.workspaceId !== undefined && workspaceIdSet.has(runtime.workspaceId)) ||
-          (runtime.workspaceId !== undefined &&
-            ((runtime.runtimeEnvironmentId !== undefined &&
-              hostScopedWorkspaceIdentities.has(
-                composeWorktreeHostIdentity(
-                  toRuntimeExecutionHostId(runtime.runtimeEnvironmentId),
-                  runtime.workspaceId
-                )
-              )) ||
-              (runtime.sshTargetId !== undefined &&
-                hostScopedWorkspaceIdentities.has(
-                  composeWorktreeHostIdentity(
-                    toSshExecutionHostId(runtime.sshTargetId),
-                    runtime.workspaceId
-                  )
-                )))) ||
-          (runtime.sshTargetId !== undefined && sshTargetIdSet.has(runtime.sshTargetId)))
-    )
+    // Main matches the records by what the removal names; the renderer filters nothing.
+    const matchingRuntimes = await window.api.ephemeralVm.listRuntimes({
+      workspaceIds: args.workspaceIds ?? [],
+      hostScopedWorkspaces: args.hostScopedWorkspaces ?? [],
+      runtimeOwnedSshTargetIds: args.runtimeOwnedSshTargetIds ?? []
+    })
     // Main lists these records itself, so an empty workspace list never skips a check.
     const acks = args.review
       ? await reviewRecipeRemoval(

@@ -425,7 +425,7 @@ describe('registerEphemeralVmHandlers', () => {
       }
 
       async function statusOf(runtimeId: string): Promise<string | undefined> {
-        const runtimes = await invokeHandler<Record[]>('ephemeralVm:listRuntimes', {})
+        const runtimes = await invokeHandler<Record[]>('ephemeralVm:listRuntimes', undefined)
         return runtimes.find((runtime) => runtime.id === runtimeId)?.status
       }
 

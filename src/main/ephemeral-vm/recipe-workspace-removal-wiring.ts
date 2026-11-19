@@ -5,6 +5,7 @@ import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/run
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { cleanupOwnedEphemeralVmRuntime } from './owned-runtime-cleanup'
 import { confirmPhoneRecipeRemoval } from './phone-recipe-removal-confirmation'
+import { releaseRecipeRemovalClaim } from './recipe-removal-acks'
 import {
   describeRecipeWorkspaceEnvironments,
   ownsRecipeWorkspaceRemoval,
@@ -48,7 +49,9 @@ export function wireRecipeWorkspaceRemoval(
                 confirmPhoneRecipeRemoval(store, userDataPath(), {
                   hostId: params.hostId ?? '',
                   workspaceId: params.worktree.slice('id:'.length)
-                })
+                }),
+              release: () =>
+                releaseRecipeRemovalClaim(params.hostId ?? '', params.worktree.slice('id:'.length))
             },
             orderDestroy
           )

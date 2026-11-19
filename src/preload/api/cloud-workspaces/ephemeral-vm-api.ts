@@ -74,7 +74,12 @@ export type EphemeralVmApi = {
   onProvisionEvent: (
     callback: (event: { provisionId: string; stream: 'stdout' | 'stderr'; chunk: string }) => void
   ) => () => void
-  listRuntimes: () => Promise<EphemeralVmRuntimeRecord[]>
+  /** Every record, or with a filter only those a removal naming them destroys (main matches them). */
+  listRuntimes: (filter?: {
+    workspaceIds?: readonly string[]
+    hostScopedWorkspaces?: readonly { workspaceId: string; executionHostId: string }[]
+    runtimeOwnedSshTargetIds?: readonly string[]
+  }) => Promise<EphemeralVmRuntimeRecord[]>
   attachWorkspace: (args: {
     runtimeId: string
     workspaceId: string
@@ -94,14 +99,16 @@ export type EphemeralVmApi = {
   removalPreflight: (args: RecipeRemovalCheckRequest) => Promise<RecipeRemovalCheckResult | null>
   /** The user chose to remove after an unsafe or unchecked answer; false when the ack is gone. */
   confirmRemoval: (args: { ack: string }) => Promise<boolean>
-  /** Cancel or close: the answer's ack authorizes nothing afterwards. */
+  /** Cancel or close: the answer's ack, and any claim made from it, authorize nothing afterwards. */
   revokeRemoval: (args: { ack: string }) => Promise<void>
   /** Right before deleting the checkout: holds the environment for this removal's destroy. */
   claimRemoval: (args: RecipeRemovalTarget & { ack: string }) => Promise<RecipeRemovalClaimResult>
+  /** The removal failed after its claim: the environment is no longer held for a destroy. */
+  releaseRemoval: (args: RecipeRemovalTarget) => Promise<void>
   /** The ack a failed create's rollback needs; empty unless main knows it never held a workspace. */
   rollbackRemovalAck: (args: { runtimeId: string }) => Promise<string>
   /** Copies its pending recordings to this Mac; only `ok: true` may be followed by the removal. */
-  copyRecordingsBeforeRemoval: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCopyResult>
+  copyRecordingsBeforeRemoval: (args: RecipeRemovalCheckRequest) => Promise<RecipeRemovalCopyResult>
   /** Drops an interrupted write-ahead record that never received a recipe result. */
   forgetRuntime: (args: { runtimeId: string }) => Promise<void>
   getCleanupCommand: (args: { runtimeId: string }) => Promise<{

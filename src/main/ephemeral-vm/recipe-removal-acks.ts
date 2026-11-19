@@ -3,8 +3,8 @@ import { RecipeWorkspaceRemovalError } from '../../shared/remote-runtime/ephemer
 
 /** How long a check's answer stays usable while the user reads it. */
 export const RECIPE_REMOVAL_ACK_TTL_MS = 2 * 60_000
-/** A claimed removal must still destroy after deleting the checkout and polling its removal. */
-export const RECIPE_REMOVAL_CLAIM_TTL_MS = 10 * 60_000
+/** A safety net only: a claim ends when its destroy spends it or its failed removal releases it. */
+export const RECIPE_REMOVAL_CLAIM_TTL_MS = 60 * 60_000
 
 /** What an acknowledgement vouches for: one workspace on one host, owned by one runtime record. */
 export type RecipeRemovalAckBinding = {
@@ -22,8 +22,11 @@ export type RecipeRemovalAckBinding = {
 type AckState = 'pending' | 'confirmed'
 
 const acks = new Map<string, RecipeRemovalAckBinding & { state: AckState; expiresAt: number }>()
-/** Removals that began their irreversible steps, keyed by the runtime record they will destroy. */
-const claims = new Map<string, RecipeRemovalAckBinding & { expiresAt: number }>()
+/**
+ * Removals that began their irreversible steps, keyed by the runtime record they will destroy.
+ * `ack` is the decision a claim came from, so cancelling that decision also ends the claim.
+ */
+const claims = new Map<string, RecipeRemovalAckBinding & { ack: string; expiresAt: number }>()
 
 function recordKey(runtimeId: string, createdAt: number): string {
   return `${runtimeId}\0${createdAt}`
@@ -76,9 +79,26 @@ export function confirmRecipeRemovalAck(ack: string): boolean {
   return true
 }
 
-/** Cancel or close: the answer authorizes nothing afterwards. */
+/** Cancel or close: the answer, and any claim already made from it, authorize nothing afterwards. */
 export function revokeRecipeRemovalAck(ack: string): void {
+  if (!ack) {
+    return
+  }
   acks.delete(ack)
+  for (const [key, claim] of claims) {
+    if (claim.ack === ack) {
+      claims.delete(key)
+    }
+  }
+}
+
+/** A removal that failed after claiming: its environment is no longer held for a destroy. */
+export function releaseRecipeRemovalClaim(hostId: string, workspaceId: string): void {
+  for (const [key, claim] of claims) {
+    if (claim.hostId === hostId && claim.workspaceId === workspaceId) {
+      claims.delete(key)
+    }
+  }
 }
 
 export type RecipeRemovalClaim = { ok: true } | { ok: false; reason: 'unconfirmed' | 'replaced' }
@@ -112,7 +132,7 @@ export function claimRecipeRemovalAck(
     return { ok: false, reason: 'replaced' }
   }
   acks.delete(ack)
-  claims.set(key, { ...current, expiresAt: Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS })
+  claims.set(key, { ...current, ack, expiresAt: Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS })
   return { ok: true }
 }
 

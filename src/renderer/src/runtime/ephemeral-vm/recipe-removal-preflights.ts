@@ -102,10 +102,14 @@ export async function reviewRecipeRemoval(
   return requestRecipeRemovalReview(results, candidates.length === 1)
 }
 
+/** A refused claim is checked and reviewed once more; past that the removal stops. */
+const CLAIM_REVIEWS = 2
+
 /**
  * Right before a removal deletes a workspace's checkout: holds the workspace's environment for its
  * destroy. Uses an authorization a decision already claimed; otherwise checks again and reviews
- * unless the answer is clean. False when the user cancelled or the environment changed.
+ * unless the answer is clean, and does so again when main refuses that claim (the answer expired or
+ * the environment changed). False when the user cancelled or main kept refusing.
  */
 export async function claimRecipeWorkspaceRemoval(
   state: Pick<AppState, 'settings'>,
@@ -120,15 +124,31 @@ export async function claimRecipeWorkspaceRemoval(
   if (held.ok) {
     return true
   }
-  const acks = await reviewRecipeRemoval([candidate])
-  if (!acks) {
-    return false
+  for (let review = 0; review < CLAIM_REVIEWS; review += 1) {
+    const acks = await reviewRecipeRemoval([candidate])
+    if (!acks) {
+      return false
+    }
+    const claimed = await window.api.ephemeralVm.claimRemoval({
+      ...target,
+      ack: acks.get(candidate.key) ?? ''
+    })
+    if (claimed.ok) {
+      return true
+    }
   }
-  const claimed = await window.api.ephemeralVm.claimRemoval({
-    ...target,
-    ack: acks.get(candidate.key) ?? ''
-  })
-  return claimed.ok
+  return false
+}
+
+/** The removal failed after its claim: main stops holding the environment for a destroy. */
+export function releaseRecipeWorkspaceRemoval(
+  state: Pick<AppState, 'settings'>,
+  workspace: { id: string; hostId?: string | null; displayName: string }
+): void {
+  const [candidate] = recipeRemovalCandidates(state, [workspace])
+  if (candidate && 'hostId' in candidate.request) {
+    void window.api.ephemeralVm.releaseRemoval(candidate.request).catch(() => {})
+  }
 }
 
 /** Claims a decision's acks right away, for removals that start as soon as the user decides. */

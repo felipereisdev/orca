@@ -23,9 +23,11 @@ export function attachEphemeralVmRuntimeToWorkspace(args: {
   if (['cleanup_pending', 'cleanup_failed', 'cleaned'].includes(runtime.status)) {
     throw new Error(`Cannot attach cleaned ephemeral VM runtime: ${args.runtimeId}`)
   }
-  forgetUnattachedProvision(args.runtimeId)
-  return updateEphemeralVmRuntimeStatus(args.userDataPath, args.runtimeId, {
+  const attached = updateEphemeralVmRuntimeStatus(args.userDataPath, args.runtimeId, {
     status: 'running',
     workspaceId: args.workspaceId
   })
+  // Only once the workspace is recorded: a failed write must leave the rollback possible.
+  forgetUnattachedProvision(args.runtimeId)
+  return attached
 }

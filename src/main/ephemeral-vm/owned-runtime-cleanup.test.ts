@@ -7,12 +7,14 @@ import { parseEphemeralVmRecipeResult } from '../../shared/remote-runtime/epheme
 import { upsertEphemeralVmRuntime } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { removeTempDirs } from '../../shared/testing/remove-temp-dirs.test-support'
+import type * as RuntimeStoreModule from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 
 const mocks = vi.hoisted(() => ({
   userData: '',
   destroy: vi.fn(),
   start: vi.fn(async () => {}),
-  stop: vi.fn()
+  stop: vi.fn(),
+  failNextWrite: false
 }))
 
 vi.mock('electron', () => ({
@@ -20,6 +22,24 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   BrowserWindow: { getAllWindows: () => [] }
 }))
+vi.mock(
+  '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store',
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof RuntimeStoreModule>()
+    return {
+      ...actual,
+      updateEphemeralVmRuntimeStatus: (
+        ...args: Parameters<typeof actual.updateEphemeralVmRuntimeStatus>
+      ) => {
+        if (mocks.failNextWrite) {
+          mocks.failNextWrite = false
+          throw new Error('runtime store write failed')
+        }
+        return actual.updateEphemeralVmRuntimeStatus(...args)
+      }
+    }
+  }
+)
 vi.mock('./runtime-service', () => ({ cleanupEphemeralVmRuntime: mocks.destroy }))
 vi.mock('../ipc/ephemeral-vm/ephemeral-vm-recipe-context', () => ({
   getRuntimeRecipeContext: () => ({ repoPath: '/repo', recipe: { id: 'cloud', destroy: 'x' } })
@@ -39,6 +59,7 @@ vi.mock('./desktop-sync-registry', () => ({
 import { cleanupOwnedEphemeralVmRuntime } from './owned-runtime-cleanup'
 import { rollbackRecipeRemovalAck } from './recipe-removal-ack-handlers'
 import { noteUnattachedProvision } from './unattached-provisions'
+import { attachEphemeralVmRuntimeToWorkspace } from './runtime-attachment'
 
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the cleanup reads only getSettings, and the recipe context it would read is mocked above.
 const STORE = { getSettings: () => ({ experimentalEphemeralVms: true }) } as unknown as Parameters<
@@ -112,6 +133,22 @@ describe('destroying a recipe environment from the desktop', () => {
       cleanupOwnedEphemeralVmRuntime(STORE, mocks.userData, record.id, { ack })
     ).rejects.toThrow('not confirmed')
     expect(mocks.destroy).not.toHaveBeenCalled()
+  })
+
+  it('an attachment whose write failed still rolls back with the ack main issues', async () => {
+    const record = provisionedRoot({ id: 'vm-unwritten' })
+    noteUnattachedProvision(record.id)
+    mocks.failNextWrite = true
+    expect(() =>
+      attachEphemeralVmRuntimeToWorkspace({
+        userDataPath: mocks.userData,
+        runtimeId: record.id,
+        workspaceId: 'repo::/workspace/repo'
+      })
+    ).toThrow('runtime store write failed')
+    await expect(
+      rollbackRecipeRemovalAck(mocks.userData, { runtimeId: record.id })
+    ).resolves.not.toBe('')
   })
 
   it('a destroy that rejects restarts the recordings sync', async () => {
