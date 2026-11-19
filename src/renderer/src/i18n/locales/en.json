@@ -6219,6 +6219,11 @@
           "UsageDisplayToggle": {
             "showRemaining": "Show remaining usage",
             "showUsed": "Show used usage"
+          },
+          "EphemeralVmRunningIndicator": {
+            "running_one": "{{count}} environment running",
+            "running_other": "{{count}} environments running",
+            "tooltip": "Open VM settings to see each environment’s CPU, memory and disk"
           }
         }
       },
@@ -12961,7 +12966,10 @@
           "untrackedRuntimeHint": "Orca never received this VM’s details. Cleanup runs destroy with only instance ID {{instanceId}}; if it fails, delete the VM in your provider, then remove it from this list.",
           "removeFromList": "Remove from list",
           "removeFromListFailed": "Couldn’t remove Cloud VM runtime from the list.",
-          "cca21fb369": "Refresh cloud VMs"
+          "cca21fb369": "Refresh cloud VMs",
+          "statsCpu": "CPU {{value}}",
+          "statsMemory": "Memory {{value}}",
+          "statsDisk": "Disk {{value}}"
         },
         "ephemeralVms": {
           "search": {

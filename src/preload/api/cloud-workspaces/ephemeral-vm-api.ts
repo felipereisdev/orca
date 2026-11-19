@@ -1,6 +1,9 @@
 import type { OrcaHooks } from '../../../shared/workspace-setup/orca-yaml-hook-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/remote-runtime/host-catalog/runtime-environments'
-import type { EphemeralVmRecipeDoctorResult } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
+import type {
+  EphemeralVmRecipeDoctorResult,
+  EphemeralVmRecipeStats
+} from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import type { EphemeralVmRecipeResultWarning } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
 import type {
   EphemeralVmProvisionedRuntimeRecord,
@@ -87,6 +90,8 @@ export type EphemeralVmApi = {
   resumeWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
   /** Suspends the workspace's VM without closing panels; sleep closes them first. */
   suspendWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
+  /** CPU, memory and disk from the recipe's `stats` step (cached 15 s); null when unavailable. */
+  runtimeStats: (args: { runtimeId: string }) => Promise<EphemeralVmRecipeStats | null>
   /** Fires after any runtime record write; re-list to read the new lifecycle status. */
   onRuntimesChanged: (callback: () => void) => () => void
   /**

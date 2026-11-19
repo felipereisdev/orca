@@ -151,6 +151,7 @@ environmentRecipes:
     suspend: ./scripts/orca-vm/docker-desktop/suspend.sh
     resume: ./scripts/orca-vm/docker-desktop/resume.sh
     destroy: ./scripts/orca-vm/docker-desktop/destroy.sh
+    stats: ./scripts/orca-vm/docker-desktop/stats.sh
     timeoutSeconds:
       create: 1800 # the first create builds the image
       suspend: 120
@@ -184,8 +185,9 @@ launcher token in place, and prints the full recipe JSON again; Orca then reconf
 `docker stats --no-stream`, and `diskBytes` as the container's writable layer (`SizeRw` from
 `docker container inspect --size`), which is what this workspace added on top of the shared image,
 not the image itself or `docker system df` totals. It reads the lifecycle payload on stdin like the other
-steps. The recipe above leaves it out: wire it as a `stats` step once the installed Orca reads one
-(an Orca without that step ignores the key, so nothing would run it).
+steps. The recipe above wires it as `stats`; Settings > VMs shows the numbers for each running
+environment and the status bar counts the running ones. Orca gives the step 5 seconds and runs it at most
+every 15 seconds, only while that page is open, so it needs no `timeoutSeconds` entry.
 
 ## `doctor-extra.sh`
 
@@ -253,7 +255,7 @@ escolhido por ele:
    no Mac e no iPhone.
 10. Suspender e retomar o workspace: o estado do container se mantém (arquivos no checkout) e a aba
     Desktop reconecta.
-11. A barra de status mostra o ambiente rodando com uso de CPU, memória e disco (quando o passo
-    `stats` estiver ligado).
+11. A barra de status mostra "1 ambiente rodando"; clicar abre Configurações > VMs, onde a linha
+    do ambiente mostra CPU, memória e disco (vindos do passo `stats`).
 12. Remover o workspace com uma gravação ainda não copiada: o Orca avisa antes de remover; depois,
     `docker ps -a --filter label=orca.workspace` não lista mais o container.

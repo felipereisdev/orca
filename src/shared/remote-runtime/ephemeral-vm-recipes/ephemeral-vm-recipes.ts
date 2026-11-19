@@ -162,6 +162,28 @@ export type EphemeralVmRecipeResultParseResult =
   | { ok: true; result: EphemeralVmRecipeResult }
   | ({ ok: false } & EphemeralVmFailure)
 
+/** What a recipe's optional `stats` step prints for a running environment. */
+export const EphemeralVmRecipeStatsSchema = z
+  .object({
+    cpuPercent: z.number().min(0),
+    memoryBytes: z.number().int().min(0),
+    diskBytes: z.number().int().min(0)
+  })
+  .strict()
+
+export type EphemeralVmRecipeStats = z.infer<typeof EphemeralVmRecipeStatsSchema>
+
+/** Null for anything but one stats object, so a misbehaving step reads as "no stats". */
+export function parseEphemeralVmRecipeStats(stdout: string): EphemeralVmRecipeStats | null {
+  const trimmed = stdout.trim()
+  try {
+    assertJsonTextStructureWithinLimits(trimmed, EPHEMERAL_VM_RECIPE_JSON_STRUCTURE_LIMITS)
+    return EphemeralVmRecipeStatsSchema.safeParse(JSON.parse(trimmed)).data ?? null
+  } catch {
+    return null
+  }
+}
+
 export type EphemeralVmRecipeDoctorCheckStatus = 'pass' | 'warn' | 'fail'
 
 export type EphemeralVmRecipeDoctorCheck = {

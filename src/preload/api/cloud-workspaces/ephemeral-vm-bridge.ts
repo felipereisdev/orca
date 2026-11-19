@@ -25,6 +25,7 @@ export const ephemeralVmApi = {
   attachWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:attachWorkspace', args),
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
   suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
+  runtimeStats: (args) => ipcRenderer.invoke('ephemeralVm:runtimeStats', args),
   onRuntimesChanged: (callback) => {
     const listener = (): void => callback()
     ipcRenderer.on(EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL, listener)

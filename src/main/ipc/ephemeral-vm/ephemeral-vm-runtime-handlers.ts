@@ -30,12 +30,17 @@ import { registerRecipeRemovalPreflightHandlers } from '../../ephemeral-vm/works
 import { forgetInterruptedEphemeralVmProvision } from '../../ephemeral-vm/runtime-provisioning-persistence'
 import { pendingVmCheckouts } from '../../ephemeral-vm/pending-vm-checkouts'
 import {
+  createEphemeralVmRuntimeStatsReader,
+  resolveRuntimeStatsTarget
+} from '../../ephemeral-vm/runtime-stats'
+import {
   parsePendingVmCheckouts,
   PENDING_VM_CHECKOUTS_CHANGED_CHANNEL
 } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
 
 // Every destroy names the acknowledgement its removal check issued; main decides when it is needed.
 const EphemeralVmCleanupArgs = z.object({ runtimeId: z.string().min(1), ack: z.string() })
+const EphemeralVmRuntimeStatsArgs = z.object({ runtimeId: z.string().min(1) })
 
 let stopRuntimesChangedBroadcast: (() => void) | null = null
 let runtimesChangedBroadcastQueued = false
@@ -127,6 +132,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:forgetRuntime')
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
   ipcMain.removeHandler('ephemeralVm:listCredentialEnvNames')
+  ipcMain.removeHandler('ephemeralVm:runtimeStats')
   stopRuntimesChangedBroadcast?.()
   stopRuntimesChangedBroadcast = onEphemeralVmRuntimesChanged(broadcastEphemeralVmRuntimesChanged)
   registerEnvironmentDesktopLifecycle(store)
@@ -141,6 +147,19 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.handle('ephemeralVm:listCredentialEnvNames', () =>
     listCredentialLikeEnvNames(process.env)
   )
+
+  // The renderer asks while its VM rows show; main runs no timer of its own.
+  const readEphemeralVmRuntimeStats = createEphemeralVmRuntimeStatsReader({
+    resolveTarget: (runtimeId) =>
+      resolveRuntimeStatsTarget(store, app.getPath('userData'), runtimeId)
+  })
+  ipcMain.handle('ephemeralVm:runtimeStats', (_event, args: unknown) => {
+    const parsed = EphemeralVmRuntimeStatsArgs.safeParse(args)
+    if (!parsed.success || store.getSettings().experimentalEphemeralVms !== true) {
+      return null
+    }
+    return readEphemeralVmRuntimeStats(parsed.data.runtimeId)
+  })
 
   // With a filter, main picks the records a removal destroys; the renderer never filters them.
   ipcMain.handle(

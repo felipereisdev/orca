@@ -64,11 +64,15 @@ export function doctorEphemeralVmRecipe(args: {
     })
   }
 
-  if (recipe.suspend) {
-    checks.push(checkCommandPath(args.repoPath, recipe.suspend, 'recipe.suspend'))
-  }
-  if (recipe.resume) {
-    checks.push(checkCommandPath(args.repoPath, recipe.resume, 'recipe.resume'))
+  const optionalSteps = [
+    ['recipe.suspend', recipe.suspend],
+    ['recipe.resume', recipe.resume],
+    ['recipe.stats', recipe.stats]
+  ] as const
+  for (const [id, command] of optionalSteps) {
+    if (command) {
+      checks.push(checkCommandPath(args.repoPath, command, id))
+    }
   }
   // Require suspend/resume pairs so suspended workspaces can always wake.
   if (Boolean(recipe.suspend) !== Boolean(recipe.resume)) {

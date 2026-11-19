@@ -38,6 +38,8 @@ export type OrcaVmRecipe = {
   resume?: string
   destroy?: string
   destroyDisabled?: boolean
+  // Prints {cpuPercent, memoryBytes, diskBytes} for a running environment; read from orca.yaml, never snapshotted.
+  stats?: string
   // Per-mode wall-clock limits; orca.yaml accepts one number for every mode or a per-mode map.
   timeoutSeconds?: OrcaVmRecipeTimeoutSeconds
   // Opt-in allowlist of Orca's environment variables the scripts receive (plus a safe base set).

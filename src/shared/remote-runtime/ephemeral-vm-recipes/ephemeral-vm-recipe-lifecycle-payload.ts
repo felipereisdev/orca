@@ -3,7 +3,7 @@ import type { EphemeralVmRecipeContext } from './ephemeral-vm-recipe-runner'
 import { quoteShellToken } from './ephemeral-vm-recipe-process'
 import type { OrcaVmRecipe } from '../../workspace-setup/orca-yaml-hook-types'
 
-export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy'
+export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy' | 'stats'
 
 export type EphemeralVmRecipeCleanupPayload = {
   schemaVersion: 1

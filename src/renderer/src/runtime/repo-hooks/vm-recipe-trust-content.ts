@@ -11,6 +11,7 @@ export function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
         `create: ${recipe.create}`,
         recipe.suspend ? `suspend: ${recipe.suspend}` : null,
         recipe.resume ? `resume: ${recipe.resume}` : null,
+        recipe.stats ? `stats: ${recipe.stats}` : null,
         recipe.destroyDisabled
           ? 'destroy: none'
           : recipe.destroy

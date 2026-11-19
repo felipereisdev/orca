@@ -1134,6 +1134,10 @@
       },
       "status": {
         "bar": {
+          "EphemeralVmRunningIndicator": {
+            "running_one": "{{count}} environment running",
+            "running_other": "{{count}} environments running"
+          },
           "NativeChatResumeStatusSegment": {
             "ariaLabelCount_one": "{{count}} chat available to resume",
             "ariaLabelCount_other": "{{count}} chats available to resume",

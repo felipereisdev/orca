@@ -105,45 +105,75 @@ export function getRuntimeRecipeContext(
   }
   const repo = runtime.repoId ? getRecipeRepo(store, runtime.repoId) : null
   if (!repo?.ok) {
-    // Why: a re-added or removed repo must not strand the VM; the snapshot plus recorded checkout
-    // path are everything destroy needs (stablyai/orca#17293). Only trust the path while it still
-    // holds the same recipe, so a different checkout later placed there can't run its scripts.
-    const fallback = runtime.recipe && runtime.repoPath ? runtime.recipe : null
-    if (fallback && runtime.repoPath) {
-      const sameRecipe = (loadHooks(runtime.repoPath)?.environmentRecipes ?? []).find(
-        (entry) => entry.id === fallback.id && entry.create === fallback.create
+    if (runtime.recipe && runtime.repoPath) {
+      const recipe = fallbackRuntimeRecipe(
+        runtime,
+        loadHooks(runtime.repoPath)?.environmentRecipes ?? []
       )
-      if (sameRecipe) {
-        const passEnv = sameRecipe.passEnv ? { passEnv: sameRecipe.passEnv } : {}
-        return { runtime, repoPath: runtime.repoPath, recipe: { ...fallback, ...passEnv } }
+      if (recipe) {
+        return { runtime, repoPath: runtime.repoPath, recipe }
       }
     }
     throw new EphemeralVmFailureError(
       repo ? repo.failure : ephemeralVmFailure('runtimeRepoMissing', { runtimeId })
     )
   }
-  const repoRecipe = (loadHooks(repo.repo.path)?.environmentRecipes ?? []).find(
-    (entry) => entry.id === runtime.recipeId
-  )
-  // Legacy runtimes lack snapshots; never substitute a newer same-ID plugin recipe for their repo-owned recipe.
-  // Snapshots never persist timeoutSeconds, so take the repo's current limits (lifecycle commands stay
-  // snapshotted). Only when the repo recipe has the same create command, so a different recipe that
-  // later took this id (e.g. a repo recipe shadowing a plugin one) cannot impose its limits.
-  // passEnv follows the same rule, so suspend/resume/destroy see the environment create saw.
-  const sameCreate = repoRecipe !== undefined && repoRecipe.create === runtime.recipe?.create
-  const fromRepo = {
-    ...(sameCreate && repoRecipe.timeoutSeconds
-      ? { timeoutSeconds: repoRecipe.timeoutSeconds }
-      : {}),
-    ...(sameCreate && repoRecipe.passEnv ? { passEnv: repoRecipe.passEnv } : {})
-  }
-  const recipe = runtime.recipe ? { ...runtime.recipe, ...fromRepo } : repoRecipe
+  const recipe = mergeRuntimeRecipe(runtime, loadHooks(repo.repo.path)?.environmentRecipes ?? [])
   if (!recipe) {
     throw new EphemeralVmFailureError(
       ephemeralVmFailure('recipeNotFound', { recipeId: runtime.recipeId })
     )
   }
   return { runtime, repoPath: repo.repo.path, recipe }
+}
+
+/**
+ * The recipe a runtime's lifecycle runs: its snapshot plus what snapshots never persist
+ * (timeoutSeconds, passEnv, stats), from the repo's recipe of the same id. Legacy runtimes lack
+ * snapshots; never substitute a newer same-ID plugin recipe for their repo-owned recipe. Only when
+ * the repo recipe has the same create command, so a different recipe that later took this id (e.g.
+ * a repo recipe shadowing a plugin one) cannot impose its limits, environment or stats command.
+ */
+export function mergeRuntimeRecipe(
+  runtime: EphemeralVmRuntimeRecord,
+  repoRecipes: readonly OrcaVmRecipe[]
+): OrcaVmRecipe | undefined {
+  const repoRecipe = repoRecipes.find((entry) => entry.id === runtime.recipeId)
+  const sameCreate = repoRecipe !== undefined && repoRecipe.create === runtime.recipe?.create
+  const fromRepo = {
+    ...(sameCreate && repoRecipe.timeoutSeconds
+      ? { timeoutSeconds: repoRecipe.timeoutSeconds }
+      : {}),
+    ...(sameCreate && repoRecipe.passEnv ? { passEnv: repoRecipe.passEnv } : {}),
+    ...(sameCreate && repoRecipe.stats ? { stats: repoRecipe.stats } : {})
+  }
+  return runtime.recipe ? { ...runtime.recipe, ...fromRepo } : repoRecipe
+}
+
+/**
+ * A runtime whose repo no longer resolves: a re-added or removed repo must not strand the VM; the
+ * snapshot plus recorded checkout path are everything destroy needs (stablyai/orca#17293). Only
+ * trust the path while it still holds the same recipe, so a different checkout later placed there
+ * can't run its scripts.
+ */
+export function fallbackRuntimeRecipe(
+  runtime: EphemeralVmRuntimeRecord,
+  recipesAtRepoPath: readonly OrcaVmRecipe[]
+): OrcaVmRecipe | null {
+  const snapshot = runtime.recipe
+  const sameRecipe = snapshot
+    ? recipesAtRepoPath.find(
+        (entry) => entry.id === snapshot.id && entry.create === snapshot.create
+      )
+    : undefined
+  if (!snapshot || !sameRecipe) {
+    return null
+  }
+  return {
+    ...snapshot,
+    ...(sameRecipe.passEnv ? { passEnv: sameRecipe.passEnv } : {}),
+    ...(sameRecipe.stats ? { stats: sameRecipe.stats } : {})
+  }
 }
 
 export function resolveRecipeForRepo(

@@ -1655,7 +1655,7 @@
 2 src/shared/file-content/node-source-copy-content-equality.ts
 4 src/shared/plugins/declarative/testing/orca-testing.ts
 7 src/shared/remote-runtime/e2ee/node/remote-runtime-e2ee-v2-host-latch.ts
-4 src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor.ts
+3 src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor.ts
 4 src/shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-runner.ts
 1 src/shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-environment-sleep.ts
 4 src/shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store.ts

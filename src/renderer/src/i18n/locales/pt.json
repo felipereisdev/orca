@@ -3954,6 +3954,12 @@
           "UsageDisplayToggle": {
             "showRemaining": "Mostrar uso restante",
             "showUsed": "Mostrar uso consumido"
+          },
+          "EphemeralVmRunningIndicator": {
+            "running_one": "{{count}} ambiente rodando",
+            "running_other": "{{count}} ambientes rodando",
+            "running_many": "{{count}} ambientes rodando",
+            "tooltip": "Abra as configurações de VMs para ver CPU, memória e disco de cada ambiente"
           }
         }
       },
@@ -6690,7 +6696,10 @@
           "stopCleanup": "Parar limpeza",
           "cleanupStopped": "Limpeza interrompida",
           "stopCleanupFailed": "Não foi possível parar a limpeza da VM na Nuvem.",
-          "cca21fb369": "Atualizar VMs na nuvem"
+          "cca21fb369": "Atualizar VMs na nuvem",
+          "statsCpu": "CPU {{value}}",
+          "statsMemory": "Memória {{value}}",
+          "statsDisk": "Disco {{value}}"
         },
         "commit": {
           "message": {

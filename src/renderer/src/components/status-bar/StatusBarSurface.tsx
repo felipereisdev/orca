@@ -37,6 +37,7 @@ import { getAccountOwnerKey } from './accounts/owner-account-rows'
 import { StatusBarVisibilityMenu } from './composition/StatusBarVisibilityMenu'
 import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
 import { GitBlameStatusSegment } from './GitBlameStatusSegment'
+import { EphemeralVmRunningIndicator } from './EphemeralVmRunningIndicator'
 
 const PetStatusSegment = lazyWithRetry(() =>
   import('./PetStatusSegment').then((module) => ({ default: module.PetStatusSegment }))
@@ -292,6 +293,7 @@ export function StatusBarSurface({
               <CaffeinateStatusSegment iconOnly={segmentsIconOnly} />
             </>
           ) : null}
+          <EphemeralVmRunningIndicator iconOnly={segmentsIconOnly} />
           <RemoteServerUpdateStatusSegment iconOnly={segmentsIconOnly} />
           <SkillUpdateStatusSegment iconOnly={segmentsIconOnly} />
           <NativeChatResumeStatusSegment iconOnly={segmentsIconOnly} />

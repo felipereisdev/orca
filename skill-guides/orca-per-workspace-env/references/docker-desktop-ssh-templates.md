@@ -1171,13 +1171,13 @@ log "removed $name"
 
 ### `stats.sh`
 
-Recipe `stats`, for when Orca reads that step.
+Recipe `stats`: what Settings > VMs shows for a running environment.
 
 ```bash
 #!/usr/bin/env bash
 # shellcheck disable=SC2016 # single quotes hold JavaScript and remote shell text.
-# Recipe `stats` (wired by a later Orca version): prints {cpuPercent, memoryBytes, diskBytes} for the
-# workspace's container. diskBytes is the container's writable layer. Lifecycle payload on stdin.
+# Recipe `stats`: prints {cpuPercent, memoryBytes, diskBytes} for the workspace's container.
+# diskBytes is the container's writable layer. Lifecycle payload on stdin.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=orca-docker-desktop.sh

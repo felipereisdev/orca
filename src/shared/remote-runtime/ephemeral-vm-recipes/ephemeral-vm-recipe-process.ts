@@ -30,7 +30,7 @@ export async function runRecipeCommand(args: {
   command: string
   repoPath: string
   context: EphemeralVmRecipeContext
-  mode: 'create' | 'suspend' | 'resume' | 'destroy'
+  mode: 'create' | 'suspend' | 'resume' | 'destroy' | 'stats'
   resultSchemaVersion: 1 | 2
   stdin?: string
   env?: NodeJS.ProcessEnv
@@ -252,7 +252,7 @@ export function killRecipeProcess(child: ChildProcessWithoutNullStreams, force =
 
 function buildRecipeEnv(
   { env, passEnv }: { env?: NodeJS.ProcessEnv; passEnv?: readonly string[] },
-  mode: 'create' | 'suspend' | 'resume' | 'destroy',
+  mode: 'create' | 'suspend' | 'resume' | 'destroy' | 'stats',
   context: EphemeralVmRecipeContext,
   resultSchemaVersion: 1 | 2
 ): NodeJS.ProcessEnv {
