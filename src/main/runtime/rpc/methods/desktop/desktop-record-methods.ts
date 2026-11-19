@@ -5,14 +5,20 @@ import {
   DESKTOP_RECORD_DEFAULT_MAX_SECONDS,
   DesktopEventsParams,
   DesktopEventsUnsubscribeParams,
+  DesktopRecordFenceParams,
   DesktopRecordingsListParams,
   DesktopRecordStartParams,
   DesktopRecordStopParams
 } from '../../../../../shared/rpc-contract/desktop/desktop-params'
 import { defineMethod, defineStreamingMethod } from '../../core'
-import { assertDesktopController } from './desktop-controller-identity'
+import {
+  assertDesktopController,
+  assertDesktopControllerToken
+} from './desktop-controller-identity'
 
 const EVENTS_SUBSCRIPTION_PREFIX = 'desktop-events:'
+/** A removal that never finished must not hold recordings off for good. */
+const REMOVAL_FENCE_MS = 10 * 60_000
 
 /**
  * Recording runs on the environment, so agents may start and stop it; `desktop.events` tells the
@@ -44,7 +50,24 @@ export function createDesktopRecordMethods(
       name: 'desktop.recordings.list',
       permission: 'workspace',
       params: DesktopRecordingsListParams,
-      handler: async () => ({ recordings: await getBroker().recorder.list(recordingsDir()) })
+      handler: async () => {
+        const { recorder } = getBroker()
+        // Read first: a recording that finishes during the listing is then in it or still flagged.
+        const inProgress = recorder.inProgress()
+        const recordings = await recorder.list(recordingsDir())
+        return { recordings, inProgress: inProgress || recorder.inProgress() }
+      }
+    }),
+    defineMethod({
+      name: 'desktop.record.fence',
+      permission: 'host-admin',
+      params: DesktopRecordFenceParams,
+      handler: async (params, ctx) => {
+        const broker = getBroker()
+        assertDesktopControllerToken(broker, ctx, params.controllerToken)
+        broker.recorder.fence(REMOVAL_FENCE_MS)
+        return { fenced: true }
+      }
     }),
     defineStreamingMethod({
       name: 'desktop.events',

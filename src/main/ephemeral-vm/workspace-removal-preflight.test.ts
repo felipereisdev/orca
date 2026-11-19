@@ -31,10 +31,16 @@ type Recording = typeof REC_A
 /** An environment whose recordings list reflects what it holds at each call. */
 function makePorts(
   answers: Answers = {},
-  options: { recordings?: Recording[]; copied?: string[] } = {}
+  options: {
+    recordings?: Recording[]
+    copied?: string[]
+    /** A recording runs (or finalizes); `desktop.record.stop` finishes it as this one. */
+    inProgress?: Recording
+  } = {}
 ) {
   const order: string[] = []
   const recordings = [...(options.recordings ?? [REC_A])]
+  let inProgress = options.inProgress
   const copied = new Set(options.copied ?? [])
   const defaults: Record<string, RuntimeRpcResponse<unknown>> = {
     'git.status': ok({ entries: [], conflictOperation: 'unknown' }),
@@ -44,9 +50,20 @@ function makePorts(
     order,
     recordings,
     call: vi.fn(async (_env: string, method: string): Promise<RuntimeRpcResponse<unknown>> => {
+      if (method === 'desktop.record.stop' && !answers[method]) {
+        if (!inProgress) {
+          return failed('desktop_not_recording')
+        }
+        order.push('stop')
+        recordings.push(inProgress)
+        inProgress = undefined
+        return ok({ stopped: 'requested' })
+      }
       const answer =
         answers[method] ??
-        (method === 'desktop.recordings.list' ? ok({ recordings: [...recordings] }) : undefined) ??
+        (method === 'desktop.recordings.list'
+          ? ok({ recordings: [...recordings], inProgress: inProgress !== undefined })
+          : undefined) ??
         defaults[method] ??
         failed('method_not_found')
       if (answer === 'hang') {
@@ -116,6 +133,61 @@ describe('recipe workspace removal preflight', () => {
     await expect(copyRecordingsBeforeRemoval(target, failing)).resolves.toEqual({
       ok: false,
       reason: 'copy_failed'
+    })
+  })
+
+  it('a recording still running or finalizing makes it unsafe', async () => {
+    const ports = makePorts({}, { recordings: [], inProgress: REC_B })
+
+    await expect(preflightRecipeWorkspaceRemoval(target, ports)).resolves.toEqual({
+      status: 'unsafe',
+      recordingsNotCopied: [],
+      recordingInProgress: true,
+      dirtyFiles: 0,
+      unpushedCommits: 0
+    })
+  })
+
+  it('a malformed recording entry, or a list that cannot say what is recording, is unchecked', async () => {
+    const malformed = makePorts({
+      'desktop.recordings.list': ok({ recordings: [REC_A, { id: 7 }], inProgress: false })
+    })
+    const silent = makePorts({ 'desktop.recordings.list': ok({ recordings: [] }) })
+
+    await expect(preflightRecipeWorkspaceRemoval(target, malformed)).resolves.toMatchObject({
+      status: 'unchecked',
+      reason: 'recordings_failed'
+    })
+    await expect(preflightRecipeWorkspaceRemoval(target, silent)).resolves.toMatchObject({
+      status: 'unchecked',
+      reason: 'recordings_failed'
+    })
+  })
+
+  it('copy-and-remove stops the recording in progress, waits for it, and copies it too', async () => {
+    const ports = makePorts({}, { recordings: [REC_A], inProgress: REC_B })
+
+    await expect(copyRecordingsBeforeRemoval(target, ports)).resolves.toEqual({
+      ok: true,
+      copied: 2
+    })
+    expect(ports.order).toEqual(['stop', `copy:${REC_A.id}`, `copy:${REC_B.id}`])
+  })
+
+  it('a recording that does not finish within 60 s keeps the removal unsafe', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const ports = makePorts(
+      { 'desktop.record.stop': 'hang' },
+      { recordings: [], inProgress: REC_B }
+    )
+
+    const copying = copyRecordingsBeforeRemoval(target, ports)
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    await expect(copying).resolves.toMatchObject({
+      ok: false,
+      reason: 'still_pending',
+      preflight: { status: 'unsafe', recordingInProgress: true }
     })
   })
 

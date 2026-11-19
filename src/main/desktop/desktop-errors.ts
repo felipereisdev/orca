@@ -14,6 +14,7 @@ export type DesktopErrorCode =
   | 'desktop_recording_unavailable'
   | 'desktop_recording_failed'
   | 'desktop_recording_not_found'
+  | 'desktop_removal_pending'
 
 const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_user_in_control: 'The user has taken control of the desktop.',
@@ -31,7 +32,8 @@ const DESKTOP_ERROR_MESSAGES: Record<DesktopErrorCode, string> = {
   desktop_not_recording: 'The desktop is not being recorded.',
   desktop_recording_unavailable: 'The desktop cannot be recorded (ffmpeg is required).',
   desktop_recording_failed: 'The desktop recording failed and was discarded.',
-  desktop_recording_not_found: 'This computer has no copy of that desktop recording.'
+  desktop_recording_not_found: 'This computer has no copy of that desktop recording.',
+  desktop_removal_pending: 'This workspace is being removed, so the desktop cannot be recorded.'
 }
 
 /** `reason` is a fixed code or caller-supplied text; credentials never go into it. */

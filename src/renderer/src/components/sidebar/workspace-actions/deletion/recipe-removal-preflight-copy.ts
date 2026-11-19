@@ -89,6 +89,11 @@ export function recipeRemovalCopyErrorText(reason: RecipeRemovalCopyFailure, t: 
 /** One line per kind of work the removal would lose, only for kinds that have any. */
 export function recipeRemovalLossLines(preflight: RecipeRemovalPreflight, t: Translate): string[] {
   const lines: string[] = []
+  if (preflight.recordingInProgress) {
+    lines.push(
+      t('workspaceDeletion.recipeCheck.recordingInProgress', 'A recording is still in progress')
+    )
+  }
   const recordings = preflight.recordingsNotCopied.length
   if (recordings > 0) {
     lines.push(

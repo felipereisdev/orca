@@ -113,7 +113,7 @@ beforeEach(() => {
     _meta: { runtimeId: 'env' },
     result:
       method === 'desktop.recordings.list'
-        ? { recordings: mocks.keep.mock.calls.length > 0 ? [] : [REC] }
+        ? { recordings: mocks.keep.mock.calls.length > 0 ? [] : [REC], inProgress: false }
         : method === 'git.unpushedCommitCount'
           ? { unpushedCommits: 0 }
           : { entries: [], conflictOperation: 'unknown' }

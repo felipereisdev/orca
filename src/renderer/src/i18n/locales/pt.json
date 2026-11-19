@@ -23101,7 +23101,8 @@
       "reasonStoreUnreadable": "O Orca não conseguiu ler o que salvou sobre este ambiente.",
       "reasonWorkspaceUnrecorded": "O Orca nunca registrou qual workspace este ambiente contém, então o trabalho dele não pôde ser verificado.",
       "workspaceReplaced": "Este workspace foi substituído enquanto era removido. Nada foi apagado.",
-      "removalNotAuthorized": "A remoção foi cancelada ou o ambiente dela mudou. Nada foi apagado."
+      "removalNotAuthorized": "A remoção foi cancelada ou o ambiente dela mudou. Nada foi apagado.",
+      "recordingInProgress": "Gravação em andamento"
     }
   },
   "worktree": {
@@ -25255,7 +25256,8 @@
         "recordingUnavailable": "Este ambiente não consegue gravar o desktop porque o ffmpeg não está instalado.",
         "recordingFailed": "A gravação falhou e foi descartada.",
         "unknown": "Algo deu errado. Tente de novo.",
-        "controllerStale": "Este Mac precisa configurar o desktop de novo. Clique em Tentar de novo."
+        "controllerStale": "Este Mac precisa configurar o desktop de novo. Clique em Tentar de novo.",
+        "removalPending": "Este workspace está sendo removido, então o desktop não pode ser gravado."
       },
       "create": "Desktop",
       "unconfiguredBody": "O desktop do ambiente ainda não foi configurado.",

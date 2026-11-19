@@ -18,6 +18,7 @@ import {
   type RecipeRemovalAckBinding
 } from './recipe-removal-acks'
 import { currentRecipeOwner } from './recipe-removal-target'
+import { fenceEnvironmentRecordings } from './desktop-recording-fence'
 import { isUnattachedProvision } from './unattached-provisions'
 
 const AckArgs = z.object({ ack: z.string() })
@@ -30,13 +31,15 @@ const ReleaseArgs = ClaimArgs.omit({ ack: true })
 const AdoptArgs = ReleaseArgs.extend({ sessionId: z.string().min(1).optional() })
 const SessionArgs = z.object({ sessionId: z.string().min(1) })
 
+type CurrentBinding = RecipeRemovalAckBinding & { environmentId?: string }
+
 /** The record owning the workspace now, as an ack binding; null when no recipe holds it. */
 async function currentBinding(
   store: DesktopSettingsSource,
   userDataPath: string,
   hostId: string,
   workspaceId: string
-): Promise<RecipeRemovalAckBinding | null | 'ambiguous'> {
+): Promise<CurrentBinding | null | 'ambiguous'> {
   if (store.getSettings().experimentalEphemeralVms !== true) {
     return null
   }
@@ -48,8 +51,13 @@ async function currentBinding(
     hostId,
     workspaceId: owner.workspaceId ?? '',
     runtimeId: owner.id,
-    runtimeCreatedAt: owner.createdAt
+    runtimeCreatedAt: owner.createdAt,
+    ...(owner.runtimeEnvironmentId ? { environmentId: owner.runtimeEnvironmentId } : {})
   }
+}
+
+function ackBinding({ environmentId: _environmentId, ...binding }: CurrentBinding) {
+  return binding
 }
 const RollbackArgs = z.object({ runtimeId: z.string().min(1) })
 
@@ -67,8 +75,14 @@ export async function claimRecipeRemoval(
   if (!binding) {
     return { ok: true, required: false }
   }
-  const claim = claimRecipeRemovalAck(args.ack, binding)
-  return claim.ok ? { ok: true, required: true } : claim
+  const claim = claimRecipeRemovalAck(args.ack, ackBinding(binding))
+  if (!claim.ok) {
+    return claim
+  }
+  if (binding.environmentId) {
+    await fenceEnvironmentRecordings(binding.environmentId)
+  }
+  return { ok: true, required: true }
 }
 
 /** At the store removal: takes over the claim its dialog session (or its own flow) made. */
@@ -85,7 +99,7 @@ export async function adoptRecipeRemoval(
   if (!binding) {
     return { ok: true, required: false }
   }
-  const adopted = adoptRecipeRemovalClaim(binding, args.sessionId)
+  const adopted = adoptRecipeRemovalClaim(ackBinding(binding), args.sessionId)
   return adopted.ok ? { ok: true, required: true } : adopted
 }
 

@@ -24985,7 +24985,8 @@
       "reasonStoreUnreadable": "Orca couldn't read what it saved about this environment.",
       "reasonWorkspaceUnrecorded": "Orca never recorded which workspace this environment holds, so its work could not be checked.",
       "workspaceReplaced": "This workspace was replaced while it was being removed. Nothing was deleted.",
-      "removalNotAuthorized": "The removal was cancelled or its environment changed. Nothing was deleted."
+      "removalNotAuthorized": "The removal was cancelled or its environment changed. Nothing was deleted.",
+      "recordingInProgress": "A recording is still in progress"
     }
   },
   "worktree": {
@@ -29746,7 +29747,8 @@
         "recordingUnavailable": "This environment cannot record the desktop because ffmpeg is missing.",
         "recordingFailed": "The recording failed and was discarded.",
         "unknown": "Something went wrong. Try again.",
-        "controllerStale": "This Mac needs to set up the desktop again. Select Try again."
+        "controllerStale": "This Mac needs to set up the desktop again. Select Try again.",
+        "removalPending": "This workspace is being removed, so the desktop can't be recorded."
       },
       "create": "Desktop",
       "unconfiguredBody": "The environment desktop hasn't been set up yet.",

@@ -24,13 +24,13 @@ import {
 
 function ports(target: RemovalPreflightTarget): CopyBeforeRemovalPorts {
   return {
-    call: (environmentId, method, params, signal) =>
+    call: (environmentId, method, params, signal, timeoutMs) =>
       callRuntimeEnvironment(
         getRuntimeEnvironmentRegistryRoot(),
         `id:${environmentId}`,
         method,
         params,
-        RECIPE_REMOVAL_PREFLIGHT_TIMEOUT_MS,
+        timeoutMs ?? RECIPE_REMOVAL_PREFLIGHT_TIMEOUT_MS,
         undefined,
         undefined,
         { signal }

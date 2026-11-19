@@ -133,7 +133,10 @@ function SingleWorkspacePanel({
     }
   }, [onBusyChange])
   // Reviews name a workspace or a runtime record; main copies for either.
-  const canCopy = preflight.status === 'unsafe' && preflight.recordingsNotCopied.length > 0
+  // "Copy recordings and remove" also stops and keeps one still in progress.
+  const canCopy =
+    preflight.status === 'unsafe' &&
+    (preflight.recordingsNotCopied.length > 0 || preflight.recordingInProgress === true)
 
   const markBusy = (next: boolean): void => {
     // A closed panel only lets go of the dialog (its unmount already did); it never re-renders.

@@ -13,6 +13,11 @@ export function desktopErrorMessage(code: string, t: Translate): string {
         'desktop.tab.errors.controllerStale',
         'This Mac needs to set up the desktop again. Select Try again.'
       )
+    case 'desktop_removal_pending':
+      return t(
+        'desktop.tab.errors.removalPending',
+        "This workspace is being removed, so the desktop can't be recorded."
+      )
     case 'desktop_unavailable':
       return t('desktop.tab.errors.unavailable', 'The desktop is not available right now.')
     case 'desktop_already_recording':

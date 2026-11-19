@@ -80,7 +80,8 @@ When the user asks you to record a test:
 
 `ORCA desktop recordings` lists the recordings on the environment. `desktop_not_recording`
 means no recording is running; `desktop_recording_unavailable` means the environment
-cannot record (ffmpeg is missing).
+cannot record (ffmpeg is missing); `desktop_removal_pending` means the user is removing this
+workspace, so do not start another recording.
 
 ## Privacy
 

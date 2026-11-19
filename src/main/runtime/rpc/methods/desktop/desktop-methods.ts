@@ -135,6 +135,8 @@ export function createDesktopMethods(
           throw error
         }
         const controllerToken = claim.bind()
+        // A configure means the desktop is in use again: a removal fence no longer applies.
+        broker.recorder.fence(null)
         return { ...broker.status(), ...(controllerToken ? { controllerToken } : {}) }
       }
     }),

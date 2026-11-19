@@ -58,7 +58,10 @@ vi.mock('../runtime-environments/requests/runtime-environment-transport-routing'
 )
 
 import { registerEphemeralVmHandlers } from './ephemeral-vm'
-import { stopEnvironmentDesktop } from '../../ephemeral-vm/desktop-sync-registry'
+import {
+  desktopControllerToken,
+  stopEnvironmentDesktop
+} from '../../ephemeral-vm/desktop-sync-registry'
 
 const tempDirs: string[] = []
 
@@ -515,6 +518,24 @@ describe('registerEphemeralVmHandlers', () => {
         // The environment is still up, so its recordings keep being copied.
         await vi.waitFor(() => expect(desktopEnv.streams).toHaveLength(2))
         await expect(cleanup(runtimeId, ack)).rejects.toThrow('not confirmed')
+      })
+
+      it('a claimed removal fences new recordings on the environment with the controller token', async () => {
+        const { provisioned } = await provisionAttached()
+        const ack = await removalAck(provisioned.runtime, WORKSPACE)
+        const target = { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', { ...target, ack })
+        ).resolves.toEqual({ ok: true, required: true })
+
+        expect(desktopEnv.calls.filter((call) => call.method === 'desktop.record.fence')).toEqual([
+          {
+            environmentId: 'ssh-env-1',
+            method: 'desktop.record.fence',
+            params: { controllerToken: desktopControllerToken('ssh-env-1') }
+          }
+        ])
       })
 
       it('copies the recordings, then destroys with the ack the copy returned', async () => {

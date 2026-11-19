@@ -118,7 +118,7 @@ class DesktopEnvironmentFake {
     }
     return fails
       ? failure('remote_runtime_unavailable', 'unreachable')
-      : ok({ recordings: snapshot })
+      : ok({ recordings: snapshot, inProgress: false })
   }
 
   call(

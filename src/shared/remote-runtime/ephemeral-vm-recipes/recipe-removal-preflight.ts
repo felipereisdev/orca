@@ -22,6 +22,8 @@ export type RecipeRemovalRecording = { id: string; path: string; bytes: number }
 export type RecipeRemovalPreflight = {
   status: 'clean' | 'unsafe' | 'unchecked'
   recordingsNotCopied: RecipeRemovalRecording[]
+  /** A recording still runs or finalizes on the environment, so it is in no list yet. */
+  recordingInProgress?: boolean
   /** Distinct paths with changes; staged and unstaged edits to one file count once. */
   dirtyFiles: number
   /** Git stopped listing changes at its limit, so `dirtyFiles` is a lower bound. */

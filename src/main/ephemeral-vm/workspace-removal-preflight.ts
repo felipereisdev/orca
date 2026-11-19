@@ -15,6 +15,9 @@ const COPY_BEFORE_REMOVAL_TIMEOUT_MS = 10 * 60_000
 /** Copy passes before the removal gives up and reports what is still pending. */
 const MAX_COPY_PASSES = 2
 
+/** How long "copy and remove" waits for a recording in progress to be stopped and finalized. */
+const STOP_RECORDING_TIMEOUT_MS = 60_000
+
 /** The recipe runtime that owns the workspace, as the host's own runtime store records it. */
 export type RemovalPreflightTarget = {
   runtimeId: string
@@ -31,7 +34,9 @@ export type RemovalPreflightPorts = {
     environmentId: string,
     method: string,
     params: unknown,
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** The RPC's own limit when a call may take longer than a check (finalizing a recording). */
+    timeoutMs?: number
   ) => Promise<RuntimeRpcResponse<unknown>>
   /** True only when this Mac's copy still exists on disk. */
   isCopied: (recordingId: string) => Promise<boolean>
@@ -61,7 +66,10 @@ const GitStatus = z
   })
   .passthrough()
 const UnpushedCommits = z.object({ unpushedCommits: z.number().int().nonnegative() }).passthrough()
-const RecordingList = z.object({ recordings: z.array(z.unknown()) }).passthrough()
+// `inProgress`: a recording runs or is still finalizing, so it is in no list yet.
+const RecordingList = z
+  .object({ recordings: z.array(z.unknown()), inProgress: z.boolean() })
+  .passthrough()
 
 type Part<T> = { ok: true; value: T } | { ok: false; reason: RecipeRemovalPreflightReason }
 
@@ -108,24 +116,27 @@ function readUnpushedCommits(result: unknown): number | null {
   return UnpushedCommits.safeParse(result).data?.unpushedCommits ?? null
 }
 
-function readRecordings(result: unknown): RecipeRemovalRecording[] | null {
+type EnvironmentRecordings = { recordings: RecipeRemovalRecording[]; inProgress: boolean }
+
+// One entry that can't be read could be the recording that matters, so the list proves nothing.
+function readRecordings(result: unknown): EnvironmentRecordings | null {
   const listed = RecordingList.safeParse(result).data
   if (!listed) {
     return null
   }
-  return listed.recordings.flatMap((entry) => {
-    const recording = parseEnvironmentRecording(entry)
-    return recording ? [recording] : []
-  })
+  const recordings = listed.recordings.map(parseEnvironmentRecording)
+  return recordings.every((recording) => recording !== null)
+    ? { recordings, inProgress: listed.inProgress }
+    : null
 }
 
 async function listPendingRecordings(
   target: RemovalPreflightTarget,
   ports: RemovalPreflightPorts,
   signal: AbortSignal
-): Promise<Part<RecipeRemovalRecording[]>> {
+): Promise<Part<EnvironmentRecordings>> {
   if (!target.hasDesktop) {
-    return { ok: true, value: [] }
+    return { ok: true, value: { recordings: [], inProgress: false } }
   }
   const listed = await ask(
     ports,
@@ -139,8 +150,12 @@ async function listPendingRecordings(
   if (!listed.ok) {
     return listed
   }
-  const copied = await Promise.all(listed.value.map((recording) => ports.isCopied(recording.id)))
-  return { ok: true, value: listed.value.filter((_recording, index) => !copied[index]) }
+  const { recordings, inProgress } = listed.value
+  const copied = await Promise.all(recordings.map((recording) => ports.isCopied(recording.id)))
+  return {
+    ok: true,
+    value: { recordings: recordings.filter((_recording, index) => !copied[index]), inProgress }
+  }
 }
 
 /** Runs `work` until it settles or `timeoutMs` passes; the signal aborts on the deadline. */
@@ -170,6 +185,7 @@ function unchecked(
   return {
     status: 'unchecked',
     recordingsNotCopied: known.recordingsNotCopied ?? [],
+    ...(known.recordingInProgress ? { recordingInProgress: true } : {}),
     dirtyFiles: known.dirtyFiles ?? 0,
     ...(known.dirtyFilesCapped ? { dirtyFilesCapped: true } : {}),
     unpushedCommits: known.unpushedCommits ?? 0,
@@ -204,19 +220,39 @@ export async function preflightRecipeWorkspaceRemoval(
     return unchecked('timeout')
   }
   const [dirty, unpushed, recordings] = answered
+  const inProgress = recordings.ok && recordings.value.inProgress
   const known = {
+    recordingsNotCopied: recordings.ok ? recordings.value.recordings : [],
+    ...(inProgress ? { recordingInProgress: true } : {}),
     dirtyFiles: dirty.ok ? dirty.value.count : 0,
     ...(dirty.ok && dirty.value.capped ? { dirtyFilesCapped: true } : {}),
-    unpushedCommits: unpushed.ok ? unpushed.value : 0,
-    recordingsNotCopied: recordings.ok ? recordings.value : []
+    unpushedCommits: unpushed.ok ? unpushed.value : 0
   }
   const failures = [dirty, unpushed, recordings].flatMap((part) => (part.ok ? [] : [part.reason]))
   if (failures.length > 0) {
     return unchecked(failures.includes('unreachable') ? 'unreachable' : failures[0], known)
   }
   const unsafe =
-    known.dirtyFiles > 0 || known.unpushedCommits > 0 || known.recordingsNotCopied.length > 0
+    inProgress ||
+    known.dirtyFiles > 0 ||
+    known.unpushedCommits > 0 ||
+    known.recordingsNotCopied.length > 0
   return { status: unsafe ? 'unsafe' : 'clean', ...known }
+}
+
+/**
+ * The user chose to keep the recordings: one still running is stopped and waited for (bounded), so
+ * the copy passes that follow find it finished. Any failure leaves it to those passes to report.
+ */
+async function stopRecordingInProgress(
+  target: RemovalPreflightTarget,
+  ports: RemovalPreflightPorts
+): Promise<void> {
+  await withDeadline(STOP_RECORDING_TIMEOUT_MS, (signal) =>
+    ports
+      .call(target.environmentId, 'desktop.record.stop', {}, signal, STOP_RECORDING_TIMEOUT_MS)
+      .catch(() => undefined)
+  )
 }
 
 /** The copy's outcome before main adds acknowledgements to it. */
@@ -240,7 +276,11 @@ export async function copyRecordingsBeforeRemoval(
   if (target.asleep) {
     return { ok: false, reason: 'unreachable' }
   }
-  let knownPending: RecipeRemovalRecording[] | null = null
+  if (target.hasDesktop) {
+    await stopRecordingInProgress(target, ports)
+  }
+  // Assigned inside the deadline callback, so declared wide for the reads after it.
+  let knownPending = null as EnvironmentRecordings | null
   const outcome = await withDeadline(
     timeoutMs,
     async (signal): Promise<CopyBeforeRemovalOutcome | 'pending'> => {
@@ -256,14 +296,14 @@ export async function copyRecordingsBeforeRemoval(
             reason: pending.reason === 'unreachable' ? 'unreachable' : 'unavailable'
           }
         }
-        if (pending.value.length === 0) {
+        if (pending.value.recordings.length === 0 && !pending.value.inProgress) {
           return { ok: true, copied }
         }
         knownPending = pending.value
         if (pass === MAX_COPY_PASSES) {
           return 'pending'
         }
-        for (const recording of pending.value) {
+        for (const recording of pending.value.recordings) {
           try {
             await ports.copy(recording, signal)
           } catch {
@@ -288,7 +328,8 @@ export async function copyRecordingsBeforeRemoval(
     reason: 'still_pending',
     preflight: {
       status: 'unsafe',
-      recordingsNotCopied: knownPending,
+      recordingsNotCopied: knownPending.recordings,
+      ...(knownPending.inProgress ? { recordingInProgress: true } : {}),
       dirtyFiles: fresh.dirtyFiles,
       ...(fresh.dirtyFilesCapped ? { dirtyFilesCapped: true } : {}),
       unpushedCommits: fresh.unpushedCommits

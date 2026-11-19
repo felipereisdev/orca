@@ -23,6 +23,9 @@ export const DesktopStatusParams = z.object({
 /** The token the newest `desktop.configure` reply carried; only the configuring host has it. */
 const DesktopControllerToken = z.string().max(256, 'controllerToken is too long').optional()
 
+/** The controlling host holds new recordings off while it removes the workspace. */
+export const DesktopRecordFenceParams = z.object({ controllerToken: DesktopControllerToken })
+
 export const DesktopControlSetParams = z.object({
   owner: z.enum(['agent', 'user']),
   viewerId: z.string().min(1, 'Missing required --viewer-id'),

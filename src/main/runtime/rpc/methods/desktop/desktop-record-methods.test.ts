@@ -24,10 +24,12 @@ afterEach(async () => {
 
 async function setup({
   ffmpegPath = '/usr/bin/ffmpeg',
-  findFfmpeg = () => ffmpegPath
+  findFfmpeg = () => ffmpegPath,
+  now
 }: {
   ffmpegPath?: string | null
   findFfmpeg?: () => string | null | Promise<string | null>
+  now?: () => number
 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'orca-record-rpc-'))
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }))
@@ -35,7 +37,7 @@ async function setup({
   cleanups.push(() => vnc.close())
   const ffmpeg = createFakeFfmpeg()
   const broker = new DesktopBroker({
-    recorder: { findFfmpeg, spawnFfmpeg: ffmpeg.spawn }
+    recorder: { findFfmpeg, spawnFfmpeg: ffmpeg.spawn, ...(now ? { now } : {}) }
   })
   const harness = createDesktopRpcHarness(broker, { recordingsDir: () => dir })
   cleanups.push(() => broker.close())
@@ -83,6 +85,7 @@ describe('desktop recording methods', () => {
     await call('desktop.record.stop', {}, MAC_AGENT)
 
     expect((await call('desktop.recordings.list', {}, MAC_AGENT)).result).toEqual({
+      inProgress: false,
       recordings: [
         {
           id: started.result?.id,
@@ -137,6 +140,54 @@ describe('desktop recording methods', () => {
 
     expect((await starting).error?.code).toBe('desktop_unavailable')
     expect(ffmpeg.spawns).toEqual([])
+  })
+
+  it('a removal fence refuses new recordings until it expires or the desktop is configured again', async () => {
+    let clock = 0
+    const { call, configure, token, vnc } = await setup({ now: () => clock })
+    await configure(vnc, MAC)
+
+    expect(await call('desktop.record.fence', {}, MAC)).toMatchObject({
+      ok: false,
+      error: { code: 'desktop_controller_token_invalid' }
+    })
+    expect(
+      await call('desktop.record.fence', { controllerToken: token() }, MAC_AGENT)
+    ).toMatchObject({ ok: false, error: { code: 'desktop_agent_not_allowed' } })
+    expect(await call('desktop.record.fence', { controllerToken: token() }, MAC)).toMatchObject({
+      ok: true
+    })
+    expect(await call('desktop.record.start', {}, MAC_AGENT)).toMatchObject({
+      ok: false,
+      error: { code: 'desktop_removal_pending' }
+    })
+
+    clock += 10 * 60_000
+    const afterExpiry = await call('desktop.record.start', {}, MAC_AGENT)
+    expect(afterExpiry).toMatchObject({ ok: true })
+    await call('desktop.record.stop', {}, MAC_AGENT)
+
+    await call('desktop.record.fence', { controllerToken: token() }, MAC)
+    await configure(vnc, MAC)
+    expect(await call('desktop.record.start', {}, MAC_AGENT)).toMatchObject({ ok: true })
+    await call('desktop.record.stop', {}, MAC_AGENT)
+  })
+
+  it('the list says when a recording is still running or finalizing', async () => {
+    const { call, configure, vnc } = await setup()
+    await configure(vnc, MAC)
+
+    expect((await call('desktop.recordings.list', {}, MAC_AGENT)).result).toMatchObject({
+      inProgress: false
+    })
+    await call('desktop.record.start', {}, MAC_AGENT)
+    expect((await call('desktop.recordings.list', {}, MAC_AGENT)).result).toMatchObject({
+      inProgress: true
+    })
+    await call('desktop.record.stop', {}, MAC_AGENT)
+    expect((await call('desktop.recordings.list', {}, MAC_AGENT)).result).toMatchObject({
+      inProgress: false
+    })
   })
 
   it('refuses agent callers on desktop.events', async () => {
