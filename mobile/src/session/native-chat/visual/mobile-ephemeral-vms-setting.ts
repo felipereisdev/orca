@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { bindDeferredRpcOperation, defineRpcOperation } from '../../../transport/rpc/rpc-operation'
 import type { RpcCompatibleReader } from '../../../transport/rpc/rpc-operation-contract'
 import type { RpcClient } from '../../../transport/rpc/rpc-client-contract'
@@ -28,105 +28,112 @@ const ephemeralVmsRead = bindDeferredRpcOperation(
   })
 )
 
-// A value older than this is re-read by the next row that mounts; mounted rows hear changes live.
+// A mount while other rows are mounted re-reads a value older than this; mounted rows hear changes live.
 const MAX_AGE_MS = 60_000
 const SETTING_KEY = 'experimentalEphemeralVms'
 
-type ClientEntry = {
-  enabled: boolean | null
-  /** When the read behind `enabled` went out; settingsChanged resets it to "never". */
+type SettingStore = {
+  /** Last value the host gave; null until a read succeeds. Rows show it while a revalidation is pending. */
+  value: boolean | null
+  /** When the read behind `value` went out. */
   readAt: number
-  /** Bumped by every read and invalidation, so an older read cannot land over a newer answer. */
-  version: number
+  /** The current read, shared by every mount. */
+  inFlight: Promise<void> | null
+  /** Bumped by every read, so only the newest read's answer lands. */
+  generation: number
+  subscriberCount: number
+  unsubscribe: (() => void) | null
   listeners: Set<() => void>
-  stopEvents: (() => void) | null
 }
 
-let entries = new WeakMap<RpcClient, ClientEntry>()
+let stores = new WeakMap<RpcClient, SettingStore>()
 
 export function resetMobileEphemeralVmsSettingCache(): void {
-  entries = new WeakMap()
+  stores = new WeakMap()
 }
 
-function entryFor(client: RpcClient): ClientEntry {
-  let entry = entries.get(client)
-  if (!entry) {
-    entry = { enabled: null, readAt: -Infinity, version: 0, listeners: new Set(), stopEvents: null }
-    entries.set(client, entry)
+function storeFor(client: RpcClient): SettingStore {
+  let store = stores.get(client)
+  if (!store) {
+    store = {
+      value: null,
+      readAt: -Infinity,
+      inFlight: null,
+      generation: 0,
+      subscriberCount: 0,
+      unsubscribe: null,
+      listeners: new Set()
+    }
+    stores.set(client, store)
   }
-  return entry
+  return store
 }
 
-function read(client: RpcClient, entry: ClientEntry): void {
-  const version = ++entry.version
+/** Replaces any read in flight; a failed read keeps the last good value. */
+function revalidate(client: RpcClient, store: SettingStore): void {
+  const generation = ++store.generation
   const readAt = Date.now()
-  void ephemeralVmsRead
-    .request(client)
-    .then((reply) => {
-      const result = ephemeralVmsRead.interpret(reply)
-      return result.accepted && result.value
-    })
-    .catch(() => false)
-    .then((enabled) => {
-      if (version !== entry.version) {
-        return
-      }
-      entry.enabled = enabled
-      entry.readAt = readAt
-      for (const listener of entry.listeners) {
+  const settle = (value: boolean | null): void => {
+    if (generation !== store.generation) {
+      return
+    }
+    store.inFlight = null
+    if (value !== null) {
+      store.value = value
+      store.readAt = readAt
+      for (const listener of store.listeners) {
         listener()
       }
-    })
+    }
+  }
+  store.inFlight = ephemeralVmsRead.request(client).then(
+    (reply) => {
+      const result = ephemeralVmsRead.interpret(reply)
+      settle(result.accepted && result.value)
+    },
+    () => settle(null)
+  )
 }
 
-function isFresh(entry: ClientEntry): boolean {
-  return entry.enabled !== null && Date.now() - entry.readAt < MAX_AGE_MS
-}
-
-/** Mounted rows follow the host's settingsChanged events on the shared client-events stream. */
-function listen(client: RpcClient, entry: ClientEntry): void {
-  entry.stopEvents = subscribeSharedClientEvents(client, (event) => {
+function listen(client: RpcClient, store: SettingStore): () => void {
+  return subscribeSharedClientEvents(client, (event) => {
     const changed =
       event.type === 'settingsChanged' &&
       (!Array.isArray(event.keys) || event.keys.includes(SETTING_KEY))
-    // A replayed ready means events were missed while the stream was down.
-    const missed = event.type === 'ready' && 'replayed' in event && event.replayed === true
-    if (changed || missed) {
-      entry.readAt = -Infinity
-      read(client, entry)
+    // A first or replayed ready may follow missed events; a joined ready is covered by the mount's read.
+    const opened = event.type === 'ready' && !('joined' in event)
+    if (changed || opened) {
+      revalidate(client, store)
     }
   })
 }
 
+function subscribe(client: RpcClient, store: SettingStore, listener: () => void): () => void {
+  store.listeners.add(listener)
+  store.subscriberCount += 1
+  if (store.subscriberCount === 1) {
+    // Nothing heard the host while no row was mounted, so the cached value may be stale.
+    store.unsubscribe = listen(client, store)
+    revalidate(client, store)
+  } else if (!store.inFlight && Date.now() - store.readAt >= MAX_AGE_MS) {
+    revalidate(client, store)
+  }
+  return () => {
+    store.listeners.delete(listener)
+    store.subscriberCount -= 1
+    if (store.subscriberCount === 0) {
+      store.unsubscribe?.()
+      store.unsubscribe = null
+    }
+  }
+}
+
 /** The desktop's `experimentalEphemeralVms` setting, read from the paired Mac; false until known. */
 export function useMobileEphemeralVmsEnabled(client: RpcClient | undefined): boolean {
-  const [state, setState] = useState<{ client: RpcClient; enabled: boolean } | null>(null)
-  useEffect(() => {
-    if (!client) {
-      return
-    }
-    const entry = entryFor(client)
-    const update = (): void => {
-      if (entry.enabled !== null) {
-        setState({ client, enabled: entry.enabled })
-      }
-    }
-    entry.listeners.add(update)
-    if (!entry.stopEvents) {
-      listen(client, entry)
-    }
-    if (isFresh(entry)) {
-      update()
-    } else {
-      read(client, entry)
-    }
-    return () => {
-      entry.listeners.delete(update)
-      if (entry.listeners.size === 0) {
-        entry.stopEvents?.()
-        entry.stopEvents = null
-      }
-    }
-  }, [client])
-  return state !== null && state.client === client && state.enabled
+  const subscribeToClient = useCallback(
+    (listener: () => void) => (client ? subscribe(client, storeFor(client), listener) : () => {}),
+    [client]
+  )
+  const enabled = (): boolean => (client ? storeFor(client).value === true : false)
+  return useSyncExternalStore(subscribeToClient, enabled, enabled)
 }

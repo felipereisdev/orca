@@ -64,6 +64,8 @@ type Host = {
   size: number
   /** While set, `settings.get` waits for this before it answers. */
   settingsGate?: Promise<void>
+  /** While set, each `settings.get` waits here until the test answers it with a flag or a failure. */
+  heldReads?: ((answer: boolean | Error) => void)[]
 }
 
 function hostClient(host: Host) {
@@ -92,6 +94,14 @@ function hostClient(host: Host) {
       sent.push({ method, params: record })
       if (method === 'settings.get') {
         await host.settingsGate
+        const held = host.heldReads
+        if (held) {
+          const answer = await new Promise<boolean | Error>((resolve) => held.push(resolve))
+          if (answer instanceof Error) {
+            throw answer
+          }
+          return { id: method, ok: true, result: hostSettings(answer) }
+        }
       }
       const result = results[method]
       return result
@@ -120,7 +130,7 @@ function textOf(node: ReactTestInstance | string): string {
 }
 
 let renderer: ReactTestRenderer | null = null
-async function renderLine(client: ReturnType<typeof hostClient>['client']) {
+async function renderLine(client: ReturnType<typeof hostClient>['client'], rows = 1) {
   await act(async () => {
     renderer = create(
       createElement(
@@ -133,11 +143,18 @@ async function renderLine(client: ReturnType<typeof hostClient>['client']) {
             imageSource: { client, worktreeId: 'wt-1' }
           }
         },
-        createElement(Prose, {
-          block: { type: 'text', text: CLI_LINE },
-          text: CLI_LINE,
-          fontScale: 1
-        })
+        createElement(
+          'View',
+          null,
+          ...Array.from({ length: rows }, (_, index) =>
+            createElement(Prose, {
+              key: index,
+              block: { type: 'text', text: CLI_LINE },
+              text: CLI_LINE,
+              fontScale: 1
+            })
+          )
+        )
       )
     )
   })
@@ -237,5 +254,63 @@ describe('a desktop recording in a chat message', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('remounting within a minute after the last row closed re-reads and honors a host that turned it off', async () => {
+    vi.useFakeTimers()
+    try {
+      const host: Host = { experiment: true, size: 1000 }
+      const { client } = hostClient(host)
+      expect(playButtons(await renderLine(client))).not.toHaveLength(0)
+      // Nothing listens while no row is mounted, so this change is never heard.
+      act(() => renderer?.unmount())
+      renderer = null
+      host.experiment = false
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+
+      const root = await renderLine(client)
+
+      expect(playButtons(root)).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('three rows mounting together share one settings read', async () => {
+    const { client, sent } = hostClient({ experiment: true, size: 1000 })
+    const root = await renderLine(client, 3)
+
+    expect(sent.filter((call) => call.method === 'settings.get')).toHaveLength(1)
+    expect(playButtons(root)).toHaveLength(3)
+  })
+
+  it('a failed replacement read keeps the last value the host gave', async () => {
+    const host: Host = { experiment: true, size: 1000, heldReads: [] }
+    const { client, emit } = hostClient(host)
+    const root = await renderLine(client)
+    await act(async () => host.heldReads!.shift()!(true))
+    expect(playButtons(root)).not.toHaveLength(0)
+
+    await act(async () => emit({ type: 'settingsChanged', keys: ['experimentalEphemeralVms'] }))
+    await act(async () => host.heldReads!.shift()!(new Error('connection lost')))
+
+    expect(playButtons(root)).not.toHaveLength(0)
+  })
+
+  it('an older read that settles after a newer one does not overwrite it', async () => {
+    const host: Host = { experiment: true, size: 1000, heldReads: [] }
+    const { client, emit } = hostClient(host)
+    const root = await renderLine(client)
+    // The stream's ready means events before it may be missed, so the mount's read is replaced.
+    await act(async () => emit({ type: 'ready' }))
+    const [older, newer] = host.heldReads!
+    expect(newer).toBeDefined()
+
+    await act(async () => newer!(false))
+    await act(async () => older!(true))
+
+    expect(playButtons(root)).toHaveLength(0)
   })
 })
