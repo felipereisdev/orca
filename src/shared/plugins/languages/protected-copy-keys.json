@@ -1671,6 +1671,7 @@
     "workspaceDeletion.recipeCheck.reasonTimeout",
     "workspaceDeletion.recipeCheck.reasonUnreachable",
     "workspaceDeletion.recipeCheck.reasonWorkspaceUnrecorded",
+    "workspaceDeletion.recipeCheck.recordingInProgress",
     "workspaceDeletion.recipeCheck.recordingsNotCopied",
     "workspaceDeletion.recipeCheck.removeAnyway",
     "workspaceDeletion.recipeCheck.reviewTitle",
