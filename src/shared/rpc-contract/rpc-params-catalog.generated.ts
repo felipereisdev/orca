@@ -1645,6 +1645,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'git.status': GitStatusParams,
   'git.submoduleStatus': GitSubmoduleStatus,
   'git.switchBranch': GitSwitchBranch,
+  'git.unpushedCommitCount': WorktreeSelectorOfGitParams,
   'git.unstage': GitFilePath,
   'git.upstreamStatus': GitTargetedRemote,
   'github.addIssueComment': IssueComment,

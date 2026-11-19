@@ -24943,7 +24943,32 @@
     "moreActions": "More force delete options",
     "moreBranchActions": "More branch delete options",
     "alwaysForceDeleteBranches": "Always delete preserved branches",
-    "alwaysForceDeleteBranchesDescription": "Applies to branches kept after future workspace deletions."
+    "alwaysForceDeleteBranchesDescription": "Applies to branches kept after future workspace deletions.",
+    "recipeCheck": {
+      "unsafeTitle": "This workspace has work that is not safe yet:",
+      "uncheckedTitle": "Couldn't verify this workspace",
+      "cancel": "Cancel",
+      "removeAnyway": "Remove anyway",
+      "copying": "Copying recordings…",
+      "copyAndRemove": "Copy recordings and remove",
+      "checking": "Checking this workspace for unsaved work…",
+      "checkingButton": "Checking…",
+      "reasonTimeout": "The environment didn't answer in time.",
+      "reasonAsleep": "The environment is asleep, so its work could not be checked.",
+      "reasonGit": "Git couldn't be read in the environment.",
+      "reasonRecordings": "The environment's recordings couldn't be listed.",
+      "reasonUnreachable": "The environment can't be reached.",
+      "copyFailed": "A recording couldn't be copied to this Mac. Nothing was removed.",
+      "copyTimeout": "Copying the recordings took too long. Nothing was removed.",
+      "copyUnavailable": "The recordings couldn't be listed. Nothing was removed.",
+      "copyUnreachable": "The environment can't be reached. Nothing was removed.",
+      "recordingsNotCopied_one": "{{count}} recording not copied to this Mac",
+      "recordingsNotCopied_other": "{{count}} recordings not copied to this Mac",
+      "dirtyFiles_one": "{{count}} file with uncommitted changes",
+      "dirtyFiles_other": "{{count}} files with uncommitted changes",
+      "unpushedCommits_one": "{{count}} commit not pushed",
+      "unpushedCommits_other": "{{count}} commits not pushed"
+    }
   },
   "worktree": {
     "setupTrust": {

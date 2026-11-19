@@ -32,6 +32,9 @@ export const ephemeralVmApi = {
   },
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
+  removalPreflight: (args) => ipcRenderer.invoke('ephemeralVm:removalPreflight', args),
+  copyRecordingsBeforeRemoval: (args) =>
+    ipcRenderer.invoke('ephemeralVm:copyRecordingsBeforeRemoval', args),
   forgetRuntime: (args) => ipcRenderer.invoke('ephemeralVm:forgetRuntime', args),
   getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args),
   publishPendingCheckouts: (checkouts) => {

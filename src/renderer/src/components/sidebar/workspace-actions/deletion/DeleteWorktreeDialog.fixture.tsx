@@ -6,6 +6,8 @@ import type { WorktreeAtRiskLocalFiles } from '../../../../../../shared/worktree
 import type { OpenFile } from '@/store/slices/editor/types/open-file'
 import type { WorktreeDeleteState } from '@/store/slices/worktrees/teardown/worktree-delete-state-types'
 import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
+import type { RecipeRemovalPreflight } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import { useAppStore } from '@/store'
 import DeleteWorktreeDialog from './DeleteWorktreeDialog'
 
 const repo: Repo = {
@@ -127,6 +129,8 @@ function dialogFixture(
     localFiles?: WorktreeAtRiskLocalFiles | 'pending' | 'unsupported'
     heightClassName?: string
     deleteState?: WorktreeDeleteState
+    /** A recipe ("cloud VM") workspace whose removal check answers this. */
+    recipe?: RecipeRemovalPreflight
   } = {},
   interact?: (frame: HTMLElement) => void
 ) {
@@ -146,12 +150,34 @@ function dialogFixture(
         ? [unsavedFile(target.id, 'src/login.ts'), unsavedFile(target.id, 'src/session.ts')]
         : [],
       deleteStateByWorktreeId: options.deleteState ? { [target.id]: options.deleteState } : {},
+      ephemeralVmRuntimesByWorkspaceId: options.recipe
+        ? {
+            [target.id]: {
+              id: 'vm-fixture',
+              workspaceId: target.id,
+              status: 'running',
+              runtimeEnvironmentId: 'env-fixture',
+              canSuspend: false,
+              hasDesktop: true
+            }
+          }
+        : {},
       activeModal: 'delete-worktree',
       modalData: options.batch
         ? { worktreeIds: all.map((item) => item.id) }
         : { worktreeId: target.id }
     },
     setup: () => {
+      const recipe = options.recipe
+      if (recipe) {
+        useAppStore.setState((state) => ({
+          settings: state.settings && { ...state.settings, experimentalEphemeralVms: true }
+        }))
+        window.api.ephemeralVm = {
+          ...window.api.ephemeralVm,
+          removalPreflight: async () => recipe
+        }
+      }
       defaultGitStatus ??= window.api.git.status
       window.api.git.status = options.incomplete
         ? async () => {
@@ -283,3 +309,28 @@ export const alwaysDeleteMenu = dialogFixture(
     document.querySelector<HTMLButtonElement>('[role="checkbox"]')?.click()
   }
 )
+
+const REC = { id: 'aaaaaaaaaaaaaaaa', path: '/rec/rec-aaaaaaaaaaaaaaaa.mp4', bytes: 1 }
+
+export const recipeUnsafe = dialogFixture({
+  target: shortWorktree,
+  entries: [],
+  recipe: {
+    status: 'unsafe',
+    recordingsNotCopied: [REC, { ...REC, id: 'bbbbbbbbbbbbbbbb' }],
+    dirtyFiles: 3,
+    unpushedCommits: 1
+  }
+})
+
+export const recipeUnchecked = dialogFixture({
+  target: shortWorktree,
+  entries: [],
+  recipe: {
+    status: 'unchecked',
+    recordingsNotCopied: [],
+    dirtyFiles: 0,
+    unpushedCommits: 0,
+    reason: 'timeout'
+  }
+})

@@ -18,6 +18,7 @@ type RuntimeGitCommandName =
   | 'getRuntimeGitBranchCompare'
   | 'getRuntimeGitCommitCompare'
   | 'getRuntimeGitUpstreamStatus'
+  | 'countRuntimeGitUnpushedCommits'
   | 'fetchRuntimeGit'
   | 'syncRuntimeGitForkDefaultBranch'
   | 'pullRuntimeGit'
@@ -74,6 +75,7 @@ export function installRuntimeGitCommandSurface(
     getRuntimeGitBranchCompare: commands.getRuntimeGitBranchCompare.bind(commands),
     getRuntimeGitCommitCompare: commands.getRuntimeGitCommitCompare.bind(commands),
     getRuntimeGitUpstreamStatus: commands.getRuntimeGitUpstreamStatus.bind(commands),
+    countRuntimeGitUnpushedCommits: commands.countRuntimeGitUnpushedCommits.bind(commands),
     fetchRuntimeGit: commands.fetchRuntimeGit.bind(commands),
     syncRuntimeGitForkDefaultBranch: commands.syncRuntimeGitForkDefaultBranch.bind(commands),
     pullRuntimeGit: commands.pullRuntimeGit.bind(commands),

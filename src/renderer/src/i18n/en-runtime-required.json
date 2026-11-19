@@ -3320,6 +3320,16 @@
       "showLinked_other": "Show {{count}} linked reviews and tasks"
     }
   },
+  "workspaceDeletion": {
+    "recipeCheck": {
+      "dirtyFiles_one": "{{count}} file with uncommitted changes",
+      "dirtyFiles_other": "{{count}} files with uncommitted changes",
+      "recordingsNotCopied_one": "{{count}} recording not copied to this Mac",
+      "recordingsNotCopied_other": "{{count}} recordings not copied to this Mac",
+      "unpushedCommits_one": "{{count}} commit not pushed",
+      "unpushedCommits_other": "{{count}} commits not pushed"
+    }
+  },
   "workspaceSpace": {
     "compact": {
       "linkedAndScannedCount_one": "{{size}} in linked worktrees · {{count}} workspace",

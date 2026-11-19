@@ -24,6 +24,7 @@ import {
   restoreEnvironmentDesktops,
   startEnvironmentDesktop
 } from '../../ephemeral-vm/desktop-sync-registry'
+import { registerRecipeRemovalPreflightHandlers } from '../../ephemeral-vm/workspace-removal-preflight-wiring'
 import { forgetInterruptedEphemeralVmProvision } from '../../ephemeral-vm/runtime-provisioning-persistence'
 import { pendingVmCheckouts } from '../../ephemeral-vm/pending-vm-checkouts'
 import {
@@ -113,6 +114,7 @@ function registerPendingVmCheckoutHandlers(): void {
 
 export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   registerPendingVmCheckoutHandlers()
+  registerRecipeRemovalPreflightHandlers(store)
   ipcMain.removeHandler('ephemeralVm:attachWorkspace')
   ipcMain.removeHandler('ephemeralVm:listRuntimes')
   ipcMain.removeHandler('ephemeralVm:cleanup')

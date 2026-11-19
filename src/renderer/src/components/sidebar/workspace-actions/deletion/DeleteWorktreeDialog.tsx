@@ -9,6 +9,7 @@ import { getWorktreeDeleteErrorToShow } from './worktree-delete-error-display'
 import { getWorkspaceDeleteLineage } from './workspace-delete-lineage'
 import { DeleteWorktreeLineageNotice } from './DeleteWorktreeLineageNotice'
 import { DeleteWorktreeDialogFooter } from './DeleteWorktreeDialogFooter'
+import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 import { DeleteWorktreeDialogHeading } from './DeleteWorktreeDialogDescription'
 import { DeleteWorktreeTargetPreview } from './DeleteWorktreeTargetPreview'
 import {
@@ -295,6 +296,12 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   const handleDetachAndDelete = (): void => {
     void detachChildren(() => handleDelete(canForceDelete))
   }
+  const forceDelete = (): void => handleDelete(true)
+  const confirmDelete = preserveChildrenSelected
+    ? handleDetachAndDelete
+    : canDeleteAllLineage
+      ? handleDeleteAll
+      : () => handleDelete(false)
 
   const { title, deleteLabel } = getDeleteWorktreeDialogHeading(
     {
@@ -377,26 +384,23 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
           />
         ) : null}
 
-        <DeleteWorktreeDialogFooter
-          isMainWorktree={isMainWorktree}
-          isDeleting={isDeleting || isSavingForcePreference}
-          isDetachingChildren={isDetachingChildren}
-          deleteDisabled={preserveChildrenSelected && !canPreserveChildren}
-          canForceDelete={canForceDelete}
-          deleteLabel={deleteLabel}
-          onForceDelete={
-            preserveChildrenSelected ? handleDetachAndDelete : () => handleDelete(true)
-          }
-          onSavingChange={setIsSavingForcePreference}
-          onDelete={
-            preserveChildrenSelected
-              ? handleDetachAndDelete
-              : canDeleteAllLineage
-                ? handleDeleteAll
-                : () => handleDelete(false)
-          }
-          onAlwaysDelete={allowSkipConfirm ? persistSkipConfirmPreference : undefined}
-        />
+        <RecipeRemovalPreflightGate
+          workspaceId={isOpen && !isBatchDelete && !isMainWorktree ? (worktree?.id ?? null) : null}
+          onRemove={canForceDelete && !preserveChildrenSelected ? forceDelete : confirmDelete}
+        >
+          <DeleteWorktreeDialogFooter
+            isMainWorktree={isMainWorktree}
+            isDeleting={isDeleting || isSavingForcePreference}
+            isDetachingChildren={isDetachingChildren}
+            deleteDisabled={preserveChildrenSelected && !canPreserveChildren}
+            canForceDelete={canForceDelete}
+            deleteLabel={deleteLabel}
+            onForceDelete={preserveChildrenSelected ? handleDetachAndDelete : forceDelete}
+            onSavingChange={setIsSavingForcePreference}
+            onDelete={confirmDelete}
+            onAlwaysDelete={allowSkipConfirm ? persistSkipConfirmPreference : undefined}
+          />
+        </RecipeRemovalPreflightGate>
       </DialogContent>
     </Dialog>
   )

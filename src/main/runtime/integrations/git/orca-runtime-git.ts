@@ -28,6 +28,7 @@ export class RuntimeGitCommands {
   readonly abortRuntimeGitMerge: RuntimeGitSyncCommands['abortRuntimeGitMerge']
   readonly abortRuntimeGitRebase: RuntimeGitSyncCommands['abortRuntimeGitRebase']
   readonly getRuntimeGitUpstreamStatus: RuntimeGitSyncCommands['getRuntimeGitUpstreamStatus']
+  readonly countRuntimeGitUnpushedCommits: RuntimeGitSyncCommands['countRuntimeGitUnpushedCommits']
   readonly fetchRuntimeGit: RuntimeGitSyncCommands['fetchRuntimeGit']
   readonly syncRuntimeGitForkDefaultBranch: RuntimeGitSyncCommands['syncRuntimeGitForkDefaultBranch']
   readonly pullRuntimeGit: RuntimeGitSyncCommands['pullRuntimeGit']
@@ -84,6 +85,7 @@ export class RuntimeGitCommands {
     this.abortRuntimeGitMerge = sync.abortRuntimeGitMerge.bind(sync)
     this.abortRuntimeGitRebase = sync.abortRuntimeGitRebase.bind(sync)
     this.getRuntimeGitUpstreamStatus = sync.getRuntimeGitUpstreamStatus.bind(sync)
+    this.countRuntimeGitUnpushedCommits = sync.countRuntimeGitUnpushedCommits.bind(sync)
     this.fetchRuntimeGit = sync.fetchRuntimeGit.bind(sync)
     this.syncRuntimeGitForkDefaultBranch = sync.syncRuntimeGitForkDefaultBranch.bind(sync)
     this.pullRuntimeGit = sync.pullRuntimeGit.bind(sync)

@@ -9,6 +9,11 @@ import type {
 } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { EphemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import type { PendingVmCheckout } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
+import type {
+  RecipeRemovalCopyResult,
+  RecipeRemovalPreflight,
+  RecipeRemovalTarget
+} from '../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 
 export type EphemeralVmApi = {
   listRecipes: (args: { repoId: string }) => Promise<{
@@ -79,6 +84,10 @@ export type EphemeralVmApi = {
   onRuntimesChanged: (callback: () => void) => () => void
   cleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
   stopCleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
+  /** What removing a recipe workspace would lose; null when the check does not apply. */
+  removalPreflight: (args: RecipeRemovalTarget) => Promise<RecipeRemovalPreflight | null>
+  /** Copies its pending recordings to this Mac; only `ok: true` may be followed by the removal. */
+  copyRecordingsBeforeRemoval: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCopyResult>
   /** Drops an interrupted write-ahead record that never received a recipe result. */
   forgetRuntime: (args: { runtimeId: string }) => Promise<void>
   getCleanupCommand: (args: { runtimeId: string }) => Promise<{

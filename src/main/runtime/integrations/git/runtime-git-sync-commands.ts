@@ -8,12 +8,17 @@ import type { GitPushTarget } from '../../../../shared/worktree/types'
 import { materializeWorktreePushTargetRemote } from '../../../ipc/worktrees/worktree-remote'
 import { assertRuntimeReadWslDistroRunning } from './runtime-wsl-background-read-gate'
 import type { LocalGitProvider } from '../../../providers/git/local-provider'
+import { gitExecFileAsync } from '../../../git/command-runner/git-exec-file'
+import { gitOptionsForWorktree } from '../../../git/command-runner/git-runtime-options'
 import {
   localGitOptionsForTarget,
+  requireLocalRuntimeGitRoute,
   requireRuntimeGitProvider,
   type RuntimeGitCommandHost,
   type RuntimeGitTarget
 } from './runtime-git-command-target'
+
+const UNPUSHED_COMMIT_COUNT_TIMEOUT_MS = 10_000
 
 export class RuntimeGitSyncCommands {
   constructor(private readonly host: RuntimeGitCommandHost) {}
@@ -59,6 +64,30 @@ export class RuntimeGitSyncCommands {
     // A poll no user asked for: never start a stopped WSL distro (E9).
     await assertRuntimeReadWslDistroRunning(target, localGitOptionsForTarget(target).wslDistro)
     return requireRuntimeGitProvider(target).getUpstreamStatus(target.worktree.path, pushTarget)
+  }
+
+  /** Commits reachable from HEAD that no remote-tracking ref holds, as `git rev-list` counts them. */
+  async countRuntimeGitUnpushedCommits(
+    worktreeSelector: string,
+    signal?: AbortSignal
+  ): Promise<{ unpushedCommits: number }> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    requireLocalRuntimeGitRoute(target)
+    const { stdout } = await gitExecFileAsync(
+      ['rev-list', '--count', 'HEAD', '--not', '--remotes'],
+      {
+        ...gitOptionsForWorktree(target.worktree.path, {
+          ...localGitOptionsForTarget(target),
+          ...(signal ? { signal } : {})
+        }),
+        timeout: UNPUSHED_COMMIT_COUNT_TIMEOUT_MS
+      }
+    )
+    const unpushedCommits = Number.parseInt(stdout.trim(), 10)
+    if (!Number.isSafeInteger(unpushedCommits) || unpushedCommits < 0) {
+      throw new Error('git rev-list returned no commit count.')
+    }
+    return { unpushedCommits }
   }
 
   async fetchRuntimeGit(

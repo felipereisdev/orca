@@ -23054,7 +23054,35 @@
     "moreActions": "Mais opções de exclusão forçada",
     "moreBranchActions": "Mais opções de exclusão de branches",
     "alwaysForceDeleteBranches": "Sempre excluir branches preservadas",
-    "alwaysForceDeleteBranchesDescription": "Aplica-se às branches mantidas após futuras exclusões de espaços de trabalho."
+    "alwaysForceDeleteBranchesDescription": "Aplica-se às branches mantidas após futuras exclusões de espaços de trabalho.",
+    "recipeCheck": {
+      "unsafeTitle": "Este workspace tem trabalho que ainda não está seguro:",
+      "uncheckedTitle": "Não foi possível verificar este workspace",
+      "cancel": "Cancelar",
+      "removeAnyway": "Remover mesmo assim",
+      "copying": "Copiando gravações…",
+      "copyAndRemove": "Copiar gravações e remover",
+      "checking": "Verificando se este workspace tem trabalho não salvo…",
+      "checkingButton": "Verificando…",
+      "reasonTimeout": "O ambiente não respondeu a tempo.",
+      "reasonAsleep": "O ambiente está dormindo, então o trabalho dele não pôde ser verificado.",
+      "reasonGit": "Não foi possível ler o Git no ambiente.",
+      "reasonRecordings": "Não foi possível listar as gravações do ambiente.",
+      "reasonUnreachable": "Não é possível acessar o ambiente.",
+      "copyFailed": "Não foi possível copiar uma gravação para este Mac. Nada foi removido.",
+      "copyTimeout": "A cópia das gravações demorou demais. Nada foi removido.",
+      "copyUnavailable": "Não foi possível listar as gravações. Nada foi removido.",
+      "copyUnreachable": "Não é possível acessar o ambiente. Nada foi removido.",
+      "recordingsNotCopied_one": "{{count}} gravação não copiada para este Mac",
+      "recordingsNotCopied_other": "{{count}} gravações não copiadas para este Mac",
+      "recordingsNotCopied_many": "{{count}} gravações não copiadas para este Mac",
+      "dirtyFiles_one": "{{count}} arquivo com alterações não commitadas",
+      "dirtyFiles_other": "{{count}} arquivos com alterações não commitadas",
+      "dirtyFiles_many": "{{count}} arquivos com alterações não commitadas",
+      "unpushedCommits_one": "{{count}} commit não enviado",
+      "unpushedCommits_other": "{{count}} commits não enviados",
+      "unpushedCommits_many": "{{count}} commits não enviados"
+    }
   },
   "worktree": {
     "nestedRemoval": {

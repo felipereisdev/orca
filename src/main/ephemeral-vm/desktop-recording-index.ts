@@ -5,7 +5,12 @@ import { app } from 'electron'
 import { desktopRecordingIdFromPath } from '../../shared/native-chat/media/native-chat-video-path'
 import { isCopiedRecordingKnown, noteCopiedRecording } from './desktop-recording-copies'
 
-export { RECORDING_ID, localRecordingPath, noteCopiedRecording } from './desktop-recording-copies'
+export {
+  RECORDING_ID,
+  localRecordingPath,
+  noteCopiedRecording,
+  recordingFileName
+} from './desktop-recording-copies'
 
 export function recordingsRoot(): string {
   return join(app.getPath('userData'), 'desktop-recordings')
@@ -15,10 +20,6 @@ export function recordingsRoot(): string {
 export function recordingsDirForWorkspace(workspaceId: string): string {
   const key = createHash('sha256').update(workspaceId).digest('hex').slice(0, 32)
   return join(recordingsRoot(), key)
-}
-
-export function recordingFileName(id: string): string {
-  return `rec-${id}.mp4`
 }
 
 async function listOrEmpty(dir: string): Promise<string[]> {

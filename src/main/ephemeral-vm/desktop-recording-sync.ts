@@ -4,9 +4,9 @@ import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/run
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { copyEnvironmentRecording, type EnvironmentRecording } from './desktop-recording-copy'
 import { keepDesktopEventsStream } from './desktop-events-stream'
+import { parseEnvironmentRecording } from './desktop-recording-copies'
 import {
   noteCopiedRecording,
-  RECORDING_ID,
   recordingFileName,
   recordingsDirForWorkspace
 } from './desktop-recording-index'
@@ -21,28 +21,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function parseRecording(value: unknown): EnvironmentRecording | null {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    !RECORDING_ID.test(value.id) ||
-    typeof value.path !== 'string' ||
-    !value.path.endsWith(`/${recordingFileName(value.id)}`) ||
-    typeof value.bytes !== 'number' ||
-    !Number.isSafeInteger(value.bytes) ||
-    value.bytes <= 0
-  ) {
-    return null
-  }
-  return { id: value.id, path: value.path, bytes: value.bytes }
-}
-
 async function isCopied(path: string): Promise<boolean> {
   try {
     return (await lstat(path)).isFile()
   } catch {
     return false
   }
+}
+
+/**
+ * Copies one environment recording into the workspace's folder on this Mac unless it is there, then
+ * indexes it. A cancellation between steps throws before touching the disk or the index again.
+ */
+export async function keepRecordingOnMac(args: {
+  environmentId: string
+  workspaceId: string
+  recording: EnvironmentRecording
+  signal: AbortSignal
+}): Promise<void> {
+  const { recording, signal } = args
+  const dir = recordingsDirForWorkspace(args.workspaceId)
+  const destination = join(dir, recordingFileName(recording.id))
+  const copied = await isCopied(destination)
+  signal.throwIfAborted()
+  if (!copied) {
+    await mkdir(dir, { recursive: true, mode: 0o700 })
+    signal.throwIfAborted()
+    await copyEnvironmentRecording({
+      environmentId: args.environmentId,
+      workspaceId: args.workspaceId,
+      recording,
+      destination,
+      signal
+    })
+    signal.throwIfAborted()
+  }
+  noteCopiedRecording(recording.id, destination)
 }
 
 function describeError(error: unknown): string {
@@ -64,7 +78,6 @@ export function syncEnvironmentRecordings(
   activeSyncs.get(workspaceId)?.()
   const controller = new AbortController()
   const { signal } = controller
-  const dir = recordingsDirForWorkspace(workspaceId)
   let passNeeded = false
   let looping = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -86,7 +99,7 @@ export function syncEnvironmentRecordings(
     }
     const listed = isRecord(response.result) ? response.result.recordings : undefined
     return (Array.isArray(listed) ? listed : []).flatMap((entry) => {
-      const recording = parseRecording(entry)
+      const recording = parseEnvironmentRecording(entry)
       return recording ? [recording] : []
     })
   }
@@ -109,29 +122,13 @@ export function syncEnvironmentRecordings(
       if (signal.aborted) {
         return failed
       }
-      const destination = join(dir, recordingFileName(recording.id))
       try {
-        const copied = await isCopied(destination)
-        if (signal.aborted) {
-          return failed
-        }
-        if (!copied) {
-          await mkdir(dir, { recursive: true, mode: 0o700 })
-          if (signal.aborted) {
-            return failed
-          }
-          await copyEnvironmentRecording({
-            environmentId: runtimeEnvironmentId,
-            workspaceId,
-            recording,
-            destination,
-            signal
-          })
-          if (signal.aborted) {
-            return failed
-          }
-        }
-        noteCopiedRecording(recording.id, destination)
+        await keepRecordingOnMac({
+          environmentId: runtimeEnvironmentId,
+          workspaceId,
+          recording,
+          signal
+        })
       } catch (error) {
         if (signal.aborted) {
           return true
