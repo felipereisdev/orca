@@ -11,7 +11,7 @@ import {
 
 // Older builds never read this file, so result-less write-ahead records cannot break their store parse.
 const EPHEMERAL_VM_WRITE_AHEAD_RUNTIMES_FILE = 'orca-ephemeral-vm-runtimes-write-ahead.json'
-const MAX_WRITE_AHEAD_STORE_FILE_BYTES = 1024 * 1024
+export const MAX_WRITE_AHEAD_STORE_FILE_BYTES = 1024 * 1024
 
 export function getEphemeralVmWriteAheadRuntimeStorePath(userDataPath: string): string {
   return join(userDataPath, EPHEMERAL_VM_WRITE_AHEAD_RUNTIMES_FILE)
@@ -55,14 +55,18 @@ function readWriteAheadFile(path: string): {
   }
   try {
     hardenExistingSecureFile(path)
-    const runtimes = WriteAheadRuntimeStoreSchema.parse(JSON.parse(text)).runtimes.filter(
-      (entry) => !hasEphemeralVmRecipeResult(entry)
-    )
-    return { runtimes, state: 'readable' }
+    return { runtimes: parseWriteAheadRuntimesText(text), state: 'readable' }
   } catch {
     // Why: an unreadable sidecar must not block cleanup of tracked VMs in the main file.
     return { runtimes: [], state: 'unreadable' }
   }
+}
+
+/** Records still provisioning; throws on text this build cannot read. */
+export function parseWriteAheadRuntimesText(text: string): EphemeralVmRuntimeRecord[] {
+  return WriteAheadRuntimeStoreSchema.parse(JSON.parse(text)).runtimes.filter(
+    (entry) => !hasEphemeralVmRecipeResult(entry)
+  )
 }
 
 export function writeWriteAheadRuntimes(

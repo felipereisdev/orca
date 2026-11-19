@@ -305,6 +305,9 @@ function writeEphemeralVmRuntimeStore(
   }
 }
 
-function compareRuntimeRecords(a: EphemeralVmRuntimeRecord, b: EphemeralVmRuntimeRecord): number {
+export function compareRuntimeRecords(
+  a: EphemeralVmRuntimeRecord,
+  b: EphemeralVmRuntimeRecord
+): number {
   return b.createdAt - a.createdAt || a.id.localeCompare(b.id)
 }

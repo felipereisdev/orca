@@ -134,9 +134,14 @@ function dialogFixture(
   } = {},
   interact?: (frame: HTMLElement) => void
 ) {
-  const target = options.target ?? worktree
+  // Recipe workspaces live on their environment's Orca, so the check is host-qualified.
+  const onRecipeHost = (item: Worktree): Worktree =>
+    options.recipe ? { ...item, hostId: 'runtime:env-fixture' } : item
+  const target = onRecipeHost(options.target ?? worktree)
   const entries = options.entries ?? dirtyEntries
-  const all = options.batch ? [target, shortWorktree, thirdWorktree] : [target]
+  const all = options.batch
+    ? [target, onRecipeHost(shortWorktree), onRecipeHost(thirdWorktree)]
+    : [target]
   const unchecked = options.incomplete || options.statusReadFailed
   return defineFixture({
     width: 640,
@@ -151,16 +156,19 @@ function dialogFixture(
         : [],
       deleteStateByWorktreeId: options.deleteState ? { [target.id]: options.deleteState } : {},
       ephemeralVmRuntimesByWorkspaceId: options.recipe
-        ? {
-            [target.id]: {
-              id: 'vm-fixture',
-              workspaceId: target.id,
-              status: 'running',
-              runtimeEnvironmentId: 'env-fixture',
-              canSuspend: false,
-              hasDesktop: true
-            }
-          }
+        ? Object.fromEntries(
+            all.map((item) => [
+              item.id,
+              {
+                id: 'vm-fixture',
+                workspaceId: item.id,
+                status: 'running' as const,
+                runtimeEnvironmentId: 'env-fixture',
+                canSuspend: false,
+                hasDesktop: true
+              }
+            ])
+          )
         : {},
       activeModal: 'delete-worktree',
       modalData: options.batch
@@ -332,5 +340,18 @@ export const recipeUnchecked = dialogFixture({
     dirtyFiles: 0,
     unpushedCommits: 0,
     reason: 'timeout'
+  }
+})
+
+export const recipeBatch = dialogFixture({
+  target: shortWorktree,
+  batch: true,
+  entries: [],
+  recipe: {
+    status: 'unsafe',
+    recordingsNotCopied: [REC],
+    dirtyFiles: 40,
+    dirtyFilesCapped: true,
+    unpushedCommits: 2
   }
 })

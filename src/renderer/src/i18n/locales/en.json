@@ -24967,7 +24967,11 @@
       "dirtyFiles_one": "{{count}} file with uncommitted changes",
       "dirtyFiles_other": "{{count}} files with uncommitted changes",
       "unpushedCommits_one": "{{count}} commit not pushed",
-      "unpushedCommits_other": "{{count}} commits not pushed"
+      "unpushedCommits_other": "{{count}} commits not pushed",
+      "aggregateTitle": "Some of these workspaces have work that is not safe yet:",
+      "reasonAmbiguous": "Several environments claim this workspace, so Orca cannot tell which one to check.",
+      "dirtyFilesCapped_one": "{{count}}+ files with uncommitted changes",
+      "dirtyFilesCapped_other": "{{count}}+ files with uncommitted changes"
     }
   },
   "worktree": {

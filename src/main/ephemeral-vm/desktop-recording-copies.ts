@@ -1,4 +1,5 @@
 // Electron-free so RPC methods and media grants can look copies up in any process.
+import { stat } from 'node:fs/promises'
 import type { EnvironmentRecording } from './desktop-recording-copy'
 
 // The environment names recordings `rec-<16 hex>.mp4`; anything else is not one of its files.
@@ -18,6 +19,19 @@ export function isCopiedRecordingKnown(recordingId: string): boolean {
 /** The Mac copy of an environment recording, if one was copied for any workspace. */
 export function localRecordingPath(recordingId: string): string | null {
   return RECORDING_ID.test(recordingId) ? (copiedRecordings.get(recordingId) ?? null) : null
+}
+
+/** Whether this Mac still holds the indexed copy: a file deleted or moved since does not count. */
+export async function isRecordingCopiedOnMac(recordingId: string): Promise<boolean> {
+  const path = localRecordingPath(recordingId)
+  if (!path) {
+    return false
+  }
+  try {
+    return (await stat(path)).isFile()
+  } catch {
+    return false
+  }
 }
 
 export function recordingFileName(id: string): string {

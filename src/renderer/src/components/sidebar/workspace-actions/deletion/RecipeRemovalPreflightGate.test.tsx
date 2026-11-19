@@ -8,17 +8,18 @@ import type {
   RecipeRemovalCopyResult,
   RecipeRemovalPreflight
 } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import type { RecipeRemovalCandidate } from './recipe-removal-preflights'
 import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 
 const WORKSPACE = 'repo::/workspace/repo-task'
-const TARGET = {
-  runtimeId: 'vm-a',
-  workspaceId: WORKSPACE,
-  environmentId: 'env-a',
-  hasDesktop: true,
-  asleep: false
-}
+const OTHER = 'repo::/workspace/repo-other'
 const REC = { id: 'aaaaaaaaaaaaaaaa', path: '/rec/rec-aaaaaaaaaaaaaaaa.mp4', bytes: 10 }
+const TASK: RecipeRemovalCandidate = { id: WORKSPACE, hostId: 'runtime:env-a', displayName: 'task' }
+const OTHER_TASK: RecipeRemovalCandidate = {
+  id: OTHER,
+  hostId: 'runtime:env-a',
+  displayName: 'other'
+}
 
 const api = {
   removalPreflight: vi.fn<(args: unknown) => Promise<RecipeRemovalPreflight | null>>(),
@@ -26,6 +27,17 @@ const api = {
 }
 const initial = useAppStore.getInitialState()
 let originalApi: typeof window.api
+
+function runtimeFor(workspaceId: string) {
+  return {
+    id: 'vm-a',
+    workspaceId,
+    status: 'running' as const,
+    runtimeEnvironmentId: 'env-a',
+    canSuspend: false,
+    hasDesktop: true
+  }
+}
 
 function seed(options: { experiment?: boolean; recipe?: boolean } = {}): void {
   useAppStore.setState({
@@ -36,16 +48,7 @@ function seed(options: { experiment?: boolean; recipe?: boolean } = {}): void {
     ephemeralVmRuntimesByWorkspaceId:
       options.recipe === false
         ? {}
-        : {
-            [WORKSPACE]: {
-              id: 'vm-a',
-              workspaceId: WORKSPACE,
-              status: 'running',
-              runtimeEnvironmentId: 'env-a',
-              canSuspend: false,
-              hasDesktop: true
-            }
-          }
+        : { [WORKSPACE]: runtimeFor(WORKSPACE), [OTHER]: runtimeFor(OTHER) }
   })
 }
 
@@ -59,18 +62,26 @@ function preflight(overrides: Partial<RecipeRemovalPreflight>): RecipeRemovalPre
   }
 }
 
-async function renderGate(onRemove = vi.fn()) {
-  render(
+function Harness(props: {
+  targets: readonly RecipeRemovalCandidate[] | null
+  onRemove: () => void
+  onBusyChange?: (busy: boolean) => void
+}) {
+  return (
     <Dialog open>
       <DialogContent>
-        <RecipeRemovalPreflightGate workspaceId={WORKSPACE} onRemove={onRemove}>
+        <RecipeRemovalPreflightGate {...props}>
           <button type="button">Current footer</button>
         </RecipeRemovalPreflightGate>
       </DialogContent>
     </Dialog>
   )
+}
+
+async function renderGate(targets: readonly RecipeRemovalCandidate[] = [TASK], onRemove = vi.fn()) {
+  const view = render(<Harness targets={targets} onRemove={onRemove} />)
   await act(async () => {})
-  return onRemove
+  return { onRemove, view }
 }
 
 describe('RecipeRemovalPreflightGate', () => {
@@ -91,7 +102,10 @@ describe('RecipeRemovalPreflightGate', () => {
     api.removalPreflight.mockResolvedValue(preflight({}))
     await renderGate()
     expect(screen.getByText('Current footer')).toBeTruthy()
-    expect(api.removalPreflight).toHaveBeenCalledWith(TARGET)
+    expect(api.removalPreflight).toHaveBeenCalledWith({
+      hostId: 'runtime:env-a',
+      workspaceId: WORKSPACE
+    })
     cleanup()
 
     api.removalPreflight.mockClear()
@@ -110,12 +124,18 @@ describe('RecipeRemovalPreflightGate', () => {
 
   it('unsafe shows the counts and removes only after every recording was copied', async () => {
     api.removalPreflight.mockResolvedValue(
-      preflight({ status: 'unsafe', recordingsNotCopied: [REC], dirtyFiles: 2, unpushedCommits: 1 })
+      preflight({
+        status: 'unsafe',
+        recordingsNotCopied: [REC],
+        dirtyFiles: 2,
+        dirtyFilesCapped: true,
+        unpushedCommits: 1
+      })
     )
     api.copyRecordingsBeforeRemoval.mockResolvedValueOnce({ ok: false, reason: 'copy_failed' })
-    const onRemove = await renderGate()
+    const { onRemove } = await renderGate()
     expect(screen.getByText('1 recording not copied to this Mac')).toBeTruthy()
-    expect(screen.getByText('2 files with uncommitted changes')).toBeTruthy()
+    expect(screen.getByText('2+ files with uncommitted changes')).toBeTruthy()
     expect(screen.getByText('1 commit not pushed')).toBeTruthy()
     expect(screen.queryByText('Current footer')).toBeNull()
 
@@ -124,23 +144,71 @@ describe('RecipeRemovalPreflightGate', () => {
     })
     expect(onRemove).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toContain("A recording couldn't be copied")
-    expect(screen.getByRole('button', { name: 'Remove anyway' }).hasAttribute('disabled')).toBe(
-      false
-    )
 
     api.copyRecordingsBeforeRemoval.mockResolvedValueOnce({ ok: true, copied: 1 })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
     })
     expect(api.copyRecordingsBeforeRemoval).toHaveBeenLastCalledWith({
-      ...TARGET
+      hostId: 'runtime:env-a',
+      workspaceId: WORKSPACE
     })
     expect(onRemove).toHaveBeenCalledTimes(1)
   })
 
+  it('recordings still pending after the copy show the new counts instead of removing', async () => {
+    api.removalPreflight.mockResolvedValue(
+      preflight({ status: 'unsafe', recordingsNotCopied: [REC] })
+    )
+    api.copyRecordingsBeforeRemoval.mockResolvedValue({
+      ok: false,
+      reason: 'still_pending',
+      preflight: preflight({
+        status: 'unsafe',
+        recordingsNotCopied: [REC, { ...REC, id: 'bbbbbbbbbbbbbbbb' }]
+      })
+    })
+    const { onRemove } = await renderGate()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
+    })
+    expect(onRemove).not.toHaveBeenCalled()
+    expect(screen.getByText('2 recordings not copied to this Mac')).toBeTruthy()
+  })
+
+  it('dismissing the dialog during the copy never removes', async () => {
+    api.removalPreflight.mockResolvedValue(
+      preflight({ status: 'unsafe', recordingsNotCopied: [REC] })
+    )
+    let finishCopy: (result: RecipeRemovalCopyResult) => void = () => {}
+    api.copyRecordingsBeforeRemoval.mockReturnValue(
+      new Promise((resolve) => {
+        finishCopy = resolve
+      })
+    )
+    const onRemove = vi.fn()
+    const onBusyChange = vi.fn()
+    const view = render(
+      <Harness targets={[TASK]} onRemove={onRemove} onBusyChange={onBusyChange} />
+    )
+    await act(async () => {})
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
+    })
+    // The dialog is busy while copying, so it can't be dismissed by Escape or an outside click.
+    expect(onBusyChange).toHaveBeenLastCalledWith(true)
+
+    view.rerender(<Harness targets={null} onRemove={onRemove} onBusyChange={onBusyChange} />)
+    await act(async () => {
+      finishCopy({ ok: true, copied: 1 })
+    })
+    expect(onRemove).not.toHaveBeenCalled()
+    expect(onBusyChange).toHaveBeenLastCalledWith(false)
+  })
+
   it('unchecked says it could not verify and never shows the clean dialog', async () => {
     api.removalPreflight.mockResolvedValue(preflight({ status: 'unchecked', reason: 'timeout' }))
-    const onRemove = await renderGate()
+    const { onRemove } = await renderGate()
     expect(screen.getByText("Couldn't verify this workspace")).toBeTruthy()
     expect(screen.getByText("The environment didn't answer in time.")).toBeTruthy()
     expect(screen.queryByText('Current footer')).toBeNull()
@@ -154,5 +222,21 @@ describe('RecipeRemovalPreflightGate', () => {
     await renderGate()
     expect(screen.getByText("Couldn't verify this workspace")).toBeTruthy()
     expect(screen.queryByText('Current footer')).toBeNull()
+  })
+
+  it('a batch lists each workspace that is not clean, with only remove anyway and cancel', async () => {
+    api.removalPreflight.mockImplementation(async (args) =>
+      JSON.stringify(args).includes('repo-task')
+        ? preflight({ status: 'unsafe', recordingsNotCopied: [REC], unpushedCommits: 3 })
+        : preflight({ status: 'unchecked', reason: 'unreachable' })
+    )
+    const { onRemove } = await renderGate([TASK, OTHER_TASK])
+    expect(screen.getByText('task')).toBeTruthy()
+    expect(screen.getByText('3 commits not pushed')).toBeTruthy()
+    expect(screen.getByText("other — Couldn't verify this workspace")).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copy recordings and remove' })).toBeNull()
+    expect(screen.queryByText('Current footer')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    expect(onRemove).toHaveBeenCalledTimes(1)
   })
 })

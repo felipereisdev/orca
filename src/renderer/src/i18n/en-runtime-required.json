@@ -3322,6 +3322,8 @@
   },
   "workspaceDeletion": {
     "recipeCheck": {
+      "dirtyFilesCapped_one": "{{count}}+ files with uncommitted changes",
+      "dirtyFilesCapped_other": "{{count}}+ files with uncommitted changes",
       "dirtyFiles_one": "{{count}} file with uncommitted changes",
       "dirtyFiles_other": "{{count}} files with uncommitted changes",
       "recordingsNotCopied_one": "{{count}} recording not copied to this Mac",

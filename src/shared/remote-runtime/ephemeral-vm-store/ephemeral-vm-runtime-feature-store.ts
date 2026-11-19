@@ -108,15 +108,23 @@ export function readEphemeralVmRuntimeFeatureStore(
   }
   try {
     hardenExistingSecureFile(path)
-    const parsed = EphemeralVmRuntimeFeatureStoreSchema.parse(
-      JSON.parse(
-        readNodeFileSyncWithinLimit(
-          path,
-          MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
-        ).buffer.toString('utf8')
-      )
+    return parseEphemeralVmRuntimeFeatureStoreText(
+      readNodeFileSyncWithinLimit(
+        path,
+        MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
+      ).buffer.toString('utf8')
     )
-    return parseFeatureRecords(parsed.records)
+  } catch {
+    return { writable: false, features: [], retainedRecords: [] }
+  }
+}
+
+/** The feature store's contents; unreadable text is an unwritable, empty store. */
+export function parseEphemeralVmRuntimeFeatureStoreText(
+  text: string
+): EphemeralVmRuntimeFeatureStoreSnapshot {
+  try {
+    return parseFeatureRecords(EphemeralVmRuntimeFeatureStoreSchema.parse(JSON.parse(text)).records)
   } catch {
     return { writable: false, features: [], retainedRecords: [] }
   }

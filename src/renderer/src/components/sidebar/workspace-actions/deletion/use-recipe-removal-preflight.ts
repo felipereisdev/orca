@@ -1,76 +1,62 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
-import { selectEphemeralVmWorkspaceRuntime } from '@/store/slices/ephemeral-vm/ephemeral-vm-lifecycle'
-import type {
-  RecipeRemovalPreflight,
-  RecipeRemovalTarget
-} from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import {
+  recipeRemovalCandidates,
+  runRecipeRemovalPreflights,
+  type RecipeRemovalCandidate,
+  type RecipeRemovalResult
+} from './recipe-removal-preflights'
 
 export type RecipeRemovalCheck =
   | { kind: 'skip' }
   | { kind: 'loading' }
-  | { kind: 'done'; target: RecipeRemovalTarget; preflight: RecipeRemovalPreflight }
-
-// The bridge failing is a check that couldn't run, never a clean answer.
-const BRIDGE_FAILED: RecipeRemovalPreflight = {
-  status: 'unchecked',
-  recordingsNotCopied: [],
-  dirtyFiles: 0,
-  unpushedCommits: 0,
-  reason: 'unreachable'
-}
+  | { kind: 'done'; results: RecipeRemovalResult[] }
 
 /**
- * Asks the host what removing this recipe workspace would lose, once per opening. Workspaces that
- * aren't recipe workspaces, or with the experiment off, `skip` the check and keep today's dialog.
+ * Asks the host what removing these workspaces would lose, once per opening. With no recipe
+ * workspace among them, or the experiment off, the check is skipped and the dialog stays as today.
  */
-export function useRecipeRemovalPreflight(workspaceId: string | null): RecipeRemovalCheck {
-  const enabled = useAppStore((s) => s.settings?.experimentalEphemeralVms === true)
-  const runtime = useAppStore((s) =>
-    workspaceId ? selectEphemeralVmWorkspaceRuntime(s, workspaceId) : null
+export function useRecipeRemovalPreflight(
+  targets: readonly RecipeRemovalCandidate[] | null,
+  checkAll = false
+): RecipeRemovalCheck {
+  const settings = useAppStore((s) => s.settings)
+  const runtimes = useAppStore((s) => s.ephemeralVmRuntimesByWorkspaceId)
+  const candidates = useMemo(
+    () =>
+      targets
+        ? recipeRemovalCandidates(
+            { settings, ephemeralVmRuntimesByWorkspaceId: runtimes },
+            targets,
+            checkAll
+          )
+        : [],
+    [checkAll, runtimes, settings, targets]
   )
-  const runtimeId = runtime?.runtimeEnvironmentId ? runtime.id : null
-  const environmentId = runtime?.runtimeEnvironmentId ?? ''
-  const hasDesktop = runtime?.hasDesktop === true
-  const asleep = runtime?.status === 'suspended'
-  const [answer, setAnswer] = useState<{
-    runtimeId: string
-    workspaceId: string
-    preflight: RecipeRemovalPreflight | null
-  } | null>(null)
-  const active = enabled && workspaceId !== null && runtimeId !== null
+  // Runtime list refreshes rebuild the array; only a different set of workspaces asks again.
+  const key = candidates.map((candidate) => `${candidate.hostId}\0${candidate.id}`).join('\n')
+  const [answer, setAnswer] = useState<{ key: string; results: RecipeRemovalResult[] } | null>(null)
+  const ask = useEffectEvent(() => runRecipeRemovalPreflights(candidates))
 
   useEffect(() => {
-    if (!active || workspaceId === null || runtimeId === null) {
+    if (!key) {
       return undefined
     }
     let current = true
-    void window.api.ephemeralVm
-      .removalPreflight({ runtimeId, workspaceId, environmentId, hasDesktop, asleep })
-      .catch(() => BRIDGE_FAILED)
-      .then((preflight) => {
-        if (current) {
-          setAnswer({ runtimeId, workspaceId, preflight })
-        }
-      })
+    void ask().then((results) => {
+      if (current) {
+        setAnswer({ key, results })
+      }
+    })
     return () => {
       current = false
       // A later opening asks again instead of showing this answer.
       setAnswer(null)
     }
-  }, [active, runtimeId, workspaceId, environmentId, hasDesktop, asleep])
+  }, [key])
 
-  if (!active || workspaceId === null || runtimeId === null) {
+  if (!key) {
     return { kind: 'skip' }
   }
-  if (!answer || answer.runtimeId !== runtimeId || answer.workspaceId !== workspaceId) {
-    return { kind: 'loading' }
-  }
-  return answer.preflight
-    ? {
-        kind: 'done',
-        target: { runtimeId, workspaceId, environmentId, hasDesktop, asleep },
-        preflight: answer.preflight
-      }
-    : { kind: 'skip' }
+  return answer?.key === key ? { kind: 'done', results: answer.results } : { kind: 'loading' }
 }

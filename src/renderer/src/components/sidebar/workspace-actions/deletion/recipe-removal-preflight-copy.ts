@@ -31,6 +31,11 @@ export function recipeRemovalReasonText(
         'workspaceDeletion.recipeCheck.reasonRecordings',
         "The environment's recordings couldn't be listed."
       )
+    case 'ambiguous':
+      return t(
+        'workspaceDeletion.recipeCheck.reasonAmbiguous',
+        'Several environments claim this workspace, so Orca cannot tell which one to check.'
+      )
     case 'unreachable':
     case undefined:
       return t(
@@ -84,10 +89,23 @@ export function recipeRemovalLossLines(preflight: RecipeRemovalPreflight, t: Tra
   }
   if (preflight.dirtyFiles > 0) {
     lines.push(
-      t('workspaceDeletion.recipeCheck.dirtyFiles', '{{count}} files with uncommitted changes', {
-        count: preflight.dirtyFiles,
-        defaultValue_one: '{{count}} file with uncommitted changes'
-      })
+      preflight.dirtyFilesCapped
+        ? t(
+            'workspaceDeletion.recipeCheck.dirtyFilesCapped',
+            '{{count}}+ files with uncommitted changes',
+            {
+              count: preflight.dirtyFiles,
+              defaultValue_one: '{{count}}+ files with uncommitted changes'
+            }
+          )
+        : t(
+            'workspaceDeletion.recipeCheck.dirtyFiles',
+            '{{count}} files with uncommitted changes',
+            {
+              count: preflight.dirtyFiles,
+              defaultValue_one: '{{count}} file with uncommitted changes'
+            }
+          )
     )
   }
   if (preflight.unpushedCommits > 0) {

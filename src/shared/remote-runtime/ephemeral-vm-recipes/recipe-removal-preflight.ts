@@ -8,6 +8,7 @@ export type RecipeRemovalPreflightReason =
   | 'asleep'
   | 'git_failed'
   | 'recordings_failed'
+  | 'ambiguous'
 
 export type RecipeRemovalRecording = { id: string; path: string; bytes: number }
 
@@ -15,25 +16,24 @@ export type RecipeRemovalRecording = { id: string; path: string; bytes: number }
 export type RecipeRemovalPreflight = {
   status: 'clean' | 'unsafe' | 'unchecked'
   recordingsNotCopied: RecipeRemovalRecording[]
+  /** Distinct paths with changes; staged and unstaged edits to one file count once. */
   dirtyFiles: number
+  /** Git stopped listing changes at its limit, so `dirtyFiles` is a lower bound. */
+  dirtyFilesCapped?: boolean
   unpushedCommits: number
   reason?: RecipeRemovalPreflightReason
 }
 
 export type RecipeRemovalCopyFailure = 'copy_failed' | 'timeout' | 'unreachable' | 'unavailable'
 
-/** Copying pending recordings before a removal; only `ok: true` lets the removal go on. */
+/**
+ * Copying pending recordings before a removal; only `ok: true` lets the removal go on. Recordings
+ * still pending after the copy passes answer with a fresh check instead.
+ */
 export type RecipeRemovalCopyResult =
   | { ok: true; copied: number }
   | { ok: false; reason: RecipeRemovalCopyFailure }
+  | { ok: false; reason: 'still_pending'; preflight: RecipeRemovalPreflight }
 
-/** The recipe runtime behind the workspace, as the desktop's runtime list describes it. */
-export type RecipeRemovalTarget = {
-  runtimeId: string
-  workspaceId: string
-  environmentId: string
-  /** The recipe set up a desktop, so the environment may hold recordings. */
-  hasDesktop: boolean
-  /** The environment is suspended; its Orca can't answer. */
-  asleep: boolean
-}
+/** The workspace as the desktop names it: the host decides which recipe runtime owns it. */
+export type RecipeRemovalTarget = { hostId: string; workspaceId: string }

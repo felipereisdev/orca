@@ -160,6 +160,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
     childWorkspaceCount === 0 &&
     !preserveChildrenSelected
   const [isSavingForcePreference, setIsSavingForcePreference] = useState(false)
+  const [isCopyingRecordings, setIsCopyingRecordings] = useState(false)
   const deleteTargets = useMemo(
     () => (deleteAllLineage ? lineageDelete.deleteAllTargets : worktrees),
     [deleteAllLineage, lineageDelete.deleteAllTargets, worktrees]
@@ -207,7 +208,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   const handleOpenChange = useDeleteWorktreeDialogDismissal({
     isOpen,
     isDeleting,
-    isSaving: isSavingForcePreference || isDetachingChildren,
+    isSaving: isSavingForcePreference || isDetachingChildren || isCopyingRecordings,
     isBatchDelete,
     worktreeId,
     worktreeCount: worktrees.length,
@@ -320,7 +321,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
       <DialogContent
         size={isBatchDelete || childWorkspaceCount > 0 ? 'list' : 'confirm'}
         surface="security"
-        busy={isDeleting || isSavingForcePreference || isDetachingChildren}
+        busy={isDeleting || isSavingForcePreference || isDetachingChildren || isCopyingRecordings}
         initialFocus="cancel"
       >
         <DeleteWorktreeDialogHeading
@@ -385,8 +386,9 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
         ) : null}
 
         <RecipeRemovalPreflightGate
-          workspaceId={isOpen && !isBatchDelete && !isMainWorktree ? (worktree?.id ?? null) : null}
+          targets={isOpen && !isMainWorktree ? deleteTargets : null}
           onRemove={canForceDelete && !preserveChildrenSelected ? forceDelete : confirmDelete}
+          onBusyChange={setIsCopyingRecordings}
         >
           <DeleteWorktreeDialogFooter
             isMainWorktree={isMainWorktree}
