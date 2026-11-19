@@ -29,7 +29,10 @@ vi.mock('../ipc/runtime-environments/requests/runtime-environment-transport-rout
   callRuntimeEnvironment: mocks.call
 }))
 vi.mock('./desktop-recording-sync', () => ({ keepRecordingOnMac: mocks.keep }))
-vi.mock('./desktop-sync-registry', () => ({ stopEnvironmentDesktop: mocks.stop }))
+vi.mock('./desktop-sync-registry', () => ({
+  stopEnvironmentDesktop: mocks.stop,
+  desktopControllerToken: () => 'controller-token'
+}))
 
 import { registerRecipeRemovalPreflightHandlers } from './workspace-removal-preflight-wiring'
 
@@ -137,7 +140,8 @@ describe('recipe removal preflight wiring', () => {
       recordingsNotCopied: [REC]
     })
     const environments = new Set(mocks.call.mock.calls.map(([, env]) => env))
-    expect([...environments]).toEqual(['id:env-b'])
+    // The recording fence names the environment as the desktop calls do; both are env-b.
+    expect([...environments].sort()).toEqual(['env-b', 'id:env-b'])
 
     await expect(invoke('ephemeralVm:copyRecordingsBeforeRemoval', request)).resolves.toEqual({
       ok: true,

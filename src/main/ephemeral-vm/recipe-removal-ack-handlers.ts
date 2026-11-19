@@ -12,13 +12,15 @@ import {
   claimRecipeRemovalAck,
   confirmRecipeRemovalAck,
   issueRecipeRemovalAck,
+  peekRecipeRemovalAck,
   releaseRecipeRemovalClaim,
   revokeRecipeRemovalAck,
   revokeRecipeRemovalSession,
   type RecipeRemovalAckBinding
 } from './recipe-removal-acks'
-import { currentRecipeOwner } from './recipe-removal-target'
-import { fenceEnvironmentRecordings } from './desktop-recording-fence'
+import { currentRecipeOwner, resolveRecipeRemoval } from './recipe-removal-target'
+import { recordingsAllowClaim } from './recipe-removal-recording-guard'
+import { removalPreflightPorts } from './workspace-removal-preflight-ports'
 import { isUnattachedProvision } from './unattached-provisions'
 
 const AckArgs = z.object({ ack: z.string() })
@@ -75,14 +77,26 @@ export async function claimRecipeRemoval(
   if (!binding) {
     return { ok: true, required: false }
   }
+  const decided = peekRecipeRemovalAck(args.ack, ackBinding(binding))
+  if (!decided.ok) {
+    return decided
+  }
+  const resolved = await resolveRecipeRemoval(store, userDataPath, args)
+  const kept =
+    resolved?.kind === 'target'
+      ? await recordingsAllowClaim(
+          resolved.target,
+          decided.accepted,
+          removalPreflightPorts(resolved.target)
+        )
+      : decided.accepted === 'unknown'
+  if (!kept) {
+    // The answer no longer holds: the user must see a fresh one.
+    revokeRecipeRemovalAck(args.ack)
+    return { ok: false, reason: 'recordings_unprotected' }
+  }
   const claim = claimRecipeRemovalAck(args.ack, ackBinding(binding))
-  if (!claim.ok) {
-    return claim
-  }
-  if (binding.environmentId) {
-    await fenceEnvironmentRecordings(binding.environmentId)
-  }
-  return { ok: true, required: true }
+  return claim.ok ? { ok: true, required: true } : claim
 }
 
 /** At the store removal: takes over the claim its dialog session (or its own flow) made. */

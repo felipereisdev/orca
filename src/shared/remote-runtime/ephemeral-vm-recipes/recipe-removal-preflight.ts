@@ -62,3 +62,5 @@ export type RecipeRemovalClaimResult =
   | { ok: true; required: true }
   /** Undecided, expired, or the workspace now belongs to another environment record. */
   | { ok: false; reason: 'unconfirmed' | 'replaced' }
+  /** Its final list could not be fenced, or found a recording the answer did not show. */
+  | { ok: false; reason: 'recordings_unprotected' }

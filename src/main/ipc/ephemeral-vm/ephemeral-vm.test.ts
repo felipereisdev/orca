@@ -531,13 +531,109 @@ describe('registerEphemeralVmHandlers', () => {
           invokeHandler('ephemeralVm:claimRemoval', { ...target, ack })
         ).resolves.toEqual({ ok: true, required: true })
 
+        const fence = {
+          environmentId: 'ssh-env-1',
+          method: 'desktop.record.fence',
+          params: { controllerToken: desktopControllerToken('ssh-env-1') }
+        }
+        // The check and the claim each fence before they list.
         expect(desktopEnv.calls.filter((call) => call.method === 'desktop.record.fence')).toEqual([
-          {
-            environmentId: 'ssh-env-1',
-            method: 'desktop.record.fence',
-            params: { controllerToken: desktopControllerToken('ssh-env-1') }
-          }
+          fence,
+          fence
         ])
+      })
+
+      /** A clean check: its ack goes straight to the claim, as removals that skip review do. */
+      async function cleanCheck(): Promise<string> {
+        desktopEnv.gitClean = true
+        const checked = await invokeHandler<{ status: string; ack: string }>(
+          'ephemeralVm:removalPreflight',
+          { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+        )
+        expect(checked.status).toBe('clean')
+        return checked.ack
+      }
+
+      it('a recording that starts while the claim makes its final list is refused', async () => {
+        await provisionAttached()
+        const ack = await cleanCheck()
+        const starts: string[] = []
+        desktopEnv.afterList = () => starts.push(desktopEnv.startRecording())
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: true, required: true })
+        expect(starts).toEqual(['desktop_removal_pending'])
+      })
+
+      it('a recording started after the check is counted: the claim and its ack are refused', async () => {
+        const { provisioned } = await provisionAttached()
+        const ack = await cleanCheck()
+        // A host reconfigure between the check and the claim lifts the check's fence.
+        desktopEnv.fenced = false
+        expect(desktopEnv.startRecording()).toBe('started')
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: false, reason: 'recordings_unprotected' })
+        await expect(cleanup(provisioned.runtime.id, ack)).rejects.toThrow('not confirmed')
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
+      })
+
+      it('a fence the environment refuses refuses the claim', async () => {
+        await provisionAttached()
+        const ack = await cleanCheck()
+        desktopEnv.fence = () => ({
+          id: 'r',
+          ok: false,
+          error: { code: 'desktop_controller_token_invalid', message: 'stale token' }
+        })
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: false, reason: 'recordings_unprotected' })
+      })
+
+      it('a recording whose stop fails to finalize keeps the removal unsafe and destroys nothing', async () => {
+        const { provisioned } = await provisionAttached()
+        desktopEnv.gitClean = true
+        desktopEnv.inProgress = true
+        // The encoder failed: the recording is discarded and the recorder is idle again.
+        desktopEnv.stop = () => {
+          desktopEnv.inProgress = false
+          return {
+            id: 'r',
+            ok: false,
+            error: { code: 'desktop_recording_failed', message: 'discarded' }
+          }
+        }
+
+        const copied = await invokeHandler<{ ok: boolean; ack?: string }>(
+          'ephemeralVm:copyRecordingsBeforeRemoval',
+          { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+        )
+
+        expect(copied).toMatchObject({
+          ok: false,
+          reason: 'still_pending',
+          preflight: { status: 'unsafe', recordingInProgress: true }
+        })
+        await expect(cleanup(provisioned.runtime.id, copied.ack ?? '')).rejects.toThrow(
+          'not confirmed'
+        )
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
       })
 
       it('copies the recordings, then destroys with the ack the copy returned', async () => {

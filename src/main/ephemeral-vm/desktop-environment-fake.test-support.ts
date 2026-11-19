@@ -41,6 +41,18 @@ class DesktopEnvironmentFake {
   streams: FakeStreamCallbacks[] = []
   closedStreams = 0
   calls: FakeCall[] = []
+  /** Git answers a clean, pushed checkout; off, git checks fail (the removal is unchecked). */
+  gitClean = false
+  /** A recording is starting, running or finalizing, as the recorder reports it. */
+  inProgress = false
+  fenced = false
+  fence: () => FakeResponse = () => {
+    this.fenced = true
+    return ok({ fenced: true })
+  }
+  stop: () => FakeResponse = () => failure('desktop_not_recording', 'not recording')
+  /** Runs right after a list took its snapshot, as if it happened just after the list answered. */
+  afterList: (() => void) | null = null
 
   reset(): void {
     this.files.clear()
@@ -55,6 +67,24 @@ class DesktopEnvironmentFake {
     this.streams = []
     this.closedStreams = 0
     this.calls = []
+    this.gitClean = false
+    this.inProgress = false
+    this.fenced = false
+    this.fence = () => {
+      this.fenced = true
+      return ok({ fenced: true })
+    }
+    this.stop = () => failure('desktop_not_recording', 'not recording')
+    this.afterList = null
+  }
+
+  /** `desktop.record.start` as the recorder answers it: refused while a removal fences it. */
+  startRecording(): 'started' | 'desktop_removal_pending' {
+    if (this.fenced) {
+      return 'desktop_removal_pending'
+    }
+    this.inProgress = true
+    return 'started'
   }
 
   configuredReply(): FakeResponse {
@@ -109,6 +139,8 @@ class DesktopEnvironmentFake {
   private async list(): Promise<FakeResponse> {
     // A snapshot, as a server answers: later recordings are not in an earlier answer.
     const snapshot = this.recordings.map((recording) => ({ ...recording }))
+    const inProgress = this.inProgress
+    this.afterList?.()
     const fails = this.failLists > 0
     if (fails) {
       this.failLists -= 1
@@ -118,7 +150,7 @@ class DesktopEnvironmentFake {
     }
     return fails
       ? failure('remote_runtime_unavailable', 'unreachable')
-      : ok({ recordings: snapshot, inProgress: false })
+      : ok({ recordings: snapshot, inProgress })
   }
 
   call(
@@ -134,6 +166,14 @@ class DesktopEnvironmentFake {
         return this.configure(args)
       case 'desktop.recordings.list':
         return this.list()
+      case 'desktop.record.fence':
+        return this.fence()
+      case 'desktop.record.stop':
+        return this.stop()
+      case 'git.status':
+        return this.gitClean ? ok({ entries: [] }) : failure('method_not_found', method)
+      case 'git.unpushedCommitCount':
+        return this.gitClean ? ok({ unpushedCommits: 0 }) : failure('method_not_found', method)
       case 'files.resolveTerminalPath': {
         const path = String(args.pathText)
         const worktree = String(args.worktree).slice('id:'.length)

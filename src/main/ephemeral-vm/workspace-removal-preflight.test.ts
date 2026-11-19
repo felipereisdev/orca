@@ -75,6 +75,7 @@ function makePorts(
       return answer
     }),
     isCopied: async (id: string) => copied.has(id),
+    fence: async () => true,
     copy: vi.fn(async (recording: { id: string }) => {
       order.push(`copy:${recording.id}`)
       copied.add(recording.id)

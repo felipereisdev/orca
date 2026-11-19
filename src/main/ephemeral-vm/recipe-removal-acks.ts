@@ -24,9 +24,18 @@ type AckState = 'pending' | 'confirmed'
 /** `sessionId`: the dialog that showed the answer; closing it revokes the whole session. */
 type Session = { sessionId?: string }
 
+/**
+ * The recordings the answer showed as lost, which a claim's final list may still find. `unknown`:
+ * the answer was unchecked, so the user accepted not knowing.
+ */
+export type RecipeRemovalAcceptedRecordings =
+  | { recordingIds: readonly string[]; inProgress: boolean }
+  | 'unknown'
+
 const acks = new Map<
   string,
-  RecipeRemovalAckBinding & Session & { state: AckState; expiresAt: number }
+  RecipeRemovalAckBinding &
+    Session & { state: AckState; accepted: RecipeRemovalAcceptedRecordings; expiresAt: number }
 >()
 /**
  * Removals that began their irreversible steps, keyed by the runtime record they will destroy.
@@ -76,7 +85,8 @@ function refused(): RecipeWorkspaceRemovalError {
 export function issueRecipeRemovalAck(
   binding: RecipeRemovalAckBinding,
   confirmed: boolean,
-  sessionId?: string
+  sessionId?: string,
+  accepted: RecipeRemovalAcceptedRecordings = 'unknown'
 ): string {
   live('')
   const ack = randomBytes(16).toString('hex')
@@ -87,6 +97,7 @@ export function issueRecipeRemovalAck(
     ...binding,
     ...(sessionId ? { sessionId } : {}),
     state: confirmed ? 'confirmed' : 'pending',
+    accepted,
     expiresAt: Date.now() + RECIPE_REMOVAL_ACK_TTL_MS
   })
   return ack
@@ -144,6 +155,33 @@ export function releaseRecipeRemovalClaim(hostId: string, workspaceId: string): 
 
 export type RecipeRemovalClaim = { ok: true } | { ok: false; reason: 'unconfirmed' | 'replaced' }
 
+function claimableAck(ack: string, current: RecipeRemovalAckBinding) {
+  const entry = live(ack)
+  if (!entry || entry.state === 'pending') {
+    return { ok: false as const, reason: 'unconfirmed' as const }
+  }
+  if (
+    entry.hostId !== current.hostId ||
+    entry.workspaceId !== current.workspaceId ||
+    entry.runtimeId !== current.runtimeId ||
+    entry.runtimeCreatedAt !== current.runtimeCreatedAt
+  ) {
+    return { ok: false as const, reason: 'replaced' as const }
+  }
+  return { ok: true as const, ...entry }
+}
+
+/** What a claim of this ack would accept losing, without spending it; a refusal otherwise. */
+export function peekRecipeRemovalAck(
+  ack: string,
+  current: RecipeRemovalAckBinding
+):
+  | { ok: true; accepted: RecipeRemovalAcceptedRecordings }
+  | { ok: false; reason: 'unconfirmed' | 'replaced' } {
+  const entry = claimableAck(ack, current)
+  return entry.ok ? { ok: true, accepted: entry.accepted } : entry
+}
+
 /**
  * Before a removal's first irreversible step: turns a confirmed ack into an authorization held for
  * the record that owns the workspace now, long enough for the whole removal.
@@ -152,19 +190,11 @@ export function claimRecipeRemovalAck(
   ack: string,
   current: RecipeRemovalAckBinding
 ): RecipeRemovalClaim {
-  const entry = live(ack)
+  const entry = claimableAck(ack, current)
+  if (!entry.ok) {
+    return entry
+  }
   const key = recordKey(current.runtimeId, current.runtimeCreatedAt)
-  if (!entry || entry.state === 'pending') {
-    return { ok: false, reason: 'unconfirmed' }
-  }
-  if (
-    entry.hostId !== current.hostId ||
-    entry.workspaceId !== current.workspaceId ||
-    entry.runtimeId !== current.runtimeId ||
-    entry.runtimeCreatedAt !== current.runtimeCreatedAt
-  ) {
-    return { ok: false, reason: 'replaced' }
-  }
   acks.delete(ack)
   claims.set(key, {
     ...current,

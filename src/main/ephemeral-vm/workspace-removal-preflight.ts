@@ -8,6 +8,7 @@ import {
   type RecipeRemovalRecording
 } from '../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 import { parseEnvironmentRecording } from './desktop-recording-copies'
+import { withDeadline } from './abortable-deadline'
 
 /** Copies run one at a time; a stuck copy must not hold the removal dialog forever. */
 const COPY_BEFORE_REMOVAL_TIMEOUT_MS = 10 * 60_000
@@ -40,6 +41,8 @@ export type RemovalPreflightPorts = {
   ) => Promise<RuntimeRpcResponse<unknown>>
   /** True only when this Mac's copy still exists on disk. */
   isCopied: (recordingId: string) => Promise<boolean>
+  /** Refuses new recordings on the environment for a while; false when it could not. */
+  fence: (environmentId: string) => Promise<boolean>
 }
 
 export type CopyBeforeRemovalPorts = RemovalPreflightPorts & {
@@ -130,13 +133,20 @@ function readRecordings(result: unknown): EnvironmentRecordings | null {
     : null
 }
 
-async function listPendingRecordings(
+/**
+ * Fenced first, so no recording can start after this list and be lost with the environment; an
+ * environment that can't be fenced proves nothing.
+ */
+export async function listPendingRecordings(
   target: RemovalPreflightTarget,
   ports: RemovalPreflightPorts,
   signal: AbortSignal
 ): Promise<Part<EnvironmentRecordings>> {
   if (!target.hasDesktop) {
     return { ok: true, value: { recordings: [], inProgress: false } }
+  }
+  if (!(await ports.fence(target.environmentId))) {
+    return { ok: false, reason: 'recordings_failed' }
   }
   const listed = await ask(
     ports,
@@ -155,26 +165,6 @@ async function listPendingRecordings(
   return {
     ok: true,
     value: { recordings: recordings.filter((_recording, index) => !copied[index]), inProgress }
-  }
-}
-
-/** Runs `work` until it settles or `timeoutMs` passes; the signal aborts on the deadline. */
-async function withDeadline<T>(
-  timeoutMs: number,
-  work: (signal: AbortSignal) => Promise<T>
-): Promise<T | 'timeout'> {
-  const controller = new AbortController()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<'timeout'>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort()
-      resolve('timeout')
-    }, timeoutMs)
-  })
-  try {
-    return await Promise.race([work(controller.signal), deadline])
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -242,17 +232,22 @@ export async function preflightRecipeWorkspaceRemoval(
 
 /**
  * The user chose to keep the recordings: one still running is stopped and waited for (bounded), so
- * the copy passes that follow find it finished. Any failure leaves it to those passes to report.
+ * the copy passes that follow find it finished. True only when it finalized or none was running: a
+ * failed finalization discarded it, which no later list can show.
  */
 async function stopRecordingInProgress(
   target: RemovalPreflightTarget,
   ports: RemovalPreflightPorts
-): Promise<void> {
-  await withDeadline(STOP_RECORDING_TIMEOUT_MS, (signal) =>
+): Promise<boolean> {
+  const stopped = await withDeadline(STOP_RECORDING_TIMEOUT_MS, (signal) =>
     ports
       .call(target.environmentId, 'desktop.record.stop', {}, signal, STOP_RECORDING_TIMEOUT_MS)
-      .catch(() => undefined)
+      .catch(() => null)
   )
+  if (stopped === 'timeout' || stopped === null) {
+    return false
+  }
+  return stopped.ok || stopped.error.code === 'desktop_not_recording'
 }
 
 /** The copy's outcome before main adds acknowledgements to it. */
@@ -277,7 +272,12 @@ export async function copyRecordingsBeforeRemoval(
     return { ok: false, reason: 'unreachable' }
   }
   if (target.hasDesktop) {
-    await stopRecordingInProgress(target, ports)
+    if (!(await ports.fence(target.environmentId))) {
+      return { ok: false, reason: 'unavailable' }
+    }
+    if (!(await stopRecordingInProgress(target, ports))) {
+      return stillPending(target, ports, null)
+    }
   }
   // Set inside the deadline callback; a holder keeps TypeScript from narrowing it to null.
   const known: { pending: EnvironmentRecordings | null } = { pending: null }
@@ -318,19 +318,30 @@ export async function copyRecordingsBeforeRemoval(
   if (outcome !== 'pending' && outcome !== 'timeout') {
     return outcome
   }
-  const knownPending = known.pending
-  if (!knownPending) {
+  if (!known.pending) {
     return { ok: false, reason: 'timeout' }
   }
-  // Git work comes from a fresh check; the recordings are the last ones a list proved pending.
+  return stillPending(target, ports, known.pending)
+}
+
+/**
+ * Git work comes from a fresh check; the recordings are the last ones a list proved pending. With
+ * none (a stop that failed), the fresh list's, and the failed recording counts as in progress.
+ */
+async function stillPending(
+  target: RemovalPreflightTarget,
+  ports: RemovalPreflightPorts,
+  knownPending: EnvironmentRecordings | null
+): Promise<CopyBeforeRemovalOutcome> {
   const fresh = await preflightRecipeWorkspaceRemoval(target, ports)
+  const inProgress = knownPending ? knownPending.inProgress : true
   return {
     ok: false,
     reason: 'still_pending',
     preflight: {
       status: 'unsafe',
-      recordingsNotCopied: knownPending.recordings,
-      ...(knownPending.inProgress ? { recordingInProgress: true } : {}),
+      recordingsNotCopied: knownPending?.recordings ?? fresh.recordingsNotCopied,
+      ...(inProgress ? { recordingInProgress: true } : {}),
       dirtyFiles: fresh.dirtyFiles,
       ...(fresh.dirtyFilesCapped ? { dirtyFilesCapped: true } : {}),
       unpushedCommits: fresh.unpushedCommits

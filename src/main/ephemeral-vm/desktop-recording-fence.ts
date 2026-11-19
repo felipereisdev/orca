@@ -5,14 +5,14 @@ import { desktopControllerToken } from './desktop-sync-registry'
 const FENCE_TIMEOUT_MS = 5_000
 
 /**
- * A removal holds its environment now: no new recording may start there and be lost with it. The
- * broker drops the fence after 10 minutes or on the next configure. Best effort: an environment
- * that can't be reached records nothing either.
+ * A removal is about to list the environment's recordings: no new one may start there and be lost
+ * with it. The broker drops the fence after 10 minutes or on the next configure. False when the
+ * environment could not be fenced (no controller token, refused or unreachable).
  */
-export async function fenceEnvironmentRecordings(environmentId: string): Promise<void> {
+export async function fenceEnvironmentRecordings(environmentId: string): Promise<boolean> {
   const controllerToken = desktopControllerToken(environmentId)
   if (!controllerToken) {
-    return
+    return false
   }
   try {
     const response = await callRuntimeEnvironment(
@@ -25,7 +25,9 @@ export async function fenceEnvironmentRecordings(environmentId: string): Promise
     if (!response.ok) {
       console.warn('[ephemeral-vm] recording fence refused', { environmentId })
     }
+    return response.ok
   } catch {
     console.warn('[ephemeral-vm] recording fence unreachable', { environmentId })
+    return false
   }
 }
