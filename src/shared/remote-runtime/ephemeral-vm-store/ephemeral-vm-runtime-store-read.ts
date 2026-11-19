@@ -1,3 +1,4 @@
+import { approvedStatsOf, type ApprovedRuntimeStats } from './ephemeral-vm-runtime-feature-records'
 import { readNodeFileWithinLimit } from '../../file-content/node-bounded-file-reader'
 import {
   compareRuntimeRecords,
@@ -45,8 +46,8 @@ const UNREADABLE = Symbol('unreadable')
 export async function readEphemeralVmRuntimesAsync(userDataPath: string): Promise<{
   runtimes: EphemeralVmRuntimeRecord[]
   complete: boolean
-  /** Each runtime's approved stats command by feature identity; empty when the sidecar is unreadable. */
-  statsCommands: ReadonlyMap<string, string>
+  /** Each runtime's approved stats step by feature identity; empty when the sidecar is unreadable. */
+  approvedStats: ReadonlyMap<string, ApprovedRuntimeStats>
 }> {
   const path = getEphemeralVmRuntimeStorePath(userDataPath)
   const [mainText, featureText, writeAheadText] = await Promise.all([
@@ -94,10 +95,11 @@ export async function readEphemeralVmRuntimesAsync(userDataPath: string): Promis
     ),
     // A record parse dropped (malformed, or from a newer build) may be one runtime's desktop.
     complete: featureStore?.writable === true && featureStore.retainedRecords.length === 0,
-    statsCommands: new Map(
-      features.flatMap((entry) =>
-        entry.recipeStats ? [[featureIdentity(entry), entry.recipeStats] as const] : []
-      )
+    approvedStats: new Map(
+      features.flatMap((entry) => {
+        const stats = approvedStatsOf(entry)
+        return stats ? [[featureIdentity(entry), stats] as const] : []
+      })
     )
   }
 }

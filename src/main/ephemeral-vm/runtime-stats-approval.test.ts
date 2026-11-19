@@ -41,6 +41,7 @@ const roots: string[] = []
 
 afterEach(async () => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   await removeTempDirs(roots.splice(0))
 })
 
@@ -120,6 +121,9 @@ function makeRepo() {
   }
   return {
     userDataPath,
+    repoPath,
+    logPath,
+    command,
     recipe,
     read,
     provision,
@@ -146,6 +150,37 @@ describe('runtime stats approval', () => {
       diskBytes: 3
     })
     expect(env.runs()).toEqual(['approved'])
+  })
+
+  it('stats run with the environment approved at creation, not one added to orca.yaml later', async () => {
+    const env = makeRepo()
+    vi.stubEnv('ORCA_STATS_APPROVED', 'shown')
+    vi.stubEnv('ORCA_STATS_SECRET', 'host-secret')
+    writeFileSync(
+      join(env.repoPath, 'env-probe.js'),
+      `require('node:fs').appendFileSync(${JSON.stringify(env.logPath)}, ` +
+        `[process.env.ORCA_STATS_APPROVED, process.env.ORCA_STATS_SECRET ?? 'unset'].join(' ') + '\\n')\n` +
+        `process.stdout.write('{"cpuPercent":1,"memoryBytes":2,"diskBytes":3}')\n`
+    )
+    const runtimeId = await env.provision({
+      ...env.recipe(),
+      stats: env.command('env-probe'),
+      passEnv: ['ORCA_STATS_APPROVED']
+    })
+    writeFileSync(
+      join(env.repoPath, 'orca.yaml'),
+      [
+        'environmentRecipes:',
+        '  - id: docker',
+        '    name: Docker',
+        `    create: '${env.command('create')}'`,
+        `    stats: '${env.command('env-probe')}'`,
+        '    passEnv: [ORCA_STATS_APPROVED, ORCA_STATS_SECRET]'
+      ].join('\n')
+    )
+
+    await expect(env.read(runtimeId)).resolves.not.toBeNull()
+    expect(env.runs()).toEqual(['shown unset'])
   })
 
   it('a stats command added to orca.yaml after creation never runs', async () => {

@@ -117,32 +117,32 @@ export async function resolveRuntimeStatsTarget(
   userDataPath: string,
   runtimeId: string
 ): Promise<EphemeralVmRuntimeStatsTarget | null> {
-  const { runtimes, statsCommands } = await readEphemeralVmRuntimesAsync(userDataPath)
+  const { runtimes, approvedStats } = await readEphemeralVmRuntimesAsync(userDataPath)
   const runtime = runtimes.find((entry) => entry.id === runtimeId)
-  // Only the stats command approved with the recipe at creation may run, read from the sidecar
-  // alone; none (or an unreadable sidecar) means no stats.
-  const approvedStats = runtime ? statsCommands.get(featureIdentity(runtime)) : undefined
-  if (
-    !runtime?.recipeResult ||
-    !approvedStats ||
-    !isEphemeralVmEnvironmentRunning(runtime.status)
-  ) {
+  // Only the stats step approved with the recipe at creation may run, read from the sidecar alone
+  // (its command and passEnv together); none (or an unreadable sidecar) means no stats.
+  const approved = runtime ? approvedStats.get(featureIdentity(runtime)) : undefined
+  if (!runtime?.recipeResult || !approved || !isEphemeralVmEnvironmentRunning(runtime.status)) {
     return null
+  }
+  const withApprovedStats = (recipe: OrcaVmRecipe): OrcaVmRecipe => {
+    const { passEnv: _livePassEnv, ...rest } = recipe
+    return {
+      ...rest,
+      stats: approved.command,
+      ...(approved.passEnv ? { passEnv: approved.passEnv } : {})
+    }
   }
   const repo = runtime.repoId ? getRecipeRepo(store, runtime.repoId) : null
   if (repo?.ok) {
     const hooks = await loadHooksAsync(repo.repo.path)
     const recipe = mergeRuntimeRecipe(runtime, hooks?.environmentRecipes ?? [])
-    return recipe
-      ? { runtime, repoPath: repo.repo.path, recipe: { ...recipe, stats: approvedStats } }
-      : null
+    return recipe ? { runtime, repoPath: repo.repo.path, recipe: withApprovedStats(recipe) } : null
   }
   if (!runtime.recipe || !runtime.repoPath) {
     return null
   }
   const hooks = await loadHooksAsync(runtime.repoPath)
   const recipe = fallbackRuntimeRecipe(runtime, hooks?.environmentRecipes ?? [])
-  return recipe
-    ? { runtime, repoPath: runtime.repoPath, recipe: { ...recipe, stats: approvedStats } }
-    : null
+  return recipe ? { runtime, repoPath: runtime.repoPath, recipe: withApprovedStats(recipe) } : null
 }

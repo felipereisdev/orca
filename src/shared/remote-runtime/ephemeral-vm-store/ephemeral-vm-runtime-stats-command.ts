@@ -1,4 +1,9 @@
-import type { EphemeralVmRuntimeFeatureEntry } from './ephemeral-vm-runtime-feature-records'
+import {
+  approvedStatsFields,
+  approvedStatsOf,
+  type ApprovedRuntimeStats,
+  type EphemeralVmRuntimeFeatureEntry
+} from './ephemeral-vm-runtime-feature-records'
 import {
   featureEntryFromRuntime,
   featureIdentity,
@@ -15,21 +20,22 @@ export function requiredRuntimeFeatures(
   runtimes: readonly EphemeralVmRuntimeRecord[],
   existing: readonly EphemeralVmRuntimeFeatureEntry[]
 ): EphemeralVmRuntimeFeatureEntry[] {
-  const commands = new Map(
-    existing.flatMap((entry) =>
-      entry.recipeStats ? [[featureIdentity(entry), entry.recipeStats] as const] : []
-    )
+  const approved = new Map(
+    existing.flatMap((entry) => {
+      const stats = approvedStatsOf(entry)
+      return stats ? [[featureIdentity(entry), stats] as const] : []
+    })
   )
   const byIdentity = new Map<string, EphemeralVmRuntimeFeatureEntry>()
   for (const runtime of runtimes) {
     const identity = featureIdentity(runtime)
     const derived = featureEntryFromRuntime(runtime)
-    const recipeStats = commands.get(identity)
+    const stats = approved.get(identity)
     const { id, recipeId, createdAt } = runtime
-    if (derived || recipeStats) {
+    if (derived || stats) {
       byIdentity.set(identity, {
         ...(derived ?? { id, recipeId, createdAt }),
-        ...(recipeStats ? { recipeStats } : {})
+        ...(stats ? approvedStatsFields(stats) : {})
       })
     }
   }
@@ -39,7 +45,7 @@ export function requiredRuntimeFeatures(
 /** A stats command approved with the recipe that created a provisioned runtime, to record with it. */
 export type PendingRuntimeStatsCommand = {
   runtime: Pick<EphemeralVmRuntimeRecord, 'id' | 'recipeId' | 'createdAt'>
-  command: string
+  stats: ApprovedRuntimeStats
 }
 
 function mergeByIdentity(
@@ -77,7 +83,7 @@ export function planRuntimeFeatureWrite(
   const withPending = pending
     ? [
         ...existing.filter((entry) => featureIdentity(entry) !== identity),
-        { ...(current ?? pending.runtime), recipeStats: pending.command }
+        { ...(current ?? pending.runtime), ...approvedStatsFields(pending.stats) }
       ]
     : existing
   const required = requiredRuntimeFeatures(runtimes, withPending)
@@ -93,9 +99,9 @@ export function planRuntimeFeatureWrite(
 
 export function pendingStatsCommand(
   runtime: PendingRuntimeStatsCommand['runtime'],
-  command: string | undefined
+  stats: ApprovedRuntimeStats | undefined
 ): PendingRuntimeStatsCommand | undefined {
-  return command ? { runtime, command } : undefined
+  return stats ? { runtime, stats } : undefined
 }
 
 // The command stays out of the log: it is recipe text, and the sidecar error adds nothing.

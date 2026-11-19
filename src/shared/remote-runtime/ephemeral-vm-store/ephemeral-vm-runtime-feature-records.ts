@@ -22,13 +22,15 @@ const EphemeralVmRuntimeDesktopFeatureRecordSchema = z
   })
   .strict()
 
-// The stats command approved with the recipe at creation; older builds keep it as a retained record.
+// The stats step approved with the recipe at creation (its command and the host variables it may
+// read); older builds keep it as a retained record.
 const EphemeralVmRuntimeStatsFeatureRecordSchema = z
   .object({
     id: z.string().min(1),
     recipeId: z.string().min(1),
     createdAt: z.number().finite(),
-    recipeStats: z.string().min(1)
+    recipeStats: z.string().min(1),
+    recipeStatsPassEnv: z.array(z.string()).optional()
   })
   .strict()
 
@@ -43,8 +45,34 @@ export type EphemeralVmRuntimeFeatureEntry = z.infer<
 > &
   Partial<
     Pick<z.infer<typeof EphemeralVmRuntimeDesktopFeatureRecordSchema>, 'resultDesktop'> &
-      Pick<z.infer<typeof EphemeralVmRuntimeStatsFeatureRecordSchema>, 'recipeStats'>
+      Pick<
+        z.infer<typeof EphemeralVmRuntimeStatsFeatureRecordSchema>,
+        'recipeStats' | 'recipeStatsPassEnv'
+      >
   >
+
+/** The stats step as approved: only this ever runs, never what orca.yaml says later. */
+export type ApprovedRuntimeStats = { command: string; passEnv?: string[] }
+
+export function approvedStatsOf(
+  entry: EphemeralVmRuntimeFeatureEntry
+): ApprovedRuntimeStats | null {
+  return entry.recipeStats
+    ? {
+        command: entry.recipeStats,
+        ...(entry.recipeStatsPassEnv ? { passEnv: entry.recipeStatsPassEnv } : {})
+      }
+    : null
+}
+
+export function approvedStatsFields(
+  stats: ApprovedRuntimeStats
+): Pick<EphemeralVmRuntimeFeatureEntry, 'recipeStats' | 'recipeStatsPassEnv'> {
+  return {
+    recipeStats: stats.command,
+    ...(stats.passEnv ? { recipeStatsPassEnv: [...stats.passEnv] } : {})
+  }
+}
 
 export function featureIdentity(
   value: Pick<EphemeralVmRuntimeRecord, 'id' | 'recipeId' | 'createdAt'>
@@ -105,12 +133,22 @@ export function parseFeatureRecords(records: unknown[]):
 }
 
 export function featureEntryToRecords(entry: EphemeralVmRuntimeFeatureEntry): unknown[] {
-  const { resultDesktop, recipeStats, ...checkout } = entry
+  const { resultDesktop, recipeStats, recipeStatsPassEnv, ...checkout } = entry
   const { id, recipeId, createdAt } = entry
   const hasCheckoutMode = Boolean(checkout.recipeCheckoutMode || checkout.resultCheckoutMode)
   return [
     ...(hasCheckoutMode || (!resultDesktop && !recipeStats) ? [checkout] : []),
     ...(resultDesktop ? [{ id, recipeId, createdAt, resultDesktop }] : []),
-    ...(recipeStats ? [{ id, recipeId, createdAt, recipeStats }] : [])
+    ...(recipeStats
+      ? [
+          {
+            id,
+            recipeId,
+            createdAt,
+            recipeStats,
+            ...(recipeStatsPassEnv ? { recipeStatsPassEnv } : {})
+          }
+        ]
+      : [])
   ]
 }

@@ -10,6 +10,7 @@ import {
 } from '../ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { notifyEphemeralVmRuntimesChanged } from './ephemeral-vm-runtime-store-events'
 import * as statsCommands from './ephemeral-vm-runtime-stats-command'
+import type { ApprovedRuntimeStats } from './ephemeral-vm-runtime-feature-records'
 import {
   featureIdentity,
   readEphemeralVmRuntimeFeatureStore,
@@ -62,8 +63,8 @@ export function listEphemeralVmRuntimes(userDataPath: string): EphemeralVmRuntim
 export function upsertEphemeralVmRuntime(
   userDataPath: string,
   record: EphemeralVmRuntimeRecord,
-  /** Best effort: the stats command approved with the recipe; only the sidecar keeps it. */
-  options: { approvedStatsCommand?: string } = {}
+  /** Best effort: the stats step approved with the recipe; only the sidecar keeps it. */
+  options: { approvedStats?: ApprovedRuntimeStats } = {}
 ): EphemeralVmRuntimeRecord {
   const parsed = EphemeralVmRuntimeRecordSchema.parse(record)
   const loaded = readEphemeralVmRuntimeStore(userDataPath)
@@ -88,7 +89,7 @@ export function upsertEphemeralVmRuntime(
       )
     },
     loaded.features,
-    statsCommands.pendingStatsCommand(parsed, options.approvedStatsCommand)
+    statsCommands.pendingStatsCommand(parsed, options.approvedStats)
   )
   return parsed
 }

@@ -129,7 +129,14 @@ export async function persistProvisionedEphemeralVmRuntime(
         recipeResult: start.result
       },
       // Best effort: a sidecar that cannot take it leaves the row at "—", never a failed provision.
-      args.recipe.stats ? { approvedStatsCommand: args.recipe.stats } : {}
+      args.recipe.stats
+        ? {
+            approvedStats: {
+              command: args.recipe.stats,
+              ...(args.recipe.passEnv ? { passEnv: [...args.recipe.passEnv] } : {})
+            }
+          }
+        : {}
     )
     if (!runtime.workspaceId) {
       noteUnattachedProvision(runtime.id)
