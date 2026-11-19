@@ -6,23 +6,46 @@ import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import { recipeRemovalBridge } from '@/runtime/ephemeral-vm/recipe-removal-bridge.test-support'
+import { handOffRecipeRemovalSession } from '@/runtime/ephemeral-vm/recipe-removal-session-handoff'
+import { runWorktreeDeletesInParallel } from '@/components/sidebar/workspace-actions/deletion/worktree-delete-execution'
 
 const removed = vi.hoisted(() => {
   const checkouts: string[] = []
-  return { checkouts, fail: false }
+  return {
+    checkouts,
+    fail: false,
+    /** Send `worktree.rm` through the real call, whose compatibility probe the test holds. */
+    throughProbe: false,
+    probe: Promise.resolve<unknown>(null)
+  }
 })
-vi.mock('@/runtime/rpc/calls/runtime-rpc-call', async (importOriginal) => ({
-  ...(await importOriginal<typeof RuntimeRpcCallModule>()),
-  callRuntimeRpc: vi.fn(async (_target: unknown, method: string) => {
-    if (method === 'worktree.rm') {
+vi.mock('@/runtime/rpc/calls/runtime-rpc-call', async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeRpcCallModule>()
+  return {
+    ...actual,
+    callRuntimeRpc: vi.fn(async (...args: Parameters<typeof actual.callRuntimeRpc>) => {
+      if (args[1] !== 'worktree.rm') {
+        return {}
+      }
       if (removed.fail) {
         throw new Error('Hook failed')
       }
-      removed.checkouts.push(method)
+      if (removed.throughProbe) {
+        return actual.callRuntimeRpc(...args)
+      }
+      removed.checkouts.push('worktree.rm')
       return { removed: true }
-    }
-    return {}
-  })
+    })
+  }
+})
+vi.mock('@/runtime/rpc/compatibility/runtime-compatibility-probe', () => ({
+  ensureRuntimeEnvironmentCompatible: () => removed.probe
+}))
+vi.mock('@/runtime/rpc/calls/runtime-rpc-environment-call', () => ({
+  callRuntimeEnvironmentWithRevision: async (args: { method: string }) => {
+    removed.checkouts.push(args.method)
+    return { id: 'req', ok: true, result: { removed: true }, _meta: { runtimeId: 'env-a' } }
+  }
 }))
 
 import { RecipeRemovalReviewDialog } from '@/components/sidebar/workspace-actions/deletion/RecipeRemovalReviewDialog'
@@ -60,6 +83,8 @@ describe('a workspace removal holds its recipe environment before deleting the c
   beforeEach(() => {
     removed.checkouts.length = 0
     removed.fail = false
+    removed.throughProbe = false
+    removed.probe = Promise.resolve(null)
     originalApi = window.api
     bridge = recipeRemovalBridge([])
     window.api = bridge.api
@@ -77,19 +102,17 @@ describe('a workspace removal holds its recipe environment before deleting the c
       .getState()
       .removeWorktree({ id: WORKSPACE, executionHostId: HOST, instanceId: 'instance-1' }, false)
     expect(result.ok).toBe(true)
-    expect(bridge.ephemeralVm.claimRemoval).toHaveBeenCalledWith({
+    expect(bridge.ephemeralVm.adoptRemoval).toHaveBeenCalledWith({
       hostId: HOST,
-      workspaceId: WORKSPACE,
-      ack: ''
+      workspaceId: WORKSPACE
     })
     expect(removed.checkouts).toEqual(['worktree.rm'])
   })
 
   it('a refused claim checks again and reviews before anything is deleted', async () => {
     // Nothing held, and the ack the first review hands on has expired by the time it is claimed.
-    bridge.ephemeralVm.claimRemoval
-      .mockResolvedValueOnce({ ok: false, reason: 'unconfirmed' })
-      .mockResolvedValueOnce({ ok: false, reason: 'unconfirmed' })
+    bridge.ephemeralVm.adoptRemoval.mockResolvedValueOnce({ ok: false, reason: 'unconfirmed' })
+    bridge.ephemeralVm.claimRemoval.mockResolvedValueOnce({ ok: false, reason: 'unconfirmed' })
     const removal = useAppStore
       .getState()
       .removeWorktree({ id: WORKSPACE, executionHostId: HOST, instanceId: 'instance-1' }, false)
@@ -106,6 +129,7 @@ describe('a workspace removal holds its recipe environment before deleting the c
   })
 
   it('a claim that keeps being refused never deletes the checkout', async () => {
+    bridge.ephemeralVm.adoptRemoval.mockResolvedValue({ ok: false, reason: 'unconfirmed' })
     bridge.ephemeralVm.claimRemoval.mockResolvedValue({ ok: false, reason: 'unconfirmed' })
     const removal = useAppStore
       .getState()
@@ -134,7 +158,7 @@ describe('a workspace removal holds its recipe environment before deleting the c
 
   it('a same-id replacement published while the claim is in flight is not deleted', async () => {
     let replyToClaim: () => void = () => {}
-    bridge.ephemeralVm.claimRemoval.mockImplementationOnce(async () => {
+    bridge.ephemeralVm.adoptRemoval.mockImplementationOnce(async () => {
       await new Promise<void>((resolve) => {
         replyToClaim = resolve
       })
@@ -144,7 +168,7 @@ describe('a workspace removal holds its recipe environment before deleting the c
       .getState()
       .removeWorktree({ id: WORKSPACE, executionHostId: HOST, instanceId: 'instance-1' }, false)
     await settle()
-    expect(bridge.ephemeralVm.claimRemoval).toHaveBeenCalledTimes(1)
+    expect(bridge.ephemeralVm.adoptRemoval).toHaveBeenCalledTimes(1)
     seed('instance-2')
     replyToClaim()
     await expect(removal).resolves.toMatchObject({ ok: false })
@@ -163,5 +187,50 @@ describe('a workspace removal holds its recipe environment before deleting the c
     expect(result.ok).toBe(false)
     expect(removed.checkouts).toEqual([])
     expect(bridge.ephemeralVm.claimRemoval).not.toHaveBeenCalled()
+  })
+
+  it('a same-id replacement published while the compatibility probe runs is not deleted', async () => {
+    removed.throughProbe = true
+    let answerProbe: () => void = () => {}
+    removed.probe = new Promise((resolve) => {
+      answerProbe = () => resolve(null)
+    })
+    const removal = useAppStore
+      .getState()
+      .removeWorktree({ id: WORKSPACE, executionHostId: HOST, instanceId: 'instance-1' }, false)
+    await settle()
+    expect(bridge.ephemeralVm.adoptRemoval).toHaveBeenCalled()
+    seed('instance-2')
+    answerProbe()
+    await expect(removal).resolves.toMatchObject({ ok: false })
+    expect(removed.checkouts).toEqual([])
+    expect(bridge.ephemeralVm.releaseRemoval).toHaveBeenCalledWith({
+      hostId: HOST,
+      workspaceId: WORKSPACE
+    })
+  })
+
+  it('a dialog removal adopts its claim in the session it took over, then ends the session', async () => {
+    let deletes: Promise<unknown> = Promise.resolve()
+    const taken = handOffRecipeRemovalSession('session-1', () => {
+      deletes = runWorktreeDeletesInParallel([
+        makeWorktree({
+          id: WORKSPACE,
+          repoId: 'repo',
+          hostId: HOST,
+          displayName: 'task',
+          instanceId: 'instance-1'
+        })
+      ])
+    })
+    expect(taken).toBe(true)
+    await deletes
+    expect(bridge.ephemeralVm.adoptRemoval).toHaveBeenCalledWith({
+      hostId: HOST,
+      workspaceId: WORKSPACE,
+      sessionId: 'session-1'
+    })
+    expect(removed.checkouts).toEqual(['worktree.rm'])
+    expect(bridge.ephemeralVm.revokeRemovalSession).toHaveBeenCalledWith({ sessionId: 'session-1' })
   })
 })

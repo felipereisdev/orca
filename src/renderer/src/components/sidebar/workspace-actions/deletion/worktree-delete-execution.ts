@@ -20,6 +20,10 @@ import type { PreservedBranchCleanup } from '../../../../../../shared/git/branch
 import type { WorktreeDeleteWithToastOptions } from './worktree-delete-request'
 import { beginWorktreeSnapshotPruneBatch } from './worktree-snapshot-prune-batch'
 import { runWorktreeDeleteWithToast } from './run-worktree-delete-with-toast'
+import {
+  endRecipeRemovalSession,
+  takeRecipeRemovalSession
+} from '@/runtime/ephemeral-vm/recipe-removal-session-handoff'
 
 function isStrictDescendantPath(parentPath: string, childPath: string): boolean {
   return (
@@ -37,12 +41,33 @@ function clearWorktreeDeleteTargetState(target: Pick<Worktree, 'id' | 'hostId'>)
   }
 }
 
+type DeleteTarget = Pick<
+  Worktree,
+  'id' | 'instanceId' | 'displayName' | 'repoId' | 'path' | 'hostId'
+>
+
+/**
+ * Takes over the delete dialog's removal session right away (before any await), so each removal
+ * can adopt its claim; whatever none adopted is revoked once every removal settled.
+ */
 export async function runWorktreeDeletesInParallel(
-  targets: readonly Pick<
-    Worktree,
-    'id' | 'instanceId' | 'displayName' | 'repoId' | 'path' | 'hostId'
-  >[],
+  targets: readonly DeleteTarget[],
   options: WorktreeDeleteWithToastOptions = {}
+): Promise<WorktreeRemovalTarget[]> {
+  const recipeRemovalSessionId = takeRecipeRemovalSession()
+  if (!recipeRemovalSessionId) {
+    return runDeletes(targets, options)
+  }
+  try {
+    return await runDeletes(targets, { ...options, recipeRemovalSessionId })
+  } finally {
+    endRecipeRemovalSession(recipeRemovalSessionId)
+  }
+}
+
+async function runDeletes(
+  targets: readonly DeleteTarget[],
+  options: WorktreeDeleteWithToastOptions
 ): Promise<WorktreeRemovalTarget[]> {
   // A destructive command must run once per identity even if a refresh duplicated rows.
   const uniqueTargets = Array.from(

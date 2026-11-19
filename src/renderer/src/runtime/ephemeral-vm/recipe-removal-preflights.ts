@@ -18,6 +18,8 @@ export type RecipeRemovalCandidate = {
 export type RecipeRemovalResult = {
   candidate: RecipeRemovalCandidate
   preflight: RecipeRemovalCheckResult
+  /** The dialog session the answer belongs to; a copy made from it joins that session. */
+  sessionId?: string
 }
 
 // The bridge failing is a check that couldn't run, never a clean answer; it has no ack either.
@@ -62,14 +64,16 @@ export function recipeRemovalCandidates(
 
 /** Asks main about each candidate; those no recipe owns drop out of the answer. */
 export async function runRecipeRemovalPreflights(
-  candidates: readonly RecipeRemovalCandidate[]
+  candidates: readonly RecipeRemovalCandidate[],
+  sessionId?: string
 ): Promise<RecipeRemovalResult[]> {
+  const session = sessionId ? { sessionId } : {}
   const answers = await Promise.all(
     candidates.map(async (candidate): Promise<RecipeRemovalResult | null> => {
       const preflight = await window.api.ephemeralVm
-        .removalPreflight(candidate.request)
+        .removalPreflight({ ...candidate.request, ...session })
         .catch(() => BRIDGE_FAILED)
-      return preflight ? { candidate, preflight } : null
+      return preflight ? { candidate, preflight, ...session } : null
     })
   )
   return answers.filter((answer): answer is RecipeRemovalResult => answer !== null)
@@ -107,20 +111,25 @@ const CLAIM_REVIEWS = 2
 
 /**
  * Right before a removal deletes a workspace's checkout: holds the workspace's environment for its
- * destroy. Uses an authorization a decision already claimed; otherwise checks again and reviews
+ * destroy. Adopts the authorization a decision already claimed; otherwise checks again and reviews
  * unless the answer is clean, and does so again when main refuses that claim (the answer expired or
  * the environment changed). False when the user cancelled or main kept refusing.
  */
 export async function claimRecipeWorkspaceRemoval(
   state: Pick<AppState, 'settings'>,
-  workspace: { id: string; hostId?: string | null; displayName: string }
+  workspace: { id: string; hostId?: string | null; displayName: string },
+  /** The delete dialog's session this removal took over; its claim is adopted in it. */
+  sessionId?: string
 ): Promise<boolean> {
   const [candidate] = recipeRemovalCandidates(state, [workspace])
   if (!candidate || !('hostId' in candidate.request)) {
     return true
   }
   const target = candidate.request
-  const held = await window.api.ephemeralVm.claimRemoval({ ...target, ack: '' })
+  const held = await window.api.ephemeralVm.adoptRemoval({
+    ...target,
+    ...(sessionId ? { sessionId } : {})
+  })
   if (held.ok) {
     return true
   }
@@ -129,10 +138,9 @@ export async function claimRecipeWorkspaceRemoval(
     if (!acks) {
       return false
     }
-    const claimed = await window.api.ephemeralVm.claimRemoval({
-      ...target,
-      ack: acks.get(candidate.key) ?? ''
-    })
+    const claimed = await window.api.ephemeralVm
+      .claimRemoval({ ...target, ack: acks.get(candidate.key) ?? '' })
+      .catch(() => ({ ok: false as const, reason: 'unconfirmed' as const }))
     if (claimed.ok) {
       return true
     }
@@ -159,10 +167,10 @@ export async function claimRecipeRemovalAcks(
   const claims = await Promise.all(
     candidates.map((candidate) =>
       'hostId' in candidate.request
-        ? window.api.ephemeralVm.claimRemoval({
-            ...candidate.request,
-            ack: acks.get(candidate.key) ?? ''
-          })
+        ? window.api.ephemeralVm
+            .claimRemoval({ ...candidate.request, ack: acks.get(candidate.key) ?? '' })
+            // A failed bridge call holds nothing; the caller checks again.
+            .catch(() => ({ ok: false as const, reason: 'unconfirmed' as const }))
         : Promise.resolve({ ok: true as const, required: false as const })
     )
   )

@@ -83,6 +83,19 @@ function PreflightSummary({ preflight }: { preflight: RecipeRemovalPreflight }):
   )
 }
 
+/** Busy while `work` runs; even a rejected call gives close and retry back. */
+async function whileBusy(
+  markBusy: (busy: boolean) => void,
+  work: () => Promise<void>
+): Promise<void> {
+  markBusy(true)
+  try {
+    await work()
+  } finally {
+    markBusy(false)
+  }
+}
+
 /** Hands the decided acks on; resolves once the removal they start holds its claim (or not). */
 type RemoveWith = (acks: RecipeRemovalAcks) => Promise<void>
 
@@ -95,11 +108,14 @@ type Decision =
 function SingleWorkspacePanel({
   candidate,
   preflight: checked,
+  sessionId,
   onRemove,
   onBusyChange
 }: {
   candidate: RecipeRemovalCandidate
   preflight: RecipeRemovalCheckResult
+  /** The copy's ack joins the dialog's session, so closing revokes it with the rest. */
+  sessionId?: string
   onRemove: RemoveWith
   onBusyChange?: (busy: boolean) => void
 }): JSX.Element {
@@ -119,31 +135,33 @@ function SingleWorkspacePanel({
   // Reviews name a workspace or a runtime record; main copies for either.
   const canCopy = preflight.status === 'unsafe' && preflight.recordingsNotCopied.length > 0
 
-  const decide = async (run: () => Promise<Decision>): Promise<void> => {
-    setBusy(true)
-    onBusyChange?.(true)
-    setCopyError(null)
-    const outcome = await run()
-    if (!mounted.current) {
-      return
-    }
-    if (outcome.kind === 'remove') {
-      // Busy until the removal holds its claim, so the dialog can't be dismissed under it.
-      await onRemove(outcome.acks)
-    } else if (outcome.kind === 'failed') {
-      setCopyError(outcome.reason)
-    } else {
-      setPreflight(outcome.preflight)
-    }
-    if (mounted.current) {
-      setBusy(false)
-      onBusyChange?.(false)
+  const markBusy = (next: boolean): void => {
+    // A closed panel only lets go of the dialog (its unmount already did); it never re-renders.
+    if (next || mounted.current) {
+      setBusy(next)
+      onBusyChange?.(next)
     }
   }
+  const decide = (run: () => Promise<Decision>): Promise<void> =>
+    whileBusy(markBusy, async () => {
+      setCopyError(null)
+      const outcome = await run()
+      if (!mounted.current) {
+        return
+      }
+      if (outcome.kind === 'remove') {
+        // Busy until the removal holds its claim, so the dialog can't be dismissed under it.
+        await onRemove(outcome.acks)
+      } else if (outcome.kind === 'failed') {
+        setCopyError(outcome.reason)
+      } else {
+        setPreflight(outcome.preflight)
+      }
+    })
 
   const copyAndRemove = async (): Promise<Decision> => {
     const result = await window.api.ephemeralVm
-      .copyRecordingsBeforeRemoval(candidate.request)
+      .copyRecordingsBeforeRemoval({ ...candidate.request, ...(sessionId ? { sessionId } : {}) })
       .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
     if (result.ok) {
       // The copy proved nothing is pending; its ack is the one the removal spends.
@@ -207,13 +225,12 @@ function AggregatePanel({
 }): JSX.Element {
   const t = useTranslate()
   const [busy, setBusy] = useState(false)
-  const removeAnyway = async (): Promise<void> => {
-    setBusy(true)
-    onBusyChange?.(true)
-    await onRemove(await confirmAnyway(results))
-    setBusy(false)
-    onBusyChange?.(false)
+  const markBusy = (next: boolean): void => {
+    setBusy(next)
+    onBusyChange?.(next)
   }
+  const removeAnyway = (): Promise<void> =>
+    whileBusy(markBusy, async () => onRemove(await confirmAnyway(results)))
   return (
     <>
       <div className="flex min-w-0 flex-col gap-1.5" data-recipe-removal-check="aggregate">
@@ -269,6 +286,7 @@ export function RecipeRemovalResultsPanel({
         key={only.candidate.key}
         candidate={only.candidate}
         preflight={only.preflight}
+        sessionId={only.sessionId}
         onRemove={onRemove}
         onBusyChange={onBusyChange}
       />

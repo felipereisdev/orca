@@ -8,11 +8,14 @@ import {
 } from '../../shared/execution-host/execution-host'
 import type { DesktopSettingsSource } from './desktop-configure'
 import {
+  adoptRecipeRemovalClaim,
   claimRecipeRemovalAck,
   confirmRecipeRemovalAck,
   issueRecipeRemovalAck,
   releaseRecipeRemovalClaim,
-  revokeRecipeRemovalAck
+  revokeRecipeRemovalAck,
+  revokeRecipeRemovalSession,
+  type RecipeRemovalAckBinding
 } from './recipe-removal-acks'
 import { currentRecipeOwner } from './recipe-removal-target'
 import { isUnattachedProvision } from './unattached-provisions'
@@ -24,6 +27,30 @@ const ClaimArgs = z.object({
   workspaceId: z.string().min(1)
 })
 const ReleaseArgs = ClaimArgs.omit({ ack: true })
+const AdoptArgs = ReleaseArgs.extend({ sessionId: z.string().min(1).optional() })
+const SessionArgs = z.object({ sessionId: z.string().min(1) })
+
+/** The record owning the workspace now, as an ack binding; null when no recipe holds it. */
+async function currentBinding(
+  store: DesktopSettingsSource,
+  userDataPath: string,
+  hostId: string,
+  workspaceId: string
+): Promise<RecipeRemovalAckBinding | null | 'ambiguous'> {
+  if (store.getSettings().experimentalEphemeralVms !== true) {
+    return null
+  }
+  const owner = await currentRecipeOwner(userDataPath, hostId, workspaceId)
+  if (!owner || owner === 'ambiguous') {
+    return owner
+  }
+  return {
+    hostId,
+    workspaceId: owner.workspaceId ?? '',
+    runtimeId: owner.id,
+    runtimeCreatedAt: owner.createdAt
+  }
+}
 const RollbackArgs = z.object({ runtimeId: z.string().min(1) })
 
 /** Holds the workspace's environment for the removal that is about to delete its checkout. */
@@ -33,23 +60,33 @@ export async function claimRecipeRemoval(
   value: unknown
 ): Promise<RecipeRemovalClaimResult> {
   const args = ClaimArgs.parse(value)
-  if (store.getSettings().experimentalEphemeralVms !== true) {
-    return { ok: true, required: false }
-  }
-  const owner = await currentRecipeOwner(userDataPath, args.hostId, args.workspaceId)
-  if (owner === 'ambiguous') {
+  const binding = await currentBinding(store, userDataPath, args.hostId, args.workspaceId)
+  if (binding === 'ambiguous') {
     return { ok: false, reason: 'replaced' }
   }
-  if (!owner) {
+  if (!binding) {
     return { ok: true, required: false }
   }
-  const claim = claimRecipeRemovalAck(args.ack, {
-    hostId: args.hostId,
-    workspaceId: owner.workspaceId ?? '',
-    runtimeId: owner.id,
-    runtimeCreatedAt: owner.createdAt
-  })
+  const claim = claimRecipeRemovalAck(args.ack, binding)
   return claim.ok ? { ok: true, required: true } : claim
+}
+
+/** At the store removal: takes over the claim its dialog session (or its own flow) made. */
+export async function adoptRecipeRemoval(
+  store: DesktopSettingsSource,
+  userDataPath: string,
+  value: unknown
+): Promise<RecipeRemovalClaimResult> {
+  const args = AdoptArgs.parse(value)
+  const binding = await currentBinding(store, userDataPath, args.hostId, args.workspaceId)
+  if (binding === 'ambiguous') {
+    return { ok: false, reason: 'replaced' }
+  }
+  if (!binding) {
+    return { ok: true, required: false }
+  }
+  const adopted = adoptRecipeRemovalClaim(binding, args.sessionId)
+  return adopted.ok ? { ok: true, required: true } : adopted
 }
 
 /**
@@ -89,7 +126,9 @@ export function registerRecipeRemovalAckHandlers(store: DesktopSettingsSource): 
     'ephemeralVm:confirmRemoval',
     'ephemeralVm:revokeRemoval',
     'ephemeralVm:claimRemoval',
+    'ephemeralVm:adoptRemoval',
     'ephemeralVm:releaseRemoval',
+    'ephemeralVm:revokeRemovalSession',
     'ephemeralVm:rollbackRemovalAck'
   ]) {
     ipcMain.removeHandler(channel)
@@ -103,6 +142,12 @@ export function registerRecipeRemovalAckHandlers(store: DesktopSettingsSource): 
   ipcMain.handle('ephemeralVm:claimRemoval', (_event, args: unknown) =>
     claimRecipeRemoval(store, app.getPath('userData'), args)
   )
+  ipcMain.handle('ephemeralVm:adoptRemoval', (_event, args: unknown) =>
+    adoptRecipeRemoval(store, app.getPath('userData'), args)
+  )
+  ipcMain.handle('ephemeralVm:revokeRemovalSession', (_event, args: unknown) => {
+    revokeRecipeRemovalSession(SessionArgs.parse(args).sessionId)
+  })
   ipcMain.handle('ephemeralVm:releaseRemoval', (_event, args: unknown) => {
     const { hostId, workspaceId } = ReleaseArgs.parse(args)
     releaseRecipeRemovalClaim(hostId, workspaceId)

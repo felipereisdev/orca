@@ -36,7 +36,9 @@ export const ephemeralVmApi = {
   confirmRemoval: (args) => ipcRenderer.invoke('ephemeralVm:confirmRemoval', args),
   revokeRemoval: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemoval', args),
   claimRemoval: (args) => ipcRenderer.invoke('ephemeralVm:claimRemoval', args),
+  adoptRemoval: (args) => ipcRenderer.invoke('ephemeralVm:adoptRemoval', args),
   releaseRemoval: (args) => ipcRenderer.invoke('ephemeralVm:releaseRemoval', args),
+  revokeRemovalSession: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemovalSession', args),
   rollbackRemovalAck: (args) => ipcRenderer.invoke('ephemeralVm:rollbackRemovalAck', args),
   copyRecordingsBeforeRemoval: (args) =>
     ipcRenderer.invoke('ephemeralVm:copyRecordingsBeforeRemoval', args),

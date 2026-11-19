@@ -121,9 +121,8 @@ export function createRemoveWorktree(
       if (unprovableRemoteRouting) {
         throw new Error(unprovableRemoteRouting)
       }
-      releaseClaim = await authorizeWorktreeRemoval(get, removalTarget, () =>
-        findWorktreeOnConfirmedHost(get, worktreeId, requiredExecutionHostId)
-      )
+      const authorization = await authorizeWorktreeRemoval(get, removalTarget, options)
+      releaseClaim = authorization.release
       let removalResult: RemoveWorktreeResult
       let snapshotPruneHandledByLocalMain = policy.forgetLocalOnly || target.kind === 'local'
       try {
@@ -135,7 +134,8 @@ export function createRemoveWorktree(
           get,
           target,
           options: policy.options,
-          assertCurrent: () => removalGenerationGuard?.assertCurrent()
+          // Also refuses a same-id replacement that landed during a remote compatibility probe.
+          assertCurrent: authorization.guard(removalGenerationGuard)
         })
       } catch (error) {
         if (

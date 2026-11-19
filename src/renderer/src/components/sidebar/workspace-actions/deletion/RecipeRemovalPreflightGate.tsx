@@ -50,10 +50,8 @@ export function RecipeRemovalPreflightGate({
   // The decision is claimed now, right before the removal starts; an answer that expired or whose
   // environment changed meanwhile is checked again and shown again unless it is now clean.
   const removeWith = async (acks: RecipeRemovalAcks): Promise<void> => {
-    const outcome = await claim(acks)
-    if (outcome === 'claimed') {
-      onRemove()
-    } else if (outcome === 'refused') {
+    // The removal it starts takes the session over; one that stops first leaves it to closing.
+    if ((await claim(acks, onRemove)) === 'refused') {
       refresh()
     }
   }

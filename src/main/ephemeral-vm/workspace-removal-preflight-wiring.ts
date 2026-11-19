@@ -1,4 +1,5 @@
 import { app, ipcMain } from 'electron'
+import { z } from 'zod'
 import {
   RECIPE_REMOVAL_PREFLIGHT_TIMEOUT_MS,
   type RecipeRemovalCheckResult,
@@ -51,12 +52,20 @@ function ports(target: RemovalPreflightTarget): CopyBeforeRemovalPorts {
  */
 function withAck(
   preflight: RecipeRemovalPreflight,
-  binding: RecipeRemovalAckBinding | undefined
+  binding: RecipeRemovalAckBinding | undefined,
+  sessionId: string | undefined
 ): RecipeRemovalCheckResult {
   return {
     ...preflight,
-    ack: binding ? issueRecipeRemovalAck(binding, preflight.status === 'clean') : ''
+    ack: binding ? issueRecipeRemovalAck(binding, preflight.status === 'clean', sessionId) : ''
   }
+}
+
+/** The dialog session a request belongs to; its acks are revoked together when it closes. */
+const RequestSession = z.object({ sessionId: z.string().min(1).optional() })
+
+function sessionOf(request: unknown): string | undefined {
+  return RequestSession.safeParse(request).data?.sessionId
 }
 
 function unchecked(reason: RecipeRemovalPreflightReason): RecipeRemovalPreflight {
@@ -73,11 +82,12 @@ export async function checkRecipeRemoval(
   if (!resolved) {
     return null
   }
+  const sessionId = sessionOf(request)
   if (resolved.kind === 'unchecked') {
-    return withAck(unchecked(resolved.reason), resolved.binding)
+    return withAck(unchecked(resolved.reason), resolved.binding, sessionId)
   }
   const preflight = await preflightRecipeWorkspaceRemoval(resolved.target, ports(resolved.target))
-  return withAck(preflight, resolved.binding)
+  return withAck(preflight, resolved.binding, sessionId)
 }
 
 /** Copies the pending recordings; only a proven-complete copy answers with a usable ack. */
@@ -93,10 +103,10 @@ export async function copyRecipeRecordingsBeforeRemoval(
   const outcome = await copyRecordingsBeforeRemoval(resolved.target, ports(resolved.target))
   if (outcome.ok) {
     // The user asked to copy and remove, and a final list proved nothing is pending.
-    return { ...outcome, ack: issueRecipeRemovalAck(resolved.binding, true) }
+    return { ...outcome, ack: issueRecipeRemovalAck(resolved.binding, true, sessionOf(request)) }
   }
   return outcome.reason === 'still_pending'
-    ? { ...outcome, preflight: withAck(outcome.preflight, resolved.binding) }
+    ? { ...outcome, preflight: withAck(outcome.preflight, resolved.binding, sessionOf(request)) }
     : outcome
 }
 

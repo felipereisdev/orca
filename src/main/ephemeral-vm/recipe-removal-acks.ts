@@ -21,12 +21,22 @@ export type RecipeRemovalAckBinding = {
  */
 type AckState = 'pending' | 'confirmed'
 
-const acks = new Map<string, RecipeRemovalAckBinding & { state: AckState; expiresAt: number }>()
+/** `sessionId`: the dialog that showed the answer; closing it revokes the whole session. */
+type Session = { sessionId?: string }
+
+const acks = new Map<
+  string,
+  RecipeRemovalAckBinding & Session & { state: AckState; expiresAt: number }
+>()
 /**
  * Removals that began their irreversible steps, keyed by the runtime record they will destroy.
  * `ack` is the decision a claim came from, so cancelling that decision also ends the claim.
+ * `adopted`: the store removal took it over, so closing its dialog no longer revokes it.
  */
-const claims = new Map<string, RecipeRemovalAckBinding & { ack: string; expiresAt: number }>()
+const claims = new Map<
+  string,
+  RecipeRemovalAckBinding & Session & { ack: string; adopted: boolean; expiresAt: number }
+>()
 
 function recordKey(runtimeId: string, createdAt: number): string {
   return `${runtimeId}\0${createdAt}`
@@ -54,12 +64,14 @@ function refused(): RecipeWorkspaceRemovalError {
 /** Issued with every removal check; only a clean answer can be used before the user decides. */
 export function issueRecipeRemovalAck(
   binding: RecipeRemovalAckBinding,
-  confirmed: boolean
+  confirmed: boolean,
+  sessionId?: string
 ): string {
   live('')
   const ack = randomBytes(16).toString('hex')
   acks.set(ack, {
     ...binding,
+    ...(sessionId ? { sessionId } : {}),
     state: confirmed ? 'confirmed' : 'pending',
     expiresAt: Date.now() + RECIPE_REMOVAL_ACK_TTL_MS
   })
@@ -92,6 +104,20 @@ export function revokeRecipeRemovalAck(ack: string): void {
   }
 }
 
+/** The dialog closed or retargeted: its answers and every claim the store didn't adopt end. */
+export function revokeRecipeRemovalSession(sessionId: string): void {
+  for (const [ack, entry] of acks) {
+    if (entry.sessionId === sessionId) {
+      acks.delete(ack)
+    }
+  }
+  for (const [key, claim] of claims) {
+    if (claim.sessionId === sessionId && !claim.adopted) {
+      claims.delete(key)
+    }
+  }
+}
+
 /** A removal that failed after claiming: its environment is no longer held for a destroy. */
 export function releaseRecipeRemovalClaim(hostId: string, workspaceId: string): void {
   for (const [key, claim] of claims) {
@@ -105,8 +131,7 @@ export type RecipeRemovalClaim = { ok: true } | { ok: false; reason: 'unconfirme
 
 /**
  * Before a removal's first irreversible step: turns a confirmed ack into an authorization held for
- * the record that owns the workspace now, long enough for the whole removal. With no ack, an
- * authorization an earlier claim left for that same record still counts.
+ * the record that owns the workspace now, long enough for the whole removal.
  */
 export function claimRecipeRemovalAck(
   ack: string,
@@ -114,12 +139,6 @@ export function claimRecipeRemovalAck(
 ): RecipeRemovalClaim {
   const entry = live(ack)
   const key = recordKey(current.runtimeId, current.runtimeCreatedAt)
-  if (!ack) {
-    const held = claims.get(key)
-    return held && held.hostId === current.hostId && held.workspaceId === current.workspaceId
-      ? { ok: true }
-      : { ok: false, reason: 'unconfirmed' }
-  }
   if (!entry || entry.state === 'pending') {
     return { ok: false, reason: 'unconfirmed' }
   }
@@ -132,7 +151,35 @@ export function claimRecipeRemovalAck(
     return { ok: false, reason: 'replaced' }
   }
   acks.delete(ack)
-  claims.set(key, { ...current, ack, expiresAt: Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS })
+  claims.set(key, {
+    ...current,
+    ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+    ack,
+    adopted: false,
+    expiresAt: Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS
+  })
+  return { ok: true }
+}
+
+/**
+ * The store removal takes over the claim its decision made, in the same dialog session (none for
+ * removals that claim on their own). From here only its destroy or its release ends it.
+ */
+export function adoptRecipeRemovalClaim(
+  current: RecipeRemovalAckBinding,
+  sessionId: string | undefined
+): RecipeRemovalClaim {
+  live('')
+  const held = claims.get(recordKey(current.runtimeId, current.runtimeCreatedAt))
+  if (
+    !held ||
+    held.hostId !== current.hostId ||
+    held.workspaceId !== current.workspaceId ||
+    held.sessionId !== sessionId
+  ) {
+    return { ok: false, reason: 'unconfirmed' }
+  }
+  held.adopted = true
   return { ok: true }
 }
 

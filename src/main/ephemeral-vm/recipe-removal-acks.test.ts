@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  adoptRecipeRemovalClaim,
   claimRecipeRemovalAck,
   confirmRecipeRemovalAck,
   consumeRecipeRemovalAck,
   issueRecipeRemovalAck,
   releaseRecipeRemovalClaim,
-  revokeRecipeRemovalAck
+  revokeRecipeRemovalAck,
+  revokeRecipeRemovalSession
 } from './recipe-removal-acks'
 
 const binding = {
@@ -64,8 +66,41 @@ describe('recipe removal acknowledgements', () => {
     expect(confirmRecipeRemovalAck(ack)).toBe(true)
     expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
     revokeRecipeRemovalAck(ack)
-    expect(claimRecipeRemovalAck('', binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+    expect(adoptRecipeRemovalClaim(binding, undefined)).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
     expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+  })
+
+  it('closing a dialog revokes its session: every ack and every claim the store did not adopt', () => {
+    const shown = issueRecipeRemovalAck(binding, false, 'session-a')
+    // "Copy recordings and remove" answers with a fresh ack of the same session.
+    const copied = issueRecipeRemovalAck(binding, true, 'session-a')
+    expect(claimRecipeRemovalAck(copied, binding)).toEqual({ ok: true })
+    revokeRecipeRemovalSession('session-a')
+    expect(confirmRecipeRemovalAck(shown)).toBe(false)
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+    expect(adoptRecipeRemovalClaim(binding, 'session-a')).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+  })
+
+  it('a claim the store adopted outlives its session; other sessions cannot adopt it', () => {
+    const ack = issueRecipeRemovalAck(binding, true, 'session-b')
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    expect(adoptRecipeRemovalClaim(binding, undefined)).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+    expect(adoptRecipeRemovalClaim(binding, 'session-other')).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+    expect(adoptRecipeRemovalClaim(binding, 'session-b')).toEqual({ ok: true })
+    revokeRecipeRemovalSession('session-b')
+    expect(() => consumeRecipeRemovalAck('', runtime)).not.toThrow()
   })
 
   it('a removal that failed after its claim releases it', () => {

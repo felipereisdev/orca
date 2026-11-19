@@ -67,6 +67,12 @@ function bridge(): typeof window.api {
       mocks.order.push(`claim:${args.ack}`)
       return { ok: true, required: true }
     }),
+    // The removal adopts the claim in the dialog session it took over.
+    adoptRemoval: vi.fn(async (args: { sessionId?: string }) => {
+      mocks.order.push(args.sessionId ? 'adopt:session' : 'adopt:none')
+      return { ok: true, required: true }
+    }),
+    revokeRemovalSession: vi.fn(async () => {}),
     cleanup: vi.fn(async (args: { ack: string }) => {
       mocks.order.push(`destroy:${args.ack}`)
       return {}
@@ -140,7 +146,13 @@ describe('copy recordings and remove, through the real removal', () => {
     copyResult = { ok: true, copied: 1, ack: 'ack-copy' }
     await copyAndRemove()
     // The copy's ack is claimed for this removal before the checkout goes; the destroy spends it.
-    expect(mocks.order).toEqual(['copy', 'claim:ack-copy', 'claim:', 'worktree.rm', 'destroy:'])
+    expect(mocks.order).toEqual([
+      'copy',
+      'claim:ack-copy',
+      'adopt:session',
+      'worktree.rm',
+      'destroy:'
+    ])
   })
 
   it('a failed copy never destroys the environment', async () => {

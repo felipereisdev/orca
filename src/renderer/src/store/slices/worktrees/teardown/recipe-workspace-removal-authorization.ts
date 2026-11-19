@@ -6,6 +6,34 @@ import {
 import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeRemovalTarget } from '../../../../../../shared/worktree/removal/removal'
 import type { WorktreeSliceGet } from '../listing/worktree-slice-types'
+import { findWorktreeOnConfirmedHost } from './host-qualified-worktree-removal'
+import type { RemoveWorktreeOptions } from './worktree-removal-options'
+
+export type WorktreeRemovalAuthorization = {
+  /** A removal that then fails calls it, so the hold doesn't outlive it. */
+  release: () => void
+  /** Adds the same-row check to the removal's own ownership check, run right before the send. */
+  guard: (ownership: { assertCurrent: () => void } | null | undefined) => () => void
+}
+
+function isReplaced(
+  removalTarget: WorktreeRemovalTarget,
+  readCurrent: () => Pick<Worktree, 'instanceId'> | null | undefined
+): boolean {
+  return (
+    removalTarget.instanceId !== undefined && readCurrent()?.instanceId !== removalTarget.instanceId
+  )
+}
+
+/** The final guard right before the destructive send, after every await (the compatibility probe). */
+export function assertWorktreeRemovalTargetCurrent(
+  removalTarget: WorktreeRemovalTarget,
+  readCurrent: () => Pick<Worktree, 'instanceId'> | null | undefined
+): void {
+  if (isReplaced(removalTarget, readCurrent)) {
+    throw replacedError()
+  }
+}
 
 function replacedError(): Error {
   return new Error(
@@ -25,10 +53,12 @@ function replacedError(): Error {
 export async function authorizeWorktreeRemoval(
   get: WorktreeSliceGet,
   removalTarget: WorktreeRemovalTarget,
-  readCurrent: () => Pick<Worktree, 'instanceId' | 'displayName'> | null | undefined
-): Promise<() => void> {
-  const replaced = (): boolean =>
-    removalTarget.instanceId !== undefined && readCurrent()?.instanceId !== removalTarget.instanceId
+  /** `recipeRemovalSessionId`: the dialog session this removal took over; it adopts in it. */
+  options?: Pick<RemoveWorktreeOptions, 'recipeRemovalSessionId'>
+): Promise<WorktreeRemovalAuthorization> {
+  const readCurrent = () =>
+    findWorktreeOnConfirmedHost(get, removalTarget.id, removalTarget.executionHostId)
+  const replaced = (): boolean => isReplaced(removalTarget, readCurrent)
   if (replaced()) {
     throw replacedError()
   }
@@ -37,7 +67,11 @@ export async function authorizeWorktreeRemoval(
     hostId: removalTarget.executionHostId,
     displayName: readCurrent()?.displayName ?? removalTarget.id
   }
-  const authorized = await claimRecipeWorkspaceRemoval(get(), workspace)
+  const authorized = await claimRecipeWorkspaceRemoval(
+    get(),
+    workspace,
+    options?.recipeRemovalSessionId
+  )
   if (!authorized) {
     throw new Error(
       translate(
@@ -52,5 +86,11 @@ export async function authorizeWorktreeRemoval(
     release()
     throw replacedError()
   }
-  return release
+  return {
+    release,
+    guard: (ownership) => () => {
+      ownership?.assertCurrent()
+      assertWorktreeRemovalTargetCurrent(removalTarget, readCurrent)
+    }
+  }
 }
