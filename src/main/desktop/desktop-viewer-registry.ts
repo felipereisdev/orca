@@ -85,6 +85,13 @@ export class DesktopViewerRegistry {
     this.#sessions.get(viewerId)?.close()
   }
 
+  /** Every announced size reaches each session now, so it outlives the control connection. */
+  announceBounds(bounds: DesktopBounds): void {
+    for (const session of this.#sessions.values()) {
+      session.updateBounds(bounds)
+    }
+  }
+
   closeAll(): void {
     for (const viewerId of new Set([...this.#pending.keys(), ...this.#sessions.keys()])) {
       this.close(viewerId)

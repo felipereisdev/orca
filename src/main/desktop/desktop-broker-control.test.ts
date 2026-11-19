@@ -196,6 +196,29 @@ describe('DesktopBroker control ownership', () => {
     ])
   })
 
+  it("a shrink announced before the control connection is lost bounds the viewer's release", async () => {
+    const { broker, server, openViewer } = await fixture()
+    const viewer = await openViewer('v1')
+    broker.setOwner('user', 'v1')
+    viewer.pointer(40, 30, 1)
+    await server.waitForReceived((received) => pointerEvents(received).length === 1)
+    server.setSize(16, 12)
+    await server.waitForReceived((received) =>
+      received.some((m) => m[0] === 3 && m[1] === 0 && m.readUInt16BE(6) === 16)
+    )
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    server.dropConnection(0)
+    await vi.waitFor(() => expect(broker.status().state).toBe('unavailable'))
+
+    broker.setOwner('agent')
+    await server.waitForReceived((received) => pointerEvents(received).length === 2)
+
+    expect(pointerEvents(server.received)).toEqual([
+      [1, 40, 30],
+      [0, 15, 11]
+    ])
+  })
+
   it("handover mid-drag releases the agent's mouse button", async () => {
     const { broker, server, openViewer } = await fixture()
     await openViewer('v1')

@@ -67,6 +67,8 @@ function snapshotFrame(framebuffer: RfbFramebuffer): DesktopFrame {
 
 type ControlHandlers = {
   onFrame: (frame: DesktopFrame) => void
+  /** The server announced a new desktop size (DesktopSize), before its pixels arrive. */
+  onDesktopSize?: (size: { width: number; height: number }) => void
   /** Called once if the connection drops on its own (not after `close()`). */
   onLost: (reason: string) => void
 }
@@ -252,6 +254,7 @@ export class DesktopControlConnection {
       if (encoding === RFB_ENCODING_DESKTOP_SIZE) {
         this.framebuffer.apply(singleRectUpdate(rect))
         this.coverage = new DesktopFrameCoverage(this.framebuffer.width, this.framebuffer.height)
+        this.handlers.onDesktopSize?.(this.desktopSize)
         continue
       }
       const [x, y, width, height] = [0, 2, 4, 6].map((offset) => rect.readUInt16BE(offset))

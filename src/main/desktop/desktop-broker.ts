@@ -22,17 +22,9 @@ import { desktopFailureReason, type DesktopVncTarget } from './desktop-upstream'
 import { DesktopViewerRegistry } from './desktop-viewer-registry'
 import { encodePng } from './rfb/png-encode'
 
-export type DesktopOwner = 'agent' | 'user'
+import type { DesktopOwner, DesktopStatus } from './desktop-broker-status'
 
-export type DesktopStatus = {
-  state: 'unconfigured' | 'connecting' | 'ready' | 'unavailable'
-  reason?: string
-  owner: DesktopOwner
-  width?: number
-  height?: number
-  recording: boolean
-}
-
+export type { DesktopOwner, DesktopStatus } from './desktop-broker-status'
 export type { DesktopBrokerConfig } from './desktop-broker-config'
 
 const OWNER_FALLBACK_MS = 5_000
@@ -305,6 +297,11 @@ export class DesktopBroker {
                 return
               }
               listener(frame)
+            }
+          },
+          onDesktopSize: (size) => {
+            if (generation === this.#generation) {
+              this.#viewers.announceBounds(size)
             }
           },
           onLost: (reason) => {

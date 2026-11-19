@@ -77,6 +77,11 @@ export class DesktopViewerSession {
     this.held.release(this.currentBounds(), (message) => this.upstream.write(message))
   }
 
+  /** The size the server just announced; kept if the control connection drops afterwards. */
+  updateBounds(bounds: DesktopBounds): void {
+    this.knownBounds = { ...bounds }
+  }
+
   /** The broker's announced size when it has one, else the last size this session knew. */
   private currentBounds(): DesktopBounds {
     const announced = this.handlers.bounds()
