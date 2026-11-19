@@ -1,3 +1,5 @@
+import { keysymForCodePoint } from '../../../../shared/desktop-keysyms'
+
 const XK_CONTROL_L = 0xffe3
 const XK_V = 0x0076
 
@@ -8,11 +10,21 @@ export type DesktopPasteTarget = {
 }
 
 /**
- * Puts the Mac's text on the guest clipboard (ClientCutText), then presses ctrl+v there. The
- * broker passes both only while this viewer holds control.
+ * Plain ClientCutText only carries Latin-1. Type Unicode text as keys instead.
+ * The broker passes input only while this viewer holds control.
  */
 export function pasteIntoDesktop(rfb: DesktopPasteTarget, text: string): void {
   if (!text) {
+    return
+  }
+  if (/[\u0100-\u{10ffff}]/u.test(text)) {
+    for (const character of text.replace(/\r\n?/g, '\n')) {
+      const codePoint = character.codePointAt(0) ?? 0
+      const keysym =
+        character === '\n' ? 0xff0d : character === '\t' ? 0xff09 : keysymForCodePoint(codePoint)
+      rfb.sendKey(keysym, '', true)
+      rfb.sendKey(keysym, '', false)
+    }
     return
   }
   rfb.clipboardPasteFrom(text)

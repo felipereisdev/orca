@@ -109,6 +109,7 @@ function SingleWorkspacePanel({
   candidate,
   preflight: checked,
   sessionId,
+  onCopyAck,
   onRemove,
   onBusyChange
 }: {
@@ -116,6 +117,7 @@ function SingleWorkspacePanel({
   preflight: RecipeRemovalCheckResult
   /** The copy's ack joins the dialog's session, so closing revokes it with the rest. */
   sessionId?: string
+  onCopyAck?: (ack: string) => void
   onRemove: RemoveWith
   onBusyChange?: (busy: boolean) => void
 }): JSX.Element {
@@ -132,8 +134,6 @@ function SingleWorkspacePanel({
       onBusyChange?.(false)
     }
   }, [onBusyChange])
-  // Reviews name a workspace or a runtime record; main copies for either.
-  // "Copy recordings and remove" also stops and keeps one still in progress.
   const canCopy =
     preflight.status === 'unsafe' &&
     (preflight.recordingsNotCopied.length > 0 || preflight.recordingInProgress === true)
@@ -167,12 +167,15 @@ function SingleWorkspacePanel({
       .copyRecordingsBeforeRemoval({ ...candidate.request, ...(sessionId ? { sessionId } : {}) })
       .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
     if (result.ok) {
+      onCopyAck?.(result.ack)
       // The copy proved nothing is pending; its ack is the one the removal spends.
       return { kind: 'remove', acks: new Map([[candidate.key, result.ack]]) }
     }
-    return result.reason === 'still_pending'
-      ? { kind: 'pending', preflight: result.preflight }
-      : { kind: 'failed', reason: result.reason }
+    if (result.reason === 'still_pending') {
+      onCopyAck?.(result.preflight.ack)
+      return { kind: 'pending', preflight: result.preflight }
+    }
+    return { kind: 'failed', reason: result.reason }
   }
 
   return (
@@ -216,7 +219,6 @@ function SingleWorkspacePanel({
   )
 }
 
-/** Several workspaces: one list of what each would lose, and only remove anyway or cancel. */
 function AggregatePanel({
   results,
   onRemove,
@@ -262,19 +264,16 @@ function AggregatePanel({
   )
 }
 
-/**
- * What removing these workspaces would lose, for the ones that aren't clean: one workspace can copy
- * its recordings first; several get one list with only remove anyway or cancel. `onRemove` gets
- * the acks the user's decision made usable, for every result (clean ones included).
- */
 export function RecipeRemovalResultsPanel({
   results,
   single,
+  onCopyAck,
   onRemove,
   onBusyChange
 }: {
   results: RecipeRemovalResult[]
   single: boolean
+  onCopyAck?: (ack: string) => void
   onRemove: RemoveWith
   onBusyChange?: (busy: boolean) => void
 }): JSX.Element | null {
@@ -290,6 +289,7 @@ export function RecipeRemovalResultsPanel({
         candidate={only.candidate}
         preflight={only.preflight}
         sessionId={only.sessionId}
+        onCopyAck={onCopyAck}
         onRemove={onRemove}
         onBusyChange={onBusyChange}
       />

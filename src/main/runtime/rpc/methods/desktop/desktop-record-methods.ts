@@ -8,7 +8,8 @@ import {
   DesktopRecordFenceParams,
   DesktopRecordingsListParams,
   DesktopRecordStartParams,
-  DesktopRecordStopParams
+  DesktopRecordStopParams,
+  DesktopRecordUnfenceParams
 } from '../../../../../shared/rpc-contract/desktop/desktop-params'
 import { defineMethod, defineStreamingMethod } from '../../core'
 import {
@@ -17,8 +18,6 @@ import {
 } from './desktop-controller-identity'
 
 const EVENTS_SUBSCRIPTION_PREFIX = 'desktop-events:'
-/** A removal that never finished must not hold recordings off for good. */
-const REMOVAL_FENCE_MS = 10 * 60_000
 
 /**
  * Recording runs on the environment, so agents may start and stop it; `desktop.events` tells the
@@ -65,8 +64,19 @@ export function createDesktopRecordMethods(
       handler: async (params, ctx) => {
         const broker = getBroker()
         assertDesktopControllerToken(broker, ctx, params.controllerToken)
-        broker.recorder.fence(REMOVAL_FENCE_MS)
+        broker.recorder.removalFences.hold(params.fenceId)
         return { fenced: true }
+      }
+    }),
+    defineMethod({
+      name: 'desktop.record.unfence',
+      permission: 'host-admin',
+      params: DesktopRecordUnfenceParams,
+      handler: async (params, ctx) => {
+        const broker = getBroker()
+        assertDesktopControllerToken(broker, ctx, params.controllerToken)
+        broker.recorder.removalFences.release(params.fenceId)
+        return { released: true }
       }
     }),
     defineStreamingMethod({

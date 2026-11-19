@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseEphemeralVmRecipeResult } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
-import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { RuntimeHostStatusSnapshot } from '../../shared/remote-runtime/host-status/runtime-host-status'
-import { desktopEnvironmentFake as env } from './desktop-environment-fake.test-support'
+import {
+  desktopEnvironmentFake as env,
+  runningDesktopRuntimeFixture as runningRuntime
+} from './desktop-environment-fake.test-support'
 import type * as RecordingIndex from './desktop-recording-index'
 
 type StatusListener = (snapshot: RuntimeHostStatusSnapshot) => void
@@ -31,40 +32,11 @@ import {
   reconfigureEnvironmentDesktop,
   registerEnvironmentDesktopLifecycle,
   restoreEnvironmentDesktops,
+  startEnvironmentDesktop,
   stopEnvironmentDesktop
 } from './desktop-sync-registry'
 
 const STORE = { getSettings: () => ({ experimentalEphemeralVms: true }) }
-
-function runningRuntime(): EphemeralVmRuntimeRecord {
-  const parsed = parseEphemeralVmRecipeResult(
-    JSON.stringify({
-      schemaVersion: 1,
-      connection: {
-        type: 'ssh',
-        projectRoot: '/workspace/repo',
-        target: { label: 'VM', host: 'vm.example.com', port: 22, username: 'root' }
-      },
-      desktop: { type: 'vnc', port: 5901, password: 'abc12345' }
-    })
-  )
-  if (!parsed.ok) {
-    throw new Error('fixture recipe result did not parse')
-  }
-  return {
-    id: 'vm-1',
-    recipeId: 'cloud',
-    repoId: 'repo-1',
-    status: 'running',
-    cleanupStatus: 'not_started',
-    connectionMode: 'ssh',
-    runtimeEnvironmentId: 'env-1',
-    workspaceId: 'repo-1::/workspace/repo',
-    recipeResult: parsed.result,
-    createdAt: 0,
-    updatedAt: 0
-  }
-}
 
 function configureCalls(): number {
   return env.methods().filter((method) => method === 'desktop.configure').length
@@ -109,7 +81,7 @@ function publish(snapshot: RuntimeHostStatusSnapshot): void {
 
 describe('desktop hand-off lifecycle', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   })
   afterEach(() => {
     stopEnvironmentDesktop('vm-1')
@@ -264,17 +236,46 @@ describe('desktop hand-off lifecycle', () => {
     expect(configureCalls()).toBe(4)
   })
 
-  it('stopping the desktop cancels the retries', async () => {
+  it.each([
+    { reason: 'stopping the desktop', stop: () => stopEnvironmentDesktop('vm-1') },
+    {
+      reason: 'unavailable transition',
+      stop: () => publish({ ...verified('env-1'), verification: 'unavailable' })
+    }
+  ])('$reason cancels the retries', async ({ stop }) => {
     registerEnvironmentDesktopLifecycle(STORE)
+    publish(verified('env-1'))
     env.configure = () => vncFailure('desktop_vnc_unreachable')
-    restoreEnvironmentDesktops(STORE, [runningRuntime()])
-    await settle()
-    expect(configureCalls()).toBe(1)
+    await startEnvironmentDesktop(STORE, runningRuntime())
 
-    stopEnvironmentDesktop('vm-1')
+    env.configure = () => env.configuredReply()
+    stop()
     await vi.advanceTimersByTimeAsync(10 * 60_000)
 
-    expect(configureCalls()).toBe(1)
+    expect(desktopControllerToken('env-1')).toBeNull()
+  })
+
+  it('slow configure RPCs count toward the five-minute retry budget', async () => {
+    registerEnvironmentDesktopLifecycle(STORE)
+    publish(verified('env-1'))
+    let pending = Promise.withResolvers<void>()
+    env.configure = async () => {
+      await pending.promise
+      return vncFailure('desktop_vnc_unreachable')
+    }
+    const starting = startEnvironmentDesktop(STORE, runningRuntime())
+    await vi.advanceTimersByTimeAsync(149_000)
+    pending.resolve()
+    await starting
+
+    pending = Promise.withResolvers<void>()
+    await vi.advanceTimersByTimeAsync(151_000)
+    expect(configureCalls()).toBe(2)
+    env.configure = () => env.configuredReply()
+    pending.resolve()
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(desktopControllerToken('env-1')).toBeNull()
   })
 
   it('a refused VNC password is tried once more, never in a loop', async () => {

@@ -36,6 +36,7 @@ vi.mock('../ipc/runtime-environments/runtime-environments', () => ({
   invalidateRuntimeEnvironmentTransport: vi.fn()
 }))
 vi.mock('../ipc/runtime-environments/connections/runtime-environment-request-connections', () => ({
+  getRuntimeEnvironmentStatusSnapshot: () => null,
   getRuntimeEnvironmentStatusOwner: () => ({ refresh: async () => ({}) }),
   reconnectRemoteRuntimeSharedControlConnection: vi.fn(),
   getRemoteRuntimeSharedControlDiagnostics: () => null

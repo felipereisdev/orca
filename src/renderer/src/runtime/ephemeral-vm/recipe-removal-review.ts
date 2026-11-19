@@ -1,11 +1,12 @@
 import type { RecipeRemovalAcks, RecipeRemovalResult } from './recipe-removal-preflights'
-import { revokeRecipeRemovalAcks } from './recipe-removal-preflights'
+import { revokeRecipeRemovalAck, revokeRecipeRemovalAcks } from './recipe-removal-preflights'
 
 /** A removal waiting for the user to see what it would lose. */
 export type RecipeRemovalReview = {
   results: RecipeRemovalResult[]
   /** One workspace: the review can copy its recordings before removing. */
   single: boolean
+  trackCopyAck: (ack: string) => void
   /** The decided acks, or null for cancel (which revokes every ack this review showed). */
   settle: (acks: RecipeRemovalAcks | null) => void
 }
@@ -37,17 +38,26 @@ export function requestRecipeRemovalReview(
   // A review still open belongs to an earlier removal; cancel it rather than lose its answer.
   current?.settle(null)
   return new Promise((resolve) => {
-    let settled = false
+    let decision: RecipeRemovalAcks | null | undefined
+    const copyAcks = new Set<string>()
     const review: RecipeRemovalReview = {
       results,
       single,
+      trackCopyAck: (ack) => {
+        if (decision === null) {
+          revokeRecipeRemovalAck(ack)
+        } else if (decision === undefined) {
+          copyAcks.add(ack)
+        }
+      },
       settle: (acks) => {
-        if (settled) {
+        if (decision !== undefined) {
           return
         }
-        settled = true
+        decision = acks
         if (!acks) {
           revokeRecipeRemovalAcks(results)
+          copyAcks.forEach(revokeRecipeRemovalAck)
         }
         if (current === review) {
           publish(null)

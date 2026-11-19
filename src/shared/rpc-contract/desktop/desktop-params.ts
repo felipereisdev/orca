@@ -24,7 +24,12 @@ export const DesktopStatusParams = z.object({
 const DesktopControllerToken = z.string().max(256, 'controllerToken is too long').optional()
 
 /** The controlling host holds new recordings off while it removes the workspace. */
-export const DesktopRecordFenceParams = z.object({ controllerToken: DesktopControllerToken })
+const DesktopRecordingFenceId = z.uuid()
+export const DesktopRecordFenceParams = z.object({
+  controllerToken: DesktopControllerToken,
+  fenceId: DesktopRecordingFenceId.optional()
+})
+export const DesktopRecordUnfenceParams = DesktopRecordFenceParams.required({ fenceId: true })
 
 export const DesktopControlSetParams = z.object({
   owner: z.enum(['agent', 'user']),

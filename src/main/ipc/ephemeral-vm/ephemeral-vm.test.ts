@@ -534,7 +534,10 @@ describe('registerEphemeralVmHandlers', () => {
         const fence = {
           environmentId: 'ssh-env-1',
           method: 'desktop.record.fence',
-          params: { controllerToken: desktopControllerToken('ssh-env-1') }
+          params: {
+            controllerToken: desktopControllerToken('ssh-env-1'),
+            fenceId: expect.any(String)
+          }
         }
         // The check and the claim each fence before they list.
         expect(desktopEnv.calls.filter((call) => call.method === 'desktop.record.fence')).toEqual([

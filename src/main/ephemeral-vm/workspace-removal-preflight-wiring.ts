@@ -7,7 +7,13 @@ import type {
   RecipeRemovalPreflightReason
 } from '../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 import type { DesktopSettingsSource } from './desktop-configure'
-import { issueRecipeRemovalAck, type RecipeRemovalAckBinding } from './recipe-removal-acks'
+import { createRemovalRecordingFence } from './desktop-recording-fence'
+import {
+  issueRecipeRemovalAck,
+  trackRecipeRemovalFence,
+  type RecipeRemovalAckBinding,
+  type RemovalRecordingFence
+} from './recipe-removal-acks'
 import { registerRecipeRemovalAckHandlers } from './recipe-removal-ack-handlers'
 import { resolveRecipeRemoval } from './recipe-removal-target'
 import {
@@ -24,7 +30,8 @@ import { acceptedRecordings } from './recipe-removal-recording-guard'
 function withAck(
   preflight: RecipeRemovalPreflight,
   binding: RecipeRemovalAckBinding | undefined,
-  sessionId: string | undefined
+  sessionId: string | undefined,
+  fence?: RemovalRecordingFence
 ): RecipeRemovalCheckResult {
   return {
     ...preflight,
@@ -33,7 +40,8 @@ function withAck(
           binding,
           preflight.status === 'clean',
           sessionId,
-          acceptedRecordings(preflight)
+          acceptedRecordings(preflight),
+          fence
         )
       : ''
   }
@@ -64,8 +72,12 @@ export async function checkRecipeRemoval(
   if (resolved.kind === 'unchecked') {
     return withAck(unchecked(resolved.reason), resolved.binding, sessionId)
   }
-  const preflight = await preflightRecipeWorkspaceRemoval(resolved.target, ports(resolved.target))
-  return withAck(preflight, resolved.binding, sessionId)
+  const { target, binding } = resolved
+  const fence = createRemovalRecordingFence(target.environmentId)
+  return trackRecipeRemovalFence(sessionId, fence, async () => {
+    const preflight = await preflightRecipeWorkspaceRemoval(target, ports(target, fence))
+    return withAck(preflight, binding, sessionId, fence)
+  })
 }
 
 /** Copies the pending recordings; only a proven-complete copy answers with a usable ack. */
@@ -78,18 +90,27 @@ export async function copyRecipeRecordingsBeforeRemoval(
   if (resolved?.kind !== 'target') {
     return { ok: false, reason: 'unavailable' }
   }
-  const outcome = await copyRecordingsBeforeRemoval(resolved.target, ports(resolved.target))
-  if (outcome.ok) {
-    // The user asked to copy and remove, and a final list proved nothing is pending.
-    const ack = issueRecipeRemovalAck(resolved.binding, true, sessionOf(request), {
-      recordingIds: [],
-      inProgress: false
-    })
-    return { ...outcome, ack }
-  }
-  return outcome.reason === 'still_pending'
-    ? { ...outcome, preflight: withAck(outcome.preflight, resolved.binding, sessionOf(request)) }
-    : outcome
+  const { target, binding } = resolved
+  const sessionId = sessionOf(request)
+  const fence = createRemovalRecordingFence(target.environmentId)
+  return trackRecipeRemovalFence(sessionId, fence, async () => {
+    const outcome = await copyRecordingsBeforeRemoval(target, ports(target, fence))
+    if (outcome.ok) {
+      const ack = issueRecipeRemovalAck(
+        binding,
+        true,
+        sessionId,
+        { recordingIds: [], inProgress: false },
+        fence
+      )
+      return { ...outcome, ack }
+    }
+    if (outcome.reason === 'still_pending') {
+      return { ...outcome, preflight: withAck(outcome.preflight, binding, sessionId, fence) }
+    }
+    void fence.release()
+    return outcome
+  })
 }
 
 /** The desktop asks here before removing a recipe workspace; null keeps today's dialog. */

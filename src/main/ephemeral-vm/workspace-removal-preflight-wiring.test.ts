@@ -3,10 +3,18 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { parseEphemeralVmRecipeResult } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { upsertEphemeralVmRuntime } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
 import { getEphemeralVmRuntimeFeatureStorePath } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
 import { removeTempDirs } from '../../shared/testing/remove-temp-dirs.test-support'
+import { DesktopBroker } from '../desktop/desktop-broker'
+import { createFakeFfmpeg } from '../desktop/testing/fake-ffmpeg'
+import {
+  createDesktopRpcHarness,
+  MAC,
+  MAC_AGENT
+} from '../runtime/rpc/methods/desktop/desktop-methods-test-harness'
 
 type Handler = (event: unknown, args: unknown) => Promise<unknown>
 const mocks = vi.hoisted(() => ({
@@ -15,7 +23,8 @@ const mocks = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
   call: vi.fn(),
   keep: vi.fn(),
-  stop: vi.fn()
+  stop: vi.fn(),
+  controllerToken: 'controller-token'
 }))
 
 vi.mock('electron', () => ({
@@ -31,7 +40,7 @@ vi.mock('../ipc/runtime-environments/requests/runtime-environment-transport-rout
 vi.mock('./desktop-recording-sync', () => ({ keepRecordingOnMac: mocks.keep }))
 vi.mock('./desktop-sync-registry', () => ({
   stopEnvironmentDesktop: mocks.stop,
-  desktopControllerToken: () => 'controller-token'
+  desktopControllerToken: () => mocks.controllerToken
 }))
 
 import { registerRecipeRemovalPreflightHandlers } from './workspace-removal-preflight-wiring'
@@ -110,6 +119,7 @@ beforeEach(() => {
   mocks.userData = mkdtempSync(join(tmpdir(), 'orca-removal-preflight-'))
   dirs.push(mocks.userData)
   mocks.experiment = true
+  mocks.controllerToken = 'controller-token'
   mocks.call.mockReset().mockImplementation(async (_root, _env, method: string) => ({
     id: 'r',
     ok: true,
@@ -130,6 +140,58 @@ beforeEach(() => {
 afterEach(() => removeTempDirs(dirs.splice(0)))
 
 describe('recipe removal preflight wiring', () => {
+  it.each([
+    { channel: 'revokeRemoval', key: 'ack' },
+    { channel: 'revokeRemovalSession', key: 'sessionId' }
+  ] as const)('$channel releases the recording fence immediately', async ({ channel, key }) => {
+    seed('vm-a', 'env-a')
+    const broker = new DesktopBroker({
+      recorder: { findFfmpeg: () => '/usr/bin/ffmpeg', spawnFfmpeg: createFakeFfmpeg().spawn }
+    })
+    vi.spyOn(broker, 'verifyCredentials').mockResolvedValue(undefined)
+    vi.spyOn(broker, 'configure').mockResolvedValue(undefined)
+    vi.spyOn(broker, 'currentFrame').mockReturnValue({
+      width: 2,
+      height: 2,
+      rgba: () => Buffer.alloc(16)
+    })
+    try {
+      const { call } = createDesktopRpcHarness(broker, {
+        recordingsDir: () => mocks.userData
+      })
+      const configured = await call(
+        'desktop.configure',
+        { host: '127.0.0.1', port: 5901, password: 'fixture' },
+        MAC
+      )
+      expect(configured.ok).toBe(true)
+      mocks.controllerToken = z.string().parse(configured.result?.controllerToken)
+      const defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((_root, env, method, params) =>
+        env === 'env-a' && method.startsWith('desktop.record.')
+          ? call(method, params, MAC)
+          : defaultCall?.(_root, env, method, params)
+      )
+      const sessionId = `cancel-${channel}`
+      const checked = await invoke('ephemeralVm:removalPreflight', {
+        hostId: 'runtime:env-a',
+        workspaceId: WORKSPACE,
+        sessionId
+      })
+      expect(checked).toMatchObject({ status: 'unsafe', ack: expect.any(String) })
+      expect(await call('desktop.record.start', {}, MAC_AGENT)).toMatchObject({
+        ok: false,
+        error: { code: 'desktop_removal_pending' }
+      })
+
+      const fields = { ...z.object({ ack: z.string() }).parse(checked), sessionId }
+      await invoke(`ephemeralVm:${channel}`, { [key]: fields[key] })
+      expect(await call('desktop.record.start', {}, MAC_AGENT)).toMatchObject({ ok: true })
+      await call('desktop.record.stop', {}, MAC_AGENT)
+    } finally {
+      broker.close()
+    }
+  })
   it('two hosts publish the same workspace id: the check and the copy reach the right VM', async () => {
     seed('vm-a', 'env-a')
     seed('vm-b', 'env-b')

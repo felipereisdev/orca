@@ -1,4 +1,6 @@
 import { vi } from 'vitest'
+import { parseEphemeralVmRecipeResult } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
+import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 
 export type FakeRecording = { id: string; path: string; bytes: number; createdAt: string }
 export type FakeStreamCallbacks = {
@@ -232,5 +234,35 @@ export function fakeTransportRoutingModule() {
         callbacks: FakeStreamCallbacks
       ) => desktopEnvironmentFake.subscribe(callbacks)
     )
+  }
+}
+
+export function runningDesktopRuntimeFixture(): EphemeralVmRuntimeRecord {
+  const parsed = parseEphemeralVmRecipeResult(
+    JSON.stringify({
+      schemaVersion: 1,
+      connection: {
+        type: 'ssh',
+        projectRoot: '/workspace/repo',
+        target: { label: 'VM', host: 'vm.example.com', port: 22, username: 'root' }
+      },
+      desktop: { type: 'vnc', port: 5901, password: 'abc12345' }
+    })
+  )
+  if (!parsed.ok) {
+    throw new Error('fixture recipe result did not parse')
+  }
+  return {
+    id: 'vm-1',
+    recipeId: 'cloud',
+    repoId: 'repo-1',
+    status: 'running',
+    cleanupStatus: 'not_started',
+    connectionMode: 'ssh',
+    runtimeEnvironmentId: 'env-1',
+    workspaceId: 'repo-1::/workspace/repo',
+    recipeResult: parsed.result,
+    createdAt: 0,
+    updatedAt: 0
   }
 }

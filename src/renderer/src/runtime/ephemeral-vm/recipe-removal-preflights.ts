@@ -82,9 +82,13 @@ export async function runRecipeRemovalPreflights(
 /** Cancel or close: none of these answers may authorize a removal afterwards. */
 export function revokeRecipeRemovalAcks(results: readonly RecipeRemovalResult[]): void {
   for (const { preflight } of results) {
-    if (preflight.ack) {
-      void window.api.ephemeralVm.revokeRemoval({ ack: preflight.ack }).catch(() => {})
-    }
+    revokeRecipeRemovalAck(preflight.ack)
+  }
+}
+
+export function revokeRecipeRemovalAck(ack: string): void {
+  if (ack) {
+    void window.api.ephemeralVm.revokeRemoval({ ack }).catch(() => {})
   }
 }
 

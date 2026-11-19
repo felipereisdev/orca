@@ -136,7 +136,7 @@ export function createDesktopMethods(
         }
         const controllerToken = claim.bind()
         // A configure means the desktop is in use again: a removal fence no longer applies.
-        broker.recorder.fence(null)
+        broker.recorder.removalFences.clear()
         return { ...broker.status(), ...(controllerToken ? { controllerToken } : {}) }
       }
     }),

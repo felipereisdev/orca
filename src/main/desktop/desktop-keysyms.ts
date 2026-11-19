@@ -1,3 +1,4 @@
+import { keysymForCodePoint } from '../../shared/desktop-keysyms'
 import { DesktopError } from './desktop-errors'
 
 const MODIFIER_KEYSYMS = new Map<string, number>([
@@ -43,13 +44,10 @@ const F1_KEYSYM = 0xffbe
 /** X11 keysym of one printable character: Latin-1 directly, anything else as Unicode. */
 function characterKeysym(character: string): number {
   const codePoint = character.codePointAt(0) ?? 0
-  if ((codePoint >= 0x20 && codePoint <= 0x7e) || (codePoint >= 0xa0 && codePoint <= 0xff)) {
-    return codePoint
-  }
   if (codePoint < 0x20 || (codePoint >= 0x7f && codePoint < 0xa0)) {
     throw new DesktopError('desktop_invalid_input', 'control characters cannot be typed')
   }
-  return 0x01000000 + codePoint
+  return keysymForCodePoint(codePoint)
 }
 
 function namedKeysym(name: string): number {

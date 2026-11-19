@@ -1,4 +1,5 @@
 import type { EphemeralVmRuntimeRecord } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import { getRuntimeEnvironmentStatusSnapshot } from '../ipc/runtime-environments/connections/runtime-environment-request-connections'
 import { onRuntimeEnvironmentStatusPublished } from '../ipc/runtime-environments/status/runtime-environment-status-owner'
 import { trackRuntimeEnvironmentVerifiedTransitions } from '../ipc/runtime-environments/status/runtime-environment-verified-transitions'
 import {
@@ -13,19 +14,23 @@ import { syncEnvironmentRecordings } from './desktop-recording-sync'
 
 const RETRY_FIRST_DELAY_MS = 2_000
 const RETRY_MAX_DELAY_MS = 30_000
-/** Retries stop once their delays add up to this; a later start or Retry begins anew. */
 const RETRY_BUDGET_MS = 5 * 60_000
 
 /** A failed configure tried again on a self-rescheduling timeout, while the entry stays current. */
 type ConfigureRetry = {
   timer: ReturnType<typeof setTimeout> | null
   nextDelayMs: number
-  spentMs: number
+  deadline: number
   authRetried: boolean
 }
 
 function freshRetry(): ConfigureRetry {
-  return { timer: null, nextDelayMs: RETRY_FIRST_DELAY_MS, spentMs: 0, authRetried: false }
+  return {
+    timer: null,
+    nextDelayMs: RETRY_FIRST_DELAY_MS,
+    deadline: performance.now() + RETRY_BUDGET_MS,
+    authRetried: false
+  }
 }
 
 type DesktopEntry = {
@@ -41,6 +46,7 @@ type DesktopEntry = {
   /** The newest configure's controller token; in memory only, gone with the entry. */
   controllerToken: string | null
   retry: ConfigureRetry
+  retryPaused: boolean
 }
 
 /** One entry per recipe runtime whose desktop this host handed over. */
@@ -72,22 +78,28 @@ function scheduleRetry(
   kind: DesktopConfigureRetry
 ): void {
   const { retry, epoch } = entry
+  const delay = retry.nextDelayMs
+  if (entry.retryPaused || retry.timer || performance.now() + delay >= retry.deadline) {
+    return
+  }
   if (kind === 'auth') {
     if (retry.authRetried) {
       return
     }
     retry.authRetried = true
   }
-  const delay = retry.nextDelayMs
-  if (retry.timer || retry.spentMs + delay > RETRY_BUDGET_MS) {
-    return
-  }
-  retry.spentMs += delay
   retry.nextDelayMs = Math.min(delay * 2, RETRY_MAX_DELAY_MS)
   retry.timer = setTimeout(() => {
     retry.timer = null
     const target = runtimeDesktop(store, entry.runtime)
-    if (entry.epoch === epoch && entries.get(runtimeId) === entry && !entry.configuring && target) {
+    if (
+      performance.now() < retry.deadline &&
+      !entry.retryPaused &&
+      entry.epoch === epoch &&
+      entries.get(runtimeId) === entry &&
+      !entry.configuring &&
+      target
+    ) {
       void configure(store, runtimeId, entry, target)
     }
   }, delay)
@@ -116,6 +128,7 @@ function configure(
       entry.restartQueued = false
       const next = runtimeDesktop(store, entry.runtime)
       if (next) {
+        resetRetry(entry)
         await configure(store, runtimeId, entry, next)
       }
       return
@@ -149,6 +162,7 @@ export function startEnvironmentDesktop(
     entry = undefined
   }
   if (!entry) {
+    const status = getRuntimeEnvironmentStatusSnapshot(target.environmentId)
     entry = {
       runtime,
       environmentId: target.environmentId,
@@ -157,7 +171,9 @@ export function startEnvironmentDesktop(
       configuring: null,
       restartQueued: false,
       controllerToken: null,
-      retry: freshRetry()
+      retry: freshRetry(),
+      retryPaused:
+        status !== null && (status.retired === true || status.verification !== 'verified')
     }
     entries.set(runtime.id, entry)
   }
@@ -241,13 +257,16 @@ export function registerEnvironmentDesktopLifecycle(store: DesktopSettingsSource
     }
   })
   detachLifecycle = onRuntimeEnvironmentStatusPublished((snapshot) => {
-    // Retiring is also how a re-pair under the same id swaps status owners: pause the sync but
-    // keep the entry, so the next verified status configures and syncs again.
-    if (snapshot.retired) {
-      for (const entry of entries.values()) {
-        if (entry.environmentId === snapshot.environmentId) {
-          invalidate(entry)
-        }
+    for (const entry of entries.values()) {
+      if (entry.environmentId !== snapshot.environmentId) {
+        continue
+      }
+      entry.retryPaused = snapshot.retired === true || snapshot.verification !== 'verified'
+      if (snapshot.retired) {
+        invalidate(entry)
+      } else if (entry.retryPaused) {
+        resetRetry(entry)
+        entry.restartQueued = false
       }
     }
     onVerified(snapshot)

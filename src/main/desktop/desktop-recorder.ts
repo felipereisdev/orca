@@ -11,6 +11,7 @@ import {
   type SpawnFfmpeg
 } from './desktop-ffmpeg'
 import { evenCanvas, fitFrame, type RecordingCanvas } from './desktop-recording-canvas'
+import { DesktopRecordingFences } from './desktop-recording-fences'
 import {
   publishRecording,
   recordingFailureReason,
@@ -89,8 +90,7 @@ export class DesktopRecorder {
   #failure: DesktopError | undefined
   /** A start between its checks and its spawn; `stop()` and `close()` cancel it. */
   #pending: { cancelled: boolean } | undefined
-  /** While the clock is before this, a removal is under way and new recordings are refused. */
-  #fencedUntil: number | undefined
+  readonly removalFences = new DesktopRecordingFences(() => this.#now())
   readonly #finishedListeners = new Set<(result: DesktopRecordingResult) => void>()
   readonly #findFfmpeg: () => Promise<string | null> | string | null
   readonly #spawnFfmpeg: SpawnFfmpeg
@@ -121,11 +121,6 @@ export class DesktopRecorder {
     return this.#session !== undefined || this.#pending !== undefined
   }
 
-  /** Refuses new starts for `ms` (null lifts it); one already running goes on. */
-  fence(ms: number | null): void {
-    this.#fencedUntil = ms === null ? undefined : this.#now() + ms
-  }
-
   /** Called whenever a recording finishes cleanly, on request or at a limit. */
   onFinished(cb: (result: DesktopRecordingResult) => void): () => void {
     this.#finishedListeners.add(cb)
@@ -137,7 +132,7 @@ export class DesktopRecorder {
   }
 
   async start(opts: DesktopRecordingStartOptions): Promise<{ id: string; path: string }> {
-    if (this.#fencedUntil !== undefined && this.#now() < this.#fencedUntil) {
+    if (this.removalFences.held()) {
       throw new DesktopError('desktop_removal_pending')
     }
     if (this.#session || this.#pending) {

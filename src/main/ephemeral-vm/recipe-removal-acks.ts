@@ -22,7 +22,12 @@ export type RecipeRemovalAckBinding = {
 type AckState = 'pending' | 'confirmed'
 
 /** `sessionId`: the dialog that showed the answer; closing it revokes the whole session. */
-type Session = { sessionId?: string }
+type Session = { sessionId?: string; fence?: RemovalRecordingFence }
+export type RemovalRecordingFence = {
+  hold: () => Promise<boolean>
+  release: () => Promise<void>
+  mayBeHeld: () => boolean
+}
 
 /**
  * The recordings the answer showed as lost, which a claim's final list may still find. `unknown`:
@@ -47,11 +52,28 @@ const claims = new Map<
   RecipeRemovalAckBinding & Session & { ack: string; adopted: boolean; expiresAt: number }
 >()
 
-/**
- * Dialog sessions already closed, until a claim from them would have expired: work still in flight
- * for one (a copy) must not mint an ack after the cancel.
- */
+// A closed session must not mint another ack from work still in flight.
 const revokedSessions = new Map<string, number>()
+const pendingFences = new Map<RemovalRecordingFence, string>()
+
+export async function trackRecipeRemovalFence<T>(
+  sessionId: string | undefined,
+  fence: RemovalRecordingFence,
+  run: () => Promise<T>
+): Promise<T> {
+  if (!sessionId) {
+    return run()
+  }
+  if ((revokedSessions.get(sessionId) ?? 0) > Date.now()) {
+    void fence.release()
+  }
+  pendingFences.set(fence, sessionId)
+  try {
+    return await run()
+  } finally {
+    pendingFences.delete(fence)
+  }
+}
 
 function recordKey(runtimeId: string, createdAt: number): string {
   return `${runtimeId}\0${createdAt}`
@@ -61,7 +83,7 @@ function live(ack: string) {
   const now = Date.now()
   for (const store of [acks, claims]) {
     for (const [key, entry] of store) {
-      if (entry.expiresAt <= now) {
+      if (entry.expiresAt <= now && !entry.fence?.mayBeHeld()) {
         store.delete(key)
       }
     }
@@ -71,7 +93,8 @@ function live(ack: string) {
       revokedSessions.delete(sessionId)
     }
   }
-  return acks.get(ack)
+  const entry = acks.get(ack)
+  return entry && entry.expiresAt > now ? entry : undefined
 }
 
 function refused(): RecipeWorkspaceRemovalError {
@@ -86,7 +109,8 @@ export function issueRecipeRemovalAck(
   binding: RecipeRemovalAckBinding,
   confirmed: boolean,
   sessionId?: string,
-  accepted: RecipeRemovalAcceptedRecordings = 'unknown'
+  accepted: RecipeRemovalAcceptedRecordings = 'unknown',
+  fence?: RemovalRecordingFence
 ): string {
   live('')
   const ack = randomBytes(16).toString('hex')
@@ -95,7 +119,8 @@ export function issueRecipeRemovalAck(
   }
   acks.set(ack, {
     ...binding,
-    ...(sessionId ? { sessionId } : {}),
+    sessionId,
+    fence,
     state: confirmed ? 'confirmed' : 'pending',
     accepted,
     expiresAt: Date.now() + RECIPE_REMOVAL_ACK_TTL_MS
@@ -103,7 +128,6 @@ export function issueRecipeRemovalAck(
   return ack
 }
 
-/** The user chose to remove after seeing the answer. False when the ack is gone. */
 export function confirmRecipeRemovalAck(ack: string): boolean {
   const entry = live(ack)
   if (!entry) {
@@ -117,31 +141,40 @@ export function confirmRecipeRemovalAck(ack: string): boolean {
 }
 
 /** Cancel or close: the answer, and any claim already made from it, authorize nothing afterwards. */
-export function revokeRecipeRemovalAck(ack: string): void {
-  if (!ack) {
-    return
-  }
+export async function revokeRecipeRemovalAck(ack: string): Promise<void> {
+  const releases = [acks.get(ack)?.fence?.release()]
   acks.delete(ack)
   for (const [key, claim] of claims) {
     if (claim.ack === ack) {
       claims.delete(key)
+      releases.push(claim.fence?.release())
     }
   }
+  await Promise.all(releases)
 }
 
 /** The dialog closed or retargeted: its answers and every claim the store didn't adopt end. */
-export function revokeRecipeRemovalSession(sessionId: string): void {
+export async function revokeRecipeRemovalSession(sessionId: string): Promise<void> {
   revokedSessions.set(sessionId, Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS)
+  const releases: (Promise<void> | undefined)[] = []
+  for (const [fence, owner] of pendingFences) {
+    if (owner === sessionId) {
+      releases.push(fence.release())
+    }
+  }
   for (const [ack, entry] of acks) {
     if (entry.sessionId === sessionId) {
       acks.delete(ack)
+      releases.push(entry.fence?.release())
     }
   }
   for (const [key, claim] of claims) {
     if (claim.sessionId === sessionId && !claim.adopted) {
       claims.delete(key)
+      releases.push(claim.fence?.release())
     }
   }
+  await Promise.all(releases)
 }
 
 /** A removal that failed after claiming: its environment is no longer held for a destroy. */
@@ -149,6 +182,7 @@ export function releaseRecipeRemovalClaim(hostId: string, workspaceId: string): 
   for (const [key, claim] of claims) {
     if (claim.hostId === hostId && claim.workspaceId === workspaceId) {
       claims.delete(key)
+      void claim.fence?.release()
     }
   }
 }
@@ -168,18 +202,22 @@ function claimableAck(ack: string, current: RecipeRemovalAckBinding) {
   ) {
     return { ok: false as const, reason: 'replaced' as const }
   }
-  return { ok: true as const, ...entry }
+  return { ok: true as const, entry }
 }
 
-/** What a claim of this ack would accept losing, without spending it; a refusal otherwise. */
 export function peekRecipeRemovalAck(
   ack: string,
-  current: RecipeRemovalAckBinding
+  current: RecipeRemovalAckBinding,
+  fallbackFence?: RemovalRecordingFence
 ):
-  | { ok: true; accepted: RecipeRemovalAcceptedRecordings }
+  | { ok: true; accepted: RecipeRemovalAcceptedRecordings; fence?: RemovalRecordingFence }
   | { ok: false; reason: 'unconfirmed' | 'replaced' } {
-  const entry = claimableAck(ack, current)
-  return entry.ok ? { ok: true, accepted: entry.accepted } : entry
+  const checked = claimableAck(ack, current)
+  if (!checked.ok) {
+    return checked
+  }
+  checked.entry.fence ??= fallbackFence
+  return { ok: true, accepted: checked.entry.accepted, fence: checked.entry.fence }
 }
 
 /**
@@ -190,15 +228,16 @@ export function claimRecipeRemovalAck(
   ack: string,
   current: RecipeRemovalAckBinding
 ): RecipeRemovalClaim {
-  const entry = claimableAck(ack, current)
-  if (!entry.ok) {
-    return entry
+  const checked = claimableAck(ack, current)
+  if (!checked.ok) {
+    return checked
   }
   const key = recordKey(current.runtimeId, current.runtimeCreatedAt)
   acks.delete(ack)
   claims.set(key, {
     ...current,
-    ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
+    sessionId: checked.entry.sessionId,
+    fence: checked.entry.fence,
     ack,
     adopted: false,
     expiresAt: Date.now() + RECIPE_REMOVAL_CLAIM_TTL_MS

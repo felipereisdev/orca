@@ -7,6 +7,7 @@ import {
   toSshExecutionHostId
 } from '../../shared/execution-host/execution-host'
 import type { DesktopSettingsSource } from './desktop-configure'
+import { createRemovalRecordingFence } from './desktop-recording-fence'
 import {
   adoptRecipeRemovalClaim,
   claimRecipeRemovalAck,
@@ -77,22 +78,28 @@ export async function claimRecipeRemoval(
   if (!binding) {
     return { ok: true, required: false }
   }
-  const decided = peekRecipeRemovalAck(args.ack, ackBinding(binding))
+  const resolved = await resolveRecipeRemoval(store, userDataPath, args)
+  const decided = peekRecipeRemovalAck(
+    args.ack,
+    ackBinding(binding),
+    resolved?.kind === 'target'
+      ? createRemovalRecordingFence(resolved.target.environmentId)
+      : undefined
+  )
   if (!decided.ok) {
     return decided
   }
-  const resolved = await resolveRecipeRemoval(store, userDataPath, args)
   const kept =
-    resolved?.kind === 'target'
+    resolved?.kind === 'target' && decided.fence
       ? await recordingsAllowClaim(
           resolved.target,
           decided.accepted,
-          removalPreflightPorts(resolved.target)
+          removalPreflightPorts(resolved.target, decided.fence)
         )
       : decided.accepted === 'unknown'
   if (!kept) {
     // The answer no longer holds: the user must see a fresh one.
-    revokeRecipeRemovalAck(args.ack)
+    await revokeRecipeRemovalAck(args.ack)
     return { ok: false, reason: 'recordings_unprotected' }
   }
   const claim = claimRecipeRemovalAck(args.ack, ackBinding(binding))
@@ -164,18 +171,18 @@ export function registerRecipeRemovalAckHandlers(store: DesktopSettingsSource): 
   ipcMain.handle('ephemeralVm:confirmRemoval', (_event, args: unknown) =>
     confirmRecipeRemovalAck(AckArgs.parse(args).ack)
   )
-  ipcMain.handle('ephemeralVm:revokeRemoval', (_event, args: unknown) => {
+  ipcMain.handle('ephemeralVm:revokeRemoval', (_event, args: unknown) =>
     revokeRecipeRemovalAck(AckArgs.parse(args).ack)
-  })
+  )
   ipcMain.handle('ephemeralVm:claimRemoval', (_event, args: unknown) =>
     claimRecipeRemoval(store, app.getPath('userData'), args)
   )
   ipcMain.handle('ephemeralVm:adoptRemoval', (_event, args: unknown) =>
     adoptRecipeRemoval(store, app.getPath('userData'), args)
   )
-  ipcMain.handle('ephemeralVm:revokeRemovalSession', (_event, args: unknown) => {
+  ipcMain.handle('ephemeralVm:revokeRemovalSession', (_event, args: unknown) =>
     revokeRecipeRemovalSession(SessionArgs.parse(args).sessionId)
-  })
+  )
   ipcMain.handle('ephemeralVm:releaseRemoval', (_event, args: unknown) => {
     const { hostId, workspaceId } = ReleaseArgs.parse(args)
     releaseRecipeRemovalClaim(hostId, workspaceId)

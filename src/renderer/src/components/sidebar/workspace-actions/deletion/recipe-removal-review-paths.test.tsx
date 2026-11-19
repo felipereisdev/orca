@@ -124,6 +124,37 @@ describe('removals outside the delete dialog review recipe work first', () => {
     expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'vm-a', ack: 'ack-copy' })
   })
 
+  it('cancelling a Cloud VMs review revokes the ack from a partial copy', async () => {
+    const preflight = {
+      status: 'unsafe' as const,
+      recordingsNotCopied: [{ id: 'aaaaaaaaaaaaaaaa', path: '/rec/a.mp4', bytes: 10 }],
+      dirtyFiles: 0,
+      unpushedCommits: 0,
+      ack: 'ack-unsafe'
+    }
+    bridge.ephemeralVm.removalPreflight.mockResolvedValue(preflight)
+    bridge.ephemeralVm.copyRecordingsBeforeRemoval.mockResolvedValue({
+      ok: false,
+      reason: 'still_pending',
+      preflight: { ...preflight, ack: 'ack-partial' }
+    })
+    render(
+      <TooltipProvider>
+        <EphemeralVmRuntimesSection />
+      </TooltipProvider>
+    )
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await settle()
+
+    expect(bridge.ephemeralVm.revokeRemoval).toHaveBeenCalledWith({ ack: 'ack-partial' })
+    expect(bridge.ephemeralVm.cleanup).not.toHaveBeenCalled()
+  })
+
   it('cancelling the Cloud VMs review revokes its ack, and a retry reviews again', async () => {
     render(
       <TooltipProvider>

@@ -2,12 +2,15 @@ import { RECIPE_REMOVAL_PREFLIGHT_TIMEOUT_MS } from '../../shared/remote-runtime
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { isRecordingCopiedOnMac } from './desktop-recording-copies'
-import { fenceEnvironmentRecordings } from './desktop-recording-fence'
 import { keepRecordingOnMac } from './desktop-recording-sync'
+import type { RemovalRecordingFence } from './recipe-removal-acks'
 import type { CopyBeforeRemovalPorts, RemovalPreflightTarget } from './workspace-removal-preflight'
 
 /** The environment's Orca and this Mac's recording copies, as a removal check reaches them. */
-export function removalPreflightPorts(target: RemovalPreflightTarget): CopyBeforeRemovalPorts {
+export function removalPreflightPorts(
+  target: RemovalPreflightTarget,
+  fence: RemovalRecordingFence
+): CopyBeforeRemovalPorts {
   return {
     call: (environmentId, method, params, signal, timeoutMs) =>
       callRuntimeEnvironment(
@@ -21,7 +24,7 @@ export function removalPreflightPorts(target: RemovalPreflightTarget): CopyBefor
         { signal }
       ),
     isCopied: isRecordingCopiedOnMac,
-    fence: fenceEnvironmentRecordings,
+    fence: fence.hold,
     copy: (recording, signal) =>
       keepRecordingOnMac({
         environmentId: target.environmentId,
