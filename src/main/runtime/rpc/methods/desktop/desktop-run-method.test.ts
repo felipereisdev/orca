@@ -398,7 +398,8 @@ describe('desktop.run session', () => {
       ok: false,
       error: { code: 'desktop_launcher_rejected' }
     })
-    expect(launcher.rejected).toBe(1)
+    expect(launcher.received()).not.toContain(TOKEN)
+    expect(launcher.received()).not.toContain(wrongToken)
     const everything = JSON.stringify([reported, unknown, status, rejected])
     expect(everything).not.toContain(TOKEN)
     expect(everything).not.toContain(wrongToken)

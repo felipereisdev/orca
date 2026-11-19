@@ -1,21 +1,31 @@
 import { connect, isIP, type Socket } from 'node:net'
 import { DesktopError } from './desktop-errors'
+import {
+  isLauncherNonce,
+  launcherClientProof,
+  launcherServerProof,
+  newLauncherNonce,
+  proofMatches
+} from './desktop-launcher-handshake'
 import { launcherLineReader } from './desktop-launcher-line-reader'
 
 /**
  * JSON-lines protocol with the in-environment launcher (starts programs as user `gui`), one TCP
- * connection per program:
- *   → {"token","op":"run","argv":[…],"cwd"?,"env"?}
+ * connection per program. The token never crosses the connection: both sides prove it first
+ * (desktop-launcher-handshake.ts), the launcher before the client sends anything else.
+ *   → {"op":"hello","nonce":"<broker nonce>"}
+ *   ← {"nonce":"<launcher nonce>","proof":"<server proof>"}   a bad proof: desktop_launcher_rejected
+ *   → {"op":"run","proof":"<client proof>","argv":[…],"cwd"?,"env"?}
  *   ← {"id":"<run id>"}                          started, in its own process group
  *   ← {"stream":"stdout"|"stderr","data":"…"}   any number of these
  *   ← {"exit":<code>}                            then the launcher closes (signal death: 128 + n)
- *   → {"token","op":"kill","id":"<run id>"}     kills the process group; the client then closes
- * Instead of the id, a refusal closes the connection: {"error":"bad_token"} for a wrong token,
+ *   → {"op":"kill","id":"<run id>"}             kills the process group; the client then closes
+ * Instead of the id, a refusal closes the connection: {"error":"bad_token"} for a wrong proof,
  * {"error":"<code>"} otherwise. The launcher also kills a run whose connection closes.
  * Flow control is TCP's: the client stops reading while its consumer is behind, and the launcher
  * must then stop reading the program's pipes instead of buffering without bound.
- * The token reaches the launcher only on its stdin and stays in its memory; here it goes only
- * into request lines: never into errors, logs or events.
+ * The token reaches the launcher only on its stdin and stays in its memory; here it only keys the
+ * proofs: never into lines, errors, logs or events.
  */
 export type LauncherEndpoint = { host: string; port: number; token: string }
 
@@ -34,6 +44,8 @@ const START_TIMEOUT_MS = 10_000
 const KILL_FLUSH_MS = 2_000
 
 type LauncherReply = {
+  nonce?: unknown
+  proof?: unknown
   id?: unknown
   error?: unknown
   stream?: unknown
@@ -59,6 +71,8 @@ export function runOnLauncher(
       return
     }
     let settled = false
+    const brokerNonce = newLauncherNonce()
+    let authenticated = false
     let runId: string | undefined
     let paused = false
     let socketClosed = false
@@ -86,7 +100,7 @@ export function runOnLauncher(
         socket.destroy()
         return
       }
-      const kill = JSON.stringify({ token: endpoint.token, op: 'kill', id: runId })
+      const kill = JSON.stringify({ op: 'kill', id: runId })
       const flushTimer = setTimeout(() => socket.destroy(), KILL_FLUSH_MS)
       socket.end(`${kill}\n`, () => {
         clearTimeout(flushTimer)
@@ -97,7 +111,34 @@ export function runOnLauncher(
 
     const protocolError = (): void =>
       fail(new DesktopError('desktop_run_failed', 'launcher_protocol_error'))
+    const sendRun = (launcherNonce: string): void => {
+      const run: Record<string, unknown> = {
+        op: 'run',
+        proof: launcherClientProof(endpoint.token, launcherNonce, brokerNonce),
+        argv: request.argv
+      }
+      if (request.cwd !== undefined) {
+        run.cwd = request.cwd
+      }
+      if (request.env !== undefined) {
+        run.env = request.env
+      }
+      socket.write(`${JSON.stringify(run)}\n`)
+    }
     const onReply = (reply: LauncherReply): void => {
+      if (!authenticated) {
+        // Whatever answers on the port gets nothing secret until it proves the token.
+        if (
+          isLauncherNonce(reply.nonce) &&
+          proofMatches(launcherServerProof(endpoint.token, brokerNonce, reply.nonce), reply.proof)
+        ) {
+          authenticated = true
+          sendRun(reply.nonce)
+        } else {
+          fail(new DesktopError('desktop_launcher_rejected'))
+        }
+        return
+      }
       if (runId === undefined) {
         if (reply.error === 'bad_token') {
           fail(new DesktopError('desktop_launcher_rejected'))
@@ -195,14 +236,7 @@ export function runOnLauncher(
       drain()
     })
     socket.once('connect', () => {
-      const run: Record<string, unknown> = { token: endpoint.token, op: 'run', argv: request.argv }
-      if (request.cwd !== undefined) {
-        run.cwd = request.cwd
-      }
-      if (request.env !== undefined) {
-        run.env = request.env
-      }
-      socket.write(`${JSON.stringify(run)}\n`)
+      socket.write(`${JSON.stringify({ op: 'hello', nonce: brokerNonce })}\n`)
     })
   })
 }

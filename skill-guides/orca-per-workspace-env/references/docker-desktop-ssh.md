@@ -55,9 +55,20 @@ Three users split the desktop:
 
 Secrets travel over stdin only. The VNC password reaches `vncpasswd -f` on stdin; the launcher
 token reaches the launcher on stdin and stays in its memory, never in env, argv or a file
-(`/proc/<pid>/environ` is readable by the same uid). The git token reaches a `GIT_ASKPASS` helper
-through a 0600 file removed after the clone. Rotating the secrets (on resume) restarts the desktop
-with the new ones. Xvnc runs with `-extension XTEST`, the image ships no `xdotool`, and
+(`/proc/<pid>/environ` is readable by the same uid). The token never crosses a connection either:
+Orca's server and the launcher prove it to each other with HMAC-SHA256 over fresh 32-byte nonces,
+the launcher first, so a listener that does not know the token receives only a nonce and the run
+fails with `desktop_launcher_rejected`. The git token reaches a `GIT_ASKPASS` helper through a 0600
+file removed after the clone.
+
+The desktop ports are held before anyone can log in. On every container start the root entrypoint
+starts Xvnc (as `vnc`) and the launcher (as `gui`) with throwaway secrets, waits until 5901 and
+5902 listen on loopback owned by those users, and only then starts sshd. Rotating the secrets
+(create and resume) restarts neither: TigerVNC reads its password file on every authentication, so
+the file is rewritten in place, and the launcher takes the new token from a pipe only root can
+write. The entrypoint answers only after checking the password file, proving the new token
+against the launcher and checking the listeners' owners; otherwise `create.sh` and `resume.sh` fail
+instead of printing JSON. Xvnc runs with `-extension XTEST`, the image ships no `xdotool`, and
 `docker run` uses `--init`, `no-new-privileges`, `--cap-drop ALL` plus only what sshd and the
 supervisor need, CPU, memory and process limits, and the `orca.workspace=<instance>` label. It
 never uses `--privileged`, the Docker socket, host network, PID or IPC namespaces, or any mount;
@@ -67,7 +78,12 @@ The honest limit: Orca's server in the environment runs as `dev`, the same user 
 password and token live only in that server's memory, and the environment requires
 `kernel.yama.ptrace_scope` ≥ 1 so the agent cannot attach to the process that started it.
 `create.sh` refuses to start otherwise. This blocks practical workarounds; it is not a boundary
-against code that exploits the kernel. Programs on the desktop, which the agent can start with
+against code that exploits the kernel. One window remains: if Xvnc or the launcher crashes, the
+entrypoint restarts it within about five seconds, and meanwhile the agent could bind the freed
+port. A fake launcher learns nothing (the handshake) and only blocks runs until it exits. A fake
+VNC server, however, would receive the server's answer to a challenge it chose, which allows an
+offline guess of the 8-character password; if the logs show `Xvnc exited; restarting`, suspend
+and resume the workspace to rotate the password. Programs on the desktop, which the agent can start with
 `orca desktop run`, can observe what the desktop shows and what is typed into it, so never type
 personal secrets into the environment's desktop. Docker Desktop and OrbStack also let containers
 reach the Docker host's own services through `host.docker.internal`; keep nothing sensitive
@@ -154,13 +170,15 @@ otherwise warns and uses the base one. A Dockerfile change needs a new `auth.sh`
 ## Suspend and resume
 
 `suspend.sh` runs `docker stop` and keeps the container's state. `resume.sh` runs `docker start`,
-records the host key under the new published port (it can change), sends a new VNC password and
-launcher token, and prints the full recipe JSON again; Orca then reconfigures the desktop.
+records the host key under the new published port (it can change), rotates the VNC password and
+launcher token in place, and prints the full recipe JSON again; Orca then reconfigures the desktop.
 
 ## Stats
 
-`stats.sh` prints `{"cpuPercent":…,"memoryBytes":…,"diskBytes":…}` from `docker stats --no-stream`
-and the container's writable-layer size. It reads the lifecycle payload on stdin like the other
+`stats.sh` prints `{"cpuPercent":…,"memoryBytes":…,"diskBytes":…}`: CPU and memory from
+`docker stats --no-stream`, and `diskBytes` as the container's writable layer (`SizeRw` from
+`docker container inspect --size`), which is what this workspace added on top of the shared image,
+not the image itself or `docker system df` totals. It reads the lifecycle payload on stdin like the other
 steps. The recipe above leaves it out: wire it as a `stats` step once the installed Orca reads one
 (an Orca without that step ignores the key, so nothing would run it).
 
@@ -170,16 +188,21 @@ steps. The recipe above leaves it out: wire it as a `stats` step once the instal
 arguments it provisions a throwaway environment through `create.sh`, runs every check and destroys
 it. `--container <name>` checks a running environment without the secret checks. Pass
 `--known <instance id>` for each environment Orca still lists in Settings > VMs; other containers
-with an `orca.workspace` label are reported as orphans (`warn`), to remove with `destroy.sh`.
+with an `orca.workspace` label are reported as orphans (`warn`), to remove with `destroy.sh`. With
+no other labeled container the run is all `pass`.
 
 The checks: the `docker run` flag block holds none of the refused flags and the container runs
-with exactly those; `ptrace_scope` ≥ 1; `dev` is only in `dev` and `work`; no sudo or xdotool; VNC
-and launcher listen on loopback only; `gui` opens `DISPLAY=:1` (control) while `dev` cannot, nor
-read the cookie or list `/tmp/.X11-unix`; the VNC password file is `vnc` 0600 and unreadable by
-`dev` and `gui`; the launcher answers `bad_token` without the token or with a wrong one and runs
-`id -un` as `gui` with it; the password and token appear in neither `docker inspect`, nor `ps`,
-command lines or environments on the hosts and in the container, nor files `dev` or `gui` can read.
-Exit status 1 means a check failed.
+with exactly those; `ptrace_scope` ≥ 1; `dev` is only in `dev` and `work`; no sudo or xdotool;
+5901 and 5902 listen on loopback only, owned by `vnc` and `gui`; `gui` opens `DISPLAY=:1`
+(control) while `dev` gets "unable to open display" and "Permission denied" on the cookie and on
+`/tmp/.X11-unix`; the VNC password file is `vnc` 0600 and `dev` and `gui` get "Permission denied";
+VNC offers only VNC authentication and refuses a wrong answer from `dev`; from `dev` the launcher
+refuses a run without the token and a wrong token fails the handshake, while from root with the
+token it runs `id -un` as `gui`; the password and token appear in neither `docker inspect`, nor
+`ps`, command lines or environments on the hosts and in the container, nor any file `dev` or `gui`
+can read (the files are streamed to this machine and searched here). Each denial must show its
+expected refusal, so a Docker or exec error fails the check, and the secrets never enter a
+process run as `dev` or `gui`. Exit status 1 means a check failed.
 
 ## Electron apps
 

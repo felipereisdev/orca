@@ -75,51 +75,73 @@ ENTRYPOINT ["/usr/local/sbin/orca-desktop-entrypoint"]
 
 ### `orca-desktop-entrypoint`
 
-Root supervisor inside the container: sshd, then the desktop once secrets arrive.
+Root supervisor inside the container: desktop ports held first, then sshd; rotates secrets in place.
 
 ```bash
 #!/bin/bash
-# PID 1's child (docker --init runs tini first). Starts sshd at once; the desktop waits for its
-# secrets, which orca-desktop-secrets writes into a root-only FIFO. The launcher token stays in
-# this process's memory and reaches the launcher only on its stdin.
+# Child of docker --init's tini, as root. Holds the desktop ports before anyone can log in: Xvnc
+# (vnc) and the launcher (gui) start with throwaway secrets, and sshd starts only once both
+# listen on loopback as their own users. orca-desktop-secrets then rotates the real secrets in
+# place, without restarting either: the VNC password file is rewritten (Xvnc reads it on every
+# authentication) and the launcher reads the new token from a pipe only root can write.
 set -eu
 umask 022
 
 run_dir=/run/orca-desktop
-fifo="$run_dir/secrets"
+control="$run_dir/secrets"
+token_pipe="$run_dir/launcher-token"
 geometry="${ORCA_DESKTOP_GEOMETRY:-1600x1000}"
 gui_env=(DISPLAY=:1 XAUTHORITY=/home/gui/.Xauthority ORCA_DESKTOP_DEFAULT_CWD=/work)
-
-install -d -o root -g root -m 0700 "$run_dir"
-rm -f "$fifo" "$run_dir/ready" "$run_dir/failed"
-mkfifo -m 0600 "$fifo"
-
-# Host keys are generated on a container's first start, never baked into an image.
-[ -s /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A >/dev/null
-install -d -m 0755 /run/sshd
-/usr/sbin/sshd -D -e &
-sshd_pid=$!
-
-xvnc_pid='' wm_pid='' launcher_pid='' token=''
-
 # Direct commands (not functions) in the background, so $! is the program's own pid.
 as_vnc=(setpriv --reuid=vnc --regid=vnc --init-groups --reset-env --)
 as_gui=(setpriv --reuid=gui --regid=gui --init-groups --reset-env --)
 
-alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+install -d -o root -g root -m 0700 "$run_dir"
+rm -f "$control" "$token_pipe" "$run_dir/ready" "$run_dir/failed"
+mkfifo -m 0600 "$control" "$token_pipe"
+# Root keeps the token pipe open read-write, so the launcher never sees end of file.
+exec 4<>"$token_pipe"
 
-stop_pid() {
-  if alive "$1"; then
-    kill -TERM "$1" 2>/dev/null || true
-    wait "$1" 2>/dev/null || true
-  fi
+xvnc_pid='' wm_pid='' launcher_pid='' sshd_pid=''
+
+alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
+random_secret() { head -c "$1" /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' | cut -c1-"$2"; }
+
+# Rewrites the VNC password file as vnc and proves it holds exactly this password.
+write_vnc_password() {
+  # shellcheck disable=SC2016 # $HOME expands in vnc's shell.
+  printf '%s\n' "$1" | "${as_vnc[@]}" sh -c \
+    'umask 077 && mkdir -p "$HOME/.vnc" && vncpasswd -f > "$HOME/.vnc/passwd.new" && mv -f "$HOME/.vnc/passwd.new" "$HOME/.vnc/passwd"' ||
+    return 1
+  # shellcheck disable=SC2016
+  printf '%s\n' "$1" | "${as_vnc[@]}" sh -c 'vncpasswd -f | cmp -s - "$HOME/.vnc/passwd"'
 }
 
-stop_desktop() {
-  stop_pid "$launcher_pid"
-  stop_pid "$wm_pid"
-  stop_pid "$xvnc_pid"
-  launcher_pid='' wm_pid='' xvnc_pid=''
+write_cookies() {
+  local cookie user
+  cookie="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+  [ "${#cookie}" -eq 32 ] || return 1
+  for user in vnc gui; do
+    # shellcheck disable=SC2016
+    printf 'add :1 MIT-MAGIC-COOKIE-1 %s\n' "$cookie" |
+      setpriv --reuid="$user" --regid="$user" --init-groups --reset-env -- sh -c \
+        'umask 077 && rm -f "$HOME/.Xauthority" && xauth -q -f "$HOME/.Xauthority" source - && [ -s "$HOME/.Xauthority" ]' ||
+      return 1
+  done
+}
+
+# The listener on 127.0.0.1:<port> exists and belongs to <uid> (socket owner, from sock_diag).
+listener_owned() { ss -Hltne "sport = :$1" | grep -q " 127\.0\.0\.1:$1 .* uid:$2 "; }
+
+wait_until() { # <tenths of a second> <command...>
+  local tries="$1"
+  shift
+  while [ "$tries" -gt 0 ]; do
+    "$@" && return 0
+    tries=$((tries - 1))
+    sleep 0.1
+  done
+  return 1
 }
 
 start_xvnc() {
@@ -127,12 +149,7 @@ start_xvnc() {
     -SecurityTypes VncAuth -PasswordFile /home/vnc/.vnc/passwd -auth /home/vnc/.Xauthority \
     -extension XTEST -geometry "$geometry" -depth 24 -desktop orca &
   xvnc_pid=$!
-  for _ in $(seq 1 100); do
-    [ -S /tmp/.X11-unix/X1 ] && return 0
-    sleep 0.1
-  done
-  echo 'orca-desktop: Xvnc did not start' >&2
-  return 1
+  wait_until 100 listener_owned 5901 "$(id -u vnc)" && wait_until 50 test -S /tmp/.X11-unix/X1
 }
 
 start_wm() {
@@ -141,78 +158,75 @@ start_wm() {
 }
 
 start_launcher() {
-  printf '%s\n' "$token" | "${as_gui[@]}" env "${gui_env[@]}" /usr/local/bin/orca-desktop-launcher &
+  "${as_gui[@]}" env "${gui_env[@]}" /usr/local/bin/orca-desktop-launcher <"$token_pipe" &
   launcher_pid=$!
+  printf '%s\n' "$token" >&4 && wait_until 100 listener_owned 5902 "$(id -u gui)"
 }
 
-listening() { ss -Hltn "sport = :$1" | grep -q '127.0.0.1:'; }
-
-wait_listening() {
-  for _ in $(seq 1 150); do
-    listening 5901 && listening 5902 && return 0
-    sleep 0.1
-  done
-  return 1
+# The launcher answers the handshake with this token and runs a program as gui.
+launcher_holds_token() {
+  [ "$(printf '%s\n' "$token" | /usr/local/bin/orca-desktop-launcher --probe)" = \
+    '{"result":"started","stdout":"gui\n","exit":0}' ]
 }
 
-start_desktop() {
-  local password="$1" cookie
-  # shellcheck disable=SC2016 # $HOME expands in the target user's shell.
-  printf '%s\n' "$password" | "${as_vnc[@]}" sh -c \
-    'umask 077 && mkdir -p "$HOME/.vnc" && vncpasswd -f > "$HOME/.vnc/passwd.new" && mv -f "$HOME/.vnc/passwd.new" "$HOME/.vnc/passwd"'
-  cookie="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
-  for user in vnc gui; do
-    # shellcheck disable=SC2016
-    printf 'add :1 MIT-MAGIC-COOKIE-1 %s\n' "$cookie" |
-      setpriv --reuid="$user" --regid="$user" --init-groups --reset-env -- sh -c \
-        'umask 077 && rm -f "$HOME/.Xauthority" && xauth -q -f "$HOME/.Xauthority" source -'
+shutdown() {
+  local pid
+  for pid in "$launcher_pid" "$wm_pid" "$xvnc_pid" "$sshd_pid"; do
+    alive "$pid" && kill -TERM "$pid" 2>/dev/null || true
   done
-  start_xvnc
-  start_wm
-  start_launcher
-  wait_listening
+  wait || true
+  exit 0
+}
+trap shutdown TERM INT
+
+# Boot: throwaway secrets nobody else knows, ports held, then sshd.
+token="$(random_secret 48 43)"
+if ! { write_vnc_password "$(random_secret 12 8)" && write_cookies && start_xvnc && start_wm &&
+  start_launcher; }; then
+  echo 'orca-desktop: the desktop did not start' >&2
+  exit 1
+fi
+[ -s /etc/ssh/ssh_host_ed25519_key ] || ssh-keygen -A >/dev/null
+install -d -m 0755 /run/sshd
+/usr/sbin/sshd -D -e &
+sshd_pid=$!
+
+rotate() { # <password> <token>; nothing restarts
+  write_vnc_password "$1" || return 1
+  token="$2"
+  printf '%s\n' "$token" >&4 || return 1
+  wait_until 50 launcher_holds_token &&
+    listener_owned 5901 "$(id -u vnc)" && listener_owned 5902 "$(id -u gui)"
 }
 
 valid_password() { [[ "$1" =~ ^[A-Za-z0-9_-]{6,8}$ ]]; }
 valid_token() { [[ "$1" =~ ^[A-Za-z0-9_-]{32,256}$ ]]; }
 
-shutdown() {
-  stop_desktop
-  stop_pid "$sshd_pid"
-  exit 0
-}
-trap shutdown TERM INT
-
-exec 3<>"$fifo"
+exec 3<>"$control"
 while true; do
   if IFS= read -r -t 5 password <&3; then
     IFS= read -r -t 5 new_token <&3 || new_token=''
     IFS= read -r -t 5 nonce <&3 || nonce=''
-    if ! valid_password "$password" || ! valid_token "$new_token" || [ -z "$nonce" ]; then
-      echo 'orca-desktop: ignored malformed secrets' >&2
-      printf '%s\n' "$nonce" > "$run_dir/failed"
-      continue
-    fi
-    stop_desktop
-    token="$new_token"
-    if start_desktop "$password"; then
-      printf '%s\n' "$nonce" > "$run_dir/ready"
+    if valid_password "$password" && valid_token "$new_token" && [ -n "$nonce" ] &&
+      rotate "$password" "$new_token"; then
+      printf '%s\n' "$nonce" >"$run_dir/ready"
     else
-      printf '%s\n' "$nonce" > "$run_dir/failed"
+      echo 'orca-desktop: the new secrets were not installed' >&2
+      printf '%s\n' "$nonce" >"$run_dir/failed"
     fi
     password='' new_token=''
     continue
   fi
-  alive "$sshd_pid" || { echo 'orca-desktop: sshd exited' >&2; stop_desktop; exit 1; }
-  # Restart a crashed piece with the secrets it already has.
-  if [ -n "$token" ]; then
-    if ! alive "$xvnc_pid"; then
-      stop_desktop
-      start_xvnc && start_wm && start_launcher || true
-    else
-      alive "$wm_pid" || start_wm
-      alive "$launcher_pid" || start_launcher
-    fi
+  alive "$sshd_pid" || { echo 'orca-desktop: sshd exited' >&2; shutdown; }
+  # A crashed piece restarts with the secrets it already has (see the reference's limits).
+  if ! alive "$xvnc_pid"; then
+    echo 'orca-desktop: Xvnc exited; restarting' >&2
+    start_xvnc || true
+  fi
+  alive "$wm_pid" || start_wm
+  if ! alive "$launcher_pid"; then
+    echo 'orca-desktop: the launcher exited; restarting' >&2
+    start_launcher || true
   fi
 done
 ```
@@ -225,7 +239,8 @@ Root-only hand-off of the VNC password and launcher token from stdin to the entr
 #!/bin/bash
 # Runs as root via `docker exec -i -u root`. Reads the VNC password and the launcher token from
 # stdin (one per line), hands them to the entrypoint through its root-only FIFO, and waits until
-# the desktop restarted with them. Secrets never appear in argv or in a file.
+# the desktop holds them (the entrypoint proves both before it answers). Then it checks that the
+# desktop ports still belong to vnc and gui. Secrets never appear in argv or in a file.
 set -eu
 run_dir=/run/orca-desktop
 fifo="$run_dir/secrets"
@@ -244,9 +259,16 @@ printf '%s\n%s\n%s\n' "$password" "$token" "$nonce" > "$fifo"
 password='' token=''
 
 for _ in $(seq 1 300); do
-  [ "$(cat "$run_dir/ready" 2>/dev/null)" = "$nonce" ] && exit 0
+  if [ "$(cat "$run_dir/ready" 2>/dev/null)" = "$nonce" ]; then
+    for owner in 5901:vnc 5902:gui; do
+      port="${owner%:*}" uid="$(id -u "${owner#*:}")"
+      ss -Hltne "sport = :$port" | grep -q " 127\.0\.0\.1:$port .* uid:$uid " ||
+        { echo "orca-desktop: port $port is not held by ${owner#*:}" >&2; exit 1; }
+    done
+    exit 0
+  fi
   if [ "$(cat "$run_dir/failed" 2>/dev/null)" = "$nonce" ]; then
-    echo 'orca-desktop: the desktop failed to start with the new secrets' >&2
+    echo 'orca-desktop: the desktop did not take the new secrets' >&2
     exit 1
   fi
   sleep 0.1
@@ -295,18 +317,23 @@ fi
 
 ### `orca-desktop-launcher`
 
-The launcher (`gui`), speaking the JSON-lines protocol Orca uses for `orca desktop run`.
+The launcher (`gui`): the handshake and JSON-lines protocol Orca uses for `orca desktop run`, plus the doctor probes.
 
 ```javascript
 #!/usr/bin/env node
 // Orca desktop launcher. Runs as `gui`, listens on 127.0.0.1:5902 and starts programs on the
-// desktop for whoever holds the token (only the environment's Orca server). The token arrives on
-// stdin and lives only in this process's memory. JSON lines, one TCP connection per program:
-//   -> {"token","op":"run","argv":[...],"cwd"?,"env"?}
+// desktop for whoever proves the token (only the environment's Orca server). Each stdin line is a
+// new token (root rotates it); it lives only in this process's memory and never crosses a
+// connection. JSON lines, one TCP connection per program; nonces are 32 random bytes in hex and
+// proofs hex HMAC-SHA256(token, "<label>|<nonce>|<nonce>"):
+//   -> {"op":"hello","nonce":B}
+//   <- {"nonce":L,"proof":HMAC("orca-launcher-server|B|L")}
+//   -> {"op":"run","proof":HMAC("orca-launcher-client|L|B"),"argv":[...],"cwd"?,"env"?}
 //   <- {"id"} | {"stream":"stdout"|"stderr","data"} ... | {"exit":<code>}  (signal death: 128 + n)
-//   -> {"token","op":"kill","id"}   kills the run's process group
+//   -> {"op":"kill","id"}   kills the run's process group
 // A refusal replaces the id and closes: {"error":"bad_token"} or {"error":"<code>"}.
-// `--probe` is a client for the template's doctor: token on stdin (may be empty), runs `id -un`.
+// `--probe` (doctor and entrypoint): token on stdin, runs `id -un`; prints one JSON result.
+// `--vnc-probe` (doctor): checks that 127.0.0.1:5901 offers only VNC auth and refuses a wrong answer.
 'use strict'
 const net = require('node:net')
 const crypto = require('node:crypto')
@@ -315,31 +342,19 @@ const { spawn } = require('node:child_process')
 
 const HOST = '127.0.0.1'
 const PORT = 5902
+const VNC_PORT = 5901
 const MAX_LINE_CHARS = 1024 * 1024
 const MAX_RUNS = 64
 const KILL_GRACE_MS = 5000
+const NONCE = /^[0-9a-f]{64}$/
 
-function readStdinLine() {
-  return new Promise((resolve) => {
-    let text = ''
-    process.stdin.setEncoding('utf8')
-    const done = () => {
-      process.stdin.removeAllListeners()
-      process.stdin.destroy()
-      resolve(text.split('\n')[0].trim())
-    }
-    process.stdin.on('data', (chunk) => {
-      text += chunk
-      if (text.includes('\n') || text.length > 4096) done()
-    })
-    process.stdin.on('end', done)
-    process.stdin.on('error', done)
-  })
-}
-
-function digest(value) {
-  return crypto.createHash('sha256').update(String(value)).digest()
-}
+const newNonce = () => crypto.randomBytes(32).toString('hex')
+const proof = (token, label, first, second) =>
+  crypto.createHmac('sha256', token).update(`${label}|${first}|${second}`).digest('hex')
+const proofMatches = (expected, received) =>
+  typeof received === 'string' &&
+  received.length === expected.length &&
+  crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received))
 
 function lineSplitter(onLine, onOverflow) {
   let pending = ''
@@ -366,10 +381,10 @@ function isStringRecord(value) {
   )
 }
 
-function serve(token) {
-  const expected = digest(token)
-  const tokenMatches = (candidate) =>
-    typeof candidate === 'string' && crypto.timingSafeEqual(digest(candidate), expected)
+function serve() {
+  let token = ''
+  let listening = false
+  let running = 0
   const baseEnv = {
     HOME: process.env.HOME,
     USER: process.env.USER,
@@ -383,11 +398,12 @@ function serve(token) {
     ELECTRON_DISABLE_SANDBOX: '1'
   }
   const defaultCwd = process.env.ORCA_DESKTOP_DEFAULT_CWD || process.env.HOME || '/'
-  let running = 0
 
   const server = net.createServer((socket) => {
     socket.setEncoding('utf8')
     socket.on('error', () => {})
+    // Each connection is bound to the token current when it said hello.
+    let session = null
     let child = null
     let runId = null
     let refused = false
@@ -477,12 +493,35 @@ function serve(token) {
       } catch {
         return runId ? undefined : refuse('bad_request')
       }
-      if (request === null || typeof request !== 'object' || !tokenMatches(request.token)) {
-        return runId ? undefined : refuse('bad_token')
+      if (request === null || typeof request !== 'object')
+        return runId ? undefined : refuse('bad_request')
+      if (!session) {
+        if (
+          request.op !== 'hello' ||
+          typeof request.nonce !== 'string' ||
+          !NONCE.test(request.nonce)
+        ) {
+          return refuse('bad_request')
+        }
+        session = { token, broker: request.nonce, launcher: newNonce() }
+        send({
+          nonce: session.launcher,
+          proof: proof(session.token, 'orca-launcher-server', session.broker, session.launcher)
+        })
+        return
       }
-      if (!runId && request.op === 'run') return start(request)
-      if (runId && request.op === 'kill' && request.id === runId) return killGroup()
-      if (!runId) refuse('bad_request')
+      if (!runId) {
+        const expected = proof(
+          session.token,
+          'orca-launcher-client',
+          session.launcher,
+          session.broker
+        )
+        if (request.op !== 'run' || !proofMatches(expected, request.proof))
+          return refuse('bad_token')
+        return start(request)
+      }
+      if (request.op === 'kill' && request.id === runId) killGroup()
     }
     socket.on(
       'data',
@@ -498,12 +537,52 @@ function serve(token) {
     process.stderr.write(`orca-desktop-launcher: ${error.code || 'listen failed'}\n`)
     process.exit(1)
   })
-  server.listen(PORT, HOST)
+
+  process.stdin.setEncoding('utf8')
+  process.stdin.on(
+    'data',
+    lineSplitter(
+      (line) => {
+        const next = line.trim()
+        if (next.length < 32) return
+        token = next
+        if (!listening) {
+          listening = true
+          server.listen(PORT, HOST)
+        }
+      },
+      () => {}
+    )
+  )
+  process.stdin.on('end', () => process.exit(1))
 }
 
+function readStdinLine() {
+  return new Promise((resolve) => {
+    let text = ''
+    process.stdin.setEncoding('utf8')
+    const done = () => {
+      process.stdin.removeAllListeners()
+      process.stdin.destroy()
+      resolve(text.split('\n')[0].trim())
+    }
+    process.stdin.on('data', (chunk) => {
+      text += chunk
+      if (text.includes('\n') || text.length > 4096) done()
+    })
+    process.stdin.on('end', done)
+    process.stdin.on('error', done)
+  })
+}
+
+// Results: started (with stdout and exit), rejected (the launcher refused our proof),
+// server_proof_mismatch (the listener proved a different token), unreachable, protocol_error.
+// An empty token skips checking the listener and sends a proof made with no token.
 function probe(token) {
   const socket = net.connect({ host: HOST, port: PORT })
   const result = { result: 'unknown', stdout: '' }
+  const broker = newNonce()
+  let authenticated = false
   const finish = () => {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     process.exit(0)
@@ -525,7 +604,20 @@ function probe(token) {
           result.result = 'protocol_error'
           return socket.destroy()
         }
-        if (reply.error === 'bad_token') result.result = 'rejected'
+        if (!authenticated && typeof reply.nonce === 'string') {
+          if (
+            token &&
+            !proofMatches(proof(token, 'orca-launcher-server', broker, reply.nonce), reply.proof)
+          ) {
+            result.result = 'server_proof_mismatch'
+            return socket.destroy()
+          }
+          authenticated = true
+          const key = token || crypto.randomBytes(32).toString('hex')
+          socket.write(
+            `${JSON.stringify({ op: 'run', proof: proof(key, 'orca-launcher-client', reply.nonce, broker), argv: ['id', '-un'] })}\n`
+          )
+        } else if (reply.error === 'bad_token') result.result = 'rejected'
         else if (typeof reply.error === 'string') result.result = `refused:${reply.error}`
         else if (typeof reply.id === 'string') result.result = 'started'
         else if (reply.stream === 'stdout') result.stdout += reply.data
@@ -534,23 +626,56 @@ function probe(token) {
       () => socket.destroy()
     )
   )
-  socket.once('connect', () => {
-    const request = { op: 'run', argv: ['id', '-un'] }
-    if (token) request.token = token
-    socket.write(`${JSON.stringify(request)}\n`)
+  socket.once('connect', () => socket.write(`${JSON.stringify({ op: 'hello', nonce: broker })}\n`))
+  setTimeout(finish, 10000).unref()
+}
+
+// RFB 3.8: the server must offer only VNC authentication (2) and refuse a random response.
+function vncProbe() {
+  const socket = net.connect({ host: HOST, port: VNC_PORT })
+  const result = { types: null, auth: 'unknown' }
+  let buffer = Buffer.alloc(0)
+  let stage = 'version'
+  const finish = () => {
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    process.exit(0)
+  }
+  socket.on('error', () => {
+    result.auth = 'unreachable'
+    finish()
+  })
+  socket.on('close', finish)
+  socket.on('data', (chunk) => {
+    buffer = Buffer.concat([buffer, chunk])
+    if (stage === 'version' && buffer.length >= 12) {
+      buffer = buffer.subarray(12)
+      socket.write('RFB 003.008\n')
+      stage = 'types'
+    }
+    if (stage === 'types' && buffer.length >= 1 && buffer.length >= 1 + buffer[0]) {
+      result.types = [...buffer.subarray(1, 1 + buffer[0])]
+      buffer = buffer.subarray(1 + buffer[0])
+      if (!result.types.includes(2)) return socket.destroy()
+      socket.write(Buffer.from([2]))
+      stage = 'challenge'
+    }
+    if (stage === 'challenge' && buffer.length >= 16) {
+      buffer = buffer.subarray(16)
+      socket.write(crypto.randomBytes(16))
+      stage = 'result'
+    }
+    if (stage === 'result' && buffer.length >= 4) {
+      result.auth = buffer.readUInt32BE(0) === 0 ? 'accepted' : 'refused'
+      socket.destroy()
+    }
   })
   setTimeout(finish, 10000).unref()
 }
 
 process.umask(0o002)
-readStdinLine().then((token) => {
-  if (process.argv[2] === '--probe') return probe(token)
-  if (token.length < 32) {
-    process.stderr.write('orca-desktop-launcher: no token on stdin\n')
-    process.exit(1)
-  }
-  serve(token)
-})
+if (process.argv[2] === '--probe') readStdinLine().then(probe)
+else if (process.argv[2] === '--vnc-probe') vncProbe()
+else serve()
 ```
 
 ### `orca-docker-desktop.sh`
@@ -670,7 +795,20 @@ check_ptrace_scope() { # <image>
 
 label_of() { dk container inspect -f '{{index .Config.Labels "orca.workspace"}}' "$1" 2>/dev/null; }
 
-container_exists() { dk container inspect "$1" >/dev/null 2>&1; }
+# Sets container_id; empty only when Docker confirms there is no such container. Any other
+# failure (Docker or SSH down) stops the script instead of passing for "already gone".
+# shellcheck disable=SC2034 # container_id is read by the caller.
+lookup_container() {
+  local out
+  if out="$(dk container inspect -f '{{.Id}}' "$1" 2>&1)"; then
+    container_id="$out"
+    return
+  fi
+  case "$out" in
+    *'No such container'* | *'No such object'*) container_id='' ;;
+    *) die "cannot inspect $1: $out" ;;
+  esac
+}
 
 require_label() { # <name> <expected instance id or empty>
   local label
@@ -812,27 +950,30 @@ image="$(pick_image)"
 check_ptrace_scope "$image"
 ensure_ssh_key
 
-if container_exists "$name"; then
-  require_label "$name" "$instance_id"
+lookup_container "$name"
+if [ -n "$container_id" ]; then
+  require_label "$container_id" "$instance_id"
   log "replacing the unfinished container $name"
-  remove_container "$name"
+  remove_container "$container_id"
 fi
 
-finished=0
-trap '[ "$finished" = 1 ] || remove_container "$name" 2>/dev/null || true' EXIT
 docker_run_args "$name" "orca.workspace=$instance_id" "$image"
-dk "${run_args[@]}" >/dev/null
-port="$(container_ssh_port "$name")"
+container_id="$(dk "${run_args[@]}")"
+[ -n "$container_id" ] || die "docker run returned no container id for $name"
+# Cleanup is armed only now and removes by id: a create that lost the name never touches the winner.
+finished=0
+trap '[ "$finished" = 1 ] || remove_container "$container_id" 2>/dev/null || true' EXIT
+port="$(container_ssh_port "$container_id")"
 [ -n "$port" ] || die "container $name published no loopback SSH port"
-record_known_host "$port" "$(container_host_key "$name")"
-authorize_ssh_key "$name"
+record_known_host "$port" "$(container_host_key "$container_id")"
+authorize_ssh_key "$container_id"
 
 log "cloning $repo_url into $project_root"
-git_token | dk exec -i -u dev "$name" /usr/local/bin/orca-desktop-clone \
+git_token | dk exec -i -u dev "$container_id" /usr/local/bin/orca-desktop-clone \
   "$repo_url" "$project_root" "${ORCA_DESKTOP_REPO_REF:-}" >&2
 
 new_desktop_secrets
-send_desktop_secrets "$name"
+send_desktop_secrets "$container_id"
 emit_result "$name" "$port" "$project_root" "$instance_id"
 finished=1
 ```
@@ -904,13 +1045,14 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 read_payload
 resolve_lifecycle_target
-if ! container_exists "$name"; then
+lookup_container "$name"
+if [ -z "$container_id" ]; then
   log "$name is already gone"
   exit 0
 fi
-require_label "$name" "$instance_id"
+require_label "$container_id" "$instance_id"
 
-remove_container "$name" "$(payload_value 'd.recipeResult.connection.target.port')"
+remove_container "$container_id" "$(payload_value 'd.recipeResult.connection.target.port')"
 log "removed $name"
 ```
 
@@ -1004,7 +1146,8 @@ Security checks on top of `orca vm recipe doctor`.
 #                                                    create.sh, runs every check, destroys it
 #   doctor-extra.sh --container NAME [--known ID]... checks a running environment (no secret checks)
 # --known names an instance id Orca still lists (Settings > VMs); other labeled containers are
-# reported as orphans. Exit status 1 when any check fails.
+# reported as orphans. Every denial must show the expected refusal, not just any failure; secrets
+# never enter a process run as dev or gui. Exit status 1 when any check fails.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=orca-docker-desktop.sh
@@ -1038,11 +1181,35 @@ check() { # <id> <message> <command...>
   if "$@"; then report pass "$id" "$message"; else report FAIL "$id" "$message"; fi
 }
 
-# A file holds a secret when grep finds either one; the secrets reach grep on stdin, not argv.
-holds_secret() { printf '%s\n%s\n' "$password" "$token" | grep -qF -f /dev/stdin "$1"; }
+as() { # <user> <command...>, in the container
+  local user="$1"
+  shift
+  dk exec -u "$user" "$container" "$@"
+}
+
+# The command ran as <user>, failed, and said <refusal>; a Docker or exec error does not count.
+refused() { # <refusal text> <user> <command...>
+  local refusal="$1" output
+  shift
+  if output="$(as "$@" 2>&1)"; then
+    printf '  unexpectedly succeeded: %s\n' "$output" >&2
+    return 1
+  fi
+  case "$output" in
+    *"$refusal"*) return 0 ;;
+    *) printf '  failed without "%s": %s\n' "$refusal" "$output" >&2 && return 1 ;;
+  esac
+}
+
+# 1 when neither secret is in <file>, 0 when one is, anything else when grep failed.
+secrets_absent_from() {
+  local status=0
+  printf '%s\n%s\n' "$password" "$token" | grep -aqF -f /dev/stdin "$1" || status=$?
+  [ "$status" -eq 1 ] || { [ "$status" -eq 0 ] && printf '  a secret is in %s\n' "$(basename "$1")" >&2; return 1; }
+}
 
 template_flags_ok() {
-  local block refused_anywhere='--privileged|docker\.sock|--(net|network|pid|ipc|uts|userns|cgroupns)[ =]+"?host|unconfined'
+  local block required refused_anywhere='--privileged|docker\.sock|--(net|network|pid|ipc|uts|userns|cgroupns)[ =]+"?host|unconfined'
   block="$(sed -n '/^# >>> docker run flags/,/^# <<< docker run flags/p' "$here/orca-docker-desktop.sh")"
   [ -n "$block" ] || return 1
   ! grep -Eq -- "(^|[[:space:]])(-v|--volume|--mount|--device|--volumes-from)([ =]|$)|/Users|\\\$HOME|--cap-add[ =]+\"?(ALL|SYS_ADMIN|SYS_PTRACE|SYS_MODULE|NET_ADMIN|DAC_READ_SEARCH|DAC_OVERRIDE)" <<<"$block" || return 1
@@ -1084,45 +1251,58 @@ process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
 })'
 }
 
-ptrace_scope_ok() { [ "$(dk exec "$container" cat /proc/sys/kernel/yama/ptrace_scope)" -ge 1 ]; }
+ptrace_scope_ok() { [ "$(as root cat /proc/sys/kernel/yama/ptrace_scope)" -ge 1 ]; }
 
-dev_groups_ok() { [ "$(dk exec "$container" id -nG dev)" = 'dev work' ]; }
+dev_groups_ok() { [ "$(as root id -nG dev)" = 'dev work' ]; }
 
-no_sudo_or_xdotool() { dk exec "$container" sh -c '! command -v sudo && ! command -v xdotool' >/dev/null; }
+no_sudo_or_xdotool() {
+  [ "$(as root sh -c 'command -v sudo || echo no-sudo; command -v xdotool || echo no-xdotool')" = \
+    "$(printf 'no-sudo\nno-xdotool')" ]
+}
 
-desktop_ports_loopback_only() {
-  dk exec "$container" ss -Hltn >"$work/listen"
-  grep -q ' 127\.0\.0\.1:5901 ' "$work/listen" && grep -q ' 127\.0\.0\.1:5902 ' "$work/listen" &&
+# Bound to 127.0.0.1 (or ::1) only, and owned by the right user (socket uid from sock_diag).
+desktop_ports_held() {
+  as root ss -Hltne >"$work/listen"
+  grep -Eq " 127\.0\.0\.1:5901 .* uid:$(as root id -u vnc) " "$work/listen" &&
+    grep -Eq " 127\.0\.0\.1:5902 .* uid:$(as root id -u gui) " "$work/listen" &&
     ! grep -E ' [^ ]*:590[12] ' "$work/listen" | grep -Evq ' (127\.0\.0\.1|\[::1\]):590[12] '
 }
 
 gui_opens_display() {
-  dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" xdpyinfo >/dev/null 2>&1
+  dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" xdpyinfo >/dev/null
 }
-dev_cannot_open_display() { ! dk exec -u dev -e DISPLAY=:1 "$container" xdpyinfo >/dev/null 2>&1; }
-dev_cannot_read_cookie() { ! dk exec -u dev "$container" cat /home/gui/.Xauthority >/dev/null 2>&1; }
-dev_cannot_list_x_sockets() { ! dk exec -u dev "$container" ls /tmp/.X11-unix >/dev/null 2>&1; }
+dev_cannot_open_display() {
+  dk exec -u dev -e DISPLAY=:1 "$container" xdpyinfo >"$work/xdpyinfo" 2>&1 && return 1
+  grep -q 'unable to open display' "$work/xdpyinfo"
+}
+dev_cannot_read_cookie() { refused 'Permission denied' dev cat /home/gui/.Xauthority; }
+dev_cannot_list_x_sockets() { refused 'Permission denied' dev ls /tmp/.X11-unix; }
 
 vnc_password_file_private() {
-  [ "$(dk exec -u vnc "$container" stat -c '%U %a' /home/vnc/.vnc/passwd)" = 'vnc 600' ] &&
-    ! dk exec -u dev "$container" cat /home/vnc/.vnc/passwd >/dev/null 2>&1 &&
-    ! dk exec -u gui "$container" cat /home/vnc/.vnc/passwd >/dev/null 2>&1
+  [ "$(as vnc stat -c '%U %a' /home/vnc/.vnc/passwd)" = 'vnc 600' ] &&
+    refused 'Permission denied' dev cat /home/vnc/.vnc/passwd &&
+    refused 'Permission denied' gui cat /home/vnc/.vnc/passwd
 }
 
-probe_launcher() { # stdin: token line, as dev
-  dk exec -i -u dev "$container" /usr/local/bin/orca-desktop-launcher --probe
+vnc_refuses_wrong_answer() {
+  [ "$(as dev /usr/local/bin/orca-desktop-launcher --vnc-probe)" = '{"types":[2],"auth":"refused"}' ]
 }
-launcher_refuses_without_token() {
-  [ "$(printf '\n' | probe_launcher)" = '{"result":"rejected","stdout":""}' ] &&
-    [ "$(printf 'not-the-token-not-the-token-not-the-token\n' | probe_launcher)" = '{"result":"rejected","stdout":""}' ]
+
+launcher_probe() { # <user>; stdin: token line
+  dk exec -i -u "$1" "$container" /usr/local/bin/orca-desktop-launcher --probe
 }
-launcher_runs_as_gui_with_token() {
-  [ "$(printf '%s\n' "$token" | probe_launcher)" = '{"result":"started","stdout":"gui\n","exit":0}' ]
+launcher_refuses_dev() {
+  [ "$(printf '\n' | launcher_probe dev)" = '{"result":"rejected","stdout":""}' ] &&
+    [ "$(printf 'not-the-token-not-the-token-not-the-token\n' | launcher_probe dev)" = \
+      '{"result":"server_proof_mismatch","stdout":""}' ]
+}
+launcher_runs_as_gui_for_root() {
+  [ "$(printf '%s\n' "$token" | launcher_probe root)" = '{"result":"started","stdout":"gui\n","exit":0}' ]
 }
 
 secrets_not_in_inspect() {
   dk container inspect "$container" >"$work/inspect"
-  ! holds_secret "$work/inspect"
+  secrets_absent_from "$work/inspect"
 }
 
 secrets_not_in_processes() {
@@ -1132,30 +1312,37 @@ secrets_not_in_processes() {
   if [ -n "$docker_host" ]; then
     ssh -T -o BatchMode=yes -- "$docker_host" ps -A -ww -o args >>"$work/host-ps"
   fi
-  dk exec "$container" ps -A -ww -o args >"$work/container-ps"
+  as root ps -A -ww -o args >"$work/container-ps"
   for user in root vnc gui dev; do
     # Each user reads its own processes' environments (root lacks CAP_SYS_PTRACE for the others).
-    dk exec -u "$user" "$container" sh -c \
-      'for f in /proc/[0-9]*/environ /proc/[0-9]*/cmdline; do { tr "\0" "\n" < "$f"; } 2>/dev/null; done' >>"$work/container-ps"
+    as "$user" sh -c \
+      'for f in /proc/[0-9]*/environ /proc/[0-9]*/cmdline; do { tr "\0" "\n" < "$f"; } 2>/dev/null; done' \
+      >"$work/proc-$user"
+    [ -s "$work/proc-$user" ] || return 1
   done
   [ -s "$work/host-ps" ] && [ -s "$work/container-ps" ] &&
-    ! holds_secret "$work/host-ps" && ! holds_secret "$work/container-ps"
+    secrets_absent_from "$work/host-ps" && secrets_absent_from "$work/container-ps" &&
+    for user in root vnc gui dev; do secrets_absent_from "$work/proc-$user" || return 1; done
 }
 
+# Each user streams every file it can read to this machine, where the secrets are searched.
 secrets_not_in_readable_files() {
   local user
   for user in dev gui; do
-    printf '%s\n%s\n' "$password" "$token" | dk exec -i -u "$user" "$container" sh -c \
-      'grep -rlIF -f /dev/stdin /home /tmp /run /work /etc /var/tmp /opt 2>/dev/null' >"$work/files-$user" || true
-    [ ! -s "$work/files-$user" ] || return 1
+    as "$user" sh -c 'find /home /tmp /run /work /etc /var/tmp /opt -xdev \
+      \( -type d \( ! -readable -o ! -executable \) -prune \) -o \( -type f -readable -print0 \) |
+      xargs -0 -r cat --' >"$work/files-$user" 2>"$work/files-$user.err" ||
+      { sed 's/^/  /' "$work/files-$user.err" >&2; return 1; }
+    [ -s "$work/files-$user" ] && secrets_absent_from "$work/files-$user" || return 1
   done
 }
 
 list_orphans() {
-  local line label state is_known id
+  local label line state is_known id others=0
   dk ps -a --filter label=orca.workspace --format '{{.Label "orca.workspace"}}|{{.Names}}|{{.State}}' >"$work/labeled"
   while IFS='|' read -r label line state; do
     [ -n "$label" ] && [ "$label" != "$instance" ] || continue
+    others=1
     is_known=0
     for id in "${known[@]+"${known[@]}"}"; do [ "$id" != "$label" ] || is_known=1; done
     if [ "$is_known" = 1 ]; then
@@ -1166,6 +1353,7 @@ list_orphans() {
       report warn orphans.unverified "$line ($state), instance $label: compare with Settings > VMs or pass --known"
     fi
   done <"$work/labeled"
+  [ "$others" = 1 ] || report pass orphans.none 'no other container carries an orca.workspace label'
 }
 
 if [ -z "$container" ]; then
@@ -1186,15 +1374,16 @@ check container.hardening 'the container runs with exactly those flags' host_con
 check kernel.ptrace_scope 'kernel.yama.ptrace_scope >= 1' ptrace_scope_ok
 check users.dev_groups 'dev is only in dev and work (not vnc, gui or xdisplay)' dev_groups_ok
 check users.no_sudo 'no sudo and no xdotool in the image' no_sudo_or_xdotool
-check desktop.loopback 'VNC (5901) and launcher (5902) listen on loopback only' desktop_ports_loopback_only
+check desktop.ports 'VNC (5901) is held by vnc and the launcher (5902) by gui, on loopback only' desktop_ports_held
 check display.gui_allowed 'gui opens DISPLAY=:1 with its cookie (control)' gui_opens_display
-check display.dev_denied 'dev cannot open DISPLAY=:1' dev_cannot_open_display
-check display.dev_no_cookie "dev cannot read gui's X cookie" dev_cannot_read_cookie
-check display.dev_no_socket 'dev cannot list /tmp/.X11-unix' dev_cannot_list_x_sockets
-check vnc.password_file 'VNC password file is vnc 0600; dev and gui cannot read it' vnc_password_file_private
-check launcher.no_token 'launcher answers bad_token without the token or with a wrong one' launcher_refuses_without_token
+check display.dev_denied 'dev cannot open DISPLAY=:1 ("unable to open display")' dev_cannot_open_display
+check display.dev_no_cookie "dev cannot read gui's X cookie (Permission denied)" dev_cannot_read_cookie
+check display.dev_no_socket 'dev cannot list /tmp/.X11-unix (Permission denied)' dev_cannot_list_x_sockets
+check vnc.password_file 'VNC password file is vnc 0600; dev and gui get Permission denied' vnc_password_file_private
+check vnc.wrong_password 'VNC offers only VNC auth and refuses a wrong answer from dev' vnc_refuses_wrong_answer
+check launcher.dev_refused 'from dev: no token is refused, a wrong token fails the handshake' launcher_refuses_dev
 if [ -n "$token" ]; then
-  check launcher.with_token 'launcher runs `id -un` as gui with the token' launcher_runs_as_gui_with_token
+  check launcher.with_token 'from root with the token: runs `id -un` as gui' launcher_runs_as_gui_for_root
   check secrets.inspect 'password and token absent from docker inspect' secrets_not_in_inspect
   check secrets.processes 'password and token absent from ps, cmdlines and environments' secrets_not_in_processes
   check secrets.files 'password and token absent from files dev or gui can read' secrets_not_in_readable_files

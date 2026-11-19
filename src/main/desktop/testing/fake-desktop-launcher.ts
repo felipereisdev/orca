@@ -1,4 +1,11 @@
 import { createServer, type Socket } from 'node:net'
+import {
+  isLauncherNonce,
+  launcherClientProof,
+  launcherServerProof,
+  newLauncherNonce,
+  proofMatches
+} from '../desktop-launcher-handshake'
 
 /** What a run request carried, minus the token (only whether it matched). */
 export type FakeLauncherRun = {
@@ -13,8 +20,10 @@ export type FakeDesktopLauncher = {
   runs: FakeLauncherRun[]
   /** Ids killed by a valid `kill` request. */
   killed: string[]
-  /** Requests refused for a wrong or missing token. */
+  /** Requests refused for a wrong or missing client proof. */
   rejected: number
+  /** Everything clients sent, to check that the token never crosses the connection. */
+  received(): string
   /** TCP connections accepted so far. */
   connections: number
   /** Resolves once the connection of run `id` closed (a real launcher kills it then too). */
@@ -27,7 +36,8 @@ export type FakeDesktopLauncher = {
 }
 
 type LauncherRequest = {
-  token?: unknown
+  proof?: unknown
+  nonce?: unknown
   op?: unknown
   id?: unknown
   argv?: unknown
@@ -55,6 +65,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
   const hanging = new Map<string, Socket>()
   let rejected = 0
   let connections = 0
+  let receivedText = ''
   let nextId = 1
 
   const markClosed = (id: string): void => {
@@ -122,6 +133,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
     let running: string | undefined
     let started: string | undefined
     let pending = ''
+    let nonces: { broker: string; launcher: string } | undefined
     socket.setEncoding('utf8')
     socket.on('error', () => {})
     socket.once('close', () => {
@@ -132,6 +144,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
       }
     })
     socket.on('data', (chunk: string) => {
+      receivedText += chunk
       pending += chunk
       let newline = pending.indexOf('\n')
       while (newline >= 0) {
@@ -146,7 +159,23 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
           socket.end()
           return
         }
-        if (request.token !== token) {
+        if (!nonces) {
+          if (request.op !== 'hello' || !isLauncherNonce(request.nonce)) {
+            send(socket, { error: 'bad_request' })
+            socket.end()
+            return
+          }
+          nonces = { broker: request.nonce, launcher: newLauncherNonce() }
+          send(socket, {
+            nonce: nonces.launcher,
+            proof: launcherServerProof(token, nonces.broker, nonces.launcher)
+          })
+          continue
+        }
+        if (
+          started === undefined &&
+          !proofMatches(launcherClientProof(token, nonces.launcher, nonces.broker), request.proof)
+        ) {
           rejected++
           send(socket, { error: 'bad_token' })
           socket.end()
@@ -187,6 +216,7 @@ export async function startFakeDesktopLauncher(token: string): Promise<FakeDeskt
     get connections() {
       return connections
     },
+    received: () => receivedText,
     waitForClosed: (id) =>
       closed.includes(id)
         ? Promise.resolve()
