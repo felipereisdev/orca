@@ -90,10 +90,17 @@ function spawnCli(userDataPath: string, args: string[]) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('ORCA_'))
   )
-  return spawn(TSX, [CLI_ENTRY, ...args], {
+  const child = spawn(TSX, [CLI_ENTRY, ...args], {
     env: { ...env, ORCA_USER_DATA_PATH: userDataPath },
     stdio: ['ignore', 'pipe', 'pipe']
   })
+  // Unconditional: a test that failed or timed out must not leave the CLI running.
+  cleanups.push(() => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGKILL')
+    }
+  })
+  return child
 }
 
 const posixOnly = process.platform === 'win32' ? describe.skip : describe
@@ -105,6 +112,8 @@ posixOnly('orca desktop run in a real process', () => {
       // 4 MiB of output: far past what a pipe buffers, so the CLI's writes block.
       const chunk = 'x'.repeat(64 * 1024)
       let reads = 0
+      // The order this test drives: the CLI asks to kill, the reader goes away, the kill is answered.
+      const steps: string[] = []
       let answerKill = (): void => {}
       const runtime = await fakeRuntime((request, respond) => {
         if (request.method === 'desktop.run.start') {
@@ -119,12 +128,19 @@ posixOnly('orca desktop run in a real process', () => {
           }
         } else if (request.method === 'desktop.run.kill') {
           // Answered once the test has closed the reader, so the pending write meets a closed pipe.
-          answerKill = () => respond({ killed: true })
+          steps.push('kill requested')
+          answerKill = () => {
+            steps.push('kill answered')
+            respond({ killed: true })
+          }
         }
       })
       const child = spawnCli(runtime.userDataPath, ['desktop', 'run', '--', 'flood'])
       const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) =>
-        child.once('exit', (code, signal) => resolve({ code, signal }))
+        child.once('exit', (code, signal) => {
+          steps.push('exited')
+          resolve({ code, signal })
+        })
       )
       let stderr = ''
       child.stderr.setEncoding('utf8')
@@ -137,10 +153,11 @@ posixOnly('orca desktop run in a real process', () => {
       child.kill('SIGINT')
       await runtime.waitFor('desktop.run.kill')
       child.stdout.destroy()
+      steps.push('reader closed')
       answerKill()
       const { code, signal } = await exited
 
-      expect(runtime.methods).toContain('desktop.run.kill')
+      expect(steps).toEqual(['kill requested', 'reader closed', 'kill answered', 'exited'])
       expect({ code, signal }).toEqual({ code: 130, signal: null })
       expect(stderr).not.toContain('EPIPE')
     },
