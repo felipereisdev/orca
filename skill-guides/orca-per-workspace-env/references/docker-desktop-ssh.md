@@ -248,7 +248,7 @@ escolhido por ele:
 
 1. No Mac dos containers, `ptrace_scope` em 1 (passo 3 da configuração) e `docker info` por SSH
    funcionando; no Mac principal, `docker-desktop.env` com `ORCA_DOCKER_HOST` e `ORCA_DOCKER_BIN`.
-2. `ORCA vm recipe doctor docker-desktop --json` sem `fail` nem `warn`, e `doctor-extra.sh` com
+2. `orca vm recipe doctor docker-desktop --json` sem `fail` nem `warn`, e `doctor-extra.sh` com
    todas as checagens `pass`.
 3. Rodar `auth.sh`, fazer o login do agente no comando impresso e confirmar a imagem
    `orca-desktop-auth:<hash>-<agente>`.

@@ -635,6 +635,8 @@ function probe(token) {
           return stop('protocol_error')
         }
         if (!authenticated) {
+          // A program's output before the handshake finished is run evidence too.
+          if (hasRunField(reply)) return stop('unverified_run')
           if (typeof reply.nonce !== 'string' || !NONCE.test(reply.nonce)) {
             return stop('no_handshake')
           }
@@ -671,7 +673,12 @@ function probe(token) {
 
 // A frame with any run field is run evidence, even when it also carries an error.
 function hasRunField(reply) {
-  return reply.id !== undefined || reply.stream !== undefined || reply.exit !== undefined
+  return (
+    reply.id !== undefined ||
+    reply.stream !== undefined ||
+    reply.data !== undefined ||
+    reply.exit !== undefined
+  )
 }
 
 // Prints {"challenge":"ok"} when the listener answers a hello with a nonce and a 64-hex proof.
@@ -692,6 +699,8 @@ function helloProbe() {
     'data',
     lineSplitter(
       (line) => {
+        // The first reply decides; later lines, even in the same chunk, cannot replace it.
+        if (result.challenge !== 'none') return
         let reply
         try {
           reply = JSON.parse(line)
@@ -1432,8 +1441,11 @@ display_control() { listener_inode 5901 vnc && gui_opens_display; }
 # The same RFB listener the denial talks to: an RFB 003.00x banner whose security types include
 # VNC auth (2); prints the listener.
 rfb_control() {
-  listener_inode 5901 vnc &&
-    [ "$(as dev /usr/local/bin/orca-desktop-launcher --vnc-probe hello)" = '{"rfb":"vnc_auth_offered"}' ]
+  local out
+  listener_inode 5901 vnc || return 1
+  # The probe must also exit 0: an output that matches from a failed command proves nothing.
+  out="$(as dev /usr/local/bin/orca-desktop-launcher --vnc-probe hello)" || return 1
+  [ "$out" = '{"rfb":"vnc_auth_offered"}' ]
 }
 dev_cannot_open_display() { refused 'xdpyinfo:  unable to open display ":1".' dev env DISPLAY=:1 timeout 5 xdpyinfo; }
 dev_cannot_read_cookie() { refused 'cat: /home/gui/.Xauthority: Permission denied' dev cat /home/gui/.Xauthority; }
@@ -1467,8 +1479,10 @@ launcher_runs_as_gui_for_root() {
 # launcher's and the broker's memory), so the challenge is its strongest positive probe.
 # Prints the listener.
 launcher_control() {
-  listener_inode 5902 gui &&
-    [ "$(as dev /usr/local/bin/orca-desktop-launcher --hello-probe)" = '{"challenge":"ok"}' ] || return 1
+  local out
+  listener_inode 5902 gui || return 1
+  out="$(as dev /usr/local/bin/orca-desktop-launcher --hello-probe)" || return 1
+  [ "$out" = '{"challenge":"ok"}' ] || return 1
   [ -z "$token" ] || launcher_runs_as_gui_for_root
 }
 
