@@ -5,14 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../images/native-chat-markdown-image-owner'
+import type * as VideoSrc from './native-chat-video-src'
 import { useAppStore } from '@/store'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 
-const mocks = vi.hoisted(() => ({
-  readNativeChatVideoSrc: vi.fn(),
-  readDesktopRecordingCopy: vi.fn()
-}))
-vi.mock('./native-chat-video-src', () => mocks)
+const mocks = vi.hoisted(() => {
+  const state: {
+    readNativeChatVideoSrc: ReturnType<typeof vi.fn>
+    readDesktopRecordingCopy: ReturnType<typeof vi.fn>
+    real: typeof VideoSrc | null
+  } = { readNativeChatVideoSrc: vi.fn(), readDesktopRecordingCopy: vi.fn(), real: null }
+  return state
+})
+vi.mock('./native-chat-video-src', async (importOriginal) => {
+  mocks.real = await importOriginal<typeof VideoSrc>()
+  return {
+    readNativeChatVideoSrc: mocks.readNativeChatVideoSrc,
+    readDesktopRecordingCopy: mocks.readDesktopRecordingCopy
+  }
+})
 
 const RECORDING = '/home/dev/.orca/desktop-recordings/rec-0123456789abcdef.mp4'
 const owner = {
@@ -95,6 +106,15 @@ describe('video in a chat message', () => {
   })
 
   it('a retained transcript with no runtime context still plays from the Mac copy', async () => {
+    // The real resolver, down to the Mac-copy grant the main process answers.
+    const real = mocks.real!
+    mocks.readNativeChatVideoSrc.mockImplementation(real.readNativeChatVideoSrc)
+    mocks.readDesktopRecordingCopy.mockImplementation(real.readDesktopRecordingCopy)
+    const grantDesktopRecordingPreview = vi.fn(async () => ({
+      mediaUrl: 'orca-media://file/mac-copy',
+      mimeType: 'video/mp4'
+    }))
+    vi.stubGlobal('api', { fs: { grantDesktopRecordingPreview } })
     // The workspace is gone: its route no longer resolves, so the owner has no context.
     const { container } = render(
       <Transcript
@@ -104,9 +124,9 @@ describe('video in a chat message', () => {
     )
 
     await waitFor(() =>
-      expect(container.querySelector('video')).toHaveAttribute('src', 'orca-media://file/env-copy')
+      expect(container.querySelector('video')).toHaveAttribute('src', 'orca-media://file/mac-copy')
     )
-    expect(mocks.readNativeChatVideoSrc).toHaveBeenCalledWith(null, RECORDING)
+    expect(grantDesktopRecordingPreview).toHaveBeenCalledWith({ recordingId: '0123456789abcdef' })
   })
 
   it('renders a video link as before while the environments experiment is off', async () => {

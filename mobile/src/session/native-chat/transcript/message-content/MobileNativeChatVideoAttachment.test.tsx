@@ -44,16 +44,26 @@ import { Prose } from './MobileNativeChatProse'
 import { MobileNativeChatRowOverlaysContext } from '../message-actions/mobile-native-chat-row-overlays'
 import { stubRpcClient } from '../../../../transport/rpc/rpc-client-test-stub'
 import { resetMobileEphemeralVmsSettingCache } from '../../visual/mobile-ephemeral-vms-setting'
+import type { RuntimeClientSettings } from '../../../../../../src/main/runtime/client/settings/runtime-client-settings-shape'
 
-// The exact line `orca desktop record stop` prints.
-const CLI_LINE = '![Gravação do teste](</home/dev/.orca/desktop-recordings/rec-abc.mp4>)'
-const RECORDING = '/home/dev/.orca/desktop-recordings/rec-abc.mp4'
+// The exact line `orca desktop record stop` prints, for a real recording id.
+const RECORDING = '/home/dev/.orca/desktop-recordings/rec-0123456789abcdef.mp4'
+const CLI_LINE = `![Gravação do teste](<${RECORDING}>)`
 const MiB = 1024 * 1024
 
-function hostClient({ experiment, size }: { experiment: boolean; size: number }) {
+// `settings.get` answers `{ settings }` in the host's client shape; the host side pins the value
+// (runtime-client-settings-ephemeral-vms.test.ts), the type pins the field's name here.
+function hostSettings(experimentalEphemeralVms: boolean): {
+  settings: Pick<RuntimeClientSettings, 'experimentalEphemeralVms' | 'compactWorktreeCards'>
+} {
+  return { settings: { experimentalEphemeralVms, compactWorktreeCards: false } }
+}
+
+function hostClient(host: { experiment: boolean; size: number }) {
+  const { size } = host
   const sent: { method: string; params: Record<string, unknown> }[] = []
   const results: Record<string, (params: Record<string, unknown>) => unknown> = {
-    'settings.get': () => ({ settings: { experimentalEphemeralVms: experiment } }),
+    'settings.get': () => hostSettings(host.experiment),
     'files.resolveTerminalPath': () => ({
       exists: true,
       openTarget: { kind: 'absolute-file', absolutePath: RECORDING, grantId: 'g-1' }
@@ -161,5 +171,25 @@ describe('a desktop recording in a chat message', () => {
     expect(root.findAllByType(playback.MobileMediaPlayback)).toHaveLength(0)
     expect(textOf(root)).toContain('Gravação do teste')
     expect(sent.some((call) => call.method.startsWith('files.'))).toBe(false)
+  })
+
+  it('an open transcript follows the experiment being turned off within the refresh window', async () => {
+    vi.useFakeTimers()
+    try {
+      const host = { experiment: true, size: 1000 }
+      const { client } = hostClient(host)
+      const root = await renderLine(client)
+      expect(playButtons(root)).not.toHaveLength(0)
+
+      host.experiment = false
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000)
+      })
+
+      expect(playButtons(root)).toHaveLength(0)
+      expect(textOf(root)).toContain('Gravação do teste')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

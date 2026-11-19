@@ -29,6 +29,7 @@ export type RuntimeClientSettings = Pick<
   | 'defaultLinearTeamSelection'
   | 'githubProjects'
   | 'experimentalNewWorktreeCardStyle'
+  | 'experimentalEphemeralVms'
   | 'worktreeCardDetailsRow'
   | 'compactWorktreeCards'
   | 'minimaxGroupId'
