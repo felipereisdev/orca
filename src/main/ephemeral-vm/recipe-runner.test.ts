@@ -225,6 +225,56 @@ describe('runEphemeralVmRecipeCleanup', () => {
       envWorkspace: 'fix-login-race'
     })
   })
+
+  it('gives the automatic destroy the full recipe result, desktop included', async () => {
+    const repoPath = makeRepo()
+    const cleanupPath = join(repoPath, 'cleanup.js')
+    writeFileSync(
+      cleanupPath,
+      [
+        "let input = ''",
+        "process.stdin.on('data', (chunk) => { input += chunk })",
+        "process.stdin.on('end', () => {",
+        '  console.log(JSON.stringify(JSON.parse(input).recipeResult.desktop ?? null))',
+        '})'
+      ].join('\n')
+    )
+    const desktop = {
+      type: 'vnc' as const,
+      host: '127.0.0.1',
+      port: 5901,
+      password: 'vncpw123',
+      launcher: { port: 5902, token: 'launcher-token-0123456789abcdef0123456789' }
+    }
+
+    const result = await runEphemeralVmRecipeCleanup({
+      repoPath,
+      recipe: {
+        id: 'docker-desktop',
+        name: 'Docker',
+        create: 'unused',
+        destroy: nodeCommand(cleanupPath)
+      },
+      context: { recipeId: 'docker-desktop', repoPath, instanceId: 'runtime-1' },
+      recipeResult: {
+        schemaVersion: 1,
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo',
+        desktop
+      }
+    })
+
+    if (!result.ok) {
+      throw new Error(JSON.stringify(result))
+    }
+    expect(JSON.parse(result.stdout)).toEqual({
+      type: 'vnc',
+      host: '127.0.0.1',
+      port: 5901,
+      password: 'vncpw123',
+      launcher: { port: 5902, token: 'launcher-token-0123456789abcdef0123456789' }
+    })
+  })
 })
 
 describe('runEphemeralVmRecipeSuspend and runEphemeralVmRecipeResume', () => {

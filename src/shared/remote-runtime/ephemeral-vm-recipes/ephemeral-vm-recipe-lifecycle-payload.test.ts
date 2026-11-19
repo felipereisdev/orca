@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildEphemeralVmRecipeCleanupCommand,
-  buildEphemeralVmRecipeCleanupPayload
+  buildEphemeralVmRecipeManualCleanupPayload
 } from './ephemeral-vm-recipe-lifecycle-payload'
 
 describe('manual cleanup payload', () => {
   it('never carries the desktop credentials into the copied command or payload', () => {
-    const payload = buildEphemeralVmRecipeCleanupPayload({
+    const payload = buildEphemeralVmRecipeManualCleanupPayload({
       recipe: { id: 'docker-desktop' },
       context: { recipeId: 'docker-desktop', instanceId: 'runtime-1', repoPath: '/repo' },
       recipeResult: {

@@ -16,8 +16,8 @@ export type EphemeralVmRecipeCleanupPayload = {
   recipeResult?: EphemeralVmRecipeResult
 }
 
-/** For the user to copy: the desktop credentials stay out of clipboards, history and argv. */
-export function buildEphemeralVmRecipeCleanupPayload(args: {
+/** Manual cleanup only (clipboard/command): desktop credentials stay out of clipboards, history and argv. */
+export function buildEphemeralVmRecipeManualCleanupPayload(args: {
   recipe: Pick<OrcaVmRecipe, 'id'>
   context: EphemeralVmRecipeContext
   recipeResult?: EphemeralVmRecipeResult

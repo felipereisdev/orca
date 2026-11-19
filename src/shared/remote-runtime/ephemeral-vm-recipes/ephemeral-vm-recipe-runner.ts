@@ -8,10 +8,7 @@ import { pickEphemeralVmFailureCode, type EphemeralVmFailure } from './ephemeral
 import { getEphemeralVmRecipeTimeoutSeconds } from './ephemeral-vm-recipe-timeouts'
 import { getRecipeStepFailure, runRecipeStep } from './ephemeral-vm-recipe-step'
 import { getEphemeralVmRecipeDestroyFailure } from './ephemeral-vm-recipe-destroy-result'
-import {
-  buildEphemeralVmRecipeCleanupPayload,
-  buildEphemeralVmRecipeLifecyclePayload
-} from './ephemeral-vm-recipe-lifecycle-payload'
+import { buildEphemeralVmRecipeLifecyclePayload } from './ephemeral-vm-recipe-lifecycle-payload'
 
 export type EphemeralVmRecipeContext = {
   instanceId?: string
@@ -148,7 +145,8 @@ export async function runEphemeralVmRecipeCleanup(
     return { ok: true, skipped: true, stdout: '', stderr: '', exitCode: null, signal: null }
   }
 
-  const payload = buildEphemeralVmRecipeCleanupPayload(args)
+  // The automatic destroy owns the full result: custom recipes may consume recipeResult.desktop.
+  const payload = buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'destroy' })
   const processResult = await runRecipeStep(
     args,
     'destroy',

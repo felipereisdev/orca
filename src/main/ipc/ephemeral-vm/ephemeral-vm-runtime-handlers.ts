@@ -16,7 +16,7 @@ import { listRuntimesForRemoval } from '../../ephemeral-vm/removal-runtime-match
 import { stopEphemeralVmRuntimeCleanup } from '../../ephemeral-vm/runtime-cleanup-control'
 import {
   buildEphemeralVmRecipeCleanupCommand,
-  buildEphemeralVmRecipeCleanupPayload
+  buildEphemeralVmRecipeManualCleanupPayload
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-lifecycle-payload'
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { ephemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
@@ -249,7 +249,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
     async (_event, args: { runtimeId: string }): Promise<EphemeralVmCleanupCommandResult> => {
       const userDataPath = app.getPath('userData')
       const resolved = getRuntimeRecipeContext(store, userDataPath, args.runtimeId)
-      const payload = buildEphemeralVmRecipeCleanupPayload({
+      const payload = buildEphemeralVmRecipeManualCleanupPayload({
         recipe: resolved.recipe,
         context: {
           instanceId: resolved.runtime.id,
