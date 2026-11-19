@@ -25,9 +25,16 @@ export function createProvisionEventForwarder(
   let discarding = false
   const sanitizer = createStderrLineSanitizer()
   let finished = false
+  let senderLost = false
   const forward = (stream: ProvisionStream, chunk: string): void => {
-    if (provisionId && chunk) {
+    if (!provisionId || !chunk || senderLost) {
+      return
+    }
+    try {
       send({ provisionId, stream, chunk })
+    } catch {
+      // A closed window only loses the live log; cleanup and cancellation must still run.
+      senderLost = true
     }
   }
   const forwardStderrLine = (line: string, lineEnd: string): void =>

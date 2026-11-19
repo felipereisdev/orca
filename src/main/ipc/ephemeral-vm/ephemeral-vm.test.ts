@@ -224,7 +224,12 @@ describe('registerEphemeralVmHandlers', () => {
 
     async function provisionWithDesktop(
       connection: Record<string, unknown>,
-      options: { destroyExitCode?: number; stderr?: string } = {}
+      options: {
+        destroyExitCode?: number
+        stderr?: string
+        provisionId?: string
+        sender?: { send: (channel: string, event: unknown) => void }
+      } = {}
     ) {
       const userDataPath = makeDir('orca-ephemeral-vm-desktop-user-data-')
       const repoPath = makeDir('orca-ephemeral-vm-desktop-repo-')
@@ -251,10 +256,14 @@ describe('registerEphemeralVmHandlers', () => {
       ])
       registerEphemeralVmHandlers(makeStore(repoPath) as never, pluginService as never)
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument and result types; these are the provision handler's.
-      const provisioned = (await handlers.get('ephemeralVm:provision')?.(null, {
-        repoId: 'repo-1',
-        recipeId: 'desktop-cloud'
-      } as never)) as {
+      const provisioned = (await handlers.get('ephemeralVm:provision')?.(
+        options.sender ? { sender: options.sender } : null,
+        {
+          repoId: 'repo-1',
+          recipeId: 'desktop-cloud',
+          ...(options.provisionId ? { provisionId: options.provisionId } : {})
+        } as never
+      )) as {
         ok: boolean
         stderr: string
         runtime: { id: string; runtimeEnvironmentId?: string }
@@ -309,6 +318,22 @@ describe('registerEphemeralVmHandlers', () => {
       expect(provisioned.ok).toBe(true)
       expect(provisioned.stderr).not.toContain('dummy-pw-77')
       expect(provisioned.stderr).toContain('ready')
+    })
+
+    it('a window that closes mid-provision neither fails the create nor strands its cancel entry', async () => {
+      const send = vi.fn(() => {
+        throw new Error('Object has been destroyed')
+      })
+      const { provisioned } = await provisionWithDesktop(
+        { type: 'orca-server', pairingCode: makePairingCode(), projectRoot: '/workspace/repo' },
+        { stderr: 'pulling image\nstarting\n', provisionId: 'closing-window', sender: { send } }
+      )
+
+      expect(send).toHaveBeenCalled()
+      expect(provisioned.ok).toBe(true)
+      await expect(
+        invokeHandler('ephemeralVm:cancelProvision', { provisionId: 'closing-window' })
+      ).resolves.toEqual({ cancelled: false })
     })
 
     it('configures the SSH-managed server after provisioning', async () => {
