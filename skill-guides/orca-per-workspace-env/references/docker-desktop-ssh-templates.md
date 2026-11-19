@@ -144,10 +144,12 @@ wait_until() { # <tenths of a second> <command...>
   return 1
 }
 
+# Every client of 5901 comes from 127.0.0.1 (the agent and Orca's SSH tunnel alike), so a blacklist
+# could only let the agent lock Orca out; the random password rotates on every resume.
 start_xvnc() {
   "${as_vnc[@]}" Xvnc :1 -localhost -interface 127.0.0.1 -rfbport 5901 -nolisten tcp \
     -SecurityTypes VncAuth -PasswordFile /home/vnc/.vnc/passwd -auth /home/vnc/.Xauthority \
-    -extension XTEST -geometry "$geometry" -depth 24 -desktop orca &
+    -extension XTEST -UseBlacklist 0 -geometry "$geometry" -depth 24 -desktop orca &
   xvnc_pid=$!
   wait_until 100 listener_owned 5901 "$(id -u vnc)" && wait_until 50 test -S /tmp/.X11-unix/X1
 }
@@ -333,7 +335,9 @@ The launcher (`gui`): the handshake and JSON-lines protocol Orca uses for `orca 
 //   -> {"op":"kill","id"}   kills the run's process group
 // A refusal replaces the id and closes: {"error":"bad_token"} or {"error":"<code>"}.
 // `--probe` (doctor and entrypoint): token on stdin, runs `id -un`; prints one JSON result.
-// `--vnc-probe` (doctor): checks that 127.0.0.1:5901 offers only VNC auth and refuses a wrong answer.
+// `--hello-probe` (doctor): sends a hello and checks the first reply is a well-formed challenge.
+// `--vnc-probe` (doctor): checks that 127.0.0.1:5901 offers only VNC auth and refuses a wrong answer;
+// `--vnc-probe hello` stops after the security types and checks they include VNC auth.
 'use strict'
 const net = require('node:net')
 const crypto = require('node:crypto')
@@ -646,12 +650,12 @@ function probe(token) {
           socket.write(
             `${JSON.stringify({ op: 'run', proof: proof(key, 'orca-launcher-client', reply.nonce, broker), argv: ['id', '-un'] })}\n`
           )
-        } else if (typeof reply.error === 'string') {
+        } else if (typeof reply.error === 'string' && !hasRunField(reply)) {
           if (ran) return stop('unverified_run')
           refusal ??= reply.error === 'bad_token' ? 'rejected' : `refused:${reply.error}`
           result.result = refusal
         } else {
-          if (!verified || refusal) return stop('unverified_run')
+          if (!verified || refusal || typeof reply.error === 'string') return stop('unverified_run')
           ran = true
           if (typeof reply.id === 'string') result.result = 'started'
           else if (reply.stream === 'stdout') result.stdout += reply.data
@@ -665,10 +669,58 @@ function probe(token) {
   setTimeout(finish, 10000).unref()
 }
 
+// A frame with any run field is run evidence, even when it also carries an error.
+function hasRunField(reply) {
+  return reply.id !== undefined || reply.stream !== undefined || reply.exit !== undefined
+}
+
+// Prints {"challenge":"ok"} when the listener answers a hello with a nonce and a 64-hex proof.
+function helloProbe() {
+  const socket = net.connect({ host: HOST, port: PORT })
+  const result = { challenge: 'none' }
+  const finish = () => {
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    process.exit(0)
+  }
+  socket.setEncoding('utf8')
+  socket.on('error', () => {
+    result.challenge = 'unreachable'
+    finish()
+  })
+  socket.on('close', finish)
+  socket.on(
+    'data',
+    lineSplitter(
+      (line) => {
+        let reply
+        try {
+          reply = JSON.parse(line)
+        } catch {
+          reply = null
+        }
+        const valid =
+          reply !== null &&
+          typeof reply === 'object' &&
+          typeof reply.nonce === 'string' &&
+          NONCE.test(reply.nonce) &&
+          typeof reply.proof === 'string' &&
+          NONCE.test(reply.proof)
+        result.challenge = valid ? 'ok' : 'malformed'
+        socket.destroy()
+      },
+      () => socket.destroy()
+    )
+  )
+  socket.once('connect', () =>
+    socket.write(`${JSON.stringify({ op: 'hello', nonce: newNonce() })}\n`)
+  )
+  setTimeout(finish, 10000).unref()
+}
+
 // RFB 3.8: the server must offer only VNC authentication (2) and refuse a random response.
-function vncProbe() {
+function vncProbe(helloOnly) {
   const socket = net.connect({ host: HOST, port: VNC_PORT })
-  const result = { types: null, auth: 'unknown' }
+  const result = helloOnly ? { rfb: 'unknown' } : { types: null, auth: 'unknown' }
   let buffer = Buffer.alloc(0)
   let stage = 'version'
   const finish = () => {
@@ -676,20 +728,45 @@ function vncProbe() {
     process.exit(0)
   }
   socket.on('error', () => {
-    result.auth = 'unreachable'
+    if (helloOnly) result.rfb = 'unreachable'
+    else result.auth = 'unreachable'
     finish()
   })
   socket.on('close', finish)
   socket.on('data', (chunk) => {
     buffer = Buffer.concat([buffer, chunk])
     if (stage === 'version' && buffer.length >= 12) {
+      if (!/^RFB 003\.00\d\n$/.test(buffer.subarray(0, 12).toString('latin1'))) {
+        if (helloOnly) result.rfb = 'bad_banner'
+        else result.auth = 'bad_banner'
+        return socket.destroy()
+      }
       buffer = buffer.subarray(12)
       socket.write('RFB 003.008\n')
       stage = 'types'
     }
-    if (stage === 'types' && buffer.length >= 1 && buffer.length >= 1 + buffer[0]) {
-      result.types = [...buffer.subarray(1, 1 + buffer[0])]
+    // No types: the server refused the connection (TigerVNC's blacklist after repeated failures).
+    if (stage === 'types' && buffer.length >= 5 && buffer[0] === 0) {
+      const length = buffer.readUInt32BE(1)
+      if (buffer.length < 5 + length) return
+      const refusal = `connection_refused:${buffer.subarray(5, 5 + length).toString('latin1')}`
+      if (helloOnly) result.rfb = refusal
+      else result.auth = refusal
+      return socket.destroy()
+    }
+    if (
+      stage === 'types' &&
+      buffer.length >= 1 &&
+      buffer[0] > 0 &&
+      buffer.length >= 1 + buffer[0]
+    ) {
+      const types = [...buffer.subarray(1, 1 + buffer[0])]
       buffer = buffer.subarray(1 + buffer[0])
+      if (helloOnly) {
+        result.rfb = types.includes(2) ? 'vnc_auth_offered' : 'no_vnc_auth'
+        return socket.destroy()
+      }
+      result.types = types
       if (!result.types.includes(2)) return socket.destroy()
       socket.write(Buffer.from([2]))
       stage = 'challenge'
@@ -709,7 +786,8 @@ function vncProbe() {
 
 process.umask(0o002)
 if (process.argv[2] === '--probe') readStdinLine().then(probe)
-else if (process.argv[2] === '--vnc-probe') vncProbe()
+else if (process.argv[2] === '--hello-probe') helloProbe()
+else if (process.argv[2] === '--vnc-probe') vncProbe(process.argv[3] === 'hello')
 else serve()
 ```
 
@@ -1350,7 +1428,13 @@ gui_opens_display() {
   dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" timeout 5 xdpyinfo >/dev/null
 }
 # Xvnc holds 5901 as vnc and serves X requests to gui; prints the listener.
-xvnc_control() { listener_inode 5901 vnc && gui_opens_display; }
+display_control() { listener_inode 5901 vnc && gui_opens_display; }
+# The same RFB listener the denial talks to: an RFB 003.00x banner whose security types include
+# VNC auth (2); prints the listener.
+rfb_control() {
+  listener_inode 5901 vnc &&
+    [ "$(as dev /usr/local/bin/orca-desktop-launcher --vnc-probe hello)" = '{"rfb":"vnc_auth_offered"}' ]
+}
 dev_cannot_open_display() { refused 'xdpyinfo:  unable to open display ":1".' dev env DISPLAY=:1 timeout 5 xdpyinfo; }
 dev_cannot_read_cookie() { refused 'cat: /home/gui/.Xauthority: Permission denied' dev cat /home/gui/.Xauthority; }
 dev_cannot_list_x_sockets() {
@@ -1378,9 +1462,13 @@ launcher_refuses_dev() {
 launcher_runs_as_gui_for_root() {
   [ "$(printf '%s\n' "$token" | launcher_probe root)" = '{"result":"started","stdout":"gui\n","exit":0}' ]
 }
-# The launcher holds 5902 as gui and, with the token, runs a program as gui; prints the listener.
+# The launcher holds 5902 as gui and answers a fresh hello with a well-formed challenge; with the
+# token it also runs a program as gui. --container mode has no token (it lives only in the
+# launcher's and the broker's memory), so the challenge is its strongest positive probe.
+# Prints the listener.
 launcher_control() {
-  listener_inode 5902 gui || return 1
+  listener_inode 5902 gui &&
+    [ "$(as dev /usr/local/bin/orca-desktop-launcher --hello-probe)" = '{"challenge":"ok"}' ] || return 1
   [ -z "$token" ] || launcher_runs_as_gui_for_root
 }
 
@@ -1481,11 +1569,11 @@ check users.dev_groups 'dev is only in dev and work (not vnc, gui or xdisplay)' 
 check users.no_sudo 'no sudo and no xdotool in the image' no_sudo_or_xdotool
 check desktop.ports 'VNC (5901) is held by vnc and the launcher (5902) by gui, on loopback only' retried desktop_ports_held
 check display.gui_allowed 'gui opens DISPLAY=:1 with its cookie (control)' retried gui_opens_display
-check display.dev_denied 'dev cannot open DISPLAY=:1 ("unable to open display")' bracketed xvnc_control dev_cannot_open_display
+check display.dev_denied 'dev cannot open DISPLAY=:1 ("unable to open display")' bracketed display_control dev_cannot_open_display
 check display.dev_no_cookie "dev cannot read gui's X cookie (Permission denied)" dev_cannot_read_cookie
 check display.dev_no_socket 'dev cannot list /tmp/.X11-unix (Permission denied)' dev_cannot_list_x_sockets
 check vnc.password_file 'VNC password file is vnc 0600; dev and gui get Permission denied' vnc_password_file_private
-check vnc.wrong_password 'VNC offers only VNC auth and refuses a wrong answer from dev' bracketed xvnc_control vnc_refuses_wrong_answer
+check vnc.wrong_password 'VNC offers only VNC auth and refuses a wrong answer from dev' bracketed rfb_control vnc_refuses_wrong_answer
 check launcher.dev_refused 'from dev: no token is refused, a wrong token fails the handshake' bracketed launcher_control launcher_refuses_dev
 if [ -n "$token" ]; then
   check launcher.with_token 'from root with the token: runs `id -un` as gui' retried launcher_runs_as_gui_for_root

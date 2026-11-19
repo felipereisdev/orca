@@ -87,7 +87,10 @@ VNC server, however, would receive the server's answer to a challenge it chose, 
 offline guess of the 8-character password; if the logs show `Xvnc exited; restarting`, suspend
 and resume the workspace to rotate the password. Programs on the desktop, which the agent can start with
 `orca desktop run`, can observe what the desktop shows and what is typed into it, so never type
-personal secrets into the environment's desktop. Docker Desktop and OrbStack also let containers
+personal secrets into the environment's desktop. Xvnc runs with `-UseBlacklist 0`: every client
+of 5901 comes from 127.0.0.1, the agent and Orca's SSH tunnel alike, so TigerVNC's blacklist could
+not tell them apart and would only let the agent lock the Desktop tab out; the random password
+(about 2^48 choices, rotated on every resume) keeps guessing it online impractical. Docker Desktop and OrbStack also let containers
 reach the Docker host's own services through `host.docker.internal`; keep nothing sensitive
 listening there.
 
@@ -205,13 +208,19 @@ token it runs `id -un` as `gui`; the password and token appear in neither `docke
 can read (the files are streamed to this machine and searched here). Each denial must show its
 expected refusal after a marker proving it ran as that user, so a Docker, SSH or exec error fails
 the check; the launcher probe accepts a run only after the launcher proved the token, and any run
-evidence outweighs a refusal in either order (`unverified_run`); an empty or failed `docker inspect`
+evidence (an id, output or exit, even in the same frame as the refusal) outweighs a refusal in either
+order (`unverified_run`); an empty or failed `docker inspect`
 and a failed `find` fail their checks; and the secrets never enter a process run as `dev` or `gui`.
 The positive controls (the ports, `gui` on the display, the launcher with the token) retry up to
 five times, one second apart, to ride out a supervised restart. Each denial of the display, the
 VNC server or the launcher runs between two passes of its control that name the same listener, so
 a service that is down or an impostor on its port fails the check, and a restart in between makes
-the bracket run again. The process and file scans skip only a process or file that disappeared
+the bracket run again. The display control is `gui` running `xdpyinfo`; the VNC control is an RFB
+handshake on 5901 (an `RFB 003.00x` banner whose security types include VNC authentication); the
+launcher control is the listener owned by `gui` answering a fresh hello with a well-formed
+challenge, plus, after a provision, a run with the token. `--container` mode has no launch probe:
+the token lives only in the launcher's and Orca's memory, so the doctor never has it there. A VNC
+server that refuses the connection is reported as `connection_refused:<reason>`. The process and file scans skip only a process or file that disappeared
 during the scan; any other read error fails. Every check prints its line, then a
 `<n> pass, <n> FAIL, <n> warn` summary; exit status 1 means a check failed.
 
