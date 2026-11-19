@@ -16,12 +16,19 @@ export type EphemeralVmRecipeCleanupPayload = {
   recipeResult?: EphemeralVmRecipeResult
 }
 
+/** For the user to copy: the desktop credentials stay out of clipboards, history and argv. */
 export function buildEphemeralVmRecipeCleanupPayload(args: {
   recipe: Pick<OrcaVmRecipe, 'id'>
   context: EphemeralVmRecipeContext
   recipeResult?: EphemeralVmRecipeResult
 }): EphemeralVmRecipeCleanupPayload {
-  return buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'destroy' })
+  const recipeResult = args.recipeResult && withoutDesktopCredentials(args.recipeResult)
+  return buildEphemeralVmRecipeLifecyclePayload({ ...args, recipeResult, mode: 'destroy' })
+}
+
+function withoutDesktopCredentials(result: EphemeralVmRecipeResult): EphemeralVmRecipeResult {
+  const { desktop: _desktop, ...rest } = result
+  return rest
 }
 
 export function buildEphemeralVmRecipeLifecyclePayload(args: {
