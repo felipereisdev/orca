@@ -38,7 +38,8 @@ const UNREADABLE = Symbol('unreadable')
 /**
  * `listEphemeralVmRuntimes` without blocking the main thread: the same records, read-only. It never
  * migrates or hardens the files; the synchronous store owns every write. `complete` is false when
- * the feature store exists but can't be read, so records may be missing their desktop.
+ * the feature store exists but can't be read or holds a record it can't parse, so a record may be
+ * missing its desktop.
  */
 export async function readEphemeralVmRuntimesAsync(
   userDataPath: string
@@ -59,7 +60,7 @@ export async function readEphemeralVmRuntimesAsync(
     featureText === UNREADABLE
       ? null
       : featureText === null
-        ? { writable: true, features: [] }
+        ? { writable: true, features: [], retainedRecords: [] }
         : parseEphemeralVmRuntimeFeatureStoreText(featureText)
   const features = featureStore?.features ?? []
   let main: EphemeralVmRuntimeRecord[] = []
@@ -87,6 +88,7 @@ export async function readEphemeralVmRuntimesAsync(
     runtimes: [...main, ...writeAhead.filter((entry) => !mainIds.has(entry.id))].sort(
       compareRuntimeRecords
     ),
-    complete: featureStore?.writable === true
+    // A record parse dropped (malformed, or from a newer build) may be one runtime's desktop.
+    complete: featureStore?.writable === true && featureStore.retainedRecords.length === 0
   }
 }

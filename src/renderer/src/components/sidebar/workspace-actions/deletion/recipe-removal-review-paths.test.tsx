@@ -40,14 +40,14 @@ async function settle(): Promise<void> {
   }
 }
 
-/** The review appears with what would be lost; removing hands the destroy the check's ack. */
+/** The review appears with what would be lost; nothing is destroyed until the user removes. */
 async function removeAnywayFromReview(): Promise<void> {
   await settle()
   expect(screen.getByText('5 commits not pushed')).toBeTruthy()
   expect(bridge.ephemeralVm.cleanup).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
   await settle()
-  expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({ runtimeId: 'vm-a', ack: 'ack-unsafe' })
+  expect(bridge.ephemeralVm.confirmRemoval).toHaveBeenCalledWith({ ack: 'ack-unsafe' })
 }
 
 describe('removals outside the delete dialog review recipe work first', () => {
@@ -88,6 +88,87 @@ describe('removals outside the delete dialog review recipe work first', () => {
     await settle()
     fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
     await removeAnywayFromReview()
+    expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({
+      runtimeId: 'vm-a',
+      ack: 'ack-unsafe'
+    })
+  })
+
+  it('cancelling the Cloud VMs review revokes its ack, and a retry reviews again', async () => {
+    render(
+      <TooltipProvider>
+        <EphemeralVmRuntimesSection />
+      </TooltipProvider>
+    )
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await settle()
+    expect(bridge.ephemeralVm.revokeRemoval).toHaveBeenCalledWith({ ack: 'ack-unsafe' })
+    expect(bridge.ephemeralVm.cleanup).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
+    await settle()
+    expect(bridge.ephemeralVm.removalPreflight).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('5 commits not pushed')).toBeTruthy()
+    expect(bridge.ephemeralVm.cleanup).not.toHaveBeenCalled()
+  })
+
+  it('an older provisioned root with no recorded workspace is reviewed in Cloud VMs', async () => {
+    const legacy = recipeRuntime({ id: 'vm-root', sshTargetId: TARGET })
+    bridge = recipeRemovalBridge([legacy])
+    bridge.ephemeralVm.removalPreflight.mockResolvedValue({
+      status: 'unchecked',
+      recordingsNotCopied: [],
+      dirtyFiles: 0,
+      unpushedCommits: 0,
+      reason: 'workspace_unrecorded',
+      ack: 'ack-root'
+    })
+    window.api = bridge.api
+    render(
+      <TooltipProvider>
+        <EphemeralVmRuntimesSection />
+      </TooltipProvider>
+    )
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }))
+    await settle()
+    expect(bridge.ephemeralVm.removalPreflight).toHaveBeenCalledWith({ runtimeId: 'vm-root' })
+    expect(screen.getByText("Couldn't verify this workspace")).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    await settle()
+    expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({
+      runtimeId: 'vm-root',
+      ack: 'ack-root'
+    })
+  })
+
+  it('removing a project by its SSH target reviews the VM even with no workspaces listed', async () => {
+    useAppStore.setState({ worktreesByRepo: {} })
+    void removeSettingsProjectFromAllHosts(
+      [
+        {
+          id: 'setup',
+          projectId: 'project',
+          repoId: 'repo',
+          hostId: HOST,
+          path: '/workspace/repo',
+          displayName: 'repo',
+          setupState: 'ready',
+          setupMethod: 'legacy-repo',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ],
+      useAppStore.getState().removeProject
+    )
+    await removeAnywayFromReview()
+    expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({
+      runtimeId: 'vm-a',
+      ack: 'ack-unsafe'
+    })
   })
 
   it('Settings project removal', async () => {
@@ -109,6 +190,12 @@ describe('removals outside the delete dialog review recipe work first', () => {
       useAppStore.getState().removeProject
     )
     await removeAnywayFromReview()
+    // Main lists the VM's records itself; each is checked by its own id.
+    expect(bridge.ephemeralVm.removalPreflight).toHaveBeenCalledWith({ runtimeId: 'vm-a' })
+    expect(bridge.ephemeralVm.cleanup).toHaveBeenCalledWith({
+      runtimeId: 'vm-a',
+      ack: 'ack-unsafe'
+    })
   })
 
   it('SSH host "Also remove workspaces"', async () => {
@@ -119,5 +206,11 @@ describe('removals outside the delete dialog review recipe work first', () => {
       workspaceCount: 1
     })
     await removeAnywayFromReview()
+    // The decision is held for these removals before any checkout goes.
+    expect(bridge.ephemeralVm.claimRemoval).toHaveBeenCalledWith({
+      hostId: HOST,
+      workspaceId: WORKSPACE,
+      ack: 'ack-unsafe'
+    })
   })
 })

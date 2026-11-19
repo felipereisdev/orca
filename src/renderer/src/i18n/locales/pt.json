@@ -23089,7 +23089,10 @@
       "dirtyFilesCapped_many": "{{count}}+ arquivos com alterações não commitadas",
       "reviewTitle": "Revisar antes de remover",
       "reasonNoOrcaServer": "O ambiente não tem um servidor Orca para consultar, então o trabalho dele não pôde ser verificado.",
-      "reasonStoreUnreadable": "O Orca não conseguiu ler o que salvou sobre este ambiente."
+      "reasonStoreUnreadable": "O Orca não conseguiu ler o que salvou sobre este ambiente.",
+      "reasonWorkspaceUnrecorded": "O Orca nunca registrou qual workspace este ambiente contém, então o trabalho dele não pôde ser verificado.",
+      "workspaceReplaced": "Este workspace foi substituído enquanto era removido. Nada foi apagado.",
+      "removalNotAuthorized": "A remoção foi cancelada ou o ambiente dela mudou. Nada foi apagado."
     }
   },
   "worktree": {

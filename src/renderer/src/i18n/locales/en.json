@@ -24974,7 +24974,10 @@
       "dirtyFilesCapped_other": "{{count}}+ files with uncommitted changes",
       "reviewTitle": "Review before removing",
       "reasonNoOrcaServer": "Its environment has no Orca server to ask, so its work could not be checked.",
-      "reasonStoreUnreadable": "Orca couldn't read what it saved about this environment."
+      "reasonStoreUnreadable": "Orca couldn't read what it saved about this environment.",
+      "reasonWorkspaceUnrecorded": "Orca never recorded which workspace this environment holds, so its work could not be checked.",
+      "workspaceReplaced": "This workspace was replaced while it was being removed. Nothing was deleted.",
+      "removalNotAuthorized": "The removal was cancelled or its environment changed. Nothing was deleted."
     }
   },
   "worktree": {

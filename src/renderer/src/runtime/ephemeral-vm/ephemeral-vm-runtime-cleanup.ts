@@ -5,13 +5,15 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host/execution-host'
 import { composeWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
-import { recipeRuntimeHostIds, takeRecipeRemovalAck } from './recipe-removal-ack-registry'
+import { reviewRecipeRemoval } from './recipe-removal-preflights'
 import { refreshRuntimeEnvironmentCatalog } from '@/runtime/rpc/environment-revisions/runtime-environment-pairing-refresh'
 
 /** Destroy runtimes for removed workspaces and runtime-owned SSH targets. Share with project removal because SSH-mode main worktrees delete through that path; classify targets so callers purge only confirmed destruction. */
 export type EphemeralVmCleanupSummary = {
   destroyedSshTargetIds: string[]
   retainedSshTargetIds: string[]
+  /** The user cancelled the review: nothing was destroyed. */
+  cancelled?: boolean
 }
 
 export async function cleanupEphemeralVmRuntimesForDeleted(args: {
@@ -23,6 +25,11 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
   }[]
   // Also destroy runtimes pinned to these raw SSH target IDs even without a matching workspace.
   runtimeOwnedSshTargetIds?: readonly string[]
+  /**
+   * Check (and review) each matched runtime by its own record before destroying it, for removals
+   * that never deleted a checkout. Otherwise main destroys only what a removal claimed.
+   */
+  review?: boolean
 }): Promise<EphemeralVmCleanupSummary> {
   const destroyedSshTargetIds = new Set<string>()
   const retainedSshTargetIds = new Set<string>()
@@ -58,13 +65,26 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
                 )))) ||
           (runtime.sshTargetId !== undefined && sshTargetIdSet.has(runtime.sshTargetId)))
     )
+    // Main lists these records itself, so an empty workspace list never skips a check.
+    const acks = args.review
+      ? await reviewRecipeRemoval(
+          matchingRuntimes.map((runtime) => ({
+            key: runtime.id,
+            request: { runtimeId: runtime.id },
+            displayName: runtime.workspaceName ?? runtime.recipe?.name ?? runtime.id
+          }))
+        )
+      : new Map<string, string>()
+    if (!acks) {
+      return { destroyedSshTargetIds: [], retainedSshTargetIds: [], cancelled: true }
+    }
     let releasedServer = false
     for (const runtime of matchingRuntimes) {
       try {
-        // Only the ack a removal check issued lets main destroy an environment that became a workspace.
+        // Main destroys a workspace's environment only with a reviewed ack or a removal's claim.
         const cleaned = await window.api.ephemeralVm.cleanup({
           runtimeId: runtime.id,
-          ack: takeRecipeRemovalAck(recipeRuntimeHostIds(runtime), runtime.workspaceId)
+          ack: acks.get(runtime.id) ?? ''
         })
         releasedServer ||=
           runtime.runtimeEnvironmentId !== undefined || runtime.sshTargetId !== undefined

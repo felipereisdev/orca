@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import { countOpenRepoTerminalTabs } from '@/store/repos/repo-removal'
 import { worktreeBelongsToHost } from '@/store/repos/repo-host-identity'
 import { getRecipeVmSshTargetForHost } from '@/runtime/ephemeral-vm/recipe-vm-managed-host'
 import { RemovalUnsavedFilesNotice } from './RemovalUnsavedFilesNotice'
-import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 import { confirmUnsavedDiscard } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
 import { projectRemovalTargets } from './removal-unsaved-files'
 import {
@@ -82,18 +81,6 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
       ),
     [detectedWorktreesByRepo, hostId, repoId, worktreesByRepo]
   )
-
-  // Removing the project destroys its recipe VM, so every workspace on it is checked first.
-  const recipeTargets = useMemo(
-    () =>
-      isOpen && onRecipeVmServer && hostId
-        ? (worktreesByRepo[repoId] ?? []).filter((worktree) =>
-            worktreeBelongsToHost(worktree, hostId)
-          )
-        : null,
-    [hostId, isOpen, onRecipeVmServer, repoId, worktreesByRepo]
-  )
-  const [copyingRecordings, setCopyingRecordings] = useState(false)
 
   // The main checkout is the project itself; every other row on this host leaves Orca with it (#17645).
   const linkedWorkspaceCount = useMemo(
@@ -167,21 +154,16 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!open && !copyingRecordings) {
+      if (!open) {
         closeModal()
       }
     },
-    [closeModal, copyingRecordings]
+    [closeModal]
   )
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent
-        surface="security"
-        className="max-w-sm sm:max-w-sm"
-        showCloseButton={false}
-        busy={copyingRecordings}
-      >
+      <DialogContent surface="security" className="max-w-sm sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="text-sm">
             {t('auto.components.sidebar.RemoveFolderDialog.b79b39d865', 'Remove Project')}
@@ -199,20 +181,14 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
           ) : null}
         </DialogHeader>
         <RemovalUnsavedFilesNotice targets={unsavedTargets} enabled={isOpen} />
-        <RecipeRemovalPreflightGate
-          targets={recipeTargets}
-          onRemove={handleConfirm}
-          onBusyChange={setCopyingRecordings}
-        >
-          <DialogFooter>
-            <Button variant="outline" onClick={() => handleOpenChange(false)}>
-              {t('auto.components.sidebar.RemoveFolderDialog.d36883e046', 'Cancel')}
-            </Button>
-            <Button variant="destructive" onClick={handleConfirm}>
-              {t('auto.components.sidebar.RemoveFolderDialog.4dc5b5065b', 'Remove')}
-            </Button>
-          </DialogFooter>
-        </RecipeRemovalPreflightGate>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            {t('auto.components.sidebar.RemoveFolderDialog.d36883e046', 'Cancel')}
+          </Button>
+          <Button variant="destructive" onClick={handleConfirm}>
+            {t('auto.components.sidebar.RemoveFolderDialog.4dc5b5065b', 'Remove')}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

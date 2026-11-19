@@ -10,7 +10,9 @@ import type {
 import type { EphemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import type { PendingVmCheckout } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
 import type {
+  RecipeRemovalCheckRequest,
   RecipeRemovalCheckResult,
+  RecipeRemovalClaimResult,
   RecipeRemovalCopyResult,
   RecipeRemovalTarget
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
@@ -89,7 +91,15 @@ export type EphemeralVmApi = {
   cleanup: (args: { runtimeId: string; ack: string }) => Promise<EphemeralVmRuntimeRecord>
   stopCleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
   /** What removing a recipe workspace would lose; null when the check does not apply. */
-  removalPreflight: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCheckResult | null>
+  removalPreflight: (args: RecipeRemovalCheckRequest) => Promise<RecipeRemovalCheckResult | null>
+  /** The user chose to remove after an unsafe or unchecked answer; false when the ack is gone. */
+  confirmRemoval: (args: { ack: string }) => Promise<boolean>
+  /** Cancel or close: the answer's ack authorizes nothing afterwards. */
+  revokeRemoval: (args: { ack: string }) => Promise<void>
+  /** Right before deleting the checkout: holds the environment for this removal's destroy. */
+  claimRemoval: (args: RecipeRemovalTarget & { ack: string }) => Promise<RecipeRemovalClaimResult>
+  /** The ack a failed create's rollback needs; empty unless main knows it never held a workspace. */
+  rollbackRemovalAck: (args: { runtimeId: string }) => Promise<string>
   /** Copies its pending recordings to this Mac; only `ok: true` may be followed by the removal. */
   copyRecordingsBeforeRemoval: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCopyResult>
   /** Drops an interrupted write-ahead record that never received a recipe result. */

@@ -9,20 +9,24 @@ import type {
   RecipeRemovalCopyResult,
   RecipeRemovalPreflight
 } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
-import type { RecipeRemovalCandidate } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 
 const WORKSPACE = 'repo::/workspace/repo-task'
 const OTHER = 'repo::/workspace/repo-other'
 const REC = { id: 'aaaaaaaaaaaaaaaa', path: '/rec/rec-aaaaaaaaaaaaaaaa.mp4', bytes: 10 }
-const TASK: RecipeRemovalCandidate = { id: WORKSPACE, hostId: 'runtime:env-a', displayName: 'task' }
-const OTHER_TASK: RecipeRemovalCandidate = {
+const TASK = { id: WORKSPACE, hostId: 'runtime:env-a', displayName: 'task' }
+const OTHER_TASK = {
   id: OTHER,
   hostId: 'runtime:env-a',
   displayName: 'other'
 }
 
+type Workspace = { id: string; hostId: string; displayName: string }
+
 const api = {
+  confirmRemoval: vi.fn(async () => true),
+  revokeRemoval: vi.fn(async () => {}),
+  claimRemoval: vi.fn(async () => ({ ok: true as const, required: true as const })),
   removalPreflight: vi.fn<(args: unknown) => Promise<RecipeRemovalCheckResult | null>>(),
   copyRecordingsBeforeRemoval: vi.fn<(args: unknown) => Promise<RecipeRemovalCopyResult>>()
 }
@@ -65,7 +69,7 @@ function preflight(overrides: Partial<RecipeRemovalPreflight>): RecipeRemovalChe
 }
 
 function Harness(props: {
-  targets: readonly RecipeRemovalCandidate[] | null
+  targets: readonly Workspace[] | null
   onRemove: () => void
   onBusyChange?: (busy: boolean) => void
 }) {
@@ -80,7 +84,7 @@ function Harness(props: {
   )
 }
 
-async function renderGate(targets: readonly RecipeRemovalCandidate[] = [TASK], onRemove = vi.fn()) {
+async function renderGate(targets: readonly Workspace[] = [TASK], onRemove = vi.fn()) {
   const view = render(<Harness targets={targets} onRemove={onRemove} />)
   await act(async () => {})
   return { onRemove, view }
@@ -214,7 +218,12 @@ describe('RecipeRemovalPreflightGate', () => {
     expect(screen.getByText("The environment didn't answer in time.")).toBeTruthy()
     expect(screen.queryByText('Current footer')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Copy recordings and remove' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    })
+    // "Remove anyway" makes the undecided answers usable, then holds them for this removal.
+    expect(api.confirmRemoval).toHaveBeenCalled()
+    expect(api.claimRemoval).toHaveBeenCalled()
     expect(onRemove).toHaveBeenCalledTimes(1)
   })
 
@@ -237,7 +246,12 @@ describe('RecipeRemovalPreflightGate', () => {
     expect(screen.getByText("other — Couldn't verify this workspace")).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Copy recordings and remove' })).toBeNull()
     expect(screen.queryByText('Current footer')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove anyway' }))
+    })
+    // "Remove anyway" makes the undecided answers usable, then holds them for this removal.
+    expect(api.confirmRemoval).toHaveBeenCalled()
+    expect(api.claimRemoval).toHaveBeenCalled()
     expect(onRemove).toHaveBeenCalledTimes(1)
   })
 })

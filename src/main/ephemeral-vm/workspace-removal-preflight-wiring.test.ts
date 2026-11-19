@@ -66,6 +66,35 @@ function seed(id: string, environmentId: string | null): void {
   })
 }
 
+/** A provisioned root adopted before workspaces were recorded on the runtime. */
+function seedLegacyRoot(id: string, environmentId: string): void {
+  const parsed = parseEphemeralVmRecipeResult(
+    JSON.stringify({
+      schemaVersion: 2,
+      checkoutMode: 'provisioned-root',
+      connection: {
+        type: 'ssh',
+        projectRoot: '/workspace/repo',
+        target: { label: 'VM', host: 'vm.example.com', port: 22, username: 'root' }
+      }
+    })
+  )
+  if (!parsed.ok) {
+    throw new Error('fixture recipe result did not parse')
+  }
+  upsertEphemeralVmRuntime(mocks.userData, {
+    id,
+    recipeId: 'cloud',
+    repoId: 'repo',
+    runtimeEnvironmentId: environmentId,
+    status: 'running',
+    cleanupStatus: 'not_started',
+    createdAt: 3,
+    updatedAt: 1,
+    recipeResult: parsed.result
+  })
+}
+
 function invoke(channel: string, args: unknown): Promise<unknown> {
   const handler = mocks.handlers.get(channel)
   if (!handler) {
@@ -133,6 +162,28 @@ describe('recipe removal preflight wiring', () => {
       ack: expect.any(String)
     })
     expect(mocks.call).not.toHaveBeenCalled()
+  })
+
+  it('a feature record the parser drops is unchecked, never a desktop-free clean', async () => {
+    seed('vm-a', 'env-a')
+    writeFileSync(
+      getEphemeralVmRuntimeFeatureStorePath(mocks.userData),
+      JSON.stringify({ version: 1, records: [{ kind: 'desktop', runtimeId: 'vm-a' }] })
+    )
+    await expect(
+      invoke('ephemeralVm:removalPreflight', { hostId: 'runtime:env-a', workspaceId: WORKSPACE })
+    ).resolves.toMatchObject({ status: 'unchecked', reason: 'store_unreadable' })
+  })
+
+  it('an older provisioned root with no recorded workspace is unchecked when named by id', async () => {
+    seedLegacyRoot('vm-root', 'env-a')
+    await expect(
+      invoke('ephemeralVm:removalPreflight', { runtimeId: 'vm-root' })
+    ).resolves.toMatchObject({
+      status: 'unchecked',
+      reason: 'workspace_unrecorded',
+      ack: expect.any(String)
+    })
   })
 
   it('an owner with no Orca server to ask is unchecked, not skipped', async () => {

@@ -1,7 +1,8 @@
-import { useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
 import {
   recipeRemovalCandidates,
+  revokeRecipeRemovalAcks,
   runRecipeRemovalPreflights,
   type RecipeRemovalCandidate,
   type RecipeRemovalResult
@@ -10,44 +11,60 @@ import {
 export type RecipeRemovalCheck =
   | { kind: 'skip' }
   | { kind: 'loading' }
-  | { kind: 'done'; results: RecipeRemovalResult[] }
+  | { kind: 'done'; candidates: RecipeRemovalCandidate[]; results: RecipeRemovalResult[] }
+
+type Workspace = { id: string; hostId?: string | null; displayName: string }
 
 /**
- * Asks the host what removing these workspaces would lose, once per opening. With no recipe
- * workspace among them, or the experiment off, the check is skipped and the dialog stays as today.
+ * Asks main what removing these workspaces would lose, once per opening (and again on `refresh`).
+ * The answers' acks live only while this check is shown: a new target or closing revokes them.
  */
-export function useRecipeRemovalPreflight(
-  targets: readonly RecipeRemovalCandidate[] | null
-): RecipeRemovalCheck {
+export function useRecipeRemovalPreflight(targets: readonly Workspace[] | null): {
+  check: RecipeRemovalCheck
+  refresh: () => void
+} {
   const settings = useAppStore((s) => s.settings)
   const candidates = useMemo(
     () => (targets ? recipeRemovalCandidates({ settings }, targets) : []),
     [settings, targets]
   )
-  // Settings refreshes rebuild the array; only a different set of workspaces asks again.
-  const key = candidates.map((candidate) => `${candidate.hostId}\0${candidate.id}`).join('\n')
+  const [generation, setGeneration] = useState(0)
+  const key =
+    candidates.length > 0 ? `${generation}\n${candidates.map((c) => c.key).join('\n')}` : ''
   const [answer, setAnswer] = useState<{ key: string; results: RecipeRemovalResult[] } | null>(null)
   const ask = useEffectEvent(() => runRecipeRemovalPreflights(candidates))
+  const refresh = useCallback(() => setGeneration((value) => value + 1), [])
 
   useEffect(() => {
     if (!key) {
       return undefined
     }
     let current = true
+    let received: RecipeRemovalResult[] = []
     void ask().then((results) => {
+      received = results
       if (current) {
         setAnswer({ key, results })
+      } else {
+        revokeRecipeRemovalAcks(results)
       }
     })
     return () => {
       current = false
-      // A later opening asks again instead of showing this answer.
+      // Closing or a new check: these answers authorize nothing afterwards.
+      revokeRecipeRemovalAcks(received)
       setAnswer(null)
     }
   }, [key])
 
   if (!key) {
-    return { kind: 'skip' }
+    return { check: { kind: 'skip' }, refresh }
   }
-  return answer?.key === key ? { kind: 'done', results: answer.results } : { kind: 'loading' }
+  return {
+    check:
+      answer?.key === key
+        ? { kind: 'done', candidates, results: answer.results }
+        : { kind: 'loading' },
+    refresh
+  }
 }

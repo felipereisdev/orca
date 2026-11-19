@@ -23,7 +23,7 @@ export function RecipeRemovalReviewDialog(): JSX.Element | null {
       open
       onOpenChange={(open) => {
         if (!open && !copying) {
-          review.settle(false)
+          review.settle(null)
         }
       }}
     >
@@ -36,7 +36,7 @@ export function RecipeRemovalReviewDialog(): JSX.Element | null {
         <RecipeRemovalResultsPanel
           results={review.results}
           single={review.single}
-          onRemove={() => review.settle(true)}
+          onRemove={(acks) => review.settle(acks)}
           onBusyChange={setCopying}
         />
       </DialogContent>

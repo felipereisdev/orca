@@ -13,6 +13,8 @@ export type RecipeRemovalPreflightReason =
   | 'no_orca_server'
   /** The host's own record of the environment could not be read. */
   | 'store_unreadable'
+  /** An older provisioned root never recorded which workspace it holds. */
+  | 'workspace_unrecorded'
 
 export type RecipeRemovalRecording = { id: string; path: string; bytes: number }
 
@@ -47,3 +49,14 @@ export type RecipeRemovalCopyResult =
 
 /** The workspace as the desktop names it: the host decides which recipe runtime owns it. */
 export type RecipeRemovalTarget = { hostId: string; workspaceId: string }
+
+/** What a removal check can be asked about: a workspace, or a runtime record by id. */
+export type RecipeRemovalCheckRequest = RecipeRemovalTarget | { runtimeId: string }
+
+/** A removal about to delete a checkout holds the workspace's environment for its destroy. */
+export type RecipeRemovalClaimResult =
+  /** No recipe environment behind this workspace: nothing to hold. */
+  | { ok: true; required: false }
+  | { ok: true; required: true }
+  /** Undecided, expired, or the workspace now belongs to another environment record. */
+  | { ok: false; reason: 'unconfirmed' | 'replaced' }

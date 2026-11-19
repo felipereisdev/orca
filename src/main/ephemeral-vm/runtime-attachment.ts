@@ -1,3 +1,4 @@
+import { forgetUnattachedProvision } from './unattached-provisions'
 import {
   listEphemeralVmRuntimes,
   updateEphemeralVmRuntimeStatus
@@ -22,6 +23,7 @@ export function attachEphemeralVmRuntimeToWorkspace(args: {
   if (['cleanup_pending', 'cleanup_failed', 'cleaned'].includes(runtime.status)) {
     throw new Error(`Cannot attach cleaned ephemeral VM runtime: ${args.runtimeId}`)
   }
+  forgetUnattachedProvision(args.runtimeId)
   return updateEphemeralVmRuntimeStatus(args.userDataPath, args.runtimeId, {
     status: 'running',
     workspaceId: args.workspaceId

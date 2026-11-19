@@ -1670,6 +1670,7 @@
     "workspaceDeletion.recipeCheck.reasonStoreUnreadable",
     "workspaceDeletion.recipeCheck.reasonTimeout",
     "workspaceDeletion.recipeCheck.reasonUnreachable",
+    "workspaceDeletion.recipeCheck.reasonWorkspaceUnrecorded",
     "workspaceDeletion.recipeCheck.recordingsNotCopied",
     "workspaceDeletion.recipeCheck.removeAnyway",
     "workspaceDeletion.recipeCheck.reviewTitle",

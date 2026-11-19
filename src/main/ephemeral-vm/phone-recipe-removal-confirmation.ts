@@ -2,6 +2,7 @@ import { RecipeWorkspaceRemovalError } from '../../shared/remote-runtime/ephemer
 import type { RecipeRemovalTarget } from '../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 import type { DesktopSettingsSource } from './desktop-configure'
 import { checkRecipeRemoval } from './workspace-removal-preflight-wiring'
+import { claimRecipeRemoval } from './recipe-removal-ack-handlers'
 
 /**
  * A phone's delete sheet can't show what a removal would lose, so it may only remove a recipe
@@ -18,7 +19,11 @@ export async function confirmPhoneRecipeRemoval(
     return ''
   }
   if (result.status === 'clean') {
-    return result.ack
+    // Held for the whole removal: deleting the checkout and polling it can outlast the check.
+    const claim = await claimRecipeRemoval(store, userDataPath, { ack: result.ack, ...target })
+    if (claim.ok) {
+      return result.ack
+    }
   }
   throw new RecipeWorkspaceRemovalError(
     'recipe_removal_unconfirmed',

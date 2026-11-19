@@ -4,7 +4,11 @@ import {
   toSshExecutionHostId
 } from '../../../../../shared/execution-host/execution-host'
 import { useAppStore } from '@/store'
-import { confirmRecipeRemoval } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
+import {
+  claimRecipeRemovalAcks,
+  recipeRemovalCandidates,
+  reviewRecipeRemoval
+} from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { runEnclosingWorktreeRemoval } from '@/store/workspaces/selection/active-worktree-deselection-intent'
 import type { SshHostRemoveResolution } from './ssh-host-remove-resolution'
 
@@ -23,8 +27,12 @@ async function clearSshHostWorkspacesImpl(
   // Pin removals to this SSH target so a same-path local checkout cannot be deleted.
   const hostId = toSshExecutionHostId(resolution.targetId)
   // A recipe VM behind this host loses these workspaces' work; the user sees it before anything goes.
-  const candidates = resolution.workspaceWorktreeIds.map((id) => ({ id, hostId, displayName: id }))
-  if (!(await confirmRecipeRemoval(store, candidates))) {
+  const candidates = recipeRemovalCandidates(
+    store,
+    resolution.workspaceWorktreeIds.map((id) => ({ id, hostId, displayName: id }))
+  )
+  const acks = candidates.length > 0 ? await reviewRecipeRemoval(candidates) : new Map()
+  if (!acks || !(await claimRecipeRemovalAcks(candidates, acks))) {
     return { failedIds: [...resolution.workspaceWorktreeIds, ...resolution.hostRepoIds] }
   }
   for (const worktreeId of resolution.workspaceWorktreeIds) {

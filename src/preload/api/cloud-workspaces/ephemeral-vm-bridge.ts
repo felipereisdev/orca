@@ -33,6 +33,10 @@ export const ephemeralVmApi = {
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
   removalPreflight: (args) => ipcRenderer.invoke('ephemeralVm:removalPreflight', args),
+  confirmRemoval: (args) => ipcRenderer.invoke('ephemeralVm:confirmRemoval', args),
+  revokeRemoval: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemoval', args),
+  claimRemoval: (args) => ipcRenderer.invoke('ephemeralVm:claimRemoval', args),
+  rollbackRemovalAck: (args) => ipcRenderer.invoke('ephemeralVm:rollbackRemovalAck', args),
   copyRecordingsBeforeRemoval: (args) =>
     ipcRenderer.invoke('ephemeralVm:copyRecordingsBeforeRemoval', args),
   forgetRuntime: (args) => ipcRenderer.invoke('ephemeralVm:forgetRuntime', args),

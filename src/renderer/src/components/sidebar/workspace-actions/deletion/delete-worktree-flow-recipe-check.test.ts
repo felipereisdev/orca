@@ -41,7 +41,7 @@ function preflight(status: RecipeRemovalCheckResult['status']): RecipeRemovalChe
 }
 
 async function settle(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 30; i += 1) {
     await Promise.resolve()
   }
 }
@@ -49,7 +49,15 @@ async function settle(): Promise<void> {
 describe("recipe check when deletes skip confirmation (Don't ask again)", () => {
   beforeEach(() => {
     originalApi = window.api
-    window.api = { ...window.api, ephemeralVm: { ...window.api?.ephemeralVm, removalPreflight } }
+    window.api = {
+      ...window.api,
+      ephemeralVm: {
+        ...window.api?.ephemeralVm,
+        removalPreflight,
+        revokeRemoval: async () => {},
+        claimRemoval: async () => ({ ok: true, required: true })
+      }
+    }
     removalPreflight.mockReset()
     mocks.deleteWithToast.mockClear()
     mocks.deleteInParallel.mockClear()

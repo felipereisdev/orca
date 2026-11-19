@@ -273,6 +273,8 @@ describe('registerEphemeralVmHandlers', () => {
       if (!checked?.ack) {
         throw new Error('the removal check issued no ack')
       }
+      // The fake environment answers no git check, so the answer waits for "Remove anyway".
+      await invokeHandler('ephemeralVm:confirmRemoval', { ack: checked.ack })
       return checked.ack
     }
 
@@ -447,6 +449,23 @@ describe('registerEphemeralVmHandlers', () => {
         ).resolves.toMatchObject({
           status: 'cleaned'
         })
+      })
+
+      it('a cancelled review revokes its ack, so a retry needs a new decision', async () => {
+        const { provisioned } = await provisionAttached()
+        const checked = await invokeHandler<{ status: string; ack: string }>(
+          'ephemeralVm:removalPreflight',
+          { runtimeId: provisioned.runtime.id }
+        )
+        expect(checked.status).toBe('unchecked')
+        // Undecided: the answer alone authorizes nothing.
+        await expect(cleanup(provisioned.runtime.id, checked.ack)).rejects.toThrow('not confirmed')
+        await invokeHandler('ephemeralVm:revokeRemoval', { ack: checked.ack })
+        await expect(
+          invokeHandler('ephemeralVm:confirmRemoval', { ack: checked.ack })
+        ).resolves.toBe(false)
+        await expect(cleanup(provisioned.runtime.id, checked.ack)).rejects.toThrow('not confirmed')
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
       })
 
       it('a failed destroy restarts the sync and its ack cannot be reused', async () => {

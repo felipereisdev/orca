@@ -1,6 +1,9 @@
 import { vi } from 'vitest'
 import type { EphemeralVmRuntimeRecord } from '../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
-import type { RecipeRemovalCheckResult } from '../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import type {
+  RecipeRemovalCheckResult,
+  RecipeRemovalClaimResult
+} from '../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 
 /** A recipe VM's runtime record, attached to a workspace. */
 export function recipeRuntime(
@@ -32,7 +35,14 @@ export const UNSAFE_CHECK: RecipeRemovalCheckResult = {
  */
 export function recipeRemovalBridge(runtimes: EphemeralVmRuntimeRecord[]) {
   const ephemeralVm = {
-    removalPreflight: vi.fn(async () => UNSAFE_CHECK),
+    removalPreflight: vi.fn(async (_request: unknown) => UNSAFE_CHECK),
+    confirmRemoval: vi.fn(async (_args: { ack: string }) => true),
+    revokeRemoval: vi.fn(async (_args: { ack: string }) => {}),
+    claimRemoval: vi.fn(async (_args: unknown): Promise<RecipeRemovalClaimResult> => ({
+      ok: true,
+      required: true
+    })),
+    rollbackRemovalAck: vi.fn(async () => ''),
     copyRecordingsBeforeRemoval: vi.fn(),
     listRuntimes: vi.fn(async () => runtimes),
     cleanup: vi.fn(async (args: { runtimeId: string; ack: string }) => ({

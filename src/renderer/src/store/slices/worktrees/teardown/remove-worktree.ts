@@ -37,6 +37,7 @@ import {
 import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-prune'
 import { retireRemovedWorktreeCommitDrafts } from '@/lib/source-control/drafts/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
+import { authorizeWorktreeRemoval } from './recipe-workspace-removal-authorization'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
 import {
   captureWorktreeStateBeforeRemoval,
@@ -118,6 +119,7 @@ export function createRemoveWorktree(
       if (unprovableRemoteRouting) {
         throw new Error(unprovableRemoteRouting)
       }
+      await authorizeWorktreeRemoval(get, removalTarget, worktreeBeforeRemoval)
       let removalResult: RemoveWorktreeResult
       let snapshotPruneHandledByLocalMain = policy.forgetLocalOnly || target.kind === 'local'
       try {

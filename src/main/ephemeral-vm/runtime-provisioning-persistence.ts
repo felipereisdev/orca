@@ -1,3 +1,4 @@
+import { noteUnattachedProvision } from './unattached-provisions'
 import { toEphemeralVmRuntimeRecipeSnapshot } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-timeouts'
 import { randomUUID } from 'node:crypto'
 import { assertEphemeralVmRuntimeCheckoutModeCanPersist } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
@@ -118,13 +119,17 @@ export async function persistProvisionedEphemeralVmRuntime(
 ): Promise<EphemeralVmRuntimeRecord> {
   const connection = getEphemeralVmRecipeResultConnection(start.result)
   try {
-    return upsertEphemeralVmRuntime(args.userDataPath, {
+    const runtime = upsertEphemeralVmRuntime(args.userDataPath, {
       ...baseRuntimeRecord(args, writeAhead),
       status: 'running',
       connectionMode: connection.type,
       updatedAt: args.now ?? Date.now(),
       recipeResult: start.result
     })
+    if (!runtime.workspaceId) {
+      noteUnattachedProvision(runtime.id)
+    }
+    return runtime
   } catch (error) {
     if (args.recipe.checkoutMode) {
       const cleaned = await cleanupFailedEphemeralVmStart(args, {

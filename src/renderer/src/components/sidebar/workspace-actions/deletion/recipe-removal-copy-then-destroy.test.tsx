@@ -61,6 +61,12 @@ function bridge(): typeof window.api {
         updatedAt: 1
       }
     ]),
+    confirmRemoval: vi.fn(async () => true),
+    revokeRemoval: vi.fn(async () => {}),
+    claimRemoval: vi.fn(async (args: { ack: string }) => {
+      mocks.order.push(`claim:${args.ack}`)
+      return { ok: true, required: true }
+    }),
     cleanup: vi.fn(async (args: { ack: string }) => {
       mocks.order.push(`destroy:${args.ack}`)
       return {}
@@ -133,8 +139,8 @@ describe('copy recordings and remove, through the real removal', () => {
   it('copies the recordings before the environment is destroyed', async () => {
     copyResult = { ok: true, copied: 1, ack: 'ack-copy' }
     await copyAndRemove()
-    // The destroy spends the ack the copy returned, proving nothing was left pending.
-    expect(mocks.order).toEqual(['copy', 'worktree.rm', 'destroy:ack-copy'])
+    // The copy's ack is claimed for this removal before the checkout goes; the destroy spends it.
+    expect(mocks.order).toEqual(['copy', 'claim:ack-copy', 'claim:', 'worktree.rm', 'destroy:'])
   })
 
   it('a failed copy never destroys the environment', async () => {

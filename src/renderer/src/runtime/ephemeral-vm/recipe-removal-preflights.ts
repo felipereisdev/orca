@@ -1,18 +1,22 @@
 import type { AppState } from '@/store/types'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host/execution-host'
 import type {
+  RecipeRemovalCheckRequest,
   RecipeRemovalCheckResult,
   RecipeRemovalTarget
 } from '../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
-import { hasFreshRecipeRemovalAck, rememberRecipeRemovalAck } from './recipe-removal-ack-registry'
 import { requestRecipeRemovalReview } from './recipe-removal-review'
 
-/** A workspace about to be removed, as the delete flows hold it. */
-export type RecipeRemovalCandidate = { id: string; hostId?: string | null; displayName: string }
+/** A workspace (or a runtime record) a removal would destroy, as the flows name it. */
+export type RecipeRemovalCandidate = {
+  /** Stable for React keys and for matching answers to candidates. */
+  key: string
+  request: RecipeRemovalCheckRequest
+  displayName: string
+}
 
 export type RecipeRemovalResult = {
   candidate: RecipeRemovalCandidate
-  target: RecipeRemovalTarget
   preflight: RecipeRemovalCheckResult
 }
 
@@ -26,87 +30,150 @@ const BRIDGE_FAILED: RecipeRemovalCheckResult = {
   ack: ''
 }
 
-type HostedCandidate = RecipeRemovalCandidate & { hostId: string }
+export function workspaceCandidate(
+  target: RecipeRemovalTarget,
+  displayName: string
+): RecipeRemovalCandidate {
+  return { key: `${target.hostId}\0${target.workspaceId}`, request: target, displayName }
+}
 
 /**
- * The workspaces to ask the host about: every one on another host, since only main knows which a
+ * The workspaces to ask main about: every one on another host, since only main knows which a
  * recipe owns (and it refuses to destroy one nobody checked). Nothing while the experiment is off.
  */
 export function recipeRemovalCandidates(
   state: Pick<AppState, 'settings'>,
-  candidates: readonly RecipeRemovalCandidate[]
-): HostedCandidate[] {
+  workspaces: readonly { id: string; hostId?: string | null; displayName: string }[]
+): RecipeRemovalCandidate[] {
   if (state.settings?.experimentalEphemeralVms !== true) {
     return []
   }
-  return candidates.flatMap((candidate) =>
-    candidate.hostId && candidate.hostId !== LOCAL_EXECUTION_HOST_ID
-      ? [{ ...candidate, hostId: candidate.hostId }]
+  return workspaces.flatMap((workspace) =>
+    workspace.hostId && workspace.hostId !== LOCAL_EXECUTION_HOST_ID
+      ? [
+          workspaceCandidate(
+            { hostId: workspace.hostId, workspaceId: workspace.id },
+            workspace.displayName
+          )
+        ]
       : []
   )
 }
 
-/** Asks the host about each candidate and keeps the acks it issues for the destroys that follow. */
+/** Asks main about each candidate; those no recipe owns drop out of the answer. */
 export async function runRecipeRemovalPreflights(
-  candidates: readonly HostedCandidate[]
+  candidates: readonly RecipeRemovalCandidate[]
 ): Promise<RecipeRemovalResult[]> {
   const answers = await Promise.all(
     candidates.map(async (candidate): Promise<RecipeRemovalResult | null> => {
-      const target = { hostId: candidate.hostId, workspaceId: candidate.id }
       const preflight = await window.api.ephemeralVm
-        .removalPreflight(target)
+        .removalPreflight(candidate.request)
         .catch(() => BRIDGE_FAILED)
-      if (!preflight) {
-        return null
-      }
-      rememberRecipeRemovalAck(target, preflight.ack)
-      return { candidate, target, preflight }
+      return preflight ? { candidate, preflight } : null
     })
   )
   return answers.filter((answer): answer is RecipeRemovalResult => answer !== null)
 }
 
+/** Cancel or close: none of these answers may authorize a removal afterwards. */
+export function revokeRecipeRemovalAcks(results: readonly RecipeRemovalResult[]): void {
+  for (const { preflight } of results) {
+    if (preflight.ack) {
+      void window.api.ephemeralVm.revokeRemoval({ ack: preflight.ack }).catch(() => {})
+    }
+  }
+}
+
+/** The acks a decision to remove hands on, keyed by candidate. */
+export type RecipeRemovalAcks = ReadonlyMap<string, string>
+
 /**
- * For removals that run without the delete dialog: checks the workspaces not yet acknowledged and,
- * when anything isn't clean, asks the user in the review dialog. True when the removal may go on.
+ * Checks these candidates and, when anything isn't clean, shows the review. Resolves the acks the
+ * removal may spend (clean ones as issued, the rest confirmed by "Remove anyway"), or null when the
+ * user cancelled, in which case every ack was revoked.
  */
-export async function confirmRecipeRemoval(
-  state: Pick<AppState, 'settings'>,
+export async function reviewRecipeRemoval(
   candidates: readonly RecipeRemovalCandidate[]
-): Promise<boolean> {
-  const asked = recipeRemovalCandidates(state, candidates).filter(
-    (candidate) =>
-      !hasFreshRecipeRemovalAck({ hostId: candidate.hostId, workspaceId: candidate.id })
-  )
-  if (asked.length === 0) {
-    return true
-  }
-  const results = await runRecipeRemovalPreflights(asked)
+): Promise<RecipeRemovalAcks | null> {
+  const results = await runRecipeRemovalPreflights(candidates)
   if (results.every((result) => result.preflight.status === 'clean')) {
-    return true
+    return new Map(results.map((result) => [result.candidate.key, result.preflight.ack]))
   }
-  return requestRecipeRemovalReview(results, asked.length === 1)
+  return requestRecipeRemovalReview(results, candidates.length === 1)
 }
 
 /**
- * For deletes that skip the confirmation: runs `remove` when every recipe workspace is clean,
- * otherwise `review` so the user sees what would be lost. Unchecked never counts as clean.
+ * Right before a removal deletes a workspace's checkout: holds the workspace's environment for its
+ * destroy. Uses an authorization a decision already claimed; otherwise checks again and reviews
+ * unless the answer is clean. False when the user cancelled or the environment changed.
+ */
+export async function claimRecipeWorkspaceRemoval(
+  state: Pick<AppState, 'settings'>,
+  workspace: { id: string; hostId?: string | null; displayName: string }
+): Promise<boolean> {
+  const [candidate] = recipeRemovalCandidates(state, [workspace])
+  if (!candidate || !('hostId' in candidate.request)) {
+    return true
+  }
+  const target = candidate.request
+  const held = await window.api.ephemeralVm.claimRemoval({ ...target, ack: '' })
+  if (held.ok) {
+    return true
+  }
+  const acks = await reviewRecipeRemoval([candidate])
+  if (!acks) {
+    return false
+  }
+  const claimed = await window.api.ephemeralVm.claimRemoval({
+    ...target,
+    ack: acks.get(candidate.key) ?? ''
+  })
+  return claimed.ok
+}
+
+/** Claims a decision's acks right away, for removals that start as soon as the user decides. */
+export async function claimRecipeRemovalAcks(
+  candidates: readonly RecipeRemovalCandidate[],
+  acks: RecipeRemovalAcks
+): Promise<boolean> {
+  const claims = await Promise.all(
+    candidates.map((candidate) =>
+      'hostId' in candidate.request
+        ? window.api.ephemeralVm.claimRemoval({
+            ...candidate.request,
+            ack: acks.get(candidate.key) ?? ''
+          })
+        : Promise.resolve({ ok: true as const, required: false as const })
+    )
+  )
+  return claims.every((claim) => claim.ok)
+}
+
+/**
+ * For deletes that skip the confirmation: runs `remove` when every recipe workspace is clean (its
+ * removal claims a fresh check), otherwise `review` so the user sees what would be lost.
  */
 export async function removeUnlessRecipeWorkNeedsReview(
   state: Pick<AppState, 'settings'>,
-  candidates: readonly RecipeRemovalCandidate[],
+  workspaces: readonly { id: string; hostId?: string | null; displayName: string }[],
   remove: () => void,
   review: () => void
 ): Promise<void> {
-  const asked = recipeRemovalCandidates(state, candidates)
-  if (asked.length === 0) {
+  const candidates = recipeRemovalCandidates(state, workspaces)
+  if (candidates.length === 0) {
     remove()
     return
   }
-  const results = await runRecipeRemovalPreflights(asked)
-  if (results.every((result) => result.preflight.status === 'clean')) {
+  const results = await runRecipeRemovalPreflights(candidates)
+  const clean = results.every((result) => result.preflight.status === 'clean')
+  if (clean && (await claimRecipeRemovalAcks(candidates, ackMap(results)))) {
     remove()
-  } else {
-    review()
+    return
   }
+  revokeRecipeRemovalAcks(results)
+  review()
+}
+
+export function ackMap(results: readonly RecipeRemovalResult[]): RecipeRemovalAcks {
+  return new Map(results.map((result) => [result.candidate.key, result.preflight.ack]))
 }

@@ -41,6 +41,11 @@ export function recipeRemovalReasonText(
         'workspaceDeletion.recipeCheck.reasonNoOrcaServer',
         'Its environment has no Orca server to ask, so its work could not be checked.'
       )
+    case 'workspace_unrecorded':
+      return t(
+        'workspaceDeletion.recipeCheck.reasonWorkspaceUnrecorded',
+        'Orca never recorded which workspace this environment holds, so its work could not be checked.'
+      )
     case 'store_unreadable':
       return t(
         'workspaceDeletion.recipeCheck.reasonStoreUnreadable',

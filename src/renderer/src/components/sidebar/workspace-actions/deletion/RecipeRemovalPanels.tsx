@@ -4,27 +4,43 @@ import { DialogFooter } from '@/components/ui/dialog'
 import { DialogCancel, DialogError, DialogWarning } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
 import type {
+  RecipeRemovalCheckResult,
   RecipeRemovalCopyFailure,
-  RecipeRemovalPreflight,
-  RecipeRemovalTarget
+  RecipeRemovalPreflight
 } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
-import { rememberRecipeRemovalAck } from '@/runtime/ephemeral-vm/recipe-removal-ack-registry'
-import type { RecipeRemovalResult } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
+import {
+  ackMap,
+  type RecipeRemovalAcks,
+  type RecipeRemovalCandidate,
+  type RecipeRemovalResult
+} from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import {
   recipeRemovalCopyErrorText,
   recipeRemovalLossLines,
   recipeRemovalReasonText
 } from './recipe-removal-preflight-copy'
 
+/** "Remove anyway": main makes each undecided answer usable only now, at the user's word. */
+async function confirmAnyway(results: readonly RecipeRemovalResult[]): Promise<RecipeRemovalAcks> {
+  await Promise.all(
+    results
+      .filter((result) => result.preflight.status !== 'clean' && result.preflight.ack)
+      .map((result) =>
+        window.api.ephemeralVm.confirmRemoval({ ack: result.preflight.ack }).catch(() => false)
+      )
+  )
+  return ackMap(results)
+}
+
 function RemoveFooter({
   busy,
   primaryCopy,
-  onRemove,
+  onRemoveAnyway,
   children
 }: {
   busy: boolean
   primaryCopy: boolean
-  onRemove: () => void
+  onRemoveAnyway: () => void
   children?: ReactNode
 }): JSX.Element {
   const t = useTranslate()
@@ -37,7 +53,7 @@ function RemoveFooter({
         size="sm"
         variant={primaryCopy ? 'outline' : 'destructive'}
         disabled={busy}
-        onClick={onRemove}
+        onClick={onRemoveAnyway}
       >
         {t('workspaceDeletion.recipeCheck.removeAnyway', 'Remove anyway')}
       </Button>
@@ -67,22 +83,28 @@ function PreflightSummary({ preflight }: { preflight: RecipeRemovalPreflight }):
   )
 }
 
+type Decision =
+  | { kind: 'remove'; acks: RecipeRemovalAcks }
+  | { kind: 'failed'; reason: RecipeRemovalCopyFailure }
+  /** Recordings still arrived during the copy: show the new counts instead of removing. */
+  | { kind: 'pending'; preflight: RecipeRemovalCheckResult }
+
 function SingleWorkspacePanel({
-  target,
+  candidate,
   preflight: checked,
   onRemove,
   onBusyChange
 }: {
-  target: RecipeRemovalTarget
-  preflight: RecipeRemovalPreflight
-  onRemove: () => void
+  candidate: RecipeRemovalCandidate
+  preflight: RecipeRemovalCheckResult
+  onRemove: (acks: RecipeRemovalAcks) => void
   onBusyChange?: (busy: boolean) => void
 }): JSX.Element {
   const t = useTranslate()
   const [preflight, setPreflight] = useState(checked)
-  const [copying, setCopying] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [copyError, setCopyError] = useState<RecipeRemovalCopyFailure | null>(null)
-  // A dialog closed or retargeted during the copy must never remove afterwards.
+  // A dialog closed or retargeted mid-decision must never remove afterwards.
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
@@ -91,30 +113,43 @@ function SingleWorkspacePanel({
       onBusyChange?.(false)
     }
   }, [onBusyChange])
-  const canCopy = preflight.status === 'unsafe' && preflight.recordingsNotCopied.length > 0
+  const request = candidate.request
+  const canCopy =
+    'hostId' in request && preflight.status === 'unsafe' && preflight.recordingsNotCopied.length > 0
 
-  const copyAndRemove = async (): Promise<void> => {
-    setCopying(true)
+  const decide = async (run: () => Promise<Decision>): Promise<void> => {
+    setBusy(true)
     onBusyChange?.(true)
     setCopyError(null)
-    const result = await window.api.ephemeralVm
-      .copyRecordingsBeforeRemoval(target)
-      .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
+    const outcome = await run()
     if (!mounted.current) {
       return
     }
-    setCopying(false)
+    setBusy(false)
     onBusyChange?.(false)
-    if (result.ok) {
-      // The copy proved nothing is pending; its ack is the one the destroy spends.
-      rememberRecipeRemovalAck(target, result.ack)
-      onRemove()
-    } else if (result.reason === 'still_pending') {
-      rememberRecipeRemovalAck(target, result.preflight.ack)
-      setPreflight(result.preflight)
+    if (outcome.kind === 'remove') {
+      onRemove(outcome.acks)
+    } else if (outcome.kind === 'failed') {
+      setCopyError(outcome.reason)
     } else {
-      setCopyError(result.reason)
+      setPreflight(outcome.preflight)
     }
+  }
+
+  const copyAndRemove = async (): Promise<Decision> => {
+    if (!('hostId' in request)) {
+      return { kind: 'failed', reason: 'unavailable' }
+    }
+    const result = await window.api.ephemeralVm
+      .copyRecordingsBeforeRemoval(request)
+      .catch(() => ({ ok: false as const, reason: 'unreachable' as const }))
+    if (result.ok) {
+      // The copy proved nothing is pending; its ack is the one the removal spends.
+      return { kind: 'remove', acks: new Map([[candidate.key, result.ack]]) }
+    }
+    return result.reason === 'still_pending'
+      ? { kind: 'pending', preflight: result.preflight }
+      : { kind: 'failed', reason: result.reason }
   }
 
   return (
@@ -131,15 +166,24 @@ function SingleWorkspacePanel({
         <PreflightSummary preflight={preflight} />
       </div>
       {copyError ? <DialogError>{recipeRemovalCopyErrorText(copyError, t)}</DialogError> : null}
-      <RemoveFooter busy={copying} primaryCopy={canCopy} onRemove={onRemove}>
+      <RemoveFooter
+        busy={busy}
+        primaryCopy={canCopy}
+        onRemoveAnyway={() =>
+          void decide(async () => ({
+            kind: 'remove',
+            acks: await confirmAnyway([{ candidate, preflight }])
+          }))
+        }
+      >
         {canCopy ? (
           <Button
             size="sm"
             variant="destructive"
-            disabled={copying}
-            onClick={() => void copyAndRemove()}
+            disabled={busy}
+            onClick={() => void decide(copyAndRemove)}
           >
-            {copying
+            {busy
               ? t('workspaceDeletion.recipeCheck.copying', 'Copying recordings…')
               : t('workspaceDeletion.recipeCheck.copyAndRemove', 'Copy recordings and remove')}
           </Button>
@@ -155,7 +199,7 @@ function AggregatePanel({
   onRemove
 }: {
   results: RecipeRemovalResult[]
-  onRemove: () => void
+  onRemove: (acks: RecipeRemovalAcks) => void
 }): JSX.Element {
   const t = useTranslate()
   return (
@@ -167,26 +211,33 @@ function AggregatePanel({
             'Some of these workspaces have work that is not safe yet:'
           )}
         </DialogWarning>
-        {results.map(({ candidate, preflight }) => (
-          <div key={`${candidate.hostId}\0${candidate.id}`} className="min-w-0">
-            <p className="text-[13px] font-medium break-words text-foreground">
-              {candidate.displayName}
-              {preflight.status === 'unchecked'
-                ? ` — ${t('workspaceDeletion.recipeCheck.uncheckedTitle', "Couldn't verify this workspace")}`
-                : null}
-            </p>
-            <PreflightSummary preflight={preflight} />
-          </div>
-        ))}
+        {results
+          .filter((result) => result.preflight.status !== 'clean')
+          .map(({ candidate, preflight }) => (
+            <div key={candidate.key} className="min-w-0">
+              <p className="text-[13px] font-medium break-words text-foreground">
+                {candidate.displayName}
+                {preflight.status === 'unchecked'
+                  ? ` — ${t('workspaceDeletion.recipeCheck.uncheckedTitle', "Couldn't verify this workspace")}`
+                  : null}
+              </p>
+              <PreflightSummary preflight={preflight} />
+            </div>
+          ))}
       </div>
-      <RemoveFooter busy={false} primaryCopy={false} onRemove={onRemove} />
+      <RemoveFooter
+        busy={false}
+        primaryCopy={false}
+        onRemoveAnyway={() => void confirmAnyway(results).then(onRemove)}
+      />
     </>
   )
 }
 
 /**
  * What removing these workspaces would lose, for the ones that aren't clean: one workspace can copy
- * its recordings first; several get one list with only remove anyway or cancel.
+ * its recordings first; several get one list with only remove anyway or cancel. `onRemove` gets
+ * the acks the user's decision made usable, for every result (clean ones included).
  */
 export function RecipeRemovalResultsPanel({
   results,
@@ -196,24 +247,24 @@ export function RecipeRemovalResultsPanel({
 }: {
   results: RecipeRemovalResult[]
   single: boolean
-  onRemove: () => void
+  onRemove: (acks: RecipeRemovalAcks) => void
   onBusyChange?: (busy: boolean) => void
 }): JSX.Element | null {
   const notClean = results.filter((result) => result.preflight.status !== 'clean')
   if (notClean.length === 0) {
     return null
   }
-  if (single && notClean.length === 1) {
-    const [only] = notClean
+  if (single && results.length === 1) {
+    const [only] = results
     return (
       <SingleWorkspacePanel
-        key={`${only.target.hostId}\0${only.target.workspaceId}`}
-        target={only.target}
+        key={only.candidate.key}
+        candidate={only.candidate}
         preflight={only.preflight}
         onRemove={onRemove}
         onBusyChange={onBusyChange}
       />
     )
   }
-  return <AggregatePanel results={notClean} onRemove={onRemove} />
+  return <AggregatePanel results={results} onRemove={onRemove} />
 }

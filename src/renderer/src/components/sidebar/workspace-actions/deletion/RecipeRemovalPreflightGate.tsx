@@ -3,7 +3,10 @@ import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
 import { DialogCancel } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
-import type { RecipeRemovalCandidate } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
+import {
+  claimRecipeRemovalAcks,
+  type RecipeRemovalAcks
+} from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { RecipeRemovalResultsPanel } from './RecipeRemovalPanels'
 import { useRecipeRemovalPreflight } from './use-recipe-removal-preflight'
 
@@ -18,14 +21,14 @@ export function RecipeRemovalPreflightGate({
   children
 }: {
   /** Null while the dialog is closed. */
-  targets: readonly RecipeRemovalCandidate[] | null
+  targets: readonly { id: string; hostId?: string | null; displayName: string }[] | null
   onRemove: () => void
   /** True while recordings are copied, so the dialog can't be dismissed mid-copy. */
   onBusyChange?: (busy: boolean) => void
   children: ReactNode
 }): JSX.Element {
   const t = useTranslate()
-  const check = useRecipeRemovalPreflight(targets)
+  const { check, refresh } = useRecipeRemovalPreflight(targets)
   if (check.kind === 'loading') {
     return (
       <>
@@ -47,11 +50,18 @@ export function RecipeRemovalPreflightGate({
   ) {
     return <>{children}</>
   }
+  // The decision is claimed now, right before the removal starts; an answer that expired or whose
+  // environment changed meanwhile is checked again and shown again unless it is now clean.
+  const removeWith = (acks: RecipeRemovalAcks): void => {
+    void claimRecipeRemovalAcks(check.candidates, acks).then((claimed) =>
+      claimed ? onRemove() : refresh()
+    )
+  }
   return (
     <RecipeRemovalResultsPanel
       results={check.results}
       single={targets?.length === 1}
-      onRemove={onRemove}
+      onRemove={removeWith}
       onBusyChange={onBusyChange}
     />
   )
