@@ -55,8 +55,8 @@ function mergeByIdentity(
 
 /**
  * The sidecar a store write leaves: `required` for the live runtimes, `prepared` with the stale
- * entries the first write keeps. A command for an unwritable sidecar only warns. `onlyStatsChanged` marks a write that only records a pending stats
- * command, which may fail without failing the store write: stats are best effort.
+ * entries the first write keeps, and `preparedWithoutStats`, the same without the pending stats
+ * command, which is best effort. A command for an unwritable sidecar only warns.
  */
 export function planRuntimeFeatureWrite(
   runtimes: readonly EphemeralVmRuntimeRecord[],
@@ -65,7 +65,7 @@ export function planRuntimeFeatureWrite(
 ): {
   required: EphemeralVmRuntimeFeatureEntry[]
   prepared: EphemeralVmRuntimeFeatureEntry[]
-  onlyStatsChanged: boolean
+  preparedWithoutStats: EphemeralVmRuntimeFeatureEntry[] | null
 } {
   const existing = sidecar.features
   if (requested && !sidecar.writable) {
@@ -82,14 +82,12 @@ export function planRuntimeFeatureWrite(
     : existing
   const required = requiredRuntimeFeatures(runtimes, withPending)
   const prepared = mergeByIdentity(existing, required)
-  const withoutPending = pending
-    ? mergeByIdentity(existing, requiredRuntimeFeatures(runtimes, existing))
-    : prepared
   return {
     required,
     prepared,
-    onlyStatsChanged:
-      pending !== undefined && JSON.stringify(withoutPending) === JSON.stringify(existing)
+    preparedWithoutStats: pending
+      ? mergeByIdentity(existing, requiredRuntimeFeatures(runtimes, existing))
+      : null
   }
 }
 
@@ -108,26 +106,35 @@ export function warnStatsCommandNotSaved(pending: PendingRuntimeStatsCommand): v
 }
 
 /**
- * The first sidecar write of a store write, when it changes anything. False when it only recorded a
- * pending stats command and failed: that warns instead of failing the store write.
+ * The first sidecar write of a store write, when it changes anything. When a write carrying a
+ * pending stats command fails, it warns and retries once without it; only a failure of what the
+ * runtimes require propagates. False when the stats command was dropped.
  */
 export function writePreparedFeatures(
   sidecar: { writable: boolean; features: readonly EphemeralVmRuntimeFeatureEntry[] },
-  plan: { prepared: EphemeralVmRuntimeFeatureEntry[]; onlyStatsChanged: boolean },
+  plan: {
+    prepared: EphemeralVmRuntimeFeatureEntry[]
+    preparedWithoutStats: EphemeralVmRuntimeFeatureEntry[] | null
+  },
   pending: PendingRuntimeStatsCommand | undefined,
   write: (features: EphemeralVmRuntimeFeatureEntry[]) => void
 ): boolean {
-  if (!sidecar.writable || JSON.stringify(sidecar.features) === JSON.stringify(plan.prepared)) {
+  const unchanged = (features: readonly EphemeralVmRuntimeFeatureEntry[]): boolean =>
+    JSON.stringify(sidecar.features) === JSON.stringify(features)
+  if (!sidecar.writable || unchanged(plan.prepared)) {
     return true
   }
   try {
     write(plan.prepared)
     return true
   } catch (error) {
-    if (!plan.onlyStatsChanged || !pending) {
+    if (!pending || !plan.preparedWithoutStats) {
       throw error
     }
     warnStatsCommandNotSaved(pending)
+    if (!unchanged(plan.preparedWithoutStats)) {
+      write(plan.preparedWithoutStats)
+    }
     return false
   }
 }

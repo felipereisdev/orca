@@ -201,4 +201,22 @@ describe('runtime stats approval', () => {
     expect(String(warn.mock.calls[0]?.join(' '))).not.toContain('approved.js')
     await expect(env.read(runtimeId)).resolves.toBeNull()
   })
+
+  it('a stats command too large for the sidecar keeps the required metadata', async () => {
+    const env = makeRepo()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const recipe: OrcaVmRecipe = {
+      ...env.recipe(),
+      checkoutMode: 'orca-worktree',
+      stats: `./stats.sh ${'x'.repeat(1_100_000)}`
+    }
+
+    const runtimeId = await env.provision(recipe)
+
+    expect(listEphemeralVmRuntimes(env.userDataPath)).toMatchObject([
+      { id: runtimeId, status: 'running', recipe: { checkoutMode: 'orca-worktree' } }
+    ])
+    expect(warn).toHaveBeenCalledOnce()
+    await expect(env.read(runtimeId)).resolves.toBeNull()
+  })
 })

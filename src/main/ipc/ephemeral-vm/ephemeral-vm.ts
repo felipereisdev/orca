@@ -137,12 +137,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
       if (!repo.ok) {
         return provisionFailure(repo.failure)
       }
-      const plugins = await getApprovedPluginVmRecipes(pluginService)
-      const approved = await resolveApprovedProvisionRecipe(store, repo.repo, args, plugins)
-      if (!approved.ok) {
-        return provisionFailure(approved.failure)
-      }
-      const { recipe } = approved
+      // Registered before the first await, so a cancel during the approval read stops the create.
       const controller = args.provisionId ? new AbortController() : null
       if (args.provisionId && controller) {
         activeProvisionControllers.set(args.provisionId, controller)
@@ -152,6 +147,15 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
       )
       // Retain cancellation registration until every signal-consuming provisioning phase settles.
       try {
+        const plugins = await getApprovedPluginVmRecipes(pluginService)
+        const approved = await resolveApprovedProvisionRecipe(store, repo.repo, args, plugins)
+        if (controller?.signal.aborted) {
+          return provisionFailure(ephemeralVmFailure('provisionCancelled'))
+        }
+        if (!approved.ok) {
+          return provisionFailure(approved.failure)
+        }
+        const { recipe } = approved
         let recipeRepoUrl = repo.repo.gitRemoteIdentity?.remoteUrl
         let sourceRef = args.ref
         let expectedRefHead: string | undefined

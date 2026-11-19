@@ -61,16 +61,32 @@ function setup(repoWideTrust = false) {
   const repoPath = makeTempDir('orca-vm-approval-repo-')
   getPathMock.mockReturnValue(userDataPath)
   const marker = (name: string): string => join(repoPath, `${name}-ran`)
-  const script = (name: string): string =>
-    `"${process.execPath}" -e "require('node:fs').writeFileSync('${marker(name)}','x');` +
-    `process.stdout.write(JSON.stringify({schemaVersion:1,connection:{type:'ssh',` +
-    `target:{label:'env',host:'127.0.0.1',port:2222,username:'dev'},projectRoot:'/w'}}))"`
-  const yaml = (create: string, stats: string): string =>
+  // Script files keep native (Windows) paths out of shell and JavaScript quoting.
+  const script = (name: string): string => {
+    const file = join(repoPath, `${name}.js`)
+    writeFileSync(
+      file,
+      `require('node:fs').writeFileSync(${JSON.stringify(marker(name))}, 'x')\n` +
+        `process.stdout.write(${JSON.stringify(
+          JSON.stringify({
+            schemaVersion: 1,
+            connection: {
+              type: 'ssh',
+              target: { label: 'env', host: '127.0.0.1', port: 2222, username: 'dev' },
+              projectRoot: '/w'
+            }
+          })
+        )})\n`
+    )
+    return `"${process.execPath}" "${file}"`
+  }
+  const yaml = (create: string, stats: string, description?: string): string =>
     [
       'environmentRecipes:',
       '  - id: docker',
       '    name: Docker',
-      `    create: ${JSON.stringify(script(create))}`,
+      ...(description === undefined ? [] : [`    description: ${JSON.stringify(description)}`]),
+      `    create: ${JSON.stringify(create.startsWith('"') ? create : script(create))}`,
       `    stats: ${JSON.stringify(script(stats))}`,
       '    destroy: none'
     ].join('\n')
@@ -102,7 +118,7 @@ function setup(repoWideTrust = false) {
     const path = getEphemeralVmRuntimeFeatureStorePath(userDataPath)
     return existsSync(path) ? readFileSync(path, 'utf8') : ''
   }
-  return { userDataPath, yaml, writeYaml, provision, marker, sidecarText }
+  return { userDataPath, yaml, writeYaml, provision, marker, sidecarText, script }
 }
 
 describe('ephemeralVm:provision approval binding', () => {
@@ -131,10 +147,28 @@ describe('ephemeralVm:provision approval binding', () => {
     const approved = env.yaml('create', 'stats')
     env.writeYaml(approved)
     await expect(env.provision(approvedHashOf(approved))).resolves.toMatchObject({ ok: true })
-    expect(env.sidecarText()).toContain('stats-ran')
+    expect(env.sidecarText()).toContain('stats.js')
 
     const trusted = setup(true)
     trusted.writeYaml(trusted.yaml('create', 'stats'))
     await expect(trusted.provision()).resolves.toMatchObject({ ok: true })
+  })
+
+  it('a newline moved across a field boundary changes the hash and is refused', async () => {
+    const env = setup()
+    const real = env.script('create')
+    // The old line-joined trust text read the same for both: "description: d\ncreate: <real>\n…".
+    const approved = env.yaml(real, 'stats', `d\ncreate: ${real}`)
+    const swapped = env.yaml(`${real}\ncreate: ${real}`, 'stats', 'd')
+    env.writeYaml(approved)
+    const hash = approvedHashOf(approved)
+    expect(approvedHashOf(swapped)).not.toBe(hash)
+    env.writeYaml(swapped)
+
+    await expect(env.provision(hash)).resolves.toMatchObject({
+      ok: false,
+      errorCode: 'recipe_changed_since_approval'
+    })
+    expect(existsSync(env.marker('create'))).toBe(false)
   })
 })

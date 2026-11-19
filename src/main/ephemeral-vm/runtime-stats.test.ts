@@ -181,4 +181,33 @@ describe('readEphemeralVmRuntimeStats', () => {
 
     expect(runStats).not.toHaveBeenCalled()
   })
+
+  it('a lookup answered past the deadline, before its timer runs, never launches', async () => {
+    vi.useFakeTimers()
+    const runStats = vi.fn(async () => ({ cpuPercent: 1, memoryBytes: 1, diskBytes: 1 }))
+    let answerLookup: (target: EphemeralVmRuntimeStatsTarget) => void = () => {}
+    const read = createEphemeralVmRuntimeStatsReader({
+      resolveTarget: () =>
+        new Promise((resolve) => {
+          answerLookup = resolve
+        }),
+      runStats
+    })
+
+    const pending = read(runtime.id)
+    // The clock passes the deadline while the deadline timer has not fired yet.
+    vi.setSystemTime(Date.now() + 5_001)
+    answerLookup({
+      runtime,
+      repoPath: '/repo',
+      recipe: { id: 'docker', name: 'Docker', create: './create.sh', stats: './stats.sh' }
+    })
+    for (let turn = 0; turn < 10; turn += 1) {
+      await Promise.resolve()
+    }
+
+    expect(runStats).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(5_000)
+    await expect(pending).resolves.toBeNull()
+  })
 })

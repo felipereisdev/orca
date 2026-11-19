@@ -45,7 +45,9 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
     const deadline = Date.now() + STATS_TIMEOUT_MS
     const target = await deps.resolveTarget(runtimeId)
     // A lookup that outlived the deadline must not launch anything: its answer is already null.
-    if (!target || signal.aborted) {
+    // The clock decides, since the deadline timer may not have run yet.
+    const remainingMs = deadline - Date.now()
+    if (!target || signal.aborted || remainingMs <= 0) {
       return null
     }
     const { runtime, repoPath, recipe } = target
@@ -62,7 +64,7 @@ export function createEphemeralVmRuntimeStatsReader(deps: {
       },
       recipeResult: runtime.recipeResult,
       // The lookup spent part of the budget; the step gets what is left, and the deadline stops it.
-      timeoutMs: Math.max(1, deadline - Date.now()),
+      timeoutMs: remainingMs,
       signal
     })
   }
