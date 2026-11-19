@@ -4,6 +4,7 @@ import { RECIPE_REMOVAL_REQUEST_TIMEOUT_MS } from '../../shared/remote-runtime/e
 import { callRuntimeEnvironment } from '../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { getRuntimeEnvironmentRegistryRoot } from '../ipc/runtime-environments/catalog/runtime-environment-registry-root'
 import { cleanupOwnedEphemeralVmRuntime } from './owned-runtime-cleanup'
+import { confirmPhoneRecipeRemoval } from './phone-recipe-removal-confirmation'
 import {
   describeRecipeWorkspaceEnvironments,
   ownsRecipeWorkspaceRemoval,
@@ -41,8 +42,13 @@ export function wireRecipeWorkspaceRemoval(
                   payload,
                   RECIPE_REMOVAL_REQUEST_TIMEOUT_MS
                 ),
-              cleanup: (runtimeId) =>
-                cleanupOwnedEphemeralVmRuntime(store, userDataPath(), runtimeId)
+              cleanup: (runtimeId, ack) =>
+                cleanupOwnedEphemeralVmRuntime(store, userDataPath(), runtimeId, { ack }),
+              confirm: () =>
+                confirmPhoneRecipeRemoval(store, userDataPath(), {
+                  hostId: params.hostId ?? '',
+                  workspaceId: params.worktree.slice('id:'.length)
+                })
             },
             orderDestroy
           )

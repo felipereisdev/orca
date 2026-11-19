@@ -10,8 +10,8 @@ import type {
 import type { EphemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import type { PendingVmCheckout } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
 import type {
+  RecipeRemovalCheckResult,
   RecipeRemovalCopyResult,
-  RecipeRemovalPreflight,
   RecipeRemovalTarget
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 
@@ -82,10 +82,14 @@ export type EphemeralVmApi = {
   suspendWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
   /** Fires after any runtime record write; re-list to read the new lifecycle status. */
   onRuntimesChanged: (callback: () => void) => () => void
-  cleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
+  /**
+   * Destroys the runtime's environment. `ack` is the acknowledgement its removal check issued;
+   * main refuses with `recipe_removal_unconfirmed` when a workspace's environment lacks one.
+   */
+  cleanup: (args: { runtimeId: string; ack: string }) => Promise<EphemeralVmRuntimeRecord>
   stopCleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
   /** What removing a recipe workspace would lose; null when the check does not apply. */
-  removalPreflight: (args: RecipeRemovalTarget) => Promise<RecipeRemovalPreflight | null>
+  removalPreflight: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCheckResult | null>
   /** Copies its pending recordings to this Mac; only `ok: true` may be followed by the removal. */
   copyRecordingsBeforeRemoval: (args: RecipeRemovalTarget) => Promise<RecipeRemovalCopyResult>
   /** Drops an interrupted write-ahead record that never received a recipe result. */

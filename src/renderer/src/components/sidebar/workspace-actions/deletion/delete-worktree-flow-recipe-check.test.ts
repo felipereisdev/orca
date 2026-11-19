@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
-import type { RecipeRemovalPreflight } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import type { RecipeRemovalCheckResult } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 
 const mocks = vi.hoisted(() => ({
   deleteWithToast: vi.fn(async () => {}),
@@ -26,16 +26,17 @@ const worktree = makeWorktree({
   hostId: HOST,
   displayName: 'task'
 })
-const removalPreflight = vi.fn<(args: unknown) => Promise<RecipeRemovalPreflight | null>>()
+const removalPreflight = vi.fn<(args: unknown) => Promise<RecipeRemovalCheckResult | null>>()
 const initial = useAppStore.getInitialState()
 let originalApi: typeof window.api
 
-function preflight(status: RecipeRemovalPreflight['status']): RecipeRemovalPreflight {
+function preflight(status: RecipeRemovalCheckResult['status']): RecipeRemovalCheckResult {
   return {
     status,
     recordingsNotCopied: [],
     dirtyFiles: status === 'unsafe' ? 1 : 0,
-    unpushedCommits: 0
+    unpushedCommits: 0,
+    ack: 'ack-1'
   }
 }
 

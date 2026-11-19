@@ -1,10 +1,11 @@
 import '../../shared/remote-runtime/host-store/environment-store-worker-test-fixture'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseEphemeralVmRecipeResult } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { upsertEphemeralVmRuntime } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import { getEphemeralVmRuntimeFeatureStorePath } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-feature-store'
 import { removeTempDirs } from '../../shared/testing/remove-temp-dirs.test-support'
 
 type Handler = (event: unknown, args: unknown) => Promise<unknown>
@@ -36,7 +37,7 @@ const WORKSPACE = 'repo::/workspace/repo-task'
 const REC = { id: 'aaaaaaaaaaaaaaaa', path: '/rec/rec-aaaaaaaaaaaaaaaa.mp4', bytes: 10 }
 const dirs: string[] = []
 
-function seed(id: string, environmentId: string): void {
+function seed(id: string, environmentId: string | null): void {
   const parsed = parseEphemeralVmRecipeResult(
     JSON.stringify({
       schemaVersion: 1,
@@ -56,7 +57,7 @@ function seed(id: string, environmentId: string): void {
     recipeId: 'cloud',
     repoId: 'repo',
     workspaceId: WORKSPACE,
-    runtimeEnvironmentId: environmentId,
+    ...(environmentId ? { runtimeEnvironmentId: environmentId } : { sshTargetId: 'ssh-1' }),
     status: 'running',
     cleanupStatus: 'not_started',
     createdAt: id === 'vm-a' ? 1 : 2,
@@ -111,13 +112,38 @@ describe('recipe removal preflight wiring', () => {
 
     await expect(invoke('ephemeralVm:copyRecordingsBeforeRemoval', request)).resolves.toEqual({
       ok: true,
-      copied: 1
+      copied: 1,
+      ack: expect.any(String)
     })
     expect(mocks.keep).toHaveBeenCalledWith(
       expect.objectContaining({ environmentId: 'env-b', workspaceId: WORKSPACE, recording: REC })
     )
     // The destroy owns stopping the desktop's sync; a removal that fails later keeps it running.
     expect(mocks.stop).not.toHaveBeenCalled()
+  })
+
+  it('an unreadable feature store is unchecked, never a desktop-free clean', async () => {
+    seed('vm-a', 'env-a')
+    writeFileSync(getEphemeralVmRuntimeFeatureStorePath(mocks.userData), '{not json')
+    await expect(
+      invoke('ephemeralVm:removalPreflight', { hostId: 'runtime:env-a', workspaceId: WORKSPACE })
+    ).resolves.toMatchObject({
+      status: 'unchecked',
+      reason: 'store_unreadable',
+      ack: expect.any(String)
+    })
+    expect(mocks.call).not.toHaveBeenCalled()
+  })
+
+  it('an owner with no Orca server to ask is unchecked, not skipped', async () => {
+    seed('vm-a', null)
+    await expect(
+      invoke('ephemeralVm:removalPreflight', { hostId: 'ssh:ssh-1', workspaceId: WORKSPACE })
+    ).resolves.toMatchObject({
+      status: 'unchecked',
+      reason: 'no_orca_server',
+      ack: expect.any(String)
+    })
   })
 
   it('a workspace no recipe owns on that host, or the experiment off, keeps today’s dialog', async () => {

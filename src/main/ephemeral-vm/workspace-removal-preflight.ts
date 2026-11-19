@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { RuntimeRpcResponse } from '../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import {
   RECIPE_REMOVAL_PREFLIGHT_TIMEOUT_MS,
-  type RecipeRemovalCopyResult,
+  type RecipeRemovalCopyFailure,
   type RecipeRemovalPreflight,
   type RecipeRemovalPreflightReason,
   type RecipeRemovalRecording
@@ -219,27 +219,38 @@ export async function preflightRecipeWorkspaceRemoval(
   return { status: unsafe ? 'unsafe' : 'clean', ...known }
 }
 
+/** The copy's outcome before main adds acknowledgements to it. */
+export type CopyBeforeRemovalOutcome =
+  | { ok: true; copied: number }
+  | { ok: false; reason: RecipeRemovalCopyFailure }
+  | { ok: false; reason: 'still_pending'; preflight: RecipeRemovalPreflight }
+
 /**
  * Copies every recording the environment holds that this Mac lacks, one at a time and within one
- * bounded wait. A recording finished during a pass is picked up by the next one, up to two passes;
- * one still pending after that answers with a fresh check instead of letting the removal go on.
- * The desktop's sync keeps running: only the environment's destroy stops it.
+ * bounded wait. A recording finished during a pass is picked up by the next one, up to two passes.
+ * Only a final list that succeeds and finds nothing pending lets the removal go on; anything else
+ * answers `unsafe` with the last pending list it knows. The desktop's sync keeps running: only the
+ * environment's destroy stops it.
  */
 export async function copyRecordingsBeforeRemoval(
   target: RemovalPreflightTarget,
   ports: CopyBeforeRemovalPorts,
   timeoutMs: number = COPY_BEFORE_REMOVAL_TIMEOUT_MS
-): Promise<RecipeRemovalCopyResult> {
+): Promise<CopyBeforeRemovalOutcome> {
   if (target.asleep) {
     return { ok: false, reason: 'unreachable' }
   }
+  let knownPending: RecipeRemovalRecording[] | null = null
   const outcome = await withDeadline(
     timeoutMs,
-    async (signal): Promise<RecipeRemovalCopyResult> => {
+    async (signal): Promise<CopyBeforeRemovalOutcome | 'pending'> => {
       let copied = 0
       for (let pass = 0; pass <= MAX_COPY_PASSES; pass += 1) {
         const pending = await listPendingRecordings(target, ports, signal)
         if (!pending.ok) {
+          if (knownPending) {
+            return 'pending'
+          }
           return {
             ok: false,
             reason: pending.reason === 'unreachable' ? 'unreachable' : 'unavailable'
@@ -248,8 +259,9 @@ export async function copyRecordingsBeforeRemoval(
         if (pending.value.length === 0) {
           return { ok: true, copied }
         }
+        knownPending = pending.value
         if (pass === MAX_COPY_PASSES) {
-          break
+          return 'pending'
         }
         for (const recording of pending.value) {
           try {
@@ -260,23 +272,26 @@ export async function copyRecordingsBeforeRemoval(
           copied += 1
         }
       }
-      return { ok: false, reason: 'still_pending', preflight: unsafeAfterCopy() }
+      return 'pending'
     }
   )
-  if (outcome === 'timeout') {
-    return { ok: false, reason: 'timeout' }
-  }
-  if (outcome.ok || outcome.reason !== 'still_pending') {
+  if (outcome !== 'pending' && outcome !== 'timeout') {
     return outcome
   }
-  // The new counts come from a full check, so git work stays listed beside the recordings.
+  if (!knownPending) {
+    return { ok: false, reason: 'timeout' }
+  }
+  // Git work comes from a fresh check; the recordings are the last ones a list proved pending.
+  const fresh = await preflightRecipeWorkspaceRemoval(target, ports)
   return {
     ok: false,
     reason: 'still_pending',
-    preflight: await preflightRecipeWorkspaceRemoval(target, ports)
+    preflight: {
+      status: 'unsafe',
+      recordingsNotCopied: knownPending,
+      dirtyFiles: fresh.dirtyFiles,
+      ...(fresh.dirtyFilesCapped ? { dirtyFilesCapped: true } : {}),
+      unpushedCommits: fresh.unpushedCommits
+    }
   }
-}
-
-function unsafeAfterCopy(): RecipeRemovalPreflight {
-  return { status: 'unsafe', recordingsNotCopied: [], dirtyFiles: 0, unpushedCommits: 0 }
 }

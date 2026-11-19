@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees/worktree.test-fixture'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
-import type { RecipeRemovalPreflight } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
+import type { RecipeRemovalCheckResult } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 import RemoveFolderDialog from './RemoveFolderDialog'
 
 const HOST = 'runtime:env-a'
@@ -17,7 +17,7 @@ const root = makeWorktree({
   displayName: 'repo',
   ephemeralVmCheckoutMode: 'provisioned-root'
 })
-const removalPreflight = vi.fn<(args: unknown) => Promise<RecipeRemovalPreflight | null>>()
+const removalPreflight = vi.fn<(args: unknown) => Promise<RecipeRemovalCheckResult | null>>()
 const removeProject = vi.fn(async () => {})
 const initial = useAppStore.getInitialState()
 let originalApi: typeof window.api
@@ -50,7 +50,8 @@ describe('removing a provisioned-root project checks its recipe VM first', () =>
       status: 'unsafe',
       recordingsNotCopied: [],
       dirtyFiles: 0,
-      unpushedCommits: 4
+      unpushedCommits: 4,
+      ack: 'ack-1'
     })
     render(<RemoveFolderDialog />)
     await act(async () => {})
@@ -68,7 +69,8 @@ describe('removing a provisioned-root project checks its recipe VM first', () =>
       status: 'clean',
       recordingsNotCopied: [],
       dirtyFiles: 0,
-      unpushedCommits: 0
+      unpushedCommits: 0,
+      ack: 'ack-1'
     })
     render(<RemoveFolderDialog />)
     await act(async () => {})

@@ -5,10 +5,11 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAppStore } from '@/store'
 import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import type {
+  RecipeRemovalCheckResult,
   RecipeRemovalCopyResult,
   RecipeRemovalPreflight
 } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
-import type { RecipeRemovalCandidate } from './recipe-removal-preflights'
+import type { RecipeRemovalCandidate } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 
 const WORKSPACE = 'repo::/workspace/repo-task'
@@ -22,7 +23,7 @@ const OTHER_TASK: RecipeRemovalCandidate = {
 }
 
 const api = {
-  removalPreflight: vi.fn<(args: unknown) => Promise<RecipeRemovalPreflight | null>>(),
+  removalPreflight: vi.fn<(args: unknown) => Promise<RecipeRemovalCheckResult | null>>(),
   copyRecordingsBeforeRemoval: vi.fn<(args: unknown) => Promise<RecipeRemovalCopyResult>>()
 }
 const initial = useAppStore.getInitialState()
@@ -52,8 +53,9 @@ function seed(options: { experiment?: boolean; recipe?: boolean } = {}): void {
   })
 }
 
-function preflight(overrides: Partial<RecipeRemovalPreflight>): RecipeRemovalPreflight {
+function preflight(overrides: Partial<RecipeRemovalPreflight>): RecipeRemovalCheckResult {
   return {
+    ack: 'ack-1',
     status: 'clean',
     recordingsNotCopied: [],
     dirtyFiles: 0,
@@ -109,8 +111,7 @@ describe('RecipeRemovalPreflightGate', () => {
     cleanup()
 
     api.removalPreflight.mockClear()
-    seed({ recipe: false })
-    await renderGate()
+    await renderGate([{ ...TASK, hostId: 'local' }])
     expect(screen.getByText('Current footer')).toBeTruthy()
     expect(api.removalPreflight).not.toHaveBeenCalled()
   })
@@ -145,7 +146,7 @@ describe('RecipeRemovalPreflightGate', () => {
     expect(onRemove).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toContain("A recording couldn't be copied")
 
-    api.copyRecordingsBeforeRemoval.mockResolvedValueOnce({ ok: true, copied: 1 })
+    api.copyRecordingsBeforeRemoval.mockResolvedValueOnce({ ok: true, copied: 1, ack: 'ack-copy' })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Copy recordings and remove' }))
     })
@@ -200,7 +201,7 @@ describe('RecipeRemovalPreflightGate', () => {
 
     view.rerender(<Harness targets={null} onRemove={onRemove} onBusyChange={onBusyChange} />)
     await act(async () => {
-      finishCopy({ ok: true, copied: 1 })
+      finishCopy({ ok: true, copied: 1, ack: 'ack-copy' })
     })
     expect(onRemove).not.toHaveBeenCalled()
     expect(onBusyChange).toHaveBeenLastCalledWith(false)

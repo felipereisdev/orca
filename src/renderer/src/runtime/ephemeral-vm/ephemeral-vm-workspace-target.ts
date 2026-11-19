@@ -1,3 +1,4 @@
+import { cleanupFailedCreateRuntime } from '@/runtime/ephemeral-vm/failed-create-runtime-cleanup'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
@@ -184,7 +185,7 @@ function recipeWorkspaceHost(provisioned: ProvisionedVm): {
 
 async function cleanupProvisionedRuntime(runtimeId: string): Promise<void> {
   try {
-    await window.api.ephemeralVm.cleanup({ runtimeId })
+    await cleanupFailedCreateRuntime(runtimeId)
   } catch {
     // Best effort: the caller still needs the original setup/provisioning error.
   }

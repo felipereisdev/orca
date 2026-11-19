@@ -33,30 +33,38 @@ async function readTextIfPresent(path: string, maxBytes: number): Promise<string
   }
 }
 
+const UNREADABLE = Symbol('unreadable')
+
 /**
  * `listEphemeralVmRuntimes` without blocking the main thread: the same records, read-only. It never
- * migrates or hardens the files; the synchronous store owns every write.
+ * migrates or hardens the files; the synchronous store owns every write. `complete` is false when
+ * the feature store exists but can't be read, so records may be missing their desktop.
  */
-export async function listEphemeralVmRuntimesAsync(
+export async function readEphemeralVmRuntimesAsync(
   userDataPath: string
-): Promise<EphemeralVmRuntimeRecord[]> {
+): Promise<{ runtimes: EphemeralVmRuntimeRecord[]; complete: boolean }> {
   const path = getEphemeralVmRuntimeStorePath(userDataPath)
   const [mainText, featureText, writeAheadText] = await Promise.all([
     readTextIfPresent(path, MAX_EPHEMERAL_VM_RUNTIME_STORE_FILE_BYTES),
     readTextIfPresent(
       getEphemeralVmRuntimeFeatureStorePath(userDataPath),
       MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
-    ).catch(() => null),
+    ).catch((): typeof UNREADABLE => UNREADABLE),
     readTextIfPresent(
       getEphemeralVmWriteAheadRuntimeStorePath(userDataPath),
       MAX_WRITE_AHEAD_STORE_FILE_BYTES
     ).catch(() => null)
   ])
+  const featureStore =
+    featureText === UNREADABLE
+      ? null
+      : featureText === null
+        ? { writable: true, features: [] }
+        : parseEphemeralVmRuntimeFeatureStoreText(featureText)
+  const features = featureStore?.features ?? []
   let main: EphemeralVmRuntimeRecord[] = []
   if (mainText !== null) {
     try {
-      const features =
-        featureText === null ? [] : parseEphemeralVmRuntimeFeatureStoreText(featureText).features
       main = restoreRuntimeFeatureList(
         EphemeralVmRuntimeStoreSchema.parse(JSON.parse(mainText)).runtimes,
         features
@@ -75,7 +83,10 @@ export async function listEphemeralVmRuntimesAsync(
     // Why: an unreadable sidecar must not hide tracked VMs in the main file.
   }
   const mainIds = new Set(main.map((entry) => entry.id))
-  return [...main, ...writeAhead.filter((entry) => !mainIds.has(entry.id))].sort(
-    compareRuntimeRecords
-  )
+  return {
+    runtimes: [...main, ...writeAhead.filter((entry) => !mainIds.has(entry.id))].sort(
+      compareRuntimeRecords
+    ),
+    complete: featureStore?.writable === true
+  }
 }

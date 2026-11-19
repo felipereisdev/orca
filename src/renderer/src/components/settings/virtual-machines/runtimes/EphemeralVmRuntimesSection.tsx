@@ -1,3 +1,9 @@
+import { useAppStore } from '@/store'
+import {
+  recipeRuntimeHostIds,
+  takeRecipeRemovalAck
+} from '@/runtime/ephemeral-vm/recipe-removal-ack-registry'
+import { confirmRecipeRemoval } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { Loader2, RefreshCw } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
@@ -146,9 +152,23 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
   }, [hasRunningLifecycle, refresh])
 
   const cleanupRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
+    // A workspace's environment is checked first; main refuses to destroy it without that ack.
+    const hostIds = recipeRuntimeHostIds(runtime)
+    const workspace = runtime.workspaceId
+    if (
+      workspace &&
+      !(await confirmRecipeRemoval(useAppStore.getState(), [
+        { id: workspace, hostId: hostIds[0], displayName: runtime.workspaceName ?? workspace }
+      ]))
+    ) {
+      return
+    }
     setCleaningId(runtime.id)
     try {
-      const cleaned = await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
+      const cleaned = await window.api.ephemeralVm.cleanup({
+        runtimeId: runtime.id,
+        ack: takeRecipeRemovalAck(hostIds, workspace)
+      })
       if (hasCleanupStopped(cleaned)) {
         await refresh(false)
         return

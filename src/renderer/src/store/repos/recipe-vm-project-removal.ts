@@ -8,6 +8,32 @@ import type { AppState } from '../types'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/runtime/ephemeral-vm/ephemeral-vm-runtime-cleanup'
 import { getRecipeVmSshTargetForHost } from '@/runtime/ephemeral-vm/recipe-vm-managed-host'
 import { selectWorktreesByRepo } from '../workspaces/catalog/workspace-record-fields'
+import { getIndexedAllWorktrees } from '../slices/worktrees/listing/worktree-catalog-index'
+import {
+  confirmRecipeRemoval,
+  type RecipeRemovalCandidate
+} from '@/runtime/ephemeral-vm/recipe-removal-preflights'
+
+/** The user cancelled after seeing what destroying the project's VM would lose. */
+export class RecipeRemovalCancelledError extends Error {
+  constructor() {
+    super('Project removal was cancelled.')
+    this.name = 'RecipeRemovalCancelledError'
+  }
+}
+
+function recipeRemovalTargets(
+  state: Pick<AppState, 'worktreesByRepo'>,
+  ownerHostId: ExecutionHostId,
+  workspaceIds: readonly string[]
+): RecipeRemovalCandidate[] {
+  const worktrees = getIndexedAllWorktrees(selectWorktreesByRepo(state))
+  return workspaceIds.map((id) => ({
+    id,
+    hostId: ownerHostId,
+    displayName: worktrees.find((worktree) => worktree.id === id)?.displayName ?? id
+  }))
+}
 
 type RecipeVmRemovalTargets = { knownServerTarget: string | null; directTarget: string | null }
 
@@ -35,7 +61,7 @@ export function getRecipeVmRemovalTargets(
 
 /** Destroy backing recipe VM before project removal to prevent leaks. Return false synchronously without a VM; resolve true if VM destruction also removed the owning managed server/catalog. */
 export function destroyRecipeVmBeforeProjectRemoval(
-  state: Pick<AppState, 'runtimeEnvironments' | 'worktreesByRepo'>,
+  state: Pick<AppState, 'runtimeEnvironments' | 'worktreesByRepo' | 'settings'>,
   ownerRepo: Pick<Repo, 'id' | 'connectionId'>,
   ownerHostId: ExecutionHostId,
   workspaceIds: string[]
@@ -44,10 +70,17 @@ export function destroyRecipeVmBeforeProjectRemoval(
   if (!targets) {
     return false
   }
-  return destroyRecipeVm(ownerHostId, workspaceIds, targets.knownServerTarget, targets.directTarget)
+  return destroyRecipeVm(
+    state,
+    ownerHostId,
+    workspaceIds,
+    targets.knownServerTarget,
+    targets.directTarget
+  )
 }
 
 async function destroyRecipeVm(
+  state: Pick<AppState, 'worktreesByRepo' | 'settings'>,
   ownerHostId: ExecutionHostId,
   workspaceIds: string[],
   knownServerTarget: string | null,
@@ -62,6 +95,12 @@ async function destroyRecipeVm(
   const targetId = serverTarget ?? directTarget
   if (!targetId) {
     return false
+  }
+  // Destroying the VM loses everything on it; its workspaces are checked (and reviewed) first.
+  if (
+    !(await confirmRecipeRemoval(state, recipeRemovalTargets(state, ownerHostId, workspaceIds)))
+  ) {
+    throw new RecipeRemovalCancelledError()
   }
   // Why host-scoped: another VM's server can publish the same raw workspace id.
   const cleanup = await cleanupEphemeralVmRuntimesForDeleted({

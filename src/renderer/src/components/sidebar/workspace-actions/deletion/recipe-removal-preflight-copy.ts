@@ -36,6 +36,16 @@ export function recipeRemovalReasonText(
         'workspaceDeletion.recipeCheck.reasonAmbiguous',
         'Several environments claim this workspace, so Orca cannot tell which one to check.'
       )
+    case 'no_orca_server':
+      return t(
+        'workspaceDeletion.recipeCheck.reasonNoOrcaServer',
+        'Its environment has no Orca server to ask, so its work could not be checked.'
+      )
+    case 'store_unreadable':
+      return t(
+        'workspaceDeletion.recipeCheck.reasonStoreUnreadable',
+        "Orca couldn't read what it saved about this environment."
+      )
     case 'unreachable':
     case undefined:
       return t(

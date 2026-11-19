@@ -201,7 +201,6 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
         <RemovalUnsavedFilesNotice targets={unsavedTargets} enabled={isOpen} />
         <RecipeRemovalPreflightGate
           targets={recipeTargets}
-          checkAll
           onRemove={handleConfirm}
           onBusyChange={setCopyingRecordings}
         >

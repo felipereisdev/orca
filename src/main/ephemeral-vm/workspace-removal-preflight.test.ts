@@ -146,6 +146,24 @@ describe('recipe workspace removal preflight', () => {
     })
   })
 
+  it('a final list that fails after copying answers unsafe with the last known recordings', async () => {
+    const ports = makePorts({}, { recordings: [REC_A] })
+    ports.isCopied = async (id: string) => ports.order.includes(`copy:${id}`)
+    const listed = ports.call.getMockImplementation()
+    let lists = 0
+    ports.call.mockImplementation(async (env: string, method: string) => {
+      if (method === 'desktop.recordings.list' && (lists += 1) > 1) {
+        return failed('remote_runtime_unavailable')
+      }
+      return listed ? listed(env, method) : failed('method_not_found')
+    })
+    await expect(copyRecordingsBeforeRemoval(target, ports)).resolves.toMatchObject({
+      ok: false,
+      reason: 'still_pending',
+      preflight: { status: 'unsafe', recordingsNotCopied: [REC_A] }
+    })
+  })
+
   it('dirty files or unpushed commits make it unsafe', async () => {
     const dirty = makePorts(
       {

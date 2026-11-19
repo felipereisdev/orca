@@ -23,7 +23,7 @@ import {
 } from './worktree-delete-request'
 import { runWorktreeDeletesInParallel } from './worktree-delete-execution'
 import { runWorktreeDeleteWithToast } from './run-worktree-delete-with-toast'
-import { removeUnlessRecipeWorkNeedsReview } from './recipe-removal-preflights'
+import { removeUnlessRecipeWorkNeedsReview } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { collectRemovalUnsavedFiles } from '@/components/editor/save/flush/removal-unsaved-editor-files'
 
 /** Standard Git-worktree deletion funnel; stale record/instance guards precede confirmation preferences. */

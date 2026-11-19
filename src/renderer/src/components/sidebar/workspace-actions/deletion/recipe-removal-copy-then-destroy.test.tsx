@@ -32,7 +32,7 @@ const worktree = makeWorktree({
 })
 const initial = useAppStore.getInitialState()
 let originalApi: typeof window.api
-let copyResult: RecipeRemovalCopyResult = { ok: true, copied: 1 }
+let copyResult: RecipeRemovalCopyResult = { ok: true, copied: 1, ack: 'ack-copy' }
 
 /** Every bridge call resolves; the ones this removal depends on answer for real. */
 function bridge(): typeof window.api {
@@ -41,7 +41,8 @@ function bridge(): typeof window.api {
       status: 'unsafe' as const,
       recordingsNotCopied: [REC],
       dirtyFiles: 0,
-      unpushedCommits: 0
+      unpushedCommits: 0,
+      ack: 'ack-check'
     })),
     copyRecordingsBeforeRemoval: vi.fn(async () => {
       mocks.order.push('copy')
@@ -60,8 +61,8 @@ function bridge(): typeof window.api {
         updatedAt: 1
       }
     ]),
-    cleanup: vi.fn(async () => {
-      mocks.order.push('destroy')
+    cleanup: vi.fn(async (args: { ack: string }) => {
+      mocks.order.push(`destroy:${args.ack}`)
       return {}
     })
   }
@@ -130,9 +131,10 @@ describe('copy recordings and remove, through the real removal', () => {
   })
 
   it('copies the recordings before the environment is destroyed', async () => {
-    copyResult = { ok: true, copied: 1 }
+    copyResult = { ok: true, copied: 1, ack: 'ack-copy' }
     await copyAndRemove()
-    expect(mocks.order).toEqual(['copy', 'worktree.rm', 'destroy'])
+    // The destroy spends the ack the copy returned, proving nothing was left pending.
+    expect(mocks.order).toEqual(['copy', 'worktree.rm', 'destroy:ack-copy'])
   })
 
   it('a failed copy never destroys the environment', async () => {

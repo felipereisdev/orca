@@ -13,14 +13,53 @@ import { cleanupEphemeralVmRuntime } from './runtime-service'
 import { removeEphemeralVmRuntimeSshTarget } from './runtime-ssh-cleanup'
 import { removeRuntimeOwnedSshTarget } from './runtime-ssh'
 import { isEphemeralVmProvisionLive } from './runtime-provisioning-persistence'
-import { stopEnvironmentDesktop } from './desktop-sync-registry'
+import { startEnvironmentDesktop, stopEnvironmentDesktop } from './desktop-sync-registry'
+import { consumeRecipeRemovalAck } from './recipe-removal-acks'
+import { isProvisionedRootRuntime } from '../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-workspace-owner'
+import {
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../../shared/execution-host/execution-host'
+
+/** How a destroy proves the user saw what it would lose: the ack its removal check issued. */
+export type RecipeDestroyConfirmation = { ack: string }
+
+/**
+ * Only an environment that became a workspace can lose work, and only while the experiment that
+ * checks it is on; one that never did (a failed create, an orphan) needs no acknowledgement.
+ */
+function requireRemovalAck(
+  store: Store,
+  runtime: EphemeralVmRuntimeRecord,
+  confirmation: RecipeDestroyConfirmation
+): void {
+  if (
+    store.getSettings().experimentalEphemeralVms !== true ||
+    runtime.cleanupStatus === 'succeeded' ||
+    (runtime.workspaceId === undefined && !isProvisionedRootRuntime(runtime))
+  ) {
+    return
+  }
+  consumeRecipeRemovalAck(confirmation.ack, {
+    id: runtime.id,
+    createdAt: runtime.createdAt,
+    hostIds: [
+      ...(runtime.runtimeEnvironmentId
+        ? [toRuntimeExecutionHostId(runtime.runtimeEnvironmentId)]
+        : []),
+      ...(runtime.sshTargetId ? [toSshExecutionHostId(runtime.sshTargetId)] : [])
+    ],
+    ...(runtime.workspaceId !== undefined ? { workspaceId: runtime.workspaceId } : {})
+  })
+}
 
 /** Destroys a recorded VM and releases what Orca holds for it. The one path for the desktop's
  *  cleanup and a failed CLI create; concurrent calls share one destroy run. */
 export async function cleanupOwnedEphemeralVmRuntime(
   store: Store,
   userDataPath: string,
-  runtimeId: string
+  runtimeId: string,
+  confirmation: RecipeDestroyConfirmation
 ): Promise<EphemeralVmRuntimeRecord> {
   const runtime = listEphemeralVmRuntimes(userDataPath).find((entry) => entry.id === runtimeId)
   if (!runtime) {
@@ -30,6 +69,7 @@ export async function cleanupOwnedEphemeralVmRuntime(
     // Why: don't mark a create in flight as cleanup_failed; its own outcome settles the row.
     throw new Error(`Ephemeral VM runtime is still provisioning: ${runtime.id}`)
   }
+  requireRemovalAck(store, runtime, confirmation)
   // The environment is going away; its recordings sync must not keep retrying it.
   stopEnvironmentDesktop(runtime.id)
   let result
@@ -46,6 +86,8 @@ export async function cleanupOwnedEphemeralVmRuntime(
         cleanupLastAttemptAt: Date.now(),
         cleanupLastError: ephemeralVmFailureFromError(error)
       })
+      // The destroy never ran, so the environment and its recordings are still there.
+      void startEnvironmentDesktop(store, runtime)
       return removeEphemeralVmRuntimeSshTarget({
         userDataPath,
         runtime: failed,
@@ -75,6 +117,8 @@ export async function cleanupOwnedEphemeralVmRuntime(
     }
   }
   if (!result.ok) {
+    // A failed destroy leaves the environment up; keep copying what it records.
+    void startEnvironmentDesktop(store, runtime)
     return result.runtime
   }
   return removeEphemeralVmRuntimeSshTarget({

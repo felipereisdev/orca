@@ -73,6 +73,6 @@ it("destroys the VM when the renderer's catalog predates the VM's server", async
     errorFeedback: 'toast'
   })
 
-  expect(ephemeralVmCleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1' })
+  expect(ephemeralVmCleanup).toHaveBeenCalledWith({ runtimeId: 'runtime-1', ack: '' })
   expect(store.getState().repos).toEqual([])
 })

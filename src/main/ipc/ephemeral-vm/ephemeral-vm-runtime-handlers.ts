@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { z } from 'zod'
 import type { Store } from '../../persistence/loading-store/store'
 import { listCredentialLikeEnvNames } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-env'
 import {
@@ -31,6 +32,9 @@ import {
   parsePendingVmCheckouts,
   PENDING_VM_CHECKOUTS_CHANGED_CHANNEL
 } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
+
+// Every destroy names the acknowledgement its removal check issued; main decides when it is needed.
+const EphemeralVmCleanupArgs = z.object({ runtimeId: z.string().min(1), ack: z.string() })
 
 let stopRuntimesChangedBroadcast: (() => void) | null = null
 let runtimesChangedBroadcastQueued = false
@@ -157,8 +161,9 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
 
   ipcMain.handle(
     'ephemeralVm:cleanup',
-    async (_event, args: { runtimeId: string }): Promise<EphemeralVmRuntimeRecord> => {
-      return cleanupOwnedEphemeralVmRuntime(store, app.getPath('userData'), args.runtimeId)
+    async (_event, args: unknown): Promise<EphemeralVmRuntimeRecord> => {
+      const { runtimeId, ack } = EphemeralVmCleanupArgs.parse(args)
+      return cleanupOwnedEphemeralVmRuntime(store, app.getPath('userData'), runtimeId, { ack })
     }
   )
 

@@ -73,6 +73,9 @@ const NativeChatAccountUsageDialog = lazy(
 const DeleteWorktreeDialog = lazy(
   () => import('../components/sidebar/workspace-actions/deletion/DeleteWorktreeDialog')
 )
+const RecipeRemovalReviewDialog = lazy(
+  () => import('../components/sidebar/workspace-actions/deletion/RecipeRemovalReviewDialog')
+)
 const PreservedBranchBatchReviewModal = lazy(
   () => import('../components/sidebar/workspace-actions/deletion/PreservedBranchBatchReviewModal')
 )
@@ -322,6 +325,9 @@ export const AppRootSurfaces = memo(function AppRootSurfaces(props: {
             <DeleteWorktreeDialog />
           </ModalBoundary>
         ) : null}
+        <ModalBoundary boundaryId="modal.recipe-removal-review" resetKey>
+          <RecipeRemovalReviewDialog />
+        </ModalBoundary>
         {activeModal === 'preserved-branch-review' ? (
           <ModalBoundary boundaryId="modal.preserved-branch-review" resetKey>
             <PreservedBranchBatchReviewModal />

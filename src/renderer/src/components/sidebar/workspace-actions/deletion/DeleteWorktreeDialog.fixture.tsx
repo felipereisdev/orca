@@ -183,7 +183,7 @@ function dialogFixture(
         }))
         window.api.ephemeralVm = {
           ...window.api.ephemeralVm,
-          removalPreflight: async () => recipe
+          removalPreflight: async () => ({ ...recipe, ack: 'fixture-ack' })
         }
       }
       defaultGitStatus ??= window.api.git.status

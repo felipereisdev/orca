@@ -156,7 +156,9 @@ export async function removeRecipeWorkspace(
       method: string,
       params: unknown
     ) => Promise<RuntimeRpcResponse<unknown>>
-    cleanup: (runtimeId: string) => Promise<EphemeralVmRuntimeRecord>
+    cleanup: (runtimeId: string, ack: string) => Promise<EphemeralVmRuntimeRecord>
+    /** Checks the workspace first: its ack when clean; refuses when work isn't safe yet. */
+    confirm: () => Promise<string>
   },
   /** Orders the destroy behind the workspace's in-flight VM wake or suspend. */
   orderDestroy: <T>(destroy: () => Promise<T>) => Promise<T> = (destroy) => destroy(),
@@ -167,6 +169,8 @@ export async function removeRecipeWorkspace(
     throw new Error('Recipe workspace ownership changed. Refresh and try again.')
   }
   const environmentId = runtime.runtimeEnvironmentId
+  // Before anything is removed: a phone can't review unsafe work, so only a clean check goes on.
+  const ack = await ports.confirm()
   const { destroyHost: _destroyHost, ...forwarded } = params
   let checkoutResult: Record<string, unknown> = {}
   // A provisioned root is the VM's primary checkout, protected from ordinary Git deletion.
@@ -218,7 +222,7 @@ export async function removeRecipeWorkspace(
       return { ...checkoutResult, removed: true, host: { runtimeId: runtime.id, state: 'kept' } }
     }
   }
-  const cleaned = await orderDestroy(() => ports.cleanup(runtime.id))
+  const cleaned = await orderDestroy(() => ports.cleanup(runtime.id, ack))
   if (cleaned.status !== 'cleaned') {
     throw new RecipeWorkspaceRemovalError(
       'recipe_host_destroy_failed',

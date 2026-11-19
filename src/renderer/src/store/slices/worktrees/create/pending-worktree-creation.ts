@@ -1,3 +1,4 @@
+import { cleanupFailedCreateRuntime } from '@/runtime/ephemeral-vm/failed-create-runtime-cleanup'
 import type { WorktreeSlice } from '../worktree-slice-contract'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { AppState } from '../../../types'
@@ -133,7 +134,7 @@ export function createRemovePendingWorktreeCreation(
     void cleanupFailedEphemeralVmWorkspace(removedEntry.request, {
       deleteProjectHostSetup: (setupId, hostId) =>
         get().deleteProjectHostSetup({ setupId, hostId }),
-      cleanupRuntime: (runtimeId) => window.api.ephemeralVm.cleanup({ runtimeId }),
+      cleanupRuntime: cleanupFailedCreateRuntime,
       reportSetupError: (error) =>
         console.error('Failed to remove cancelled provisioned-root project setup:', error),
       reportRuntimeError: (error) =>

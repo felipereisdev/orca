@@ -5,6 +5,7 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host/execution-host'
 import { composeWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
+import { recipeRuntimeHostIds, takeRecipeRemovalAck } from './recipe-removal-ack-registry'
 import { refreshRuntimeEnvironmentCatalog } from '@/runtime/rpc/environment-revisions/runtime-environment-pairing-refresh'
 
 /** Destroy runtimes for removed workspaces and runtime-owned SSH targets. Share with project removal because SSH-mode main worktrees delete through that path; classify targets so callers purge only confirmed destruction. */
@@ -60,7 +61,11 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
     let releasedServer = false
     for (const runtime of matchingRuntimes) {
       try {
-        const cleaned = await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
+        // Only the ack a removal check issued lets main destroy an environment that became a workspace.
+        const cleaned = await window.api.ephemeralVm.cleanup({
+          runtimeId: runtime.id,
+          ack: takeRecipeRemovalAck(recipeRuntimeHostIds(runtime), runtime.workspaceId)
+        })
         releasedServer ||=
           runtime.runtimeEnvironmentId !== undefined || runtime.sshTargetId !== undefined
         if (runtime.sshTargetId) {

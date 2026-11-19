@@ -73,7 +73,8 @@ function makePorts(
       ): Promise<RuntimeRpcResponse<unknown>> =>
         answers[method] ?? (method === 'worktree.list' ? ok(onlyMain) : ok({ removed: true }))
     ),
-    cleanup: vi.fn(async (runtimeId: string): Promise<EphemeralVmRuntimeRecord> => {
+    confirm: vi.fn(async () => 'ack-1'),
+    cleanup: vi.fn(async (runtimeId: string, _ack: string): Promise<EphemeralVmRuntimeRecord> => {
       const record = listEphemeralVmRuntimes(root).find((entry) => entry.id === runtimeId)
       if (!record) {
         throw new Error('missing record')
@@ -103,6 +104,26 @@ describe('recipe workspace removal on the provisioning host', () => {
     expect(ports.cleanup.mock.invocationCallOrder[0]).toBeGreaterThan(
       ports.call.mock.invocationCallOrder[1]
     )
+  })
+
+  it('a phone removal of unsafe work is refused before anything is removed', async () => {
+    seed()
+    const ports = makePorts()
+    ports.confirm.mockRejectedValueOnce(
+      new RecipeWorkspaceRemovalError('recipe_removal_unconfirmed', 'Open Orca on the Mac')
+    )
+    await expect(removeRecipeWorkspace(root, params, ports)).rejects.toMatchObject({
+      code: 'recipe_removal_unconfirmed'
+    })
+    expect(ports.call).not.toHaveBeenCalled()
+    expect(ports.cleanup).not.toHaveBeenCalled()
+  })
+
+  it('the destroy carries the ack the clean check issued', async () => {
+    seed()
+    const ports = makePorts()
+    await removeRecipeWorkspace(root, params, ports)
+    expect(ports.cleanup).toHaveBeenCalledWith('vm-a', 'ack-1')
   })
 
   it('keeps an environment that still holds other workspaces', async () => {

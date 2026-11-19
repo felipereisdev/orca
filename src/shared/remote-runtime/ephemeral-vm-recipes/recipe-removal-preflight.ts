@@ -9,6 +9,10 @@ export type RecipeRemovalPreflightReason =
   | 'git_failed'
   | 'recordings_failed'
   | 'ambiguous'
+  /** The owner has no Orca server to ask (an SSH-only recipe). */
+  | 'no_orca_server'
+  /** The host's own record of the environment could not be read. */
+  | 'store_unreadable'
 
 export type RecipeRemovalRecording = { id: string; path: string; bytes: number }
 
@@ -24,16 +28,22 @@ export type RecipeRemovalPreflight = {
   reason?: RecipeRemovalPreflightReason
 }
 
+/** A check's answer as the desktop receives it: `ack` lets the destroy that follows go ahead. */
+export type RecipeRemovalCheckResult = RecipeRemovalPreflight & {
+  /** Single use, bound to this workspace on this host and its runtime record; expires in 2 min. */
+  ack: string
+}
+
 export type RecipeRemovalCopyFailure = 'copy_failed' | 'timeout' | 'unreachable' | 'unavailable'
 
 /**
- * Copying pending recordings before a removal; only `ok: true` lets the removal go on. Recordings
- * still pending after the copy passes answer with a fresh check instead.
+ * Copying pending recordings before a removal. `ok: true` proves a final list found nothing pending
+ * and carries a fresh ack; recordings still pending answer with what is known instead.
  */
 export type RecipeRemovalCopyResult =
-  | { ok: true; copied: number }
+  | { ok: true; copied: number; ack: string }
   | { ok: false; reason: RecipeRemovalCopyFailure }
-  | { ok: false; reason: 'still_pending'; preflight: RecipeRemovalPreflight }
+  | { ok: false; reason: 'still_pending'; preflight: RecipeRemovalCheckResult }
 
 /** The workspace as the desktop names it: the host decides which recipe runtime owns it. */
 export type RecipeRemovalTarget = { hostId: string; workspaceId: string }
