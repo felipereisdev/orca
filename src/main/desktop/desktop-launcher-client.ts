@@ -109,8 +109,13 @@ export function runOnLauncher(
     }
     signal.addEventListener('abort', onAbort, { once: true })
 
+    // Before the launcher proved the token, anything unexpected is a rejection: the peer is unproven.
     const protocolError = (): void =>
-      fail(new DesktopError('desktop_run_failed', 'launcher_protocol_error'))
+      fail(
+        authenticated
+          ? new DesktopError('desktop_run_failed', 'launcher_protocol_error')
+          : new DesktopError('desktop_launcher_rejected')
+      )
     const sendRun = (launcherNonce: string): void => {
       const run: Record<string, unknown> = {
         op: 'run',
@@ -192,7 +197,12 @@ export function runOnLauncher(
           protocolError()
           return
         }
-        onReply(reply)
+        // Nothing a peer sends may throw out of this socket callback.
+        try {
+          onReply(reply)
+        } catch {
+          protocolError()
+        }
       },
       protocolError,
       () => paused

@@ -58,7 +58,9 @@ token reaches the launcher on stdin and stays in its memory, never in env, argv 
 (`/proc/<pid>/environ` is readable by the same uid). The token never crosses a connection either:
 Orca's server and the launcher prove it to each other with HMAC-SHA256 over fresh 32-byte nonces,
 the launcher first, so a listener that does not know the token receives only a nonce and the run
-fails with `desktop_launcher_rejected`. The git token reaches a `GIT_ASKPASS` helper through a 0600
+fails with `desktop_launcher_rejected`; a malformed or missing proof is a rejection too. The
+launcher checks a client's proof against its current token, gives an unauthenticated connection
+five seconds, and closes every unauthenticated connection when the token rotates. The git token reaches a `GIT_ASKPASS` helper through a 0600
 file removed after the clone.
 
 The desktop ports are held before anyone can log in. On every container start the root entrypoint
@@ -201,8 +203,10 @@ refuses a run without the token and a wrong token fails the handshake, while fro
 token it runs `id -un` as `gui`; the password and token appear in neither `docker inspect`, nor
 `ps`, command lines or environments on the hosts and in the container, nor any file `dev` or `gui`
 can read (the files are streamed to this machine and searched here). Each denial must show its
-expected refusal, so a Docker or exec error fails the check, and the secrets never enter a
-process run as `dev` or `gui`. Exit status 1 means a check failed.
+expected refusal after a marker proving it ran as that user, so a Docker, SSH or exec error fails
+the check; the launcher probe accepts a run only after the launcher proved the token; an empty or
+failed `docker inspect` and a failed `find` fail their checks; and the secrets never enter a process
+run as `dev` or `gui`. Exit status 1 means a check failed.
 
 ## Electron apps
 

@@ -25,7 +25,8 @@ async function startImpostor(
     socket.on('data', (chunk: string) => {
       received += chunk
       for (const line of chunk.split('\n').filter(Boolean)) {
-        socket.write(`${JSON.stringify(reply(line))}\n`)
+        const answer = reply(line)
+        socket.write(typeof answer === 'string' ? answer : `${JSON.stringify(answer)}\n`)
       }
     })
   })
@@ -93,6 +94,22 @@ describe('runOnLauncher', () => {
     ).rejects.toMatchObject({
       code: 'desktop_launcher_rejected'
     })
+    expect(impostor.received().split('\n').filter(Boolean)).toHaveLength(1)
+  })
+
+  // Same string length as a real proof but other byte lengths or alphabets, a short proof, and
+  // a line that is not JSON: each is a rejection, never a throw out of the socket callback.
+  it.each([
+    ['a multi-byte proof of the same length', { nonce: 'a'.repeat(64), proof: 'é'.repeat(64) }],
+    ['a non-hex proof', { nonce: 'a'.repeat(64), proof: 'z'.repeat(64) }],
+    ['a truncated proof', { nonce: 'a'.repeat(64), proof: 'ab'.repeat(5) }],
+    ['invalid JSON before authentication', 'this is not json\n']
+  ])('refuses %s as desktop_launcher_rejected', async (_label, answer) => {
+    const impostor = await startImpostor(() => answer)
+
+    await expect(
+      run({ host: '127.0.0.1', port: impostor.port, token: TOKEN }, ['echo', 'hi'])
+    ).rejects.toMatchObject({ code: 'desktop_launcher_rejected' })
     expect(impostor.received().split('\n').filter(Boolean)).toHaveLength(1)
   })
 

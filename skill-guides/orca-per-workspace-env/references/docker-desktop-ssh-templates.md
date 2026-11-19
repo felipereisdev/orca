@@ -346,15 +346,17 @@ const VNC_PORT = 5901
 const MAX_LINE_CHARS = 1024 * 1024
 const MAX_RUNS = 64
 const KILL_GRACE_MS = 5000
+const HANDSHAKE_MS = 5000
 const NONCE = /^[0-9a-f]{64}$/
 
 const newNonce = () => crypto.randomBytes(32).toString('hex')
 const proof = (token, label, first, second) =>
   crypto.createHmac('sha256', token).update(`${label}|${first}|${second}`).digest('hex')
+// Only a well-formed proof (64 lowercase hex characters) is compared; nothing here throws.
 const proofMatches = (expected, received) =>
   typeof received === 'string' &&
-  received.length === expected.length &&
-  crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+  NONCE.test(received) &&
+  crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'))
 
 function lineSplitter(onLine, onOverflow) {
   let pending = ''
@@ -398,11 +400,18 @@ function serve() {
     ELECTRON_DISABLE_SANDBOX: '1'
   }
   const defaultCwd = process.env.ORCA_DESKTOP_DEFAULT_CWD || process.env.HOME || '/'
+  // Connections that have not proved the token yet: closed on rotation and after the deadline.
+  const pending = new Set()
 
   const server = net.createServer((socket) => {
     socket.setEncoding('utf8')
     socket.on('error', () => {})
-    // Each connection is bound to the token current when it said hello.
+    pending.add(socket)
+    const deadline = setTimeout(() => pending.has(socket) && socket.destroy(), HANDSHAKE_MS)
+    socket.once('close', () => {
+      clearTimeout(deadline)
+      pending.delete(socket)
+    })
     let session = null
     let child = null
     let runId = null
@@ -503,22 +512,20 @@ function serve() {
         ) {
           return refuse('bad_request')
         }
-        session = { token, broker: request.nonce, launcher: newNonce() }
+        session = { broker: request.nonce, launcher: newNonce() }
         send({
           nonce: session.launcher,
-          proof: proof(session.token, 'orca-launcher-server', session.broker, session.launcher)
+          proof: proof(token, 'orca-launcher-server', session.broker, session.launcher)
         })
         return
       }
       if (!runId) {
-        const expected = proof(
-          session.token,
-          'orca-launcher-client',
-          session.launcher,
-          session.broker
-        )
+        // Checked against the token current now, never one from before a rotation.
+        const expected = proof(token, 'orca-launcher-client', session.launcher, session.broker)
         if (request.op !== 'run' || !proofMatches(expected, request.proof))
           return refuse('bad_token')
+        pending.delete(socket)
+        clearTimeout(deadline)
         return start(request)
       }
       if (request.op === 'kill' && request.id === runId) killGroup()
@@ -546,6 +553,8 @@ function serve() {
         const next = line.trim()
         if (next.length < 32) return
         token = next
+        for (const socket of pending) socket.destroy()
+        pending.clear()
         if (!listening) {
           listening = true
           server.listen(PORT, HOST)
@@ -575,14 +584,17 @@ function readStdinLine() {
   })
 }
 
-// Results: started (with stdout and exit), rejected (the launcher refused our proof),
-// server_proof_mismatch (the listener proved a different token), unreachable, protocol_error.
-// An empty token skips checking the listener and sends a proof made with no token.
+// Results: started (with stdout and exit; only after the listener proved our token), rejected
+// (the launcher refused our proof), server_proof_mismatch (the listener proved another token or
+// sent a malformed proof), no_handshake (it answered without a proof), unverified_run (it ran a
+// program for a probe that could not check it), unreachable, protocol_error. An empty token cannot
+// check the listener and sends a proof made with no token; it expects `rejected`.
 function probe(token) {
   const socket = net.connect({ host: HOST, port: PORT })
   const result = { result: 'unknown', stdout: '' }
   const broker = newNonce()
   let authenticated = false
+  let verified = false
   const finish = () => {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     process.exit(0)
@@ -604,7 +616,11 @@ function probe(token) {
           result.result = 'protocol_error'
           return socket.destroy()
         }
-        if (!authenticated && typeof reply.nonce === 'string') {
+        if (!authenticated) {
+          if (typeof reply.nonce !== 'string' || !NONCE.test(reply.nonce)) {
+            result.result = 'no_handshake'
+            return socket.destroy()
+          }
           if (
             token &&
             !proofMatches(proof(token, 'orca-launcher-server', broker, reply.nonce), reply.proof)
@@ -613,13 +629,17 @@ function probe(token) {
             return socket.destroy()
           }
           authenticated = true
+          verified = Boolean(token)
           const key = token || crypto.randomBytes(32).toString('hex')
           socket.write(
             `${JSON.stringify({ op: 'run', proof: proof(key, 'orca-launcher-client', reply.nonce, broker), argv: ['id', '-un'] })}\n`
           )
         } else if (reply.error === 'bad_token') result.result = 'rejected'
         else if (typeof reply.error === 'string') result.result = `refused:${reply.error}`
-        else if (typeof reply.id === 'string') result.result = 'started'
+        else if (!verified) {
+          result.result = 'unverified_run'
+          return socket.destroy()
+        } else if (typeof reply.id === 'string') result.result = 'started'
         else if (reply.stream === 'stdout') result.stdout += reply.data
         else if (typeof reply.exit === 'number') result.exit = reply.exit
       },
@@ -1187,17 +1207,18 @@ as() { # <user> <command...>, in the container
   dk exec -u "$user" "$container" "$@"
 }
 
-# The command ran as <user>, failed, and said <refusal>; a Docker or exec error does not count.
+# The command ran inside the container as <user> (it printed a marker first), failed, and said
+# <refusal>, the message of that very command. A Docker, SSH or exec error has no marker.
 refused() { # <refusal text> <user> <command...>
-  local refusal="$1" output
-  shift
-  if output="$(as "$@" 2>&1)"; then
+  local refusal="$1" user="$2" output
+  shift 2
+  if output="$(as "$user" sh -c 'echo "orca-probe-ran-as:$(id -un)"; exec "$@"' probe "$@" 2>&1)"; then
     printf '  unexpectedly succeeded: %s\n' "$output" >&2
     return 1
   fi
   case "$output" in
-    *"$refusal"*) return 0 ;;
-    *) printf '  failed without "%s": %s\n' "$refusal" "$output" >&2 && return 1 ;;
+    *"orca-probe-ran-as:$user"*"$refusal"*) return 0 ;;
+    *) printf '  no "%s" after running as %s: %s\n' "$refusal" "$user" "$output" >&2 && return 1 ;;
   esac
 }
 
@@ -1271,17 +1292,16 @@ desktop_ports_held() {
 gui_opens_display() {
   dk exec -u gui -e DISPLAY=:1 -e XAUTHORITY=/home/gui/.Xauthority "$container" xdpyinfo >/dev/null
 }
-dev_cannot_open_display() {
-  dk exec -u dev -e DISPLAY=:1 "$container" xdpyinfo >"$work/xdpyinfo" 2>&1 && return 1
-  grep -q 'unable to open display' "$work/xdpyinfo"
+dev_cannot_open_display() { refused 'xdpyinfo:  unable to open display ":1".' dev env DISPLAY=:1 xdpyinfo; }
+dev_cannot_read_cookie() { refused 'cat: /home/gui/.Xauthority: Permission denied' dev cat /home/gui/.Xauthority; }
+dev_cannot_list_x_sockets() {
+  refused "ls: cannot open directory '/tmp/.X11-unix': Permission denied" dev ls /tmp/.X11-unix
 }
-dev_cannot_read_cookie() { refused 'Permission denied' dev cat /home/gui/.Xauthority; }
-dev_cannot_list_x_sockets() { refused 'Permission denied' dev ls /tmp/.X11-unix; }
 
 vnc_password_file_private() {
   [ "$(as vnc stat -c '%U %a' /home/vnc/.vnc/passwd)" = 'vnc 600' ] &&
-    refused 'Permission denied' dev cat /home/vnc/.vnc/passwd &&
-    refused 'Permission denied' gui cat /home/vnc/.vnc/passwd
+    refused 'cat: /home/vnc/.vnc/passwd: Permission denied' dev cat /home/vnc/.vnc/passwd &&
+    refused 'cat: /home/vnc/.vnc/passwd: Permission denied' gui cat /home/vnc/.vnc/passwd
 }
 
 vnc_refuses_wrong_answer() {
@@ -1300,9 +1320,10 @@ launcher_runs_as_gui_for_root() {
   [ "$(printf '%s\n' "$token" | launcher_probe root)" = '{"result":"started","stdout":"gui\n","exit":0}' ]
 }
 
+# The inspect must succeed and describe this container; an empty or failed one proves nothing.
 secrets_not_in_inspect() {
-  dk container inspect "$container" >"$work/inspect"
-  secrets_absent_from "$work/inspect"
+  dk container inspect "$container" >"$work/inspect" || return 1
+  grep -q '"Id": "[0-9a-f]\{64\}"' "$work/inspect" && secrets_absent_from "$work/inspect"
 }
 
 secrets_not_in_processes() {
@@ -1329,9 +1350,15 @@ secrets_not_in_processes() {
 secrets_not_in_readable_files() {
   local user
   for user in dev gui; do
-    as "$user" sh -c 'find /home /tmp /run /work /etc /var/tmp /opt -xdev \
-      \( -type d \( ! -readable -o ! -executable \) -prune \) -o \( -type f -readable -print0 \) |
-      xargs -0 -r cat --' >"$work/files-$user" 2>"$work/files-$user.err" ||
+    # find's own exit status counts: a partial listing must not pass for a full scan.
+    as "$user" sh -c 'list="$(mktemp)" || exit 1
+      find /home /tmp /run /work /etc /var/tmp /opt -xdev \
+        \( -type d \( ! -readable -o ! -executable \) -prune \) -o \( -type f -readable -print0 \) >"$list"
+      status=$?
+      [ "$status" -eq 0 ] && xargs -0 -r cat -- <"$list"
+      status=$((status ? status : $?))
+      rm -f "$list"
+      exit "$status"' >"$work/files-$user" 2>"$work/files-$user.err" ||
       { sed 's/^/  /' "$work/files-$user.err" >&2; return 1; }
     [ -s "$work/files-$user" ] && secrets_absent_from "$work/files-$user" || return 1
   done

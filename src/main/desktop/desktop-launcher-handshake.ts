@@ -6,14 +6,18 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
  *   launcher proves "orca-launcher-server|<broker nonce>|<launcher nonce>",
  *   broker proves   "orca-launcher-client|<launcher nonce>|<broker nonce>".
  */
-const NONCE_PATTERN = /^[0-9a-f]{64}$/
+const HEX_32_BYTES = /^[0-9a-f]{64}$/
+
+function isHex32(value: unknown): value is string {
+  return typeof value === 'string' && HEX_32_BYTES.test(value)
+}
 
 export function newLauncherNonce(): string {
   return randomBytes(32).toString('hex')
 }
 
 export function isLauncherNonce(value: unknown): value is string {
-  return typeof value === 'string' && NONCE_PATTERN.test(value)
+  return isHex32(value)
 }
 
 export function launcherServerProof(
@@ -36,9 +40,10 @@ export function launcherClientProof(
     .digest('hex')
 }
 
+/** Accepts only a well-formed proof (64 lowercase hex characters); never throws. */
 export function proofMatches(expected: string, received: unknown): boolean {
-  if (typeof received !== 'string' || received.length !== expected.length) {
+  if (!isHex32(expected) || !isHex32(received)) {
     return false
   }
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+  return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'))
 }
