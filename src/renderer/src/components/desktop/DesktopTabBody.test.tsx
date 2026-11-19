@@ -18,12 +18,15 @@ const mocks = vi.hoisted(() => {
   const channelViewerIds: string[] = []
   // Status reads held back by a test, answered later with whatever it chooses.
   const heldReads: ((status: unknown) => void)[] = []
-  const state: { status: DesktopStatus; controller: string | null; holdReads: boolean } = {
-    status,
-    controller: null,
-    holdReads: false
-  }
-  return Object.assign(state, { rpc: vi.fn(), heldReads, viewers, channelViewerIds })
+  const heldControl: ((status: unknown) => void)[] = []
+  const state: {
+    status: DesktopStatus
+    controller: string | null
+    holdReads: boolean
+    holdControl: boolean
+    statusError: { code: string; message: string } | null
+  } = { status, controller: null, holdReads: false, holdControl: false, statusError: null }
+  return Object.assign(state, { rpc: vi.fn(), heldReads, heldControl, viewers, channelViewerIds })
 })
 
 vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({ callRuntimeRpc: mocks.rpc }))
@@ -86,10 +89,16 @@ describe('DesktopTabBody', () => {
     mocks.viewers.length = 0
     mocks.channelViewerIds.length = 0
     mocks.heldReads.length = 0
+    mocks.heldControl.length = 0
     mocks.holdReads = false
+    mocks.holdControl = false
+    mocks.statusError = null
     mocks.controller = null
     mocks.rpc.mockReset().mockImplementation(async (_target, method: string, params: Params) => {
       if (method === 'desktop.status') {
+        if (mocks.statusError) {
+          throw mocks.statusError
+        }
         if (mocks.holdReads) {
           return new Promise((resolve) => mocks.heldReads.push(resolve))
         }
@@ -98,6 +107,10 @@ describe('DesktopTabBody', () => {
       if (method === 'desktop.control.set' && params.owner) {
         mocks.status = { ...mocks.status, owner: params.owner }
         mocks.controller = params.owner === 'user' ? (params.viewerId ?? null) : null
+        if (mocks.holdControl) {
+          const acknowledged = mocks.status
+          return new Promise((resolve) => mocks.heldControl.push(() => resolve(acknowledged)))
+        }
         return mocks.status
       }
       if (method === 'desktop.record.start') {
@@ -215,6 +228,46 @@ describe('DesktopTabBody', () => {
 
     expect(screen.getByText("You're in control")).toBeTruthy()
     expect(mocks.viewers[0].viewOnly).toBe(false)
+  })
+
+  it('a status read that starts during taking control and lands after the ack does not undo it', async () => {
+    mocks.status = { state: 'ready', owner: 'agent', recording: false }
+    render(<DesktopTabBody worktreeId="repo::/w" />)
+    await flush()
+    const stale = statusFor(mocks.channelViewerIds[0])
+    mocks.holdReads = true
+    mocks.holdControl = true
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take control' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000)
+    })
+    const startedDuring = mocks.heldReads.splice(0)
+    // The ack and a read begun during the mutation land together; the fresh read stays held.
+    act(() => {
+      mocks.heldControl[0](undefined)
+      for (const resolve of startedDuring) {
+        resolve(stale)
+      }
+    })
+    await flush()
+
+    expect(screen.getByText("You're in control")).toBeTruthy()
+    expect(mocks.viewers[0].viewOnly).toBe(false)
+  })
+
+  it('a failed retry keeps the localized reason', async () => {
+    mocks.statusError = { code: 'desktop_agent_not_allowed', message: 'Agents cannot view.' }
+    render(<DesktopTabBody worktreeId="repo::/w" />)
+    await flush()
+    const reason = 'Only the computer that set up this desktop can view or control it.'
+    expect(screen.getByRole('alert').textContent).toBe(reason)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await flush()
+
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe(reason)
   })
 
   it('a status read that started before recording does not undo it', async () => {

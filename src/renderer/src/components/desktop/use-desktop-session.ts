@@ -65,6 +65,8 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
   const [connection, setConnection] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Why a failed status read is unavailable: its RPC code, shown until a read succeeds.
+  const [statusError, setStatusError] = useState<string | null>(null)
   const pollerRef = useRef<DesktopStatusPoller | null>(null)
 
   useEffect(() => {
@@ -76,12 +78,16 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
       viewerId,
       (next) => {
         setStatus(next)
+        setStatusError(null)
         // A desktop that went down and came back gets a fresh viewer without a retry.
         if (next.state !== 'ready') {
           setLost(false)
         }
       },
-      () => setLost(true)
+      (reason) => {
+        setLost(true)
+        setStatusError(errorCode(reason))
+      }
     )
     pollerRef.current = poller
     return () => {
@@ -97,13 +103,13 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
       }
       setBusy(true)
       setError(null)
-      // Reads already in flight may predate this action, so their answers are dropped.
-      pollerRef.current?.invalidate()
+      // Reads begun before or during this action may predate it, so their answers are dropped.
+      const mutation = pollerRef.current?.beginMutation()
       callRuntimeRpc<T>(target, method, params)
         .then(apply, (reason: unknown) => setError(errorCode(reason)))
         .finally(() => {
           setBusy(false)
-          pollerRef.current?.refresh()
+          mutation?.settled()
         })
     },
     [target]
@@ -139,7 +145,7 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
     view: desktopView(target, status, lost),
     connection,
     busy,
-    error,
+    error: error ?? statusError,
     actions,
     markLost: useCallback(() => setLost(true), [])
   }

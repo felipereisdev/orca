@@ -17,8 +17,11 @@ export type DesktopStatus = {
 export type DesktopStatusPoller = {
   /** Reads now; a read already in flight is ignored when it lands. */
   refresh: () => void
-  /** Call before and after a mutation: reads that started earlier are ignored when they land. */
-  invalidate: () => void
+  /**
+   * Call as a mutation starts: every read begun before or during it is ignored, and none start
+   * until the returned `settled` runs, which does one fresh read after the ack is applied.
+   */
+  beginMutation: () => { settled: () => void }
   stop: () => void
 }
 
@@ -32,22 +35,26 @@ export function pollDesktopStatus(
   target: RuntimeClientTarget,
   viewerId: string,
   onStatus: (status: DesktopStatus) => void,
-  onFailure: () => void
+  onFailure: (error: unknown) => void
 ): DesktopStatusPoller {
   let active = true
   let epoch = 0
+  let mutations = 0
   let timer: ReturnType<typeof setTimeout> | undefined
   const poll = async (): Promise<void> => {
-    const started = ++epoch
     clearTimeout(timer)
+    if (mutations > 0) {
+      return
+    }
+    const started = ++epoch
     try {
       const next = await callRuntimeRpc<DesktopStatus>(target, 'desktop.status', { viewerId })
       if (active && started === epoch) {
         onStatus(next)
       }
-    } catch {
+    } catch (error) {
       if (active && started === epoch) {
-        onFailure()
+        onFailure(error)
       }
     }
     if (active && started === epoch) {
@@ -61,12 +68,22 @@ export function pollDesktopStatus(
         void poll()
       }
     },
-    invalidate: () => {
+    beginMutation: () => {
       epoch++
-      // The superseded read no longer reschedules; keep polling from here.
+      mutations++
       clearTimeout(timer)
-      if (active) {
-        timer = setTimeout(() => void poll(), STATUS_POLL_MS)
+      let done = false
+      return {
+        settled: () => {
+          if (done) {
+            return
+          }
+          done = true
+          mutations--
+          if (active) {
+            void poll()
+          }
+        }
       }
     },
     stop: () => {
