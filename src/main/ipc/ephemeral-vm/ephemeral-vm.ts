@@ -9,7 +9,7 @@ import {
   getEphemeralVmRecipeResultWarnings,
   type EphemeralVmRecipeResultWarning
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
-import { redactEphemeralVmRecipeDiagnosticText } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { sanitizeEphemeralVmRecipeStderr } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-stderr-sanitizer'
 import { createProvisionEventForwarder } from './ephemeral-vm-provision-events'
 import { getProvisionedRootRecipeRepoUrl } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-repo-url'
 // Import the Node-only doctor directly so browser consumers of the barrel do not bundle fs/path.
@@ -204,7 +204,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             error: result.start.error,
             ...pickEphemeralVmFailureCode(result.start),
             stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
-            stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+            stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
           }
         }
         const connection = getEphemeralVmRecipeResultConnection(result.start.result)
@@ -228,7 +228,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
               sshTargetId: ssh.targetId,
               environmentId: ssh.environmentId,
               ...(expectedRefHead ? { expectedRefHead } : {}),
-              stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr),
+              stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr),
               warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
             }
           } catch (error) {
@@ -242,7 +242,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
               ok: false,
               error: error instanceof Error ? error.message : String(error),
               stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
-              stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+              stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
             }
           }
         }
@@ -265,7 +265,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             ok: false,
             error: error instanceof Error ? error.message : String(error),
             stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
-            stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+            stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
           }
         }
         const runtime = requireEphemeralVmRecipeResult(
@@ -280,7 +280,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           connectionType: 'orca-server',
           runtime,
           environment: redactRuntimeEnvironment(environment),
-          stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr),
+          stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr),
           warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
         }
       } finally {

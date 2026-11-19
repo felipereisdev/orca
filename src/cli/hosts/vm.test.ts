@@ -72,4 +72,16 @@ describe('vm recipe doctor --provision', () => {
     expect(output).toContain('[recipe stdout withheld: not a recipe result, 44 bytes]')
     expect(output).not.toContain(PASSWORD)
   })
+  it('withholds a stderr password line in the transcript and the remediation', async () => {
+    const output = await runDoctor(
+      [
+        `process.stderr.write('vnc password:\\n  ${PASSWORD}\\nstarting\\n')`,
+        `process.stderr.write('PASSWORD=${PASSWORD}\\n')`,
+        'process.exit(3)'
+      ].join(';')
+    )
+
+    expect(output).toContain('[stderr line withheld: may contain a secret]')
+    expect(output).not.toContain(PASSWORD)
+  })
 })

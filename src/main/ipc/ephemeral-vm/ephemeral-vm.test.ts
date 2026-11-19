@@ -224,7 +224,7 @@ describe('registerEphemeralVmHandlers', () => {
 
     async function provisionWithDesktop(
       connection: Record<string, unknown>,
-      options: { destroyExitCode?: number } = {}
+      options: { destroyExitCode?: number; stderr?: string } = {}
     ) {
       const userDataPath = makeDir('orca-ephemeral-vm-desktop-user-data-')
       const repoPath = makeDir('orca-ephemeral-vm-desktop-repo-')
@@ -234,7 +234,7 @@ describe('registerEphemeralVmHandlers', () => {
       const startPath = join(repoPath, 'start.js')
       writeFileSync(
         startPath,
-        `console.log(${JSON.stringify(
+        `process.stderr.write(${JSON.stringify(options.stderr ?? '')});console.log(${JSON.stringify(
           JSON.stringify({ schemaVersion: 1, connection, desktop: DESKTOP })
         )})`
       )
@@ -256,6 +256,7 @@ describe('registerEphemeralVmHandlers', () => {
         recipeId: 'desktop-cloud'
       } as never)) as {
         ok: boolean
+        stderr: string
         runtime: { id: string; runtimeEnvironmentId?: string }
       }
       runtimeIds.push(provisioned.runtime.id)
@@ -297,6 +298,17 @@ describe('registerEphemeralVmHandlers', () => {
         method: 'desktop.configure',
         params: { host: '127.0.0.1', port: 5901, password: 'abc12345' }
       })
+    })
+
+    it('withholds secret stderr lines from the returned diagnostics', async () => {
+      const { provisioned } = await provisionWithDesktop(
+        { type: 'orca-server', pairingCode: makePairingCode(), projectRoot: '/workspace/repo' },
+        { stderr: 'generated vnc password:\n  dummy-pw-77\nVNC_PASSWORD=dummy-pw-77\nready\n' }
+      )
+
+      expect(provisioned.ok).toBe(true)
+      expect(provisioned.stderr).not.toContain('dummy-pw-77')
+      expect(provisioned.stderr).toContain('ready')
     })
 
     it('configures the SSH-managed server after provisioning', async () => {

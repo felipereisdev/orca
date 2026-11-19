@@ -12,7 +12,7 @@ import {
   describeEphemeralVmRecipeStdoutForDiagnostics,
   getEphemeralVmRecipeResultWarnings
 } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
-import { redactEphemeralVmRecipeDiagnosticText } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { sanitizeEphemeralVmRecipeStderr } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-stderr-sanitizer'
 // This module uses Node fs/path; exporting it through the shared barrel would break browser bundles.
 import { doctorEphemeralVmRecipe } from '../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor'
 import {
@@ -111,7 +111,7 @@ function capTranscriptStdout(value: string): string {
 
 // Keep setup context and final diagnostics while bounding and redacting each stream.
 function capTranscriptStream(value: string): string {
-  return capRedactedTranscript(redactEphemeralVmRecipeDiagnosticText(value))
+  return capRedactedTranscript(sanitizeEphemeralVmRecipeStderr(value))
 }
 
 function capRedactedTranscript(redacted: string): string {
@@ -253,7 +253,7 @@ async function doctorRecipeWithProvision(
 }
 
 function buildProvisionFailureRemediation(stderr: string, stdout: string): string {
-  const redactedStderr = redactEphemeralVmRecipeDiagnosticText(stderr).trim()
+  const redactedStderr = sanitizeEphemeralVmRecipeStderr(stderr).trim()
   const redactedStdout = describeEphemeralVmRecipeStdoutForDiagnostics(stdout).trim()
   const detail = redactedStderr || redactedStdout
   return detail

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runRecipeCommand } from './ephemeral-vm-recipe-process'
+import { sanitizeEphemeralVmRecipeStderr } from './ephemeral-vm-recipe-stderr-sanitizer'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -56,12 +57,23 @@ describe('recipe output capture', () => {
     await vi.advanceTimersByTimeAsync(5000)
     await expect(fixture.result).resolves.toEqual({
       stdout: '😀Z!',
-      stderr: 'r tail',
+      stderr: '[earlier stderr omitted]\n',
       exitCode: null,
       signal: null,
       aborted: true
     })
     expect(fixture.child.kill.mock.calls).toEqual([['SIGTERM'], ['SIGKILL']])
     expect(fixture.child.unref).toHaveBeenCalledOnce()
+  })
+
+  it('a stderr tail that lost its head withholds the line that may be a lost key value', async () => {
+    const fixture = fakeCommand(24)
+    fixture.child.stderr.emit('data', Buffer.from('ok\nthe password:\n  hunter22\nnext line\n'))
+    fixture.child.emit('close', 0, null)
+    const { stderr } = await fixture.result
+
+    expect(sanitizeEphemeralVmRecipeStderr(stderr)).toBe(
+      '[earlier stderr omitted]\n[stderr line withheld: may contain a secret]\nnext line\n'
+    )
   })
 })
