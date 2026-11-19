@@ -158,7 +158,8 @@ async function minifyWebOutput() {
           minifyIdentifiers: !outputPath.startsWith('assets/'),
           minifySyntax: true,
           minifyWhitespace: true,
-          target: 'es2020'
+          // Matches the renderer build target (electron.vite.config.ts): noVNC uses top-level await.
+          target: 'es2022'
         })
         writeFileSync(targetPath, result.code)
       })
