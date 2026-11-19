@@ -15,7 +15,10 @@ export const DesktopConfigureParams = z.object({
     .optional()
 })
 
-export const DesktopStatusParams = z.object({})
+export const DesktopStatusParams = z.object({
+  /** Adds `viewerControl` for this viewer to the status. */
+  viewerId: z.string().min(1, '--viewer-id must not be empty').optional()
+})
 
 export const DesktopControlSetParams = z.object({
   owner: z.enum(['agent', 'user']),

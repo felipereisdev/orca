@@ -80,7 +80,9 @@ export function TabBarStaticCreateMenu({
   const databaseClient = useWorkspaceDatabaseClient(terminalOnly ? null : props.worktreeId)
   const simulatorAvailable = !terminalOnly && mobileEmulatorEnabled && mobileEmulatorCreationEnabled
   const workspaceHasDesktop = useAppStore(
-    (state) => state.ephemeralVmRuntimesByWorkspaceId[props.worktreeId]?.hasDesktop === true
+    (state) =>
+      state.settings?.experimentalEphemeralVms === true &&
+      state.ephemeralVmRuntimesByWorkspaceId[props.worktreeId]?.hasDesktop === true
   )
 
   const terminalItems: TabBarCreateRowItem[] =

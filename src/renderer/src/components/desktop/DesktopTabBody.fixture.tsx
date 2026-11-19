@@ -38,17 +38,27 @@ function frame(view: DesktopView, error: string | null = null) {
 
 export const agentInControl = defineFixture({
   width: 720,
-  render: frame({ kind: 'ready', owner: 'agent', recording: false })
+  render: frame({ kind: 'ready', control: 'agent', recording: false })
 })
 
 export const userInControl = defineFixture({
   width: 720,
-  render: frame({ kind: 'ready', owner: 'user', recording: false })
+  render: frame({ kind: 'ready', control: 'this', recording: false })
 })
 
 export const recording = defineFixture({
   width: 720,
-  render: frame({ kind: 'ready', owner: 'agent', recording: true })
+  render: frame({ kind: 'ready', control: 'agent', recording: true })
+})
+
+export const otherWindow = defineFixture({
+  width: 720,
+  render: frame({ kind: 'ready', control: 'other', recording: false })
+})
+
+export const unconfigured = defineFixture({
+  width: 720,
+  render: frame({ kind: 'unconfigured' })
 })
 
 export const unavailable = defineFixture({
@@ -58,5 +68,5 @@ export const unavailable = defineFixture({
 
 export const recordingFailed = defineFixture({
   width: 720,
-  render: frame({ kind: 'ready', owner: 'user', recording: false }, 'desktop_recording_failed')
+  render: frame({ kind: 'ready', control: 'this', recording: false }, 'desktop_recording_failed')
 })

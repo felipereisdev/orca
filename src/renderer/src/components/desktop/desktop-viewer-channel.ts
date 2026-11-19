@@ -164,7 +164,8 @@ class DesktopViewerChannel implements WebSocketLike {
     if (unsubscribe) {
       this.#handle?.unsubscribe()
     }
-    this.onclose?.({ code: wasClean ? 1000 : 1006, reason: '', wasClean })
+    // A WebSocket's close event is a later task, never inside close(); noVNC relies on that order.
+    setTimeout(() => this.onclose?.({ code: wasClean ? 1000 : 1006, reason: '', wasClean }), 0)
   }
 }
 

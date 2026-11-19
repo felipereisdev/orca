@@ -1,30 +1,56 @@
-import { Bot, Circle, Hand, Square, UserRound } from 'lucide-react'
+import { AppWindow, Bot, Circle, Hand, Square, UserRound } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import type { DesktopActions, DesktopView } from './use-desktop-session'
 
+function RetryableChip({ label, onRetry }: { label: string; onRetry: () => void }) {
+  const t = useTranslate()
+  return (
+    <span className="flex items-center gap-1.5 text-xs">
+      <Badge variant="warning">{label}</Badge>
+      <Button variant="link" size="inlineText" onClick={onRetry}>
+        {t('desktop.tab.retry', 'Try again')}
+      </Button>
+    </span>
+  )
+}
+
 function StatusChip({ view, onRetry }: { view: DesktopView; onRetry: () => void }) {
   const t = useTranslate()
   if (view.kind === 'unavailable') {
     return (
-      <span className="flex items-center gap-1.5 text-xs">
-        <Badge variant="warning">{t('desktop.tab.status.unavailable', 'Unavailable')}</Badge>
-        <Button variant="link" size="inlineText" onClick={onRetry}>
-          {t('desktop.tab.retry', 'Try again')}
-        </Button>
-      </span>
+      <RetryableChip label={t('desktop.tab.status.unavailable', 'Unavailable')} onRetry={onRetry} />
+    )
+  }
+  if (view.kind === 'unconfigured') {
+    return (
+      <RetryableChip
+        label={t('desktop.tab.status.unconfigured', 'Not set up yet')}
+        onRetry={onRetry}
+      />
     )
   }
   if (view.kind === 'connecting') {
     return <Badge variant="outline">{t('desktop.tab.status.connecting', 'Connecting…')}</Badge>
   }
-  return view.owner === 'user' ? (
-    <Badge variant="dot">
-      <UserRound />
-      {t('desktop.tab.status.user', "You're in control")}
-    </Badge>
-  ) : (
+  if (view.control === 'this') {
+    return (
+      <Badge variant="dot">
+        <UserRound />
+        {t('desktop.tab.status.user', "You're in control")}
+      </Badge>
+    )
+  }
+  if (view.control === 'other') {
+    return (
+      <Badge variant="outline">
+        <AppWindow />
+        {t('desktop.tab.status.otherWindow', 'Control in another window')}
+      </Badge>
+    )
+  }
+  return (
     <Badge variant="outline">
       <Bot />
       {t('desktop.tab.status.agent', 'Agent in control')}
@@ -46,6 +72,7 @@ export function DesktopToolbar({
 }): React.JSX.Element {
   const t = useTranslate()
   const ready = view.kind === 'ready'
+  const mine = ready && view.control === 'this'
   return (
     <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-1.5">
       <StatusChip view={view} onRetry={actions.retry} />
@@ -68,13 +95,13 @@ export function DesktopToolbar({
               : t('desktop.tab.recording.start', 'Record')}
           </Button>
           <Button
-            variant={view.owner === 'user' ? 'outline' : 'default'}
+            variant={mine ? 'outline' : 'default'}
             size="xs"
             disabled={busy}
-            onClick={view.owner === 'user' ? actions.handBack : actions.takeControl}
+            onClick={mine ? actions.handBack : actions.takeControl}
           >
             <Hand />
-            {view.owner === 'user'
+            {mine
               ? t('desktop.tab.control.handBack', 'Hand back to agent')
               : t('desktop.tab.control.take', 'Take control')}
           </Button>

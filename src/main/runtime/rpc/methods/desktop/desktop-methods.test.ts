@@ -256,6 +256,32 @@ describe('desktop RPC methods', () => {
     expect(second!.replies.map((reply) => reply.result?.type)).toEqual(['ready'])
   })
 
+  it("desktop.status with a viewerId says whether that viewer holds control, never another viewer's id", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const server = await vncServer()
+    const { dispatcher, call, configure } = setup()
+    await configure(server, MAC)
+    await connectFakeRfbViewer(async (client) => {
+      streamViewer(dispatcher, 'v1', MAC, client)
+    })
+    await connectFakeRfbViewer(async (client) => {
+      streamViewer(dispatcher, 'v2', MAC, client)
+    })
+
+    const agentOwned = await call('desktop.status', { viewerId: 'v1' }, MAC)
+    await call('desktop.control.set', { owner: 'user', viewerId: 'v1' }, MAC)
+    const mine = await call('desktop.status', { viewerId: 'v1' }, MAC)
+    const other = await call('desktop.status', { viewerId: 'v2' }, MAC)
+    const plain = await call('desktop.status', {}, MAC)
+
+    expect(agentOwned).toMatchObject({ result: { owner: 'agent', viewerControl: null } })
+    expect(mine).toMatchObject({ result: { owner: 'user', viewerControl: 'this' } })
+    expect(other).toMatchObject({ result: { owner: 'user', viewerControl: 'other' } })
+    expect(plain).toMatchObject({ ok: true })
+    expect(plain).not.toHaveProperty('result.viewerControl')
+    expect(JSON.stringify([mine, other, plain])).not.toContain('v1')
+  })
+
   it('desktop.status hides the password', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const server = await vncServer()

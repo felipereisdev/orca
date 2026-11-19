@@ -1,22 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RuntimeClientTarget } from '../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
+import {
+  pollDesktopStatus,
+  type DesktopStatus,
+  type DesktopStatusPoller
+} from './desktop-status-poller'
 
-export type DesktopOwner = 'agent' | 'user'
-
-export type DesktopStatus = {
-  state: 'unconfigured' | 'connecting' | 'ready' | 'unavailable'
-  reason?: string
-  owner: DesktopOwner
-  width?: number
-  height?: number
-  recording: boolean
-}
+/** Who holds the desktop as this viewer sees it: the agent, this viewer, or another window. */
+export type DesktopControl = 'agent' | 'this' | 'other'
 
 export type DesktopView =
   | { kind: 'connecting' }
   | { kind: 'unavailable' }
-  | { kind: 'ready'; owner: DesktopOwner; recording: boolean }
+  | { kind: 'unconfigured' }
+  | { kind: 'ready'; control: DesktopControl; recording: boolean }
 
 export type DesktopActions = {
   takeControl: () => void
@@ -26,12 +24,18 @@ export type DesktopActions = {
   retry: () => void
 }
 
-const STATUS_POLL_MS = 3_000
-
 function errorCode(error: unknown): string {
   return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
     ? error.code
     : 'unknown'
+}
+
+function control(status: DesktopStatus): DesktopControl {
+  if (status.viewerControl === 'this') {
+    return 'this'
+  }
+  // A user owner this viewer cannot place is someone else's, so this one stays view-only.
+  return status.viewerControl === 'other' || status.owner === 'user' ? 'other' : 'agent'
 }
 
 export function desktopView(
@@ -42,40 +46,13 @@ export function desktopView(
   if (!target || target.kind !== 'environment' || lost || status?.state === 'unavailable') {
     return { kind: 'unavailable' }
   }
+  if (status?.state === 'unconfigured') {
+    return { kind: 'unconfigured' }
+  }
   if (status?.state !== 'ready') {
     return { kind: 'connecting' }
   }
-  return { kind: 'ready', owner: status.owner, recording: status.recording }
-}
-
-/** Polls `desktop.status` until the returned stop runs; a failed read keeps polling. */
-function pollDesktopStatus(
-  target: RuntimeClientTarget,
-  onStatus: (status: DesktopStatus) => void,
-  onFailure: () => void
-): () => void {
-  let active = true
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const poll = async (): Promise<void> => {
-    try {
-      const next = await callRuntimeRpc<DesktopStatus>(target, 'desktop.status', {})
-      if (active) {
-        onStatus(next)
-      }
-    } catch {
-      if (active) {
-        onFailure()
-      }
-    }
-    if (active) {
-      timer = setTimeout(() => void poll(), STATUS_POLL_MS)
-    }
-  }
-  void poll()
-  return () => {
-    active = false
-    clearTimeout(timer)
-  }
+  return { kind: 'ready', control: control(status), recording: status.recording }
 }
 
 /**
@@ -88,13 +65,15 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
   const [connection, setConnection] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const pollerRef = useRef<DesktopStatusPoller | null>(null)
 
   useEffect(() => {
     if (!target || target.kind !== 'environment') {
       return
     }
-    return pollDesktopStatus(
+    const poller = pollDesktopStatus(
       target,
+      viewerId,
       (next) => {
         setStatus(next)
         // A desktop that went down and came back gets a fresh viewer without a retry.
@@ -104,41 +83,55 @@ export function useDesktopSession(target: RuntimeClientTarget | null, viewerId: 
       },
       () => setLost(true)
     )
-  }, [target])
+    pollerRef.current = poller
+    return () => {
+      pollerRef.current = null
+      poller.stop()
+    }
+  }, [target, viewerId])
 
-  const run = useCallback(
+  const mutate = useCallback(
     <T>(method: string, params: unknown, apply: (result: T) => void): void => {
       if (!target) {
         return
       }
       setBusy(true)
       setError(null)
+      // Reads already in flight may predate this action, so their answers are dropped.
+      pollerRef.current?.invalidate()
       callRuntimeRpc<T>(target, method, params)
         .then(apply, (reason: unknown) => setError(errorCode(reason)))
-        .finally(() => setBusy(false))
+        .finally(() => {
+          setBusy(false)
+          pollerRef.current?.refresh()
+        })
     },
     [target]
   )
 
+  const setControl = (owner: 'agent' | 'user'): void =>
+    mutate<DesktopStatus>('desktop.control.set', { owner, viewerId }, (next) =>
+      setStatus({ ...next, viewerControl: owner === 'user' ? 'this' : null })
+    )
+
   const actions: DesktopActions = {
-    takeControl: () =>
-      run<DesktopStatus>('desktop.control.set', { owner: 'user', viewerId }, setStatus),
-    handBack: () =>
-      run<DesktopStatus>('desktop.control.set', { owner: 'agent', viewerId }, setStatus),
+    takeControl: () => setControl('user'),
+    handBack: () => setControl('agent'),
     startRecording: () =>
-      run('desktop.record.start', {}, () =>
+      mutate('desktop.record.start', {}, () =>
         setStatus((current) => current && { ...current, recording: true })
       ),
     stopRecording: () =>
-      run('desktop.record.stop', {}, () =>
+      mutate('desktop.record.stop', {}, () =>
         setStatus((current) => current && { ...current, recording: false })
       ),
     retry: () => {
       setStatus(null)
       setLost(false)
+      setError(null)
+      // A new connection opens a new viewer; read now instead of waiting for the next poll.
       setConnection((current) => current + 1)
-      // Read now instead of waiting for the next poll; a new connection opens a new viewer.
-      run<DesktopStatus>('desktop.status', {}, setStatus)
+      pollerRef.current?.refresh()
     }
   }
 

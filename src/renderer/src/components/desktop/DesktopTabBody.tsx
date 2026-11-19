@@ -47,7 +47,12 @@ export function DesktopTabLayout({
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {view.kind === 'connecting'
               ? t('desktop.tab.status.connecting', 'Connecting…')
-              : t('desktop.tab.unavailableBody', 'The environment desktop is not reachable.')}
+              : view.kind === 'unconfigured'
+                ? t(
+                    'desktop.tab.unconfiguredBody',
+                    "The environment desktop hasn't been set up yet."
+                  )
+                : t('desktop.tab.unavailableBody', 'The environment desktop is not reachable.')}
           </div>
         )}
       </div>
@@ -57,12 +62,26 @@ export function DesktopTabLayout({
 
 /** A Desktop tab's pane body: a live view of the workspace environment's desktop. */
 export function DesktopTabBody({ worktreeId }: { worktreeId: string }): React.JSX.Element {
+  const t = useTranslate()
+  const enabled = useAppStore((state) => state.settings?.experimentalEphemeralVms === true)
+  if (!enabled) {
+    // A restored tab stays put but talks to nothing while the experiment is off.
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-background text-sm text-muted-foreground">
+        {t('desktop.tab.disabled', 'Desktop disabled (experiment off)')}
+      </div>
+    )
+  }
+  return <DesktopSession worktreeId={worktreeId} />
+}
+
+function DesktopSession({ worktreeId }: { worktreeId: string }): React.JSX.Element {
   const target = useAppStore(
     useShallow((state) => getRuntimeTargetForWorktreeOwner(state, worktreeId))
   )
   const [viewerId] = useState(createNonSecureContextUuid)
   const session = useDesktopSession(target, viewerId)
-  const viewOnly = session.view.kind !== 'ready' || session.view.owner !== 'user'
+  const viewOnly = session.view.kind !== 'ready' || session.view.control !== 'this'
   return (
     <DesktopTabLayout
       view={session.view}

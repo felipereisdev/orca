@@ -29680,7 +29680,9 @@
         "connecting": "Connecting…",
         "unavailable": "Unavailable",
         "user": "You're in control",
-        "agent": "Agent in control"
+        "agent": "Agent in control",
+        "unconfigured": "Not set up yet",
+        "otherWindow": "Control in another window"
       },
       "unavailableBody": "The environment desktop is not reachable.",
       "retry": "Try again",
@@ -29701,7 +29703,9 @@
         "recordingFailed": "The recording failed and was discarded.",
         "unknown": "Something went wrong. Try again."
       },
-      "create": "Desktop"
+      "create": "Desktop",
+      "unconfiguredBody": "The environment desktop hasn't been set up yet.",
+      "disabled": "Desktop disabled (experiment off)"
     }
   }
 }

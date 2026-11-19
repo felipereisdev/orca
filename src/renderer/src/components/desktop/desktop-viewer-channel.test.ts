@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import { createDesktopViewerChannel, type DesktopViewerSubscribe } from './desktop-viewer-channel'
 
@@ -28,6 +28,13 @@ function fakeSubscribe() {
 }
 
 describe('desktop viewer channel', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('viewer channel forwards binary both ways and reports close', async () => {
     const fake = fakeSubscribe()
     const channel = createDesktopViewerChannel(
@@ -67,10 +74,12 @@ describe('desktop viewer channel', () => {
 
     fake.server().onResponse(ok({ type: 'end', subscriptionId: 'desktop-viewer:1' }))
     expect(channel.readyState).toBe(3)
+    await vi.advanceTimersByTimeAsync(0)
     expect(closed).toHaveBeenCalledTimes(1)
     expect(fake.unsubscribe).toHaveBeenCalledTimes(1)
     channel.send(new Uint8Array([5]))
     channel.close()
+    await vi.advanceTimersByTimeAsync(0)
     expect(fake.sent).toEqual([[9, 8, 7]])
     expect(closed).toHaveBeenCalledTimes(1)
   })
@@ -94,6 +103,7 @@ describe('desktop viewer channel', () => {
       _meta: { runtimeId: 'env-runtime' }
     })
     expect(errored).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(0)
     expect(closed).toHaveBeenCalledTimes(1)
     expect(channel.readyState).toBe(3)
   })
@@ -108,9 +118,28 @@ describe('desktop viewer channel', () => {
     const closed = vi.fn()
     channel.onclose = closed
     channel.close()
+    await vi.advanceTimersByTimeAsync(0)
     expect(closed).toHaveBeenCalledTimes(1)
-    await Promise.resolve()
-    await Promise.resolve()
     expect(fake.unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onclose after close() returns, as a WebSocket does', async () => {
+    const fake = fakeSubscribe()
+    const channel = createDesktopViewerChannel(
+      { kind: 'environment', environmentId: 'env-1' },
+      'viewer-1',
+      fake.subscribe
+    )
+    const events: string[] = []
+    channel.onclose = () => events.push('close')
+    await Promise.resolve()
+    fake.server().onResponse(ok({ type: 'ready', subscriptionId: 'desktop-viewer:1' }))
+
+    channel.close()
+    events.push('close() returned')
+    expect(channel.readyState).toBe(3)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(events).toEqual(['close() returned', 'close'])
   })
 })

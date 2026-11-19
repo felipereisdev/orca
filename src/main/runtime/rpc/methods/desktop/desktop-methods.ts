@@ -131,7 +131,13 @@ export function createDesktopMethods(
       name: 'desktop.status',
       permission: 'workspace',
       params: DesktopStatusParams,
-      handler: async () => getBroker().status()
+      handler: async (params) => {
+        const broker = getBroker()
+        const status = broker.status()
+        return params.viewerId === undefined
+          ? status
+          : { ...status, viewerControl: broker.viewerControl(params.viewerId) }
+      }
     }),
     defineMethod({
       name: 'desktop.control.set',

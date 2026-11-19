@@ -25184,7 +25184,9 @@
         "connecting": "Conectando…",
         "unavailable": "Indisponível",
         "user": "Você no controle",
-        "agent": "Agente no controle"
+        "agent": "Agente no controle",
+        "unconfigured": "Ainda não configurado",
+        "otherWindow": "Controle em outra janela"
       },
       "unavailableBody": "O desktop do ambiente não está acessível.",
       "retry": "Tentar de novo",
@@ -25205,7 +25207,9 @@
         "recordingFailed": "A gravação falhou e foi descartada.",
         "unknown": "Algo deu errado. Tente de novo."
       },
-      "create": "Desktop"
+      "create": "Desktop",
+      "unconfiguredBody": "O desktop do ambiente ainda não foi configurado.",
+      "disabled": "Desktop desativado (experimento desligado)"
     }
   }
 }

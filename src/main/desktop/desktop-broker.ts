@@ -116,11 +116,9 @@ export class DesktopBroker {
   status(): DesktopStatus {
     const status: DesktopStatus = {
       state: this.#state,
+      ...(this.#reason !== undefined ? { reason: this.#reason } : {}),
       owner: this.#owner,
       recording: this.recorder.active()
-    }
-    if (this.#reason !== undefined) {
-      status.reason = this.#reason
     }
     if (this.#state === 'ready' && this.#control) {
       status.width = this.#control.frame.width
@@ -134,6 +132,11 @@ export class DesktopBroker {
     return this.#target && this.#launcher
       ? { host: this.#target.host, ...this.#launcher }
       : undefined
+  }
+
+  /** `viewerId`'s view of control: it (`this`) or another viewer (`other`) holds it, or nobody. */
+  viewerControl(viewerId: string): 'this' | 'other' | null {
+    return this.#owner !== 'user' ? null : this.#controller === viewerId ? 'this' : 'other'
   }
 
   setOwner(owner: DesktopOwner, viewerId?: string): void {

@@ -53,14 +53,19 @@ const crm: DatabaseConnectionSummary = {
 
 function renderMenu(
   layout?: NewTabMenuLayout,
-  runtimes: AppState['ephemeralVmRuntimesByWorkspaceId'] = {}
+  runtimes: AppState['ephemeralVmRuntimesByWorkspaceId'] = {},
+  experimentalEphemeralVms = false
 ): void {
   // The + menu's create row suspends global shortcuts through the preload bridge.
   Object.assign(window, { api: { ui: { setShortcutRecorderFocused: noop } } })
   useAppStore.setState(
     {
       ...initial,
-      settings: { ...getDefaultSettings('/tmp/orca-test'), newTabMenuLayout: layout },
+      settings: {
+        ...getDefaultSettings('/tmp/orca-test'),
+        newTabMenuLayout: layout,
+        experimentalEphemeralVms
+      },
       repos: [
         {
           id: 'repo',
@@ -193,12 +198,30 @@ it('desktop item shows only for workspaces with a desktop', () => {
     runtimeEnvironmentId: 'env-1',
     canSuspend: false
   }
-  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: false } })
+  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: false } }, true)
   expect(screen.queryByRole('button', { name: 'Desktop' })).toBeNull()
   cleanup()
-  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: true } })
+  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: true } }, true)
   fireEvent.click(screen.getByRole('button', { name: 'Desktop' }))
   expect(useAppStore.getState().unifiedTabsByWorktree[WORKSPACE]).toEqual([
     expect.objectContaining({ contentType: 'desktop', entityId: WORKSPACE, groupId: 'right' })
   ])
+})
+
+it('desktop item stays hidden while the ephemeral VM experiment is off', () => {
+  renderMenu(
+    undefined,
+    {
+      [WORKSPACE]: {
+        id: 'vm-1',
+        workspaceId: WORKSPACE,
+        status: 'running',
+        runtimeEnvironmentId: 'env-1',
+        canSuspend: false,
+        hasDesktop: true
+      }
+    },
+    false
+  )
+  expect(screen.queryByRole('button', { name: 'Desktop' })).toBeNull()
 })
