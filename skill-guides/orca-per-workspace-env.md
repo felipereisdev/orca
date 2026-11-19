@@ -333,7 +333,7 @@ The base result, which is what Orca-server mode prints:
 ```
 
 `pairingCode` and `projectRoot` are required; `schemaVersion` (`1`) and `userData` are optional.
-Three named deltas change that shape:
+Four named deltas change that shape:
 
 - **`orca serve --recipe-json` output** is this same object without `userData`. Merge your own
   `userData` into it rather than rebuilding it.
@@ -343,6 +343,9 @@ Three named deltas change that shape:
   `checkoutMode: provisioned-root` to the recipe, require `ORCA_RECIPE_RESULT_SCHEMA_VERSION=2`, and
   emit `"schemaVersion": 2` with `"checkoutMode": "provisioned-root"`. Fail if the requested schema
   is not `2` rather than falling back to the ordinary shape. Details are in `references/ssh-host.md`.
+- **A desktop** adds an optional `desktop` block (`type: "vnc"`, a loopback `host`, `port`,
+  `password`, and a `launcher` with `port` and `token`) that Orca shows in the workspace's Desktop
+  tab. A reference recipe that produces it is in `references/docker-desktop-ssh.md`.
 
 ### The `orca serve` invocation
 
@@ -404,10 +407,12 @@ rejects `--reference`, run `ORCA skills get orca-per-workspace-env --full` once 
 this guide plus every reference from the same CLI build, so read only the named one. If `--full` is
 rejected too, keep these rules, use the command's `--help`, and do not guess flags.
 
-| Action gate                                                                               | Bundled reference               |
-| ----------------------------------------------------------------------------------------- | ------------------------------- |
-| Writing the base-snapshot, auth, or create script for a snapshot-capable cloud provider   | `references/provider-vercel.md` |
-| The recipe connects over SSH instead of starting `orca serve`, including provisioned root | `references/ssh-host.md`        |
-| The environment is a local Docker container reached over SSH                              | `references/docker-ssh.md`      |
-| The user's desktop is Windows and you are scaffolding local-side scripts                  | `references/windows-scripts.md` |
-| A doctor, provision, clone, login, or snapshot step failed                                | `references/failure-modes.md`   |
+| Action gate                                                                               | Bundled reference                            |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Writing the base-snapshot, auth, or create script for a snapshot-capable cloud provider   | `references/provider-vercel.md`              |
+| The recipe connects over SSH instead of starting `orca serve`, including provisioned root | `references/ssh-host.md`                     |
+| The environment is a local Docker container reached over SSH                              | `references/docker-ssh.md`                   |
+| The environment is a Docker container with a desktop (VNC), on this Mac or another one    | `references/docker-desktop-ssh.md`           |
+| Writing the scripts for that Docker desktop recipe                                        | `references/docker-desktop-ssh-templates.md` |
+| The user's desktop is Windows and you are scaffolding local-side scripts                  | `references/windows-scripts.md`              |
+| A doctor, provision, clone, login, or snapshot step failed                                | `references/failure-modes.md`                |
