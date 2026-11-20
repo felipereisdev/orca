@@ -91,6 +91,11 @@ export class RuntimeAccountController {
     return this.hostAccounts.prepareHostAgentLaunch(agent)
   }
 
+  /** The folder a host launch on this account pins, read without preparing it. */
+  claudeAccountHome(accountId: string): string | null {
+    return this.hostAccounts.claudeAccountHome(accountId)
+  }
+
   prepareClaudeAccountLaunch(accountId: string, target?: ClaudeAccountSelectionTarget) {
     return this.services
       ? prepareExplicitClaudeAccountLaunch(accountId, target)
@@ -116,11 +121,11 @@ export class RuntimeAccountController {
     return this.services?.claudeAccounts.getRuntimeConfigDir(target) ?? null
   }
 
+  /** Without account services, the accounts the desktop pushed to this host. */
   getClaudeAccountsSnapshot(): ClaudeRateLimitAccountsState {
-    if (!this.services) {
-      return this.hostAccounts.accountSnapshot().claude
-    }
-    return this.services.claudeAccounts.listAccounts()
+    return (
+      this.services?.claudeAccounts.listAccounts() ?? this.hostAccounts.accountSnapshot().claude
+    )
   }
 
   async getSnapshot(): Promise<AccountsSnapshot> {

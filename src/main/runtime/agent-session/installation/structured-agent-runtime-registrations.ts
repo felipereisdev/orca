@@ -134,6 +134,7 @@ function createClaudeAdapter(
         ...(deps.prepareClaudeAccountLaunch
           ? { prepareClaudeAccountLaunch: deps.prepareClaudeAccountLaunch }
           : {}),
+        ...(deps.claudeAccountHome ? { claudeAccountHome: deps.claudeAccountHome } : {}),
         resolveLaunchArgs: () => deps.resolveLaunchArgs('claude'),
         ...(deps.resolveClaudeCommand ? { resolveCommand: deps.resolveClaudeCommand } : {}),
         resolveAuthPolicy: deps.resolveClaudeAuthPolicy,

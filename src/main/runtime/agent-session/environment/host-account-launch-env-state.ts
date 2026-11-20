@@ -1,5 +1,6 @@
 import { createEmptyRateLimitState } from '../../../../shared/agent-usage/rate-limits/rate-limit-state-factory'
 import { prepareHostClaudeAccountLaunch } from './host-claude-account-launch'
+import { getClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
 import { retireAtRestCommandContext } from '../../../native-chat/agent-session-wire/options/at-rest-command-context'
 import { agentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
 import type { CommitMessageAgentEnvironmentResolvers } from '../../../text-generation/execution/commit-message-agent-environment'
@@ -140,6 +141,13 @@ export class HostAccountLaunchEnvState {
       codex: { accounts: [], activeAccountId: null },
       rateLimits: createEmptyRateLimitState()
     }
+  }
+
+  /** The folder this host's own profiles keep for the account, else the one the desktop named. */
+  claudeAccountHome(accountId: string): string | null {
+    return this.hasOwnAccountServices()
+      ? (getClaudeProfileRouter()?.accountHome(accountId) ?? null)
+      : (this.hostLaunchEnv?.claudeAccounts?.[accountId]?.configDir ?? null)
   }
 
   async prepareClaudeAccountLaunch(accountId: string) {

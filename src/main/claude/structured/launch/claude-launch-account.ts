@@ -2,6 +2,7 @@ import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runt
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
 import type { ClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-router'
 import {
+  CLAUDE_EXPLICIT_ENV_DELETIONS,
   explicitClaudeAccountEnv,
   applyClaudeEnvPatch
 } from '../../../claude-accounts/runtime-auth/environment'
@@ -60,12 +61,18 @@ export function claudeAccountHomeEnv(
 }
 
 /** Pins the account a launch would run under now, without preparing its folder: managed settings
- *  can refuse flags per account, so flag checks must ask as that account. */
+ *  can refuse flags per account, so flag checks must ask as that account. A chat's chosen account
+ *  is pinned as its spawn pins it, since refusals are remembered by the folder that spawn used. */
 export async function withClaudeLaunchAccountPin(
   router: ClaudeProfileRouter | undefined,
   env: Record<string, string>,
-  recordHome: string
+  recordHome: string,
+  chosen: { accountId?: string; homeOf?: (accountId: string) => string | null } = {}
 ): Promise<Record<string, string>> {
+  const chosenHome = chosen.accountId ? chosen.homeOf?.(chosen.accountId) : null
+  if (chosen.accountId && chosenHome) {
+    return explicitClaudeAccountEnv(env, chosen.accountId, { CLAUDE_CONFIG_DIR: chosenHome })
+  }
   const home = router
     ? await resolveStructuredClaudeAccountHomePath({
         launchEnv: env,
@@ -75,4 +82,12 @@ export async function withClaudeLaunchAccountPin(
       })
     : recordHome
   return { ...env, ...claudeConfigDirEnvPatch(home, { env }) }
+}
+
+/** Inherited variables a launch drops: a chosen account's own auth must not be overridden. */
+export function claudeInheritedEnvDeletions(
+  claudeAccountId: string | undefined,
+  refused: readonly string[]
+): string[] {
+  return [...(claudeAccountId ? CLAUDE_EXPLICIT_ENV_DELETIONS : []), ...refused]
 }

@@ -1,9 +1,12 @@
 import type { ClaudeRuntimeAuthPreparation } from '../../../claude-accounts/runtime-auth/runtime-auth-types'
-import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../../claude-accounts/runtime-auth/environment'
 import { claudeBotSessionOptions } from './claude-bot-session-options'
 import { withBotLaunchToolsEnv } from '../../../bots/bot-launch-tools'
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
-import { prepareClaudeLaunchAccount, withClaudeLaunchAccountPin } from './claude-launch-account'
+import {
+  claudeInheritedEnvDeletions,
+  prepareClaudeLaunchAccount,
+  withClaudeLaunchAccountPin
+} from './claude-launch-account'
 import { assertStructuredAgentResolutionCurrent } from '../../../native-chat/agent-launch/structured-agent-command-resolution'
 import { activeProviderContext } from '../../../../shared/agent-session/conversation-context/agent-session-provider-context'
 import { getClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
@@ -105,6 +108,8 @@ export type ClaudeStructuredLaunch = {
 
 export type ClaudeStructuredLaunchPartDeps = {
   prepareClaudeAccountLaunch?: (accountId: string) => Promise<ClaudeRuntimeAuthPreparation>
+  /** The folder a chosen account's launch pins, read without preparing it; null when unknown. */
+  claudeAccountHome?: (accountId: string) => string | null
   resolveLaunchArgs: () => Promise<string[]> | string[]
   resolveCommand?: ClaudeEnvDeps['resolveCommand']
   /** Explicit policy identifies the account for sign-in errors; use claudeStructuredAuthPolicyForSettings. */
@@ -190,11 +195,13 @@ export function claudeStructuredLaunchPart(
     }
     const sources = await resolveClaudeChildEnvSources(envDeps)
     // Overlap the version probe with remaining launch preparation.
+    // A chat on a chosen account asks as that account, as its spawn will run.
+    const pin = { accountId: record.claudeAccountId, homeOf: deps.claudeAccountHome }
     const probeLaunch = {
       command: sources.command,
       prefixArgs: sources.prefixArgs,
       cwd,
-      env: await withClaudeLaunchAccountPin(router, claudeProbeEnv(sources), accountHome.path)
+      env: await withClaudeLaunchAccountPin(router, claudeProbeEnv(sources), accountHome.path, pin)
     }
     const launchFlags = resolveClaudeLaunchFlags(
       { ...deps, prepareVisuals: basis.visuals },
@@ -311,10 +318,10 @@ export function claudeStructuredLaunchPart(
           : {})
       },
       env,
-      inheritedEnvToDelete: [
-        ...(record.claudeAccountId ? CLAUDE_EXPLICIT_ENV_DELETIONS : []),
-        ...refused.envToDelete
-      ],
+      inheritedEnvToDelete: claudeInheritedEnvDeletions(
+        record.claudeAccountId,
+        refused.envToDelete
+      ),
       // The agent runtime follows Orca's CLI directory on PATH so another orca cannot shadow it.
       cliRuntimeCommand: command
     }
