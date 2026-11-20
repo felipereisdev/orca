@@ -65,6 +65,9 @@ snapshot (step 5), and `create` boots from the authenticated snapshot they produ
      so on) and that the user has an account for it. It is logged in during step 6.
    - **Git auth:** the token source for cloning a private repo (`GH_TOKEN`, `GITHUB_TOKEN`, or
      `gh auth token`).
+   - **Desktop:** ask "Do you need to watch the agent use graphical apps, on a GUI desktop it
+     drives that you can take over and record?" If yes, read `references/docker-desktop-ssh.md`
+     and build that recipe, which adds the workspace's Desktop tab.
 3. **Check prerequisites** (section 2) and confirm the items above are in place before any paid
    step.
 4. **Scaffold the scripts and state file**, filling in the provider's real commands, and make them

@@ -905,13 +905,29 @@ docker_run_args() { # <name> <label key=value> <image>; sets run_args for the ca
 }
 # <<< docker run flags
 
+# >>> ptrace_scope fix: text for the user to run on the Docker host; this file never runs it.
+ptrace_scope_fix() {
+  local bin="$docker_bin" sentinel once
+  case "$bin" in *[!A-Za-z0-9/._-]*) bin="$(shell_quote "$bin")" ;; esac
+  sentinel="$bin run -d --name orca-ptrace-scope --label orca.purpose=ptrace-scope --restart=always --privileged --network none --memory 16m --cpus 0.05 busybox:1.37 sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope && exec sleep 2147483647'"
+  once="$bin run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope'"
+  if [ -n "$docker_host" ]; then
+    sentinel="ssh $(shell_quote "$docker_host") \"$sentinel\""
+    once="ssh $(shell_quote "$docker_host") \"$once\""
+  fi
+  printf 'Keep it at 1 across Docker restarts with a sentinel container (remove it with "docker rm -f orca-ptrace-scope"):\n  %s\n' "$sentinel"
+  printf 'Or raise it until the next Docker restart:\n  %s\nThen try again.' "$once"
+}
+# <<< ptrace_scope fix
+
 check_ptrace_scope() { # <image>
   local scope
   scope="$(dk run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
     --entrypoint cat "$1" /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || true)"
   case "$scope" in
     1 | 2 | 3) ;;
-    *) die "kernel.yama.ptrace_scope on the Docker host is '${scope:-unknown}'; it must be 1 or more so the agent cannot read the Orca server's memory. See the reference's setup section." ;;
+    *) die "kernel.yama.ptrace_scope on the Docker host is '${scope:-unknown}'; it must be 1 or more so the agent cannot read the Orca server's memory.
+$(ptrace_scope_fix)" ;;
   esac
 }
 
@@ -1140,6 +1156,9 @@ project_root="$(payload_value 'd.recipeResult.connection.projectRoot')"
 
 previous_port="$(payload_value 'd.recipeResult.connection.target.port')"
 
+# A Docker restart can drop ptrace_scope back to 0, so check again before starting.
+image="$(dk container inspect -f '{{.Config.Image}}' "$name")"
+check_ptrace_scope "$image"
 dk start "$name" >/dev/null
 port="$(container_ssh_port "$name")"
 [ -n "$port" ] || die "container $name published no loopback SSH port"
@@ -1374,14 +1393,17 @@ secrets_absent_from() {
 }
 
 template_flags_ok() {
-  local block required refused_anywhere='--privileged|docker\.sock|--(net|network|pid|ipc|uts|userns|cgroupns)[ =]+"?host|unconfined'
+  local block required scripts refused_anywhere='--privileged|docker\.sock|--(net|network|pid|ipc|uts|userns|cgroupns)[ =]+"?host|unconfined'
   block="$(sed -n '/^# >>> docker run flags/,/^# <<< docker run flags/p' "$here/orca-docker-desktop.sh")"
   [ -n "$block" ] || return 1
   ! grep -Eq -- "(^|[[:space:]])(-v|--volume|--mount|--device|--volumes-from)([ =]|$)|/Users|\\\$HOME|--cap-add[ =]+\"?(ALL|SYS_ADMIN|SYS_PTRACE|SYS_MODULE|NET_ADMIN|DAC_READ_SEARCH|DAC_OVERRIDE)" <<<"$block" || return 1
   for required in '--init' 'no-new-privileges' '--cap-drop ALL' '--pids-limit' '--memory' '--cpus' '127.0.0.1:0:22'; do
     grep -qF -- "$required" <<<"$block" || return 1
   done
-  ! grep -Eq -- "$refused_anywhere" "$here"/create.sh "$here"/resume.sh "$here"/auth.sh "$here"/orca-docker-desktop.sh
+  # The ptrace_scope fix block only prints the host admin commands, which need --privileged.
+  scripts="$(cat "$here"/create.sh "$here"/resume.sh "$here"/auth.sh)" || return 1
+  scripts+="$(sed '/^# >>> ptrace_scope fix/,/^# <<< ptrace_scope fix/d' "$here/orca-docker-desktop.sh")" || return 1
+  ! grep -Eq -- "$refused_anywhere" <<<"$scripts"
 }
 
 host_config_ok() {

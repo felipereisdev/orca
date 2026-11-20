@@ -79,7 +79,7 @@ never uses `--privileged`, the Docker socket, host network, PID or IPC namespace
 The honest limit: Orca's server in the environment runs as `dev`, the same user as the agent. The
 password and token live only in that server's memory, and the environment requires
 `kernel.yama.ptrace_scope` ≥ 1 so the agent cannot attach to the process that started it.
-`create.sh` refuses to start otherwise. The server also keeps its pairing credential in `dev`'s
+`create.sh` and `resume.sh` refuse to start otherwise and print the commands from setup step 3. The server also keeps its pairing credential in `dev`'s
 own files, so the agent can call it as the Mac's paired device. That identity alone therefore
 authorizes nothing on the desktop: the broker accepts `desktop.configure` only when the VNC
 password it carries authenticates to Xvnc (a wrong one changes nothing), and answers a successful
@@ -113,7 +113,7 @@ On the Mac that runs the containers (the "VPS"):
    key for this user. `ssh -o BatchMode=yes user@air.local true` must succeed without a prompt.
 3. Raise `kernel.yama.ptrace_scope` in the Docker VM (OrbStack ships it at 0). The setting lives in
    that VM's kernel and may not survive a restart of OrbStack or Docker Desktop, so repeat it
-   whenever `create.sh` refuses:
+   whenever `create.sh` or `resume.sh` refuses (the refusal prints these commands):
    `docker run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope'`.
    This is a one-off admin step on the Docker host; no workspace container is privileged.
    To keep the setting across restarts, run a tiny sentinel container that Docker starts again with the engine:

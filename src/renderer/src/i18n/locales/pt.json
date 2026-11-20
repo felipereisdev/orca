@@ -7723,6 +7723,7 @@
           "whatScaffold": "Escreve a receita e os scripts para o seu provedor — conectado via servidor Orca ou SSH.",
           "whatBuild": "Cria uma imagem base reutilizável e faz login do seu agente.",
           "whatValidate": "Valida para que você possa criar um espaço de trabalho nela.",
+          "whatDesktop": "Pode adicionar uma aba Desktop: acompanhe o agente ao vivo, assuma o controle e grave testes que são reproduzidos no chat.",
           "promptHint": "Em qualquer espaço de trabalho, peça ao seu agente:",
           "copy": "Copiar",
           "copied": "Copiado",

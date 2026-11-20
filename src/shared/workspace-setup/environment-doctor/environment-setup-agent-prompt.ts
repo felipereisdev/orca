@@ -33,6 +33,7 @@ export function buildEnvironmentSetupAgentPrompt(args: {
     `- Run ${recipeDoctor} and fix every failing check.`,
     '- Inside the environment, run `orca vm env doctor --run-setup --json` and fix what fails: missing CLIs, agent sign-in, Git access, the setup script, disk space.',
     '- Re-run both doctors after each fix until no check fails, and resolve or explain every warning.',
+    '- In the interview, ask whether the user needs to watch the agent use graphical apps on a desktop they can take over and record; if so, follow the skill to the Docker desktop (VNC) recipe.',
     '- Follow the skill: ask before any paid or interactive step, and never write a secret into a file or commit.',
     '- Work on a new branch. Finish with a commit and open a pull request that explains what changed.'
   ]

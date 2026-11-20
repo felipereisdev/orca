@@ -217,6 +217,12 @@ export function EphemeralVmsPane(): React.JSX.Element {
               'Validates it so you can create a workspace on it.'
             )}
           />
+          <WhatItem
+            text={t(
+              'auto.components.settings.EphemeralVmsPane.whatDesktop',
+              'Can add a Desktop tab: watch the agent live, take over control, and record tests that play in the chat.'
+            )}
+          />
         </ul>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-1">
           <Button
