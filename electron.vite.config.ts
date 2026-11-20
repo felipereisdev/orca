@@ -279,7 +279,8 @@ export const electronViteConfig: UserConfig = {
       chunkSizeWarningLimit: RENDERER_CHUNK_SIZE_WARNING_LIMIT_KB,
       modulePreload: { polyfill: true },
       minify: 'oxc',
-      target: 'es2020',
+      // ES2022 for native top-level await (noVNC uses it); Electron's Chromium and the web client's browsers run it.
+      target: 'es2022',
       // Give pop-out dashboard its own HTML/React root with shared preload API; retain index or overriding input drops electron-vite’s default entry.
       rollupOptions: {
         // Shared chunks must not import HTML entries that mount another React root.

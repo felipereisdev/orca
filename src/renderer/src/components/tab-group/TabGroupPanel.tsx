@@ -16,6 +16,7 @@ import { registerTabGroupBody } from './retained-pane/tab-group-body-geometry'
 import { observeTabGroupBodyGridSize } from '@/runtime/sync-runtime-graph/graph-sync-scheduler'
 import { useTranslate } from '@/i18n/use-translate'
 import { DatabaseTabBody } from '../database/DatabaseTabBody'
+import { DesktopTabBody } from '../desktop/DesktopTabBody'
 import {
   toVisibleTabType,
   type TabGroup
@@ -207,7 +208,7 @@ export default function TabGroupPanel({
       groupActiveTabId={activeTab?.id ?? null}
       agentSessionTabs={agentSessionItems}
       activeFileId={
-        activeTab?.contentType === 'database'
+        activeTab?.contentType === 'database' || activeTab?.contentType === 'desktop'
           ? activeTab.id
           : activeTab && toVisibleTabType(activeTab.contentType) !== 'editor'
             ? null
@@ -406,6 +407,7 @@ export default function TabGroupPanel({
         {activeTab?.contentType === 'database' && (
           <DatabaseTabBody worktreeId={worktreeId} entityId={activeTab.entityId} />
         )}
+        {activeTab?.contentType === 'desktop' && <DesktopTabBody worktreeId={worktreeId} />}
 
         {showsSplitLanding ? (
           <SplitPaneLanding

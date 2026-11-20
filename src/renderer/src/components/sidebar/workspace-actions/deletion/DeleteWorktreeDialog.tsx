@@ -9,6 +9,7 @@ import { getWorktreeDeleteErrorToShow } from './worktree-delete-error-display'
 import { getWorkspaceDeleteLineage } from './workspace-delete-lineage'
 import { DeleteWorktreeLineageNotice } from './DeleteWorktreeLineageNotice'
 import { DeleteWorktreeDialogFooter } from './DeleteWorktreeDialogFooter'
+import { RecipeRemovalPreflightGate } from './RecipeRemovalPreflightGate'
 import { DeleteWorktreeDialogHeading } from './DeleteWorktreeDialogDescription'
 import { DeleteWorktreeTargetPreview } from './DeleteWorktreeTargetPreview'
 import {
@@ -159,6 +160,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
     childWorkspaceCount === 0 &&
     !preserveChildrenSelected
   const [isSavingForcePreference, setIsSavingForcePreference] = useState(false)
+  const [isCopyingRecordings, setIsCopyingRecordings] = useState(false)
   const deleteTargets = useMemo(
     () => (deleteAllLineage ? lineageDelete.deleteAllTargets : worktrees),
     [deleteAllLineage, lineageDelete.deleteAllTargets, worktrees]
@@ -206,7 +208,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   const handleOpenChange = useDeleteWorktreeDialogDismissal({
     isOpen,
     isDeleting,
-    isSaving: isSavingForcePreference || isDetachingChildren,
+    isSaving: isSavingForcePreference || isDetachingChildren || isCopyingRecordings,
     isBatchDelete,
     worktreeId,
     worktreeCount: worktrees.length,
@@ -295,6 +297,12 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
   const handleDetachAndDelete = (): void => {
     void detachChildren(() => handleDelete(canForceDelete))
   }
+  const forceDelete = (): void => handleDelete(true)
+  const confirmDelete = preserveChildrenSelected
+    ? handleDetachAndDelete
+    : canDeleteAllLineage
+      ? handleDeleteAll
+      : () => handleDelete(false)
 
   const { title, deleteLabel } = getDeleteWorktreeDialogHeading(
     {
@@ -313,7 +321,7 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
       <DialogContent
         size={isBatchDelete || childWorkspaceCount > 0 ? 'list' : 'confirm'}
         surface="security"
-        busy={isDeleting || isSavingForcePreference || isDetachingChildren}
+        busy={isDeleting || isSavingForcePreference || isDetachingChildren || isCopyingRecordings}
         initialFocus="cancel"
       >
         <DeleteWorktreeDialogHeading
@@ -377,26 +385,24 @@ const DeleteWorktreeDialog = React.memo(function DeleteWorktreeDialog() {
           />
         ) : null}
 
-        <DeleteWorktreeDialogFooter
-          isMainWorktree={isMainWorktree}
-          isDeleting={isDeleting || isSavingForcePreference}
-          isDetachingChildren={isDetachingChildren}
-          deleteDisabled={preserveChildrenSelected && !canPreserveChildren}
-          canForceDelete={canForceDelete}
-          deleteLabel={deleteLabel}
-          onForceDelete={
-            preserveChildrenSelected ? handleDetachAndDelete : () => handleDelete(true)
-          }
-          onSavingChange={setIsSavingForcePreference}
-          onDelete={
-            preserveChildrenSelected
-              ? handleDetachAndDelete
-              : canDeleteAllLineage
-                ? handleDeleteAll
-                : () => handleDelete(false)
-          }
-          onAlwaysDelete={allowSkipConfirm ? persistSkipConfirmPreference : undefined}
-        />
+        <RecipeRemovalPreflightGate
+          targets={isOpen && !isMainWorktree ? deleteTargets : null}
+          onRemove={canForceDelete && !preserveChildrenSelected ? forceDelete : confirmDelete}
+          onBusyChange={setIsCopyingRecordings}
+        >
+          <DeleteWorktreeDialogFooter
+            isMainWorktree={isMainWorktree}
+            isDeleting={isDeleting || isSavingForcePreference}
+            isDetachingChildren={isDetachingChildren}
+            deleteDisabled={preserveChildrenSelected && !canPreserveChildren}
+            canForceDelete={canForceDelete}
+            deleteLabel={deleteLabel}
+            onForceDelete={preserveChildrenSelected ? handleDetachAndDelete : forceDelete}
+            onSavingChange={setIsSavingForcePreference}
+            onDelete={confirmDelete}
+            onAlwaysDelete={allowSkipConfirm ? persistSkipConfirmPreference : undefined}
+          />
+        </RecipeRemovalPreflightGate>
       </DialogContent>
     </Dialog>
   )

@@ -5,10 +5,12 @@ import {
   type EphemeralVmRecipeDoctorResult
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import {
+  describeEphemeralVmRecipeStdoutForDiagnostics,
   getEphemeralVmRecipeResultWarnings,
   type EphemeralVmRecipeResultWarning
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
-import { redactEphemeralVmRecipeDiagnosticText } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostic-redaction'
+import { sanitizeEphemeralVmRecipeStderr } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-stderr-sanitizer'
+import { createProvisionEventForwarder } from './ephemeral-vm-provision-events'
 import { getProvisionedRootRecipeRepoUrl } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-repo-url'
 // Import the Node-only doctor directly so browser consumers of the barrel do not bundle fs/path.
 import { doctorEphemeralVmRecipe } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-doctor'
@@ -32,13 +34,14 @@ import {
   getRecipeRepo,
   listRecipeCatalog,
   listRecipes,
-  resolveRecipeForRepo,
   type EphemeralVmRecipeCatalogEntry
 } from './ephemeral-vm-recipe-context'
 import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handlers'
 import type { PluginService } from '../../plugins/plugin-service'
 import { getApprovedPluginVmRecipes } from '../../plugins/contributions/plugin-approved-vm-recipes'
 import { resolveProvisionedRootSource } from '../../ephemeral-vm/provisioned-root-source'
+import { resolveApprovedProvisionRecipe } from '../../ephemeral-vm/provision-recipe-approval'
+import { startEnvironmentDesktop } from '../../ephemeral-vm/desktop-sync-registry'
 import { getRuntimeEnvironmentRegistryRoot } from '../runtime-environments/catalog/runtime-environment-registry-root'
 import {
   ephemeralVmFailure,
@@ -127,36 +130,32 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
         branch?: string
         ref?: string
         provisionId?: string
+        approvedRecipeHash?: unknown
       }
     ): Promise<EphemeralVmProvisionIpcResult> => {
       const repo = getRecipeRepo(store, args.repoId)
       if (!repo.ok) {
         return provisionFailure(repo.failure)
       }
-      const recipe = resolveRecipeForRepo(
-        repo.repo.path,
-        args.recipeId,
-        await getApprovedPluginVmRecipes(pluginService)
-      )
-      if (!recipe) {
-        return provisionFailure(ephemeralVmFailure('recipeNotFound', { recipeId: args.recipeId }))
-      }
+      // Registered before the first await, so a cancel during the approval read stops the create.
       const controller = args.provisionId ? new AbortController() : null
       if (args.provisionId && controller) {
         activeProvisionControllers.set(args.provisionId, controller)
       }
-      const sendProvisionEvent = (stream: 'stdout' | 'stderr', chunk: string): void => {
-        if (!args.provisionId) {
-          return
-        }
-        _event.sender.send('ephemeralVm:provisionEvent', {
-          provisionId: args.provisionId,
-          stream,
-          chunk: redactEphemeralVmRecipeDiagnosticText(chunk)
-        })
-      }
+      const provisionEvents = createProvisionEventForwarder(args.provisionId, (event) =>
+        _event.sender.send('ephemeralVm:provisionEvent', event)
+      )
       // Retain cancellation registration until every signal-consuming provisioning phase settles.
       try {
+        const plugins = await getApprovedPluginVmRecipes(pluginService)
+        const approved = await resolveApprovedProvisionRecipe(store, repo.repo, args, plugins)
+        if (controller?.signal.aborted) {
+          return provisionFailure(ephemeralVmFailure('provisionCancelled'))
+        }
+        if (!approved.ok) {
+          return provisionFailure(approved.failure)
+        }
+        const { recipe } = approved
         let recipeRepoUrl = repo.repo.gitRemoteIdentity?.remoteUrl
         let sourceRef = args.ref
         let expectedRefHead: string | undefined
@@ -195,16 +194,17 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           ...(sourceRef ? { ref: sourceRef } : {}),
           ...(expectedRefHead ? { expectedRefHead } : {}),
           ...(controller ? { signal: controller.signal } : {}),
-          onStdout: (chunk) => sendProvisionEvent('stdout', chunk),
-          onStderr: (chunk) => sendProvisionEvent('stderr', chunk)
+          onStdout: (chunk) => provisionEvents.send('stdout', chunk),
+          onStderr: (chunk) => provisionEvents.send('stderr', chunk)
         })
+        provisionEvents.finish(result.start.stdout)
         if (!result.ok) {
           return {
             ok: false,
             error: result.start.error,
             ...pickEphemeralVmFailureCode(result.start),
-            stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
-            stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+            stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
+            stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
           }
         }
         const connection = getEphemeralVmRecipeResultConnection(result.start.result)
@@ -220,6 +220,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
                 runtimeEnvironmentId: ssh.environmentId
               })
             )
+            void startEnvironmentDesktop(store, runtime)
             return {
               ok: true,
               connectionType: 'ssh',
@@ -227,7 +228,7 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
               sshTargetId: ssh.targetId,
               environmentId: ssh.environmentId,
               ...(expectedRefHead ? { expectedRefHead } : {}),
-              stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr),
+              stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr),
               warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
             }
           } catch (error) {
@@ -240,8 +241,8 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             return {
               ok: false,
               error: error instanceof Error ? error.message : String(error),
-              stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
-              stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+              stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
+              stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
             }
           }
         }
@@ -263,8 +264,8 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
           return {
             ok: false,
             error: error instanceof Error ? error.message : String(error),
-            stdout: redactEphemeralVmRecipeDiagnosticText(result.start.stdout),
-            stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr)
+            stdout: describeEphemeralVmRecipeStdoutForDiagnostics(result.start.stdout),
+            stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr)
           }
         }
         const runtime = requireEphemeralVmRecipeResult(
@@ -272,15 +273,18 @@ export function registerEphemeralVmHandlers(store: Store, pluginService?: Plugin
             runtimeEnvironmentId: environment.id
           })
         )
+        // In the background: a desktop that cannot be configured never fails the workspace.
+        void startEnvironmentDesktop(store, runtime)
         return {
           ok: true,
           connectionType: 'orca-server',
           runtime,
           environment: redactRuntimeEnvironment(environment),
-          stderr: redactEphemeralVmRecipeDiagnosticText(result.start.stderr),
+          stderr: sanitizeEphemeralVmRecipeStderr(result.start.stderr),
           warnings: getEphemeralVmRecipeResultWarnings(result.start.result)
         }
       } finally {
+        provisionEvents.finish('')
         if (args.provisionId) {
           activeProvisionControllers.delete(args.provisionId)
         }

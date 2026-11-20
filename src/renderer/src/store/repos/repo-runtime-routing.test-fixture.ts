@@ -125,7 +125,9 @@ export function installReposRuntimeRoutingHarness(): void {
         },
         ephemeralVm: {
           listRuntimes: ephemeralVmListRuntimes,
-          cleanup: ephemeralVmCleanup
+          cleanup: ephemeralVmCleanup,
+          // No recipe check applies to these runtimes (the experiment is off).
+          removalPreflight: async () => null
         },
         ui: { set: uiSet }
       }

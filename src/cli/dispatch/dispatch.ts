@@ -8,6 +8,8 @@ export type HandlerContext = {
   cwd: string
   json: boolean
   rawArgs?: string[]
+  /** What followed a bare `--`, for commands whose spec sets `trailingArgs`. */
+  trailingArgs?: string[]
 }
 
 export type CommandHandler = (ctx: HandlerContext) => Promise<void>

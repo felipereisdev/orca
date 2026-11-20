@@ -1,6 +1,9 @@
 import type { OrcaHooks } from '../../../shared/workspace-setup/orca-yaml-hook-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/remote-runtime/host-catalog/runtime-environments'
-import type { EphemeralVmRecipeDoctorResult } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
+import type {
+  EphemeralVmRecipeDoctorResult,
+  EphemeralVmRecipeStats
+} from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import type { EphemeralVmRecipeResultWarning } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-diagnostics'
 import type {
   EphemeralVmProvisionedRuntimeRecord,
@@ -9,6 +12,13 @@ import type {
 } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import type { EphemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import type { PendingVmCheckout } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
+import type {
+  RecipeRemovalCheckRequest,
+  RecipeRemovalCheckResult,
+  RecipeRemovalClaimResult,
+  RecipeRemovalCopyResult,
+  RecipeRemovalTarget
+} from '../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-removal-preflight'
 
 export type EphemeralVmApi = {
   listRecipes: (args: { repoId: string }) => Promise<{
@@ -41,6 +51,8 @@ export type EphemeralVmApi = {
     branch?: string
     ref?: string
     provisionId?: string
+    /** The vmRecipe trust hash the user approved; main refuses `recipe_changed_since_approval` when orca.yaml no longer matches. */
+    approvedRecipeHash?: string
   }) => Promise<
     | {
         ok: true
@@ -67,7 +79,12 @@ export type EphemeralVmApi = {
   onProvisionEvent: (
     callback: (event: { provisionId: string; stream: 'stdout' | 'stderr'; chunk: string }) => void
   ) => () => void
-  listRuntimes: () => Promise<EphemeralVmRuntimeRecord[]>
+  /** Every record, or with a filter only those a removal naming them destroys (main matches them). */
+  listRuntimes: (filter?: {
+    workspaceIds?: readonly string[]
+    hostScopedWorkspaces?: readonly { workspaceId: string; executionHostId: string }[]
+    runtimeOwnedSshTargetIds?: readonly string[]
+  }) => Promise<EphemeralVmRuntimeRecord[]>
   attachWorkspace: (args: {
     runtimeId: string
     workspaceId: string
@@ -75,10 +92,45 @@ export type EphemeralVmApi = {
   resumeWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
   /** Suspends the workspace's VM without closing panels; sleep closes them first. */
   suspendWorkspace: (args: { workspaceId: string }) => Promise<EphemeralVmWorkspaceLifecycleResult>
+  /** CPU, memory and disk from the recipe's `stats` step (cached 15 s); null when unavailable. */
+  runtimeStats: (args: { runtimeId: string }) => Promise<EphemeralVmRecipeStats | null>
+  /** The controller token this Mac's newest desktop configure got; in main's memory only. */
+  desktopControllerToken: (args: { environmentId: string }) => Promise<string | null>
+  /** Runs the desktop configure again for the environment (Retry); true when it now holds a token. */
+  reconfigureDesktop: (args: { environmentId: string }) => Promise<boolean>
   /** Fires after any runtime record write; re-list to read the new lifecycle status. */
   onRuntimesChanged: (callback: () => void) => () => void
-  cleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
+  /**
+   * Destroys the runtime's environment. `ack` is the acknowledgement its removal check issued;
+   * main refuses with `recipe_removal_unconfirmed` when a workspace's environment lacks one.
+   */
+  cleanup: (args: { runtimeId: string; ack: string }) => Promise<EphemeralVmRuntimeRecord>
   stopCleanup: (args: { runtimeId: string }) => Promise<EphemeralVmRuntimeRecord>
+  /** What removing a recipe workspace would lose; null when the check does not apply. */
+  /** `sessionId`: the dialog asking; closing it revokes every ack and unadopted claim it got. */
+  removalPreflight: (
+    args: RecipeRemovalCheckRequest & { sessionId?: string }
+  ) => Promise<RecipeRemovalCheckResult | null>
+  /** The user chose to remove after an unsafe or unchecked answer; false when the ack is gone. */
+  confirmRemoval: (args: { ack: string }) => Promise<boolean>
+  /** Cancel or close: the answer's ack, and any claim made from it, authorize nothing afterwards. */
+  revokeRemoval: (args: { ack: string }) => Promise<void>
+  /** Right before deleting the checkout: holds the environment for this removal's destroy. */
+  claimRemoval: (args: RecipeRemovalTarget & { ack: string }) => Promise<RecipeRemovalClaimResult>
+  /** At the store removal: takes over the claim this dialog session (or no session) made. */
+  adoptRemoval: (
+    args: RecipeRemovalTarget & { sessionId?: string }
+  ) => Promise<RecipeRemovalClaimResult>
+  /** The dialog closed or retargeted: its acks, and every claim no removal adopted, end. */
+  revokeRemovalSession: (args: { sessionId: string }) => Promise<void>
+  /** The removal failed after its claim: the environment is no longer held for a destroy. */
+  releaseRemoval: (args: RecipeRemovalTarget) => Promise<void>
+  /** The ack a failed create's rollback needs; empty unless main knows it never held a workspace. */
+  rollbackRemovalAck: (args: { runtimeId: string }) => Promise<string>
+  /** Copies its pending recordings to this Mac; only `ok: true` may be followed by the removal. */
+  copyRecordingsBeforeRemoval: (
+    args: RecipeRemovalCheckRequest & { sessionId?: string }
+  ) => Promise<RecipeRemovalCopyResult>
   /** Drops an interrupted write-ahead record that never received a recipe result. */
   forgetRuntime: (args: { runtimeId: string }) => Promise<void>
   getCleanupCommand: (args: { runtimeId: string }) => Promise<{

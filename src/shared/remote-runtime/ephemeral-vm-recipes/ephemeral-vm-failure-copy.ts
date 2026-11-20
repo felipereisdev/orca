@@ -6,6 +6,8 @@ export const EPHEMERAL_VM_FAILURE_COPY = {
   repoNotFound: 'Repo not found: {{repoId}}',
   remoteRepoUnsupported: 'Ephemeral VM recipes run on the local desktop host in v1.',
   recipeNotFound: 'Recipe not found: {{recipeId}}',
+  recipe_changed_since_approval:
+    'The environment recipe in orca.yaml changed after you approved it. Create the workspace again to review the new recipe.',
   runtimeNotFound: 'Unknown ephemeral VM runtime: {{runtimeId}}',
   runtimeRepoMissing: 'Ephemeral VM runtime has no repo id: {{runtimeId}}',
   provisionCancelled: 'Provisioning cancelled.',

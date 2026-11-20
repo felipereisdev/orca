@@ -20,6 +20,12 @@ export const EphemeralVmRuntimeStatusSchema = z.enum([
 
 export type EphemeralVmRuntimeStatus = z.infer<typeof EphemeralVmRuntimeStatusSchema>
 
+/** Up and using resources: running, or a failed suspend that left it up. Asleep (suspended or a
+ *  failed resume), provisioning, failed and cleanup states are not. */
+export function isEphemeralVmEnvironmentRunning(status: EphemeralVmRuntimeStatus): boolean {
+  return status === 'running' || status === 'suspend_failed'
+}
+
 export const EphemeralVmCleanupStatusSchema = z.enum([
   'not_started',
   'disabled',
@@ -144,9 +150,10 @@ const RollbackEphemeralVmRuntimeRecipeSchema = z
 
 export const RollbackEphemeralVmRuntimeRecordSchema = EphemeralVmRuntimeRecordSchema.extend({
   recipe: RollbackEphemeralVmRuntimeRecipeSchema.optional(),
+  // Older builds parse recipe results strictly and know no `desktop`.
   recipeResult: z.union([
-    EphemeralVmRecipeLegacyResultSchema,
-    EphemeralVmRecipeConnectionResultSchema
+    EphemeralVmRecipeLegacyResultSchema.omit({ desktop: true }),
+    EphemeralVmRecipeConnectionResultSchema.omit({ desktop: true })
   ])
 })
 

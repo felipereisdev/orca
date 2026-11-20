@@ -9,6 +9,13 @@ import {
 import { writeSecureJsonFileWithinLimit } from '../../secure-storage/bounded-secure-json-file'
 import { hardenExistingSecureFile } from '../../secure-storage/secure-file'
 import {
+  featureEntryToRecords,
+  featureIdentity,
+  parseFeatureRecords,
+  sortRuntimeFeatures,
+  type EphemeralVmRuntimeFeatureEntry
+} from './ephemeral-vm-runtime-feature-records'
+import {
   EphemeralVmRuntimeRecordSchema,
   type EphemeralVmRuntimeRecord
 } from './ephemeral-vm-runtimes'
@@ -16,17 +23,7 @@ import {
 const EPHEMERAL_VM_RUNTIME_FEATURES_FILE = 'orca-ephemeral-vm-runtime-features.json'
 export const MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES = 1024 * 1024
 
-const EphemeralVmRuntimeFeatureEntrySchema = z
-  .object({
-    id: z.string().min(1),
-    recipeId: z.string().min(1),
-    createdAt: z.number().finite(),
-    recipeCheckoutMode: z.enum(['orca-worktree', 'provisioned-root']).optional(),
-    resultCheckoutMode: z.literal('provisioned-root').optional()
-  })
-  .strict()
-
-export type EphemeralVmRuntimeFeatureEntry = z.infer<typeof EphemeralVmRuntimeFeatureEntrySchema>
+export { featureIdentity, sortRuntimeFeatures, type EphemeralVmRuntimeFeatureEntry }
 
 const EphemeralVmRuntimeFeatureStoreSchema = z
   .object({
@@ -92,15 +89,23 @@ export function readEphemeralVmRuntimeFeatureStore(
   }
   try {
     hardenExistingSecureFile(path)
-    const parsed = EphemeralVmRuntimeFeatureStoreSchema.parse(
-      JSON.parse(
-        readNodeFileSyncWithinLimit(
-          path,
-          MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
-        ).buffer.toString('utf8')
-      )
+    return parseEphemeralVmRuntimeFeatureStoreText(
+      readNodeFileSyncWithinLimit(
+        path,
+        MAX_EPHEMERAL_VM_RUNTIME_FEATURE_STORE_FILE_BYTES
+      ).buffer.toString('utf8')
     )
-    return parseFeatureRecords(parsed.records)
+  } catch {
+    return { writable: false, features: [], retainedRecords: [] }
+  }
+}
+
+/** The feature store's contents; unreadable text is an unwritable, empty store. */
+export function parseEphemeralVmRuntimeFeatureStoreText(
+  text: string
+): EphemeralVmRuntimeFeatureStoreSnapshot {
+  try {
+    return parseFeatureRecords(EphemeralVmRuntimeFeatureStoreSchema.parse(JSON.parse(text)).records)
   } catch {
     return { writable: false, features: [], retainedRecords: [] }
   }
@@ -152,7 +157,8 @@ export function featureEntryFromRuntime(
   const recipeCheckoutMode = runtime.recipe?.checkoutMode
   const resultCheckoutMode =
     runtime.recipeResult?.schemaVersion === 2 ? runtime.recipeResult.checkoutMode : undefined
-  if (!recipeCheckoutMode && !resultCheckoutMode) {
+  const resultDesktop = runtime.recipeResult?.desktop
+  if (!recipeCheckoutMode && !resultCheckoutMode && !resultDesktop) {
     return null
   }
   return {
@@ -160,7 +166,8 @@ export function featureEntryFromRuntime(
     recipeId: runtime.recipeId,
     createdAt: runtime.createdAt,
     ...(recipeCheckoutMode ? { recipeCheckoutMode } : {}),
-    ...(resultCheckoutMode ? { resultCheckoutMode } : {})
+    ...(resultCheckoutMode ? { resultCheckoutMode } : {}),
+    ...(resultDesktop ? { resultDesktop } : {})
   }
 }
 
@@ -192,64 +199,33 @@ function restoreRuntimeFeatures(
     ...(runtime.recipe && feature.recipeCheckoutMode
       ? { recipe: { ...runtime.recipe, checkoutMode: feature.recipeCheckoutMode } }
       : {}),
-    ...(feature.resultCheckoutMode && runtime.recipeResult
+    ...(runtime.recipeResult && (feature.resultCheckoutMode || feature.resultDesktop)
       ? {
           recipeResult: {
             ...runtime.recipeResult,
-            schemaVersion: 2,
-            checkoutMode: feature.resultCheckoutMode
+            ...(feature.resultCheckoutMode
+              ? { schemaVersion: 2, checkoutMode: feature.resultCheckoutMode }
+              : {}),
+            ...(feature.resultDesktop ? { desktop: feature.resultDesktop } : {})
           }
         }
       : {})
   })
 }
 
+/** Checkout modes are fixed for a runtime's life; the desktop may be reconfigured. */
 export function runtimeFeaturesEqual(
   left: EphemeralVmRuntimeRecord,
   right: EphemeralVmRuntimeRecord
 ): boolean {
-  return (
-    JSON.stringify(featureEntryFromRuntime(left)) === JSON.stringify(featureEntryFromRuntime(right))
-  )
+  return JSON.stringify(checkoutFeatures(left)) === JSON.stringify(checkoutFeatures(right))
 }
 
-export function featureIdentity(
-  value: Pick<EphemeralVmRuntimeRecord, 'id' | 'recipeId' | 'createdAt'>
-): string {
-  return `${value.id}\0${value.recipeId}\0${value.createdAt}`
-}
-
-function parseFeatureRecords(records: unknown[]): EphemeralVmRuntimeFeatureStoreSnapshot {
-  const features: EphemeralVmRuntimeFeatureEntry[] = []
-  const retainedRecords: unknown[] = []
-  const identities = new Map<string, string>()
-  for (const record of records) {
-    const parsed = EphemeralVmRuntimeFeatureEntrySchema.safeParse(record)
-    if (!parsed.success) {
-      retainedRecords.push(record)
-      continue
-    }
-    const identity = featureIdentity(parsed.data)
-    const serialized = JSON.stringify(parsed.data)
-    const existing = identities.get(identity)
-    if (existing && existing !== serialized) {
-      return { writable: false, features: [], retainedRecords: [] }
-    }
-    if (!existing) {
-      identities.set(identity, serialized)
-      features.push(parsed.data)
-    }
-  }
-  return { writable: true, features: sortRuntimeFeatures(features), retainedRecords }
-}
-
-export function sortRuntimeFeatures<T extends { id: string; recipeId: string; createdAt: number }>(
-  features: readonly T[]
-): T[] {
-  return features
-    .map((feature) => ({ feature, identity: featureIdentity(feature) }))
-    .sort((left, right) => left.identity.localeCompare(right.identity, 'en'))
-    .map(({ feature }) => feature)
+function checkoutFeatures(
+  runtime: EphemeralVmRuntimeRecord
+): Pick<EphemeralVmRuntimeFeatureEntry, 'recipeCheckoutMode' | 'resultCheckoutMode'> {
+  const { recipeCheckoutMode, resultCheckoutMode } = featureEntryFromRuntime(runtime) ?? {}
+  return { recipeCheckoutMode, resultCheckoutMode }
 }
 
 function runtimeFeatureStoreValue(
@@ -258,6 +234,9 @@ function runtimeFeatureStoreValue(
 ): { version: 1; records: unknown[] } {
   return {
     version: 1,
-    records: [...sortRuntimeFeatures(features), ...snapshot.retainedRecords]
+    records: [
+      ...sortRuntimeFeatures(features).flatMap(featureEntryToRecords),
+      ...snapshot.retainedRecords
+    ]
   }
 }

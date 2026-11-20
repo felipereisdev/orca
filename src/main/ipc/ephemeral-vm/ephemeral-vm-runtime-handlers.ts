@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { z } from 'zod'
 import type { Store } from '../../persistence/loading-store/store'
 import { listCredentialLikeEnvNames } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-env'
 import {
@@ -11,20 +12,38 @@ import {
 } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store-events'
 import type { EphemeralVmRuntimeRecord } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { cleanupOwnedEphemeralVmRuntime } from '../../ephemeral-vm/owned-runtime-cleanup'
+import { listRuntimesForRemoval } from '../../ephemeral-vm/removal-runtime-match'
 import { stopEphemeralVmRuntimeCleanup } from '../../ephemeral-vm/runtime-cleanup-control'
 import {
   buildEphemeralVmRecipeCleanupCommand,
-  buildEphemeralVmRecipeCleanupPayload
+  buildEphemeralVmRecipeManualCleanupPayload
 } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-lifecycle-payload'
 import { getRuntimeRecipeContext } from './ephemeral-vm-recipe-context'
 import { ephemeralVmFailure } from '../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { attachEphemeralVmRuntimeToWorkspace } from '../../ephemeral-vm/runtime-attachment'
+import {
+  desktopControllerToken,
+  reconfigureEnvironmentDesktop,
+  registerEnvironmentDesktopLifecycle,
+  restoreEnvironmentDesktops,
+  startEnvironmentDesktop
+} from '../../ephemeral-vm/desktop-sync-registry'
+import { registerRecipeRemovalPreflightHandlers } from '../../ephemeral-vm/workspace-removal-preflight-wiring'
 import { forgetInterruptedEphemeralVmProvision } from '../../ephemeral-vm/runtime-provisioning-persistence'
 import { pendingVmCheckouts } from '../../ephemeral-vm/pending-vm-checkouts'
+import {
+  createEphemeralVmRuntimeStatsReader,
+  resolveRuntimeStatsTarget
+} from '../../ephemeral-vm/runtime-stats'
 import {
   parsePendingVmCheckouts,
   PENDING_VM_CHECKOUTS_CHANGED_CHANNEL
 } from '../../../shared/remote-runtime/ephemeral-vm-store/pending-vm-checkouts'
+
+// Every destroy names the acknowledgement its removal check issued; main decides when it is needed.
+const EphemeralVmCleanupArgs = z.object({ runtimeId: z.string().min(1), ack: z.string() })
+const EphemeralVmRuntimeStatsArgs = z.object({ runtimeId: z.string().min(1) })
+const EphemeralVmDesktopArgs = z.object({ environmentId: z.string().min(1) })
 
 let stopRuntimesChangedBroadcast: (() => void) | null = null
 let runtimesChangedBroadcastQueued = false
@@ -108,6 +127,7 @@ function registerPendingVmCheckoutHandlers(): void {
 
 export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   registerPendingVmCheckoutHandlers()
+  registerRecipeRemovalPreflightHandlers(store)
   ipcMain.removeHandler('ephemeralVm:attachWorkspace')
   ipcMain.removeHandler('ephemeralVm:listRuntimes')
   ipcMain.removeHandler('ephemeralVm:cleanup')
@@ -115,33 +135,79 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:forgetRuntime')
   ipcMain.removeHandler('ephemeralVm:getCleanupCommand')
   ipcMain.removeHandler('ephemeralVm:listCredentialEnvNames')
+  ipcMain.removeHandler('ephemeralVm:runtimeStats')
+  ipcMain.removeHandler('ephemeralVm:desktopControllerToken')
+  ipcMain.removeHandler('ephemeralVm:reconfigureDesktop')
   stopRuntimesChangedBroadcast?.()
   stopRuntimesChangedBroadcast = onEphemeralVmRuntimesChanged(broadcastEphemeralVmRuntimesChanged)
+  registerEnvironmentDesktopLifecycle(store)
+  try {
+    restoreEnvironmentDesktops(store, listEphemeralVmRuntimes(app.getPath('userData')))
+  } catch (error) {
+    // An unreadable store must not abort registration; the desktops return on their next resume.
+    console.warn('[ephemeral-vm] Could not restore recipe desktops:', error)
+  }
 
   // Names only: the recipe list warns which credentials scripts inherit, never their values.
   ipcMain.handle('ephemeralVm:listCredentialEnvNames', () =>
     listCredentialLikeEnvNames(process.env)
   )
 
-  ipcMain.handle('ephemeralVm:listRuntimes', (): EphemeralVmRuntimeRecord[] => {
-    return listEphemeralVmRuntimes(app.getPath('userData'))
+  // The renderer asks while its VM rows show; main runs no timer of its own.
+  const readEphemeralVmRuntimeStats = createEphemeralVmRuntimeStatsReader({
+    resolveTarget: (runtimeId) =>
+      resolveRuntimeStatsTarget(store, app.getPath('userData'), runtimeId)
   })
+  ipcMain.handle('ephemeralVm:runtimeStats', (_event, args: unknown) => {
+    const parsed = EphemeralVmRuntimeStatsArgs.safeParse(args)
+    if (!parsed.success || store.getSettings().experimentalEphemeralVms !== true) {
+      return null
+    }
+    return readEphemeralVmRuntimeStats(parsed.data.runtimeId)
+  })
+
+  // The Desktop tab's viewer and control calls carry this token; it never touches disk.
+  ipcMain.handle('ephemeralVm:desktopControllerToken', (_event, args: unknown) => {
+    const parsed = EphemeralVmDesktopArgs.safeParse(args)
+    return parsed.success && store.getSettings().experimentalEphemeralVms === true
+      ? desktopControllerToken(parsed.data.environmentId)
+      : null
+  })
+  ipcMain.handle('ephemeralVm:reconfigureDesktop', (_event, args: unknown) => {
+    const parsed = EphemeralVmDesktopArgs.safeParse(args)
+    return parsed.success && store.getSettings().experimentalEphemeralVms === true
+      ? reconfigureEnvironmentDesktop(store, parsed.data.environmentId)
+      : false
+  })
+
+  // With a filter, main picks the records a removal destroys; the renderer never filters them.
+  ipcMain.handle(
+    'ephemeralVm:listRuntimes',
+    (_event, filter: unknown): EphemeralVmRuntimeRecord[] | Promise<EphemeralVmRuntimeRecord[]> =>
+      filter === undefined
+        ? listEphemeralVmRuntimes(app.getPath('userData'))
+        : listRuntimesForRemoval(app.getPath('userData'), filter)
+  )
 
   ipcMain.handle(
     'ephemeralVm:attachWorkspace',
     (_event, args: { runtimeId: string; workspaceId: string }): EphemeralVmRuntimeRecord => {
-      return attachEphemeralVmRuntimeToWorkspace({
+      const runtime = attachEphemeralVmRuntimeToWorkspace({
         userDataPath: app.getPath('userData'),
         runtimeId: args.runtimeId,
         workspaceId: args.workspaceId
       })
+      // Provisioning ran before the workspace existed; its recordings can sync now.
+      void startEnvironmentDesktop(store, runtime)
+      return runtime
     }
   )
 
   ipcMain.handle(
     'ephemeralVm:cleanup',
-    async (_event, args: { runtimeId: string }): Promise<EphemeralVmRuntimeRecord> => {
-      return cleanupOwnedEphemeralVmRuntime(store, app.getPath('userData'), args.runtimeId)
+    async (_event, args: unknown): Promise<EphemeralVmRuntimeRecord> => {
+      const { runtimeId, ack } = EphemeralVmCleanupArgs.parse(args)
+      return cleanupOwnedEphemeralVmRuntime(store, app.getPath('userData'), runtimeId, { ack })
     }
   )
 
@@ -183,7 +249,7 @@ export function registerEphemeralVmRuntimeHandlers(store: Store): void {
     async (_event, args: { runtimeId: string }): Promise<EphemeralVmCleanupCommandResult> => {
       const userDataPath = app.getPath('userData')
       const resolved = getRuntimeRecipeContext(store, userDataPath, args.runtimeId)
-      const payload = buildEphemeralVmRecipeCleanupPayload({
+      const payload = buildEphemeralVmRecipeManualCleanupPayload({
         recipe: resolved.recipe,
         context: {
           instanceId: resolved.runtime.id,

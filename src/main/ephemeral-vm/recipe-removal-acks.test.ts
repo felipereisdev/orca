@@ -1,0 +1,165 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  adoptRecipeRemovalClaim,
+  claimRecipeRemovalAck,
+  confirmRecipeRemovalAck,
+  consumeRecipeRemovalAck,
+  issueRecipeRemovalAck,
+  releaseRecipeRemovalClaim,
+  revokeRecipeRemovalAck,
+  revokeRecipeRemovalSession
+} from './recipe-removal-acks'
+
+const binding = {
+  hostId: 'runtime:env-a',
+  workspaceId: 'repo::/workspace/repo-task',
+  runtimeId: 'vm-a',
+  runtimeCreatedAt: 10
+}
+const runtime = {
+  id: 'vm-a',
+  createdAt: 10,
+  hostIds: ['runtime:env-a'],
+  workspaceId: 'repo::/workspace/repo-task'
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('recipe removal acknowledgements', () => {
+  it('spends a clean ack once', () => {
+    const ack = issueRecipeRemovalAck(binding, true)
+    expect(() => consumeRecipeRemovalAck(ack, runtime)).not.toThrow()
+    expect(() => consumeRecipeRemovalAck(ack, runtime)).toThrow('not confirmed')
+  })
+
+  it('an unsafe answer authorizes nothing until the user confirms, and cancel revokes it', () => {
+    const pending = issueRecipeRemovalAck(binding, false)
+    expect(() => consumeRecipeRemovalAck(pending, runtime)).toThrow('not confirmed')
+    expect(claimRecipeRemovalAck(pending, binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+    expect(confirmRecipeRemovalAck(pending)).toBe(true)
+    expect(() => consumeRecipeRemovalAck(pending, runtime)).not.toThrow()
+
+    const cancelled = issueRecipeRemovalAck(binding, false)
+    revokeRecipeRemovalAck(cancelled)
+    expect(confirmRecipeRemovalAck(cancelled)).toBe(false)
+    expect(() => consumeRecipeRemovalAck(cancelled, runtime)).toThrow('not confirmed')
+  })
+
+  it('refuses a missing or expired ack; a claim holds it for the whole removal', () => {
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const expired = issueRecipeRemovalAck(binding, true)
+    vi.setSystemTime(Date.now() + 2 * 60_000 + 1)
+    expect(claimRecipeRemovalAck(expired, binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+
+    const claimed = issueRecipeRemovalAck(binding, true)
+    expect(claimRecipeRemovalAck(claimed, binding)).toEqual({ ok: true })
+    // Checkout removal and its polling can take long; only the destroy or a release ends a claim.
+    vi.setSystemTime(Date.now() + 59 * 60_000)
+    expect(() => consumeRecipeRemovalAck(claimed, runtime)).not.toThrow()
+  })
+
+  it('cancelling a decision revokes the claim already made from it', () => {
+    const ack = issueRecipeRemovalAck(binding, false)
+    expect(confirmRecipeRemovalAck(ack)).toBe(true)
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    revokeRecipeRemovalAck(ack)
+    expect(adoptRecipeRemovalClaim(binding, undefined)).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+  })
+
+  it('closing a dialog revokes its session: every ack and every claim the store did not adopt', () => {
+    const shown = issueRecipeRemovalAck(binding, false, 'session-a')
+    // "Copy recordings and remove" answers with a fresh ack of the same session.
+    const copied = issueRecipeRemovalAck(binding, true, 'session-a')
+    expect(claimRecipeRemovalAck(copied, binding)).toEqual({ ok: true })
+    revokeRecipeRemovalSession('session-a')
+    expect(confirmRecipeRemovalAck(shown)).toBe(false)
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+    expect(adoptRecipeRemovalClaim(binding, 'session-a')).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+  })
+
+  it('cancelling overlapping removal sessions releases each of their recording fences', async () => {
+    const heldFences = new Set<string>()
+    const createFence = (id: string) => ({
+      hold: async () => {
+        heldFences.add(id)
+        return true
+      },
+      release: async () => {
+        heldFences.delete(id)
+      },
+      mayBeHeld: () => heldFences.has(id)
+    })
+    const first = createFence('first')
+    const second = createFence('second')
+    await first.hold()
+    await second.hold()
+    const firstAck = issueRecipeRemovalAck(binding, true, 'session-first', 'unknown', first)
+    const secondAck = issueRecipeRemovalAck(binding, true, 'session-second', 'unknown', second)
+    expect(claimRecipeRemovalAck(firstAck, binding)).toEqual({ ok: true })
+    expect(claimRecipeRemovalAck(secondAck, binding)).toEqual({ ok: true })
+
+    await revokeRecipeRemovalSession('session-first')
+    const heldAfterFirstCancel = [...heldFences]
+    await revokeRecipeRemovalSession('session-second')
+
+    expect(heldAfterFirstCancel).toEqual(['second'])
+    expect([...heldFences]).toEqual([])
+  })
+
+  it('a copy that finishes after its session was revoked gets an ack that authorizes nothing', () => {
+    revokeRecipeRemovalSession('session-late')
+    const late = issueRecipeRemovalAck(binding, true, 'session-late')
+    expect(confirmRecipeRemovalAck(late)).toBe(false)
+    expect(claimRecipeRemovalAck(late, binding)).toEqual({ ok: false, reason: 'unconfirmed' })
+    expect(() => consumeRecipeRemovalAck(late, runtime)).toThrow('not confirmed')
+  })
+
+  it('a claim the store adopted outlives its session; other sessions cannot adopt it', () => {
+    const ack = issueRecipeRemovalAck(binding, true, 'session-b')
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    expect(adoptRecipeRemovalClaim(binding, undefined)).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+    expect(adoptRecipeRemovalClaim(binding, 'session-other')).toEqual({
+      ok: false,
+      reason: 'unconfirmed'
+    })
+    expect(adoptRecipeRemovalClaim(binding, 'session-b')).toEqual({ ok: true })
+    revokeRecipeRemovalSession('session-b')
+    expect(() => consumeRecipeRemovalAck('', runtime)).not.toThrow()
+  })
+
+  it('a removal that failed after its claim releases it', () => {
+    const ack = issueRecipeRemovalAck(binding, true)
+    expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+    releaseRecipeRemovalClaim(binding.hostId, binding.workspaceId)
+    expect(() => consumeRecipeRemovalAck('', runtime)).toThrow('not confirmed')
+  })
+
+  it('refuses an ack issued for another runtime instance, host or workspace', () => {
+    // A replacement record under the same id was created later than the one that was checked.
+    const replaced = issueRecipeRemovalAck(binding, true)
+    expect(claimRecipeRemovalAck(replaced, { ...binding, runtimeCreatedAt: 11 })).toEqual({
+      ok: false,
+      reason: 'replaced'
+    })
+    expect(() => consumeRecipeRemovalAck(replaced, { ...runtime, createdAt: 11 })).toThrow(
+      'not confirmed'
+    )
+    const otherHost = issueRecipeRemovalAck({ ...binding, hostId: 'runtime:env-b' }, true)
+    expect(() => consumeRecipeRemovalAck(otherHost, runtime)).toThrow('not confirmed')
+    const otherWorkspace = issueRecipeRemovalAck({ ...binding, workspaceId: 'repo::/other' }, true)
+    expect(() => consumeRecipeRemovalAck(otherWorkspace, runtime)).toThrow('not confirmed')
+  })
+})

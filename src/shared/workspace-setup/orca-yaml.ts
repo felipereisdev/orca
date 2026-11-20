@@ -172,6 +172,7 @@ function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
       }
       const suspend = asTrimmedString(record.suspend)
       const resume = asTrimmedString(record.resume)
+      const stats = asTrimmedString(record.stats)
       const destroyValue = asTrimmedString(record.destroy) ?? asTrimmedString(record.cleanup)
       const destroyDisabled = destroyValue === 'none'
       const timeouts = parseEphemeralVmRecipeTimeoutSeconds(record.timeoutSeconds)
@@ -203,6 +204,7 @@ function normalizeVmRecipes(value: unknown): VmRecipeParseResult {
         ...(description ? { description } : {}),
         ...(suspend ? { suspend } : {}),
         ...(resume ? { resume } : {}),
+        ...(stats ? { stats } : {}),
         ...(destroyValue && !destroyDisabled ? { destroy: destroyValue } : {}),
         ...(destroyDisabled ? { destroyDisabled: true } : {}),
         ...(timeouts.ok && timeouts.timeoutSeconds

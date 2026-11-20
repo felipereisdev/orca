@@ -88,8 +88,8 @@ export function renderTabBarItems({
     if (item.type === 'browser') {
       return activeTabType === 'browser' && activeBrowserTabId === item.id
     }
-    if (item.type === 'database') {
-      return activeTabType === 'database' && item.id === activeFileId
+    if (item.type === 'database' || item.type === 'desktop') {
+      return activeTabType === item.type && item.id === activeFileId
     }
     if (item.type === 'simulator') {
       return activeTabType === 'simulator' && item.id === activeSimulatorTabId

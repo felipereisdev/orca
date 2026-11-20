@@ -1,6 +1,7 @@
 import { DatabaseOperationError } from '../../../../shared/database/database-operation-error'
 import { BranchSwitchLandedWithWarningError } from '../../../git/worktrees/checkout/branch-switch'
 import { mapBrowserError } from './browser-error-response'
+import { DesktopError } from '../../../desktop/desktop-errors'
 import { ZodError } from 'zod'
 import {
   InvalidArgumentError,
@@ -42,6 +43,12 @@ export function mapDispatcherError(
   }
   if (error instanceof DatabaseOperationError) {
     return errorResponse(request.id, meta, error.code, error.message)
+  }
+  if (error instanceof DesktopError) {
+    // The reason tells a caller whether VNC is only not up yet; it is a fixed code, no credential.
+    const data =
+      error.code === 'desktop_unavailable' && error.reason ? { reason: error.reason } : undefined
+    return errorResponse(request.id, meta, error.code, error.message, data)
   }
   if (error instanceof ZodError) {
     return invalidArgumentResponse(request, meta, formatZodError(error))

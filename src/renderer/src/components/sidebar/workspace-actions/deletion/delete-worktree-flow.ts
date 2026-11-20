@@ -23,6 +23,7 @@ import {
 } from './worktree-delete-request'
 import { runWorktreeDeletesInParallel } from './worktree-delete-execution'
 import { runWorktreeDeleteWithToast } from './run-worktree-delete-with-toast'
+import { removeUnlessRecipeWorkNeedsReview } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { collectRemovalUnsavedFiles } from '@/components/editor/save/flush/removal-unsaved-editor-files'
 
 /** Standard Git-worktree deletion funnel; stale record/instance guards precede confirmation preferences. */
@@ -99,7 +100,18 @@ export function runWorktreeDelete(worktreeId: string, options: WorktreeDeleteOpt
     (state.settings?.skipDeleteWorktreeConfirm ?? false) &&
     collectRemovalUnsavedFiles(useAppStore.getState, [target]).length === 0
   if (skipConfirm && !hasLineageChildren) {
-    void runWorktreeDeleteWithToast(toWorktreeRemovalTarget(target), target.displayName)
+    // Skipping the confirmation never skips a recipe workspace whose work isn't safe yet.
+    void removeUnlessRecipeWorkNeedsReview(
+      state,
+      [target],
+      () => void runWorktreeDeleteWithToast(toWorktreeRemovalTarget(target), target.displayName),
+      () =>
+        state.openModal('delete-worktree', {
+          worktreeId,
+          worktreeDeleteIdentities: toWorktreeDeleteIdentities([target]),
+          allowSkipConfirm: false
+        })
+    )
     return
   }
   state.openModal('delete-worktree', {
@@ -161,13 +173,26 @@ export function runWorktreeBatchDelete(
     (state.settings?.skipDeleteWorktreeConfirm ?? false) &&
     collectRemovalUnsavedFiles(useAppStore.getState, targets).length === 0
   if (skipConfirm) {
-    void runWorktreeDeletesInParallel(targets, {
-      onForceDeleted: (deletedTarget) => options.onDeleted?.([deletedTarget])
-    }).then((deletedTargets) => {
-      if (deletedTargets.length > 0) {
-        options.onDeleted?.(deletedTargets)
-      }
-    })
+    void removeUnlessRecipeWorkNeedsReview(
+      state,
+      targets,
+      () =>
+        void runWorktreeDeletesInParallel(targets, {
+          onForceDeleted: (deletedTarget) => options.onDeleted?.([deletedTarget])
+        }).then((deletedTargets) => {
+          if (deletedTargets.length > 0) {
+            options.onDeleted?.(deletedTargets)
+          }
+        }),
+      () =>
+        state.openModal('delete-worktree', {
+          worktreeId: targets[0].id,
+          worktreeDeleteIdentities: toWorktreeDeleteIdentities(targets),
+          allowSkipConfirm: false,
+          ...(options.onDeleted ? { onDeleted: options.onDeleted } : {}),
+          ...(options.forceOnConfirm === false ? { forceOnConfirm: false } : {})
+        })
+    )
     return true
   }
 

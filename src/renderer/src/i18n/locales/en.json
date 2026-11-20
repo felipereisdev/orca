@@ -6219,6 +6219,11 @@
           "UsageDisplayToggle": {
             "showRemaining": "Show remaining usage",
             "showUsed": "Show used usage"
+          },
+          "EphemeralVmRunningIndicator": {
+            "running_one": "{{count}} environment running",
+            "running_other": "{{count}} environments running",
+            "tooltip": "Open VM settings to see each environment’s CPU, memory and disk"
           }
         }
       },
@@ -12961,7 +12966,10 @@
           "untrackedRuntimeHint": "Orca never received this VM’s details. Cleanup runs destroy with only instance ID {{instanceId}}; if it fails, delete the VM in your provider, then remove it from this list.",
           "removeFromList": "Remove from list",
           "removeFromListFailed": "Couldn’t remove Cloud VM runtime from the list.",
-          "cca21fb369": "Refresh cloud VMs"
+          "cca21fb369": "Refresh cloud VMs",
+          "statsCpu": "CPU {{value}}",
+          "statsMemory": "Memory {{value}}",
+          "statsDisk": "Disk {{value}}"
         },
         "ephemeralVms": {
           "search": {
@@ -24943,7 +24951,43 @@
     "moreActions": "More force delete options",
     "moreBranchActions": "More branch delete options",
     "alwaysForceDeleteBranches": "Always delete preserved branches",
-    "alwaysForceDeleteBranchesDescription": "Applies to branches kept after future workspace deletions."
+    "alwaysForceDeleteBranchesDescription": "Applies to branches kept after future workspace deletions.",
+    "recipeCheck": {
+      "unsafeTitle": "This workspace has work that is not safe yet:",
+      "uncheckedTitle": "Couldn't verify this workspace",
+      "cancel": "Cancel",
+      "removeAnyway": "Remove anyway",
+      "copying": "Copying recordings…",
+      "copyAndRemove": "Copy recordings and remove",
+      "checking": "Checking this workspace for unsaved work…",
+      "checkingButton": "Checking…",
+      "reasonTimeout": "The environment didn't answer in time.",
+      "reasonAsleep": "The environment is asleep, so its work could not be checked.",
+      "reasonGit": "Git couldn't be read in the environment.",
+      "reasonRecordings": "The environment's recordings couldn't be listed.",
+      "reasonUnreachable": "The environment can't be reached.",
+      "copyFailed": "A recording couldn't be copied to this Mac. Nothing was removed.",
+      "copyTimeout": "Copying the recordings took too long. Nothing was removed.",
+      "copyUnavailable": "The recordings couldn't be listed. Nothing was removed.",
+      "copyUnreachable": "The environment can't be reached. Nothing was removed.",
+      "recordingsNotCopied_one": "{{count}} recording not copied to this Mac",
+      "recordingsNotCopied_other": "{{count}} recordings not copied to this Mac",
+      "dirtyFiles_one": "{{count}} file with uncommitted changes",
+      "dirtyFiles_other": "{{count}} files with uncommitted changes",
+      "unpushedCommits_one": "{{count}} commit not pushed",
+      "unpushedCommits_other": "{{count}} commits not pushed",
+      "aggregateTitle": "Some of these workspaces have work that is not safe yet:",
+      "reasonAmbiguous": "Several environments claim this workspace, so Orca cannot tell which one to check.",
+      "dirtyFilesCapped_one": "{{count}}+ files with uncommitted changes",
+      "dirtyFilesCapped_other": "{{count}}+ files with uncommitted changes",
+      "reviewTitle": "Review before removing",
+      "reasonNoOrcaServer": "Its environment has no Orca server to ask, so its work could not be checked.",
+      "reasonStoreUnreadable": "Orca couldn't read what it saved about this environment.",
+      "reasonWorkspaceUnrecorded": "Orca never recorded which workspace this environment holds, so its work could not be checked.",
+      "workspaceReplaced": "This workspace was replaced while it was being removed. Nothing was deleted.",
+      "removalNotAuthorized": "The removal was cancelled or its environment changed. Nothing was deleted.",
+      "recordingInProgress": "A recording is still in progress"
+    }
   },
   "worktree": {
     "setupTrust": {
@@ -26745,7 +26789,8 @@
       "resumeExited": "Resume exited with code {{exitCode}}.",
       "resumeExitedWithoutCode": "Resume exited with code unknown.",
       "recipeTimedOut": "The recipe {{mode}} step did not finish within {{timeout}}, so Orca stopped it. Check the recipe output, or raise timeoutSeconds in orca.yaml if it needs longer.",
-      "provisionInterrupted": "Orca stopped while this VM was being created. Destroy it to release any provider resources."
+      "provisionInterrupted": "Orca stopped while this VM was being created. Destroy it to release any provider resources.",
+      "recipeChangedSinceApproval": "The environment recipe in orca.yaml changed after you approved it. Create the workspace again to review the new recipe."
     }
   },
   "installDirAcl": {
@@ -29672,5 +29717,43 @@
     "suggestionUse": "Use",
     "browseOnline": "Browse",
     "browseOnlineLabel": "Browse community translations on orca.dev (opens in your browser)"
+  },
+  "desktop": {
+    "tab": {
+      "notice": "Programs on the environment desktop can see what is shown and typed there. Don't type personal passwords here.",
+      "status": {
+        "connecting": "Connecting…",
+        "unavailable": "Unavailable",
+        "user": "You're in control",
+        "agent": "Agent in control",
+        "unconfigured": "Not set up yet",
+        "otherWindow": "Control in another window"
+      },
+      "unavailableBody": "The environment desktop is not reachable.",
+      "retry": "Try again",
+      "recording": {
+        "stop": "Stop recording",
+        "start": "Record"
+      },
+      "control": {
+        "handBack": "Hand back to agent",
+        "take": "Take control"
+      },
+      "errors": {
+        "notAllowed": "Only the computer that set up this desktop can view or control it.",
+        "unavailable": "The desktop is not available right now.",
+        "alreadyRecording": "The desktop is already being recorded.",
+        "notRecording": "The desktop is not being recorded.",
+        "recordingUnavailable": "This environment cannot record the desktop because ffmpeg is missing.",
+        "recordingFailed": "The recording failed and was discarded.",
+        "unknown": "Something went wrong. Try again.",
+        "controllerStale": "This Mac needs to set up the desktop again. Select Try again.",
+        "removalPending": "This workspace is being removed, so the desktop can't be recorded."
+      },
+      "create": "Desktop",
+      "unconfiguredBody": "The environment desktop hasn't been set up yet.",
+      "disabled": "Desktop disabled (experiment off)",
+      "paste": "Paste text"
+    }
   }
 }

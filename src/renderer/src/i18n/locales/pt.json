@@ -3954,6 +3954,12 @@
           "UsageDisplayToggle": {
             "showRemaining": "Mostrar uso restante",
             "showUsed": "Mostrar uso consumido"
+          },
+          "EphemeralVmRunningIndicator": {
+            "running_one": "{{count}} ambiente rodando",
+            "running_other": "{{count}} ambientes rodando",
+            "running_many": "{{count}} ambientes rodando",
+            "tooltip": "Abra as configurações de VMs para ver CPU, memória e disco de cada ambiente"
           }
         }
       },
@@ -6690,7 +6696,10 @@
           "stopCleanup": "Parar limpeza",
           "cleanupStopped": "Limpeza interrompida",
           "stopCleanupFailed": "Não foi possível parar a limpeza da VM na Nuvem.",
-          "cca21fb369": "Atualizar VMs na nuvem"
+          "cca21fb369": "Atualizar VMs na nuvem",
+          "statsCpu": "CPU {{value}}",
+          "statsMemory": "Memória {{value}}",
+          "statsDisk": "Disco {{value}}"
         },
         "commit": {
           "message": {
@@ -23054,7 +23063,47 @@
     "moreActions": "Mais opções de exclusão forçada",
     "moreBranchActions": "Mais opções de exclusão de branches",
     "alwaysForceDeleteBranches": "Sempre excluir branches preservadas",
-    "alwaysForceDeleteBranchesDescription": "Aplica-se às branches mantidas após futuras exclusões de espaços de trabalho."
+    "alwaysForceDeleteBranchesDescription": "Aplica-se às branches mantidas após futuras exclusões de espaços de trabalho.",
+    "recipeCheck": {
+      "unsafeTitle": "Este workspace tem trabalho que ainda não está seguro:",
+      "uncheckedTitle": "Não foi possível verificar este workspace",
+      "cancel": "Cancelar",
+      "removeAnyway": "Remover mesmo assim",
+      "copying": "Copiando gravações…",
+      "copyAndRemove": "Copiar gravações e remover",
+      "checking": "Verificando se este workspace tem trabalho não salvo…",
+      "checkingButton": "Verificando…",
+      "reasonTimeout": "O ambiente não respondeu a tempo.",
+      "reasonAsleep": "O ambiente está dormindo, então o trabalho dele não pôde ser verificado.",
+      "reasonGit": "Não foi possível ler o Git no ambiente.",
+      "reasonRecordings": "Não foi possível listar as gravações do ambiente.",
+      "reasonUnreachable": "Não é possível acessar o ambiente.",
+      "copyFailed": "Não foi possível copiar uma gravação para este Mac. Nada foi removido.",
+      "copyTimeout": "A cópia das gravações demorou demais. Nada foi removido.",
+      "copyUnavailable": "Não foi possível listar as gravações. Nada foi removido.",
+      "copyUnreachable": "Não é possível acessar o ambiente. Nada foi removido.",
+      "recordingsNotCopied_one": "{{count}} gravação não copiada para este Mac",
+      "recordingsNotCopied_other": "{{count}} gravações não copiadas para este Mac",
+      "recordingsNotCopied_many": "{{count}} gravações não copiadas para este Mac",
+      "dirtyFiles_one": "{{count}} arquivo com alterações não commitadas",
+      "dirtyFiles_other": "{{count}} arquivos com alterações não commitadas",
+      "dirtyFiles_many": "{{count}} arquivos com alterações não commitadas",
+      "unpushedCommits_one": "{{count}} commit não enviado",
+      "unpushedCommits_other": "{{count}} commits não enviados",
+      "unpushedCommits_many": "{{count}} commits não enviados",
+      "aggregateTitle": "Alguns destes workspaces têm trabalho que ainda não está seguro:",
+      "reasonAmbiguous": "Vários ambientes reivindicam este workspace, então o Orca não sabe qual verificar.",
+      "dirtyFilesCapped_one": "{{count}}+ arquivos com alterações não commitadas",
+      "dirtyFilesCapped_other": "{{count}}+ arquivos com alterações não commitadas",
+      "dirtyFilesCapped_many": "{{count}}+ arquivos com alterações não commitadas",
+      "reviewTitle": "Revisar antes de remover",
+      "reasonNoOrcaServer": "O ambiente não tem um servidor Orca para consultar, então o trabalho dele não pôde ser verificado.",
+      "reasonStoreUnreadable": "O Orca não conseguiu ler o que salvou sobre este ambiente.",
+      "reasonWorkspaceUnrecorded": "O Orca nunca registrou qual workspace este ambiente contém, então o trabalho dele não pôde ser verificado.",
+      "workspaceReplaced": "Este workspace foi substituído enquanto era removido. Nada foi apagado.",
+      "removalNotAuthorized": "A remoção foi cancelada ou o ambiente dela mudou. Nada foi apagado.",
+      "recordingInProgress": "Gravação em andamento"
+    }
   },
   "worktree": {
     "nestedRemoval": {
@@ -24660,7 +24709,8 @@
       "cleanupInterrupted": "A limpeza foi interrompida. Tente a limpeza novamente para continuar.",
       "sshTargetRemoveFailed": "Não foi possível remover o destino SSH oculto.",
       "recipeExitedWithoutCode": "A receita terminou com um código desconhecido.",
-      "destroyExitedWithoutCode": "A destruição terminou com um código desconhecido."
+      "destroyExitedWithoutCode": "A destruição terminou com um código desconhecido.",
+      "recipeChangedSinceApproval": "A receita do ambiente no orca.yaml mudou depois que você a aprovou. Crie o workspace de novo para revisar a nova receita."
     }
   },
   "installDirAcl": {
@@ -25176,5 +25226,43 @@
     "dontSend": "Não enviar",
     "sending": "Enviando…",
     "sendReport": "Enviar relatório"
+  },
+  "desktop": {
+    "tab": {
+      "notice": "Programas no desktop do ambiente podem ver o que é exibido e digitado. Não digite senhas pessoais aqui.",
+      "status": {
+        "connecting": "Conectando…",
+        "unavailable": "Indisponível",
+        "user": "Você no controle",
+        "agent": "Agente no controle",
+        "unconfigured": "Ainda não configurado",
+        "otherWindow": "Controle em outra janela"
+      },
+      "unavailableBody": "O desktop do ambiente não está acessível.",
+      "retry": "Tentar de novo",
+      "recording": {
+        "stop": "Parar gravação",
+        "start": "Gravar"
+      },
+      "control": {
+        "handBack": "Devolver ao agente",
+        "take": "Assumir controle"
+      },
+      "errors": {
+        "notAllowed": "Só o computador que configurou este desktop pode vê-lo ou controlá-lo.",
+        "unavailable": "O desktop não está disponível no momento.",
+        "alreadyRecording": "O desktop já está sendo gravado.",
+        "notRecording": "O desktop não está sendo gravado.",
+        "recordingUnavailable": "Este ambiente não consegue gravar o desktop porque o ffmpeg não está instalado.",
+        "recordingFailed": "A gravação falhou e foi descartada.",
+        "unknown": "Algo deu errado. Tente de novo.",
+        "controllerStale": "Este Mac precisa configurar o desktop de novo. Clique em Tentar de novo.",
+        "removalPending": "Este workspace está sendo removido, então o desktop não pode ser gravado."
+      },
+      "create": "Desktop",
+      "unconfiguredBody": "O desktop do ambiente ainda não foi configurado.",
+      "disabled": "Desktop desativado (experimento desligado)",
+      "paste": "Colar texto"
+    }
   }
 }

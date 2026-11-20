@@ -1,4 +1,3 @@
-import { featureIdentity, sortRuntimeFeatures } from './ephemeral-vm-runtime-feature-store'
 import {
   hasEphemeralVmRecipeResult,
   RollbackEphemeralVmRuntimeRecordSchema,
@@ -29,29 +28,20 @@ export function projectRuntimeForRollback(
   const recipe = runtime.recipe
     ? (({ checkoutMode: _checkoutMode, ...rollbackRecipe }) => rollbackRecipe)(runtime.recipe)
     : undefined
+  // Older builds parse recipe results strictly and know neither `checkoutMode` nor `desktop`.
+  const { desktop: _desktop, ...withoutDesktop } = runtime.recipeResult
   const recipeResult =
-    runtime.recipeResult.schemaVersion === 2
+    withoutDesktop.schemaVersion === 2
       ? (({ checkoutMode: _checkoutMode, ...rollbackResult }) => ({
           ...rollbackResult,
           schemaVersion: 1 as const
-        }))(runtime.recipeResult)
-      : runtime.recipeResult
+        }))(withoutDesktop)
+      : withoutDesktop
   return RollbackEphemeralVmRuntimeRecordSchema.parse({
     ...runtime,
     ...(recipe ? { recipe } : {}),
     recipeResult
   })
-}
-
-export function mergeRuntimeFeatures<T extends { id: string; recipeId: string; createdAt: number }>(
-  existing: readonly T[],
-  required: readonly T[]
-): T[] {
-  const merged = new Map(existing.map((entry) => [featureIdentity(entry), entry]))
-  for (const entry of required) {
-    merged.set(featureIdentity(entry), entry)
-  }
-  return sortRuntimeFeatures([...merged.values()])
 }
 
 export function runtimeFeatureListsEqual<

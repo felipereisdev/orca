@@ -21,10 +21,13 @@ export const ephemeralVmApi = {
     ipcRenderer.on('ephemeralVm:provisionEvent', listener)
     return () => ipcRenderer.removeListener('ephemeralVm:provisionEvent', listener)
   },
-  listRuntimes: () => ipcRenderer.invoke('ephemeralVm:listRuntimes'),
+  listRuntimes: (filter) => ipcRenderer.invoke('ephemeralVm:listRuntimes', filter),
   attachWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:attachWorkspace', args),
   resumeWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:resumeWorkspace', args),
   suspendWorkspace: (args) => ipcRenderer.invoke('ephemeralVm:suspendWorkspace', args),
+  runtimeStats: (args) => ipcRenderer.invoke('ephemeralVm:runtimeStats', args),
+  desktopControllerToken: (args) => ipcRenderer.invoke('ephemeralVm:desktopControllerToken', args),
+  reconfigureDesktop: (args) => ipcRenderer.invoke('ephemeralVm:reconfigureDesktop', args),
   onRuntimesChanged: (callback) => {
     const listener = (): void => callback()
     ipcRenderer.on(EPHEMERAL_VM_RUNTIMES_CHANGED_CHANNEL, listener)
@@ -32,6 +35,16 @@ export const ephemeralVmApi = {
   },
   cleanup: (args) => ipcRenderer.invoke('ephemeralVm:cleanup', args),
   stopCleanup: (args) => ipcRenderer.invoke('ephemeralVm:stopCleanup', args),
+  removalPreflight: (args) => ipcRenderer.invoke('ephemeralVm:removalPreflight', args),
+  confirmRemoval: (args) => ipcRenderer.invoke('ephemeralVm:confirmRemoval', args),
+  revokeRemoval: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemoval', args),
+  claimRemoval: (args) => ipcRenderer.invoke('ephemeralVm:claimRemoval', args),
+  adoptRemoval: (args) => ipcRenderer.invoke('ephemeralVm:adoptRemoval', args),
+  releaseRemoval: (args) => ipcRenderer.invoke('ephemeralVm:releaseRemoval', args),
+  revokeRemovalSession: (args) => ipcRenderer.invoke('ephemeralVm:revokeRemovalSession', args),
+  rollbackRemovalAck: (args) => ipcRenderer.invoke('ephemeralVm:rollbackRemovalAck', args),
+  copyRecordingsBeforeRemoval: (args) =>
+    ipcRenderer.invoke('ephemeralVm:copyRecordingsBeforeRemoval', args),
   forgetRuntime: (args) => ipcRenderer.invoke('ephemeralVm:forgetRuntime', args),
   getCleanupCommand: (args) => ipcRenderer.invoke('ephemeralVm:getCleanupCommand', args),
   publishPendingCheckouts: (checkouts) => {

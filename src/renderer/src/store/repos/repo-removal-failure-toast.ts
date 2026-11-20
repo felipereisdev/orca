@@ -1,3 +1,4 @@
+import { RecipeRemovalCancelledError } from './recipe-vm-project-removal'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { readIpcErrorMessage } from '@/runtime/errors/ipc-error'
@@ -9,6 +10,9 @@ export function toastProjectRemovalFailure(
   error: unknown,
   options: { hostUnreachable: boolean; removeLocally: () => void }
 ): void {
+  if (error instanceof RecipeRemovalCancelledError) {
+    return
+  }
   toast.error(
     translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
     {

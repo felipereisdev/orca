@@ -96,7 +96,11 @@ export function useTabGroupActivationCommands({
       }
       focusGroup(worktreeId, groupId)
       activateTab(item.id)
-      if (item.contentType === 'simulator' || item.contentType === 'database') {
+      if (
+        item.contentType === 'simulator' ||
+        item.contentType === 'database' ||
+        item.contentType === 'desktop'
+      ) {
         setActiveTabType(item.contentType, worktreeId)
         // simulator has no editor file entity
       } else {

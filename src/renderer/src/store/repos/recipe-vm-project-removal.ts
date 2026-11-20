@@ -9,6 +9,14 @@ import { cleanupEphemeralVmRuntimesForDeleted } from '@/runtime/ephemeral-vm/eph
 import { getRecipeVmSshTargetForHost } from '@/runtime/ephemeral-vm/recipe-vm-managed-host'
 import { selectWorktreesByRepo } from '../workspaces/catalog/workspace-record-fields'
 
+/** The user cancelled after seeing what destroying the project's VM would lose. */
+export class RecipeRemovalCancelledError extends Error {
+  constructor() {
+    super('Project removal was cancelled.')
+    this.name = 'RecipeRemovalCancelledError'
+  }
+}
+
 type RecipeVmRemovalTargets = { knownServerTarget: string | null; directTarget: string | null }
 
 /** Return null when removing this project on this host leaves no recipe VM to destroy. */
@@ -69,8 +77,13 @@ async function destroyRecipeVm(
       workspaceId,
       executionHostId: ownerHostId
     })),
-    runtimeOwnedSshTargetIds: [targetId]
+    runtimeOwnedSshTargetIds: [targetId],
+    // Destroying the VM loses everything on it; each of its records is checked (and reviewed) first.
+    review: true
   })
+  if (cleanup.cancelled) {
+    throw new RecipeRemovalCancelledError()
+  }
   if (cleanup.retainedSshTargetIds.includes(targetId)) {
     throw new Error('The cloud VM could not be destroyed. Retry cleanup before removing it.')
   }

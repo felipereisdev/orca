@@ -28,6 +28,8 @@ export type TabContentType =
   | 'database'
   /** A bot group's room; its entity is the group id. */
   | 'room'
+  /** The environment's remote desktop; one per workspace, its entity is the worktree id. */
+  | 'desktop'
 
 export type WorkspaceVisibleTabType =
   | 'terminal'
@@ -36,6 +38,7 @@ export type WorkspaceVisibleTabType =
   | 'browser'
   | 'simulator'
   | 'database'
+  | 'desktop'
 export type CtrlTabOrderMode = 'mru' | 'sequential'
 
 /** What each tab kind is, in one place, so a new kind must state every trait. */
@@ -59,7 +62,8 @@ export const TAB_CONTENT_TRAITS: Record<
   simulator: { renderableWithoutRecord: true, visibleType: 'simulator' },
   database: { renderableWithoutRecord: true, visibleType: 'database' },
   // A room is a chat surface, shown where an agent chat is.
-  room: { renderableWithoutRecord: true, visibleType: 'agent-session' }
+  room: { renderableWithoutRecord: true, visibleType: 'agent-session' },
+  desktop: { renderableWithoutRecord: true, visibleType: 'desktop' }
 }
 
 export function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {

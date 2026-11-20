@@ -24,6 +24,7 @@
 1 src/main/daemon/admission/host-terminal-policy.ts
 1 src/main/daemon/endpoint/publication/daemon-endpoint-lifecycle.ts
 1 src/main/daemon/transport/stream/daemon-stream-backlog-probe.ts
+1 src/main/desktop/desktop-recorder.ts
 1 src/main/diagnostics/event-loop-delay-probe.ts
 1 src/main/diagnostics/main-thread-churn-probe.ts
 1 src/main/git/refs/maintenance/pack-refs-lock-ownership.ts

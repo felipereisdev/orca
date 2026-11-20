@@ -36,6 +36,9 @@ export const PAIRED_DESKTOP_METHODS = [
   // The Mac republishes host changes it already observes.
   'runtime.clientEvents.subscribe',
   'runtime.clientEvents.unsubscribe',
+  // Only the Mac keeps copies of environment recordings, which outlive their environment.
+  'desktop.recordings.copyReadChunk',
+  'desktop.recordings.copyStat',
   'diagnostics.memory',
   'stats.summary',
   'ui.get',

@@ -38,7 +38,10 @@ export function runWorktreeDeleteWithToast(
     ...(options.suppressPreservedBranchToast ? { suppressPreservedBranchToast: true } : {}),
     ...(options.snapshotPruneBatchId ? { snapshotPruneBatchId: options.snapshotPruneBatchId } : {}),
     ...(options.confirmedDiscards ? { confirmedDiscards: options.confirmedDiscards } : {}),
-    ...(options.assertBeforeDispatch ? { assertBeforeDispatch: options.assertBeforeDispatch } : {})
+    ...(options.assertBeforeDispatch ? { assertBeforeDispatch: options.assertBeforeDispatch } : {}),
+    ...(options.recipeRemovalSessionId
+      ? { recipeRemovalSessionId: options.recipeRemovalSessionId }
+      : {})
   }
   const showFailureToast = (
     error: string,

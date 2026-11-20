@@ -148,12 +148,20 @@ describe('runWorktreeDeletesInParallel', () => {
     )
 
     await expect(runDeletesForCurrentWorktrees([hostAChild, hostBParent])).resolves.toEqual([
-      { id: hostBParent.id, executionHostId: hostBParent.hostId }
+      {
+        id: hostBParent.id,
+        executionHostId: hostBParent.hostId,
+        instanceId: hostBParent.instanceId
+      }
     ])
 
     expect(mocks.state.removeWorktree).toHaveBeenCalledTimes(2)
     expect(mocks.state.removeWorktree).toHaveBeenCalledWith(
-      { id: hostBParent.id, executionHostId: hostBParent.hostId },
+      {
+        id: hostBParent.id,
+        executionHostId: hostBParent.hostId,
+        instanceId: hostBParent.instanceId
+      },
       false,
       { suppressPreservedBranchToast: true }
     )

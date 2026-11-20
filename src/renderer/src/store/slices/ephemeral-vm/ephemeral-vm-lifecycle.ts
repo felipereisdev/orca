@@ -1,12 +1,16 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
-import type { EphemeralVmRuntimeRecord } from '../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import {
+  isEphemeralVmEnvironmentRunning,
+  type EphemeralVmRuntimeRecord
+} from '../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import {
   getEphemeralVmHostState,
   type EphemeralVmHostLifecycle,
   type ExecutionHostVmState
 } from '../../../../../shared/execution-host/execution-host-health'
 import type { EphemeralVmFailure } from '../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-failure-copy'
+import { getEphemeralVmRecipeResultDesktop } from '../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 
 /** The lifecycle facts the UI reads; recipe results (pairing codes, keys) never enter the store. */
 export type EphemeralVmWorkspaceRuntime = Pick<
@@ -18,11 +22,15 @@ export type EphemeralVmWorkspaceRuntime = Pick<
   failure?: EphemeralVmFailure
   /** False when the recipe snapshot has no suspend step, so Suspend VM would do nothing. */
   canSuspend: boolean
+  /** The recipe result set up a remote desktop, so the workspace can open a Desktop tab. */
+  hasDesktop?: boolean
 }
 
 export type EphemeralVmLifecycleSlice = {
   /** Live (not cleaned up) VM runtimes by the workspace they back. */
   ephemeralVmRuntimesByWorkspaceId: Record<string, EphemeralVmWorkspaceRuntime>
+  /** Provisioned runtimes that are up, across every record (attached or not, several per workspace). */
+  runningEphemeralVmRuntimeCount: number
   /** Workspaces whose VM resume is in flight; the record only flips when it finishes. */
   wakingEphemeralVmWorkspaceIds: Record<string, true>
   refreshEphemeralVmRuntimes: () => Promise<void>
@@ -76,7 +84,10 @@ export function projectEphemeralVmWorkspaceRuntimes(
       ...(failure ? { failure } : {}),
       // Records without a snapshot resolve the recipe from the repo at suspend time.
       // Main only suspends a VM whose repo it can resolve (findWorkspaceEphemeralVmRuntime).
-      canSuspend: Boolean(record.repoId) && (!record.recipe || Boolean(record.recipe.suspend))
+      canSuspend: Boolean(record.repoId) && (!record.recipe || Boolean(record.recipe.suspend)),
+      ...(record.recipeResult && getEphemeralVmRecipeResultDesktop(record.recipeResult)
+        ? { hasDesktop: true }
+        : {})
     }
   }
   return byWorkspaceId
@@ -99,6 +110,7 @@ function sameRuntimes(
       left.status === right.status &&
       left.runtimeEnvironmentId === right.runtimeEnvironmentId &&
       left.canSuspend === right.canSuspend &&
+      left.hasDesktop === right.hasDesktop &&
       left.failure?.error === right.failure?.error &&
       left.failure?.errorCode === right.failure?.errorCode &&
       JSON.stringify(left.failure?.errorParams) === JSON.stringify(right.failure?.errorParams)
@@ -116,6 +128,7 @@ export const createEphemeralVmLifecycleSlice: StateCreator<
   EphemeralVmLifecycleSlice
 > = (set) => ({
   ephemeralVmRuntimesByWorkspaceId: {},
+  runningEphemeralVmRuntimeCount: 0,
   wakingEphemeralVmWorkspaceIds: {},
   refreshEphemeralVmRuntimes: () => {
     const listRuntimes = window.api?.ephemeralVm?.listRuntimes
@@ -124,16 +137,22 @@ export const createEphemeralVmLifecycleSlice: StateCreator<
     }
     const sequence = ++refreshSequence
     const refresh = (async (): Promise<void> => {
-      const next = projectEphemeralVmWorkspaceRuntimes(await listRuntimes())
+      const records = await listRuntimes()
+      const next = projectEphemeralVmWorkspaceRuntimes(records)
+      const runningCount = records.filter(
+        (record) =>
+          record.recipeResult !== undefined && isEphemeralVmEnvironmentRunning(record.status)
+      ).length
       // Out-of-order replies must not roll a newer lifecycle status back; a superseded caller
       // settles with the newer read, so it never acts on a store that has not caught up.
       if (sequence !== refreshSequence) {
         return latestRefresh
       }
       set((state) =>
-        sameRuntimes(state.ephemeralVmRuntimesByWorkspaceId, next)
+        sameRuntimes(state.ephemeralVmRuntimesByWorkspaceId, next) &&
+        state.runningEphemeralVmRuntimeCount === runningCount
           ? state
-          : { ephemeralVmRuntimesByWorkspaceId: next }
+          : { ephemeralVmRuntimesByWorkspaceId: next, runningEphemeralVmRuntimeCount: runningCount }
       )
     })()
     latestRefresh = refresh

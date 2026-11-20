@@ -1,14 +1,25 @@
 import { AlertTriangle, Copy, Loader2, Square, Trash2, X } from 'lucide-react'
 import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
-import { getEphemeralVmRecipeResultProjectRoot } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
+import {
+  getEphemeralVmRecipeResultProjectRoot,
+  type EphemeralVmRecipeStats
+} from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipes'
 import { useTranslate } from '@/i18n/use-translate'
 import { ephemeralVmCleanupErrorText } from '@/runtime/ephemeral-vm/ephemeral-vm-error-copy'
 import { cn } from '@/lib/class-names'
 import { Button } from '../../../ui/button'
+import {
+  formatEphemeralVmBytes,
+  formatEphemeralVmCpuPercent
+} from './ephemeral-vm-runtime-stats-format'
+
+const NO_STAT = '—'
 
 type EphemeralVmRuntimeRowProps = {
   runtime: EphemeralVmRuntimeRecord
   statusLabel: string
+  /** Null shows dashes: not running, no stats step, or no answer yet. */
+  stats: EphemeralVmRecipeStats | null
   cleanupFailed: boolean
   cleanupRunning: boolean
   isStopping: boolean
@@ -22,6 +33,7 @@ type EphemeralVmRuntimeRowProps = {
 export function EphemeralVmRuntimeRow({
   runtime,
   statusLabel,
+  stats,
   cleanupFailed,
   cleanupRunning,
   isStopping,
@@ -38,7 +50,7 @@ export function EphemeralVmRuntimeRow({
   // Write-ahead rows never got a recipe result, so destroy only knows the instance id.
   const isUntracked = !runtime.recipeResult && !isProvisioning
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-3" data-runtime-row>
       <div
         className={cn(
           'size-2 shrink-0 rounded-full',
@@ -58,6 +70,24 @@ export function EphemeralVmRuntimeRow({
           {runtime.recipeResult
             ? getEphemeralVmRecipeResultProjectRoot(runtime.recipeResult)
             : runtime.id}
+        </p>
+        <p
+          className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground"
+          data-testid="runtime-stats"
+        >
+          {[
+            t('auto.components.settings.EphemeralVmRuntimesSection.statsCpu', 'CPU {{value}}', {
+              value: stats ? formatEphemeralVmCpuPercent(stats.cpuPercent) : NO_STAT
+            }),
+            t(
+              'auto.components.settings.EphemeralVmRuntimesSection.statsMemory',
+              'Memory {{value}}',
+              { value: stats ? formatEphemeralVmBytes(stats.memoryBytes) : NO_STAT }
+            ),
+            t('auto.components.settings.EphemeralVmRuntimesSection.statsDisk', 'Disk {{value}}', {
+              value: stats ? formatEphemeralVmBytes(stats.diskBytes) : NO_STAT
+            })
+          ].join(' · ')}
         </p>
         {cleanupError ? (
           <p className="mt-0.5 truncate text-xs text-destructive">{cleanupError}</p>

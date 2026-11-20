@@ -1,3 +1,4 @@
+import { cleanupFailedCreateRuntime } from '@/runtime/ephemeral-vm/failed-create-runtime-cleanup'
 import {
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
@@ -29,6 +30,7 @@ export type PrepareEphemeralVmWorkspaceTargetArgs = {
   branch?: string
   ref?: string
   provisionId?: string
+  approvedRecipeHash?: string
   setupExistingFolder: (
     args: ProjectHostSetupExistingFolderArgs
   ) => Promise<ProjectHostSetupResult | null>
@@ -61,7 +63,8 @@ export async function prepareEphemeralVmWorkspaceTarget(
     workspaceName: args.workspaceName,
     ...(args.branch ? { branch: args.branch } : {}),
     ...(args.ref ? { ref: args.ref } : {}),
-    ...(args.provisionId ? { provisionId: args.provisionId } : {})
+    ...(args.provisionId ? { provisionId: args.provisionId } : {}),
+    ...(args.approvedRecipeHash ? { approvedRecipeHash: args.approvedRecipeHash } : {})
   })
   if (!provisioned.ok) {
     return { ok: false, error: ephemeralVmErrorText(provisioned), stderr: provisioned.stderr }
@@ -184,7 +187,7 @@ function recipeWorkspaceHost(provisioned: ProvisionedVm): {
 
 async function cleanupProvisionedRuntime(runtimeId: string): Promise<void> {
   try {
-    await window.api.ephemeralVm.cleanup({ runtimeId })
+    await cleanupFailedCreateRuntime(runtimeId)
   } catch {
     // Best effort: the caller still needs the original setup/provisioning error.
   }

@@ -1,3 +1,4 @@
+import { cleanupFailedCreateRuntime } from '@/runtime/ephemeral-vm/failed-create-runtime-cleanup'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/index'
 import { prepareEphemeralVmWorkspaceTarget } from '@/runtime/ephemeral-vm/ephemeral-vm-workspace-target'
@@ -64,6 +65,7 @@ async function prepareEphemeralVmRecipeRequest(
           }
         : {}),
       provisionId: creationId,
+      ...(request.approvedVmRecipeHash ? { approvedRecipeHash: request.approvedVmRecipeHash } : {}),
       setupExistingFolder: async (args) => {
         const setup = await store.setupProjectExistingFolder(args)
         if (setup) {
@@ -201,7 +203,7 @@ export async function cleanupEphemeralVmRuntimeForFailedCreate(
   const cleanedUp = await cleanupFailedEphemeralVmWorkspace(request, {
     deleteProjectHostSetup: (setupId, hostId) =>
       useAppStore.getState().deleteProjectHostSetup({ setupId, hostId }),
-    cleanupRuntime: (runtimeId) => window.api.ephemeralVm.cleanup({ runtimeId }),
+    cleanupRuntime: cleanupFailedCreateRuntime,
     reportSetupError: (error) =>
       console.error('Failed to remove provisioned-root project setup:', error),
     reportRuntimeError: (error) =>

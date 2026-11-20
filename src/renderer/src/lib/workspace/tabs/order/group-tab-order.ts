@@ -8,7 +8,7 @@ import type { AppState } from '../../../../store/types'
 import { reconcileTabOrder } from './reconcile-tab-order'
 
 export type VisibleTabRef = {
-  type: 'terminal' | 'editor' | 'agent-session' | 'browser' | 'simulator' | 'database'
+  type: 'terminal' | 'editor' | 'agent-session' | 'browser' | 'simulator' | 'database' | 'desktop'
   id: string
   tabId?: string
 }
@@ -43,8 +43,8 @@ export function getGroupVisibleTabOrder(
         ? { type: 'browser', id: tab.entityId, tabId: tab.id }
         : null
     }
-    if (tab.contentType === 'database') {
-      return { type: 'database', id: tab.id, tabId: tab.id }
+    if (tab.contentType === 'database' || tab.contentType === 'desktop') {
+      return { type: tab.contentType, id: tab.id, tabId: tab.id }
     }
     if (tab.contentType === 'simulator') {
       return simulatorTabIds.has(tab.id) ? { type: 'simulator', id: tab.id, tabId: tab.id } : null
@@ -73,6 +73,7 @@ export function getGroupVisibleTabOrder(
       browser: new Set<string>(),
       simulator: new Set<string>(),
       database: new Set<string>(),
+      desktop: new Set<string>(),
       'agent-session': new Set<string>()
     }
     const result: VisibleTabRef[] = []
@@ -108,6 +109,7 @@ export function getGroupVisibleTabOrder(
     browser: browserIds,
     simulator: simulatorIds,
     database: simulatorIds,
+    desktop: simulatorIds,
     'agent-session': agentSessionIds
   }
   for (const tab of [...declaredTabs, ...groupTabs]) {
@@ -125,6 +127,7 @@ export function getGroupVisibleTabOrder(
         browser: 2,
         simulator: 3,
         database: 3,
+        desktop: 3,
         'agent-session': 4
       } as const
       if (priority[ref.type] > priority[existing.type]) {

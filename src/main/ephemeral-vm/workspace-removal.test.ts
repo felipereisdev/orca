@@ -13,6 +13,12 @@ import type { RuntimeRpcResponse } from '../../shared/remote-runtime/rpc/runtime
 import { RecipeWorkspaceRemovalError } from '../../shared/remote-runtime/ephemeral-vm-recipes/recipe-host-removal'
 import { mapRuntimeError } from '../runtime/rpc/responses/rpc-response'
 import { removeRecipeWorkspace, type RecipeWorkspaceRemoveParams } from './workspace-removal'
+import {
+  claimRecipeRemovalAck,
+  consumeRecipeRemovalAck,
+  issueRecipeRemovalAck,
+  releaseRecipeRemovalClaim
+} from './recipe-removal-acks'
 
 let root: string
 const workspaceId = 'repo::/workspace/repo-task'
@@ -73,7 +79,9 @@ function makePorts(
       ): Promise<RuntimeRpcResponse<unknown>> =>
         answers[method] ?? (method === 'worktree.list' ? ok(onlyMain) : ok({ removed: true }))
     ),
-    cleanup: vi.fn(async (runtimeId: string): Promise<EphemeralVmRuntimeRecord> => {
+    confirm: vi.fn(async () => 'ack-1'),
+    release: vi.fn(),
+    cleanup: vi.fn(async (runtimeId: string, _ack: string): Promise<EphemeralVmRuntimeRecord> => {
       const record = listEphemeralVmRuntimes(root).find((entry) => entry.id === runtimeId)
       if (!record) {
         throw new Error('missing record')
@@ -103,6 +111,61 @@ describe('recipe workspace removal on the provisioning host', () => {
     expect(ports.cleanup.mock.invocationCallOrder[0]).toBeGreaterThan(
       ports.call.mock.invocationCallOrder[1]
     )
+  })
+
+  it('a phone removal of unsafe work is refused before anything is removed', async () => {
+    seed()
+    const ports = makePorts()
+    ports.confirm.mockRejectedValueOnce(
+      new RecipeWorkspaceRemovalError('recipe_removal_unconfirmed', 'Open Orca on the Mac')
+    )
+    await expect(removeRecipeWorkspace(root, params, ports)).rejects.toMatchObject({
+      code: 'recipe_removal_unconfirmed'
+    })
+    expect(ports.call).not.toHaveBeenCalled()
+    expect(ports.cleanup).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['its checkout removal fails', { 'worktree.rm': failed('worktree_archive_hook_failed') }],
+    [
+      'other workspaces keep the environment',
+      { 'worktree.list': ok({ worktrees: [{ id: 'repo::/workspace/repo-other' }] }) }
+    ]
+  ])('a phone removal releases its claim when %s', async (_case, answers) => {
+    seed()
+    const binding = {
+      hostId: 'runtime:env-a',
+      workspaceId,
+      runtimeId: 'vm-a',
+      runtimeCreatedAt: 1
+    }
+    const ports = {
+      ...makePorts(answers),
+      confirm: async () => {
+        const ack = issueRecipeRemovalAck(binding, true)
+        expect(claimRecipeRemovalAck(ack, binding)).toEqual({ ok: true })
+        return ack
+      },
+      release: () => releaseRecipeRemovalClaim(binding.hostId, binding.workspaceId)
+    }
+    await removeRecipeWorkspace(root, params, ports).catch(() => undefined)
+    expect(ports.cleanup).not.toHaveBeenCalled()
+    expect(() =>
+      consumeRecipeRemovalAck('', {
+        id: 'vm-a',
+        createdAt: 1,
+        hostIds: ['runtime:env-a'],
+        workspaceId
+      })
+    ).toThrow('not confirmed')
+  })
+
+  it('the destroy carries the ack the clean check issued', async () => {
+    seed()
+    const ports = makePorts()
+    await removeRecipeWorkspace(root, params, ports)
+    expect(ports.cleanup).toHaveBeenCalledWith('vm-a', 'ack-1')
   })
 
   it('keeps an environment that still holds other workspaces', async () => {

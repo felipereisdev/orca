@@ -1,3 +1,4 @@
+import '../../../shared/remote-runtime/host-store/environment-store-worker-test-fixture'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -5,6 +6,10 @@ import { removeTempDirs } from '../../../shared/testing/remove-temp-dirs.test-su
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodePairingOffer } from '../../../shared/remote-runtime/pairing/pairing'
 import { PAIRING_OFFER_VERSION } from '../../../shared/remote-runtime/pairing/mobile-relay-pairing-offer'
+import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { getEphemeralVmRuntimeStorePath } from '../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtime-store'
+import { desktopEnvironmentFake as desktopEnv } from '../../ephemeral-vm/desktop-environment-fake.test-support'
 
 const handlers = new Map<string, (_event: unknown, args: never) => unknown>()
 const {
@@ -46,7 +51,17 @@ vi.mock('../runtime-environments/runtime-environments', () => ({
   invalidateRuntimeEnvironmentTransport: invalidateRuntimeEnvironmentTransportMock
 }))
 
+vi.mock('../runtime-environments/requests/runtime-environment-transport-routing', async () =>
+  (
+    await import('../../ephemeral-vm/desktop-environment-fake.test-support')
+  ).fakeTransportRoutingModule()
+)
+
 import { registerEphemeralVmHandlers } from './ephemeral-vm'
+import {
+  desktopControllerToken,
+  stopEnvironmentDesktop
+} from '../../ephemeral-vm/desktop-sync-registry'
 
 const tempDirs: string[] = []
 
@@ -58,6 +73,13 @@ function makeDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   tempDirs.push(dir)
   return dir
+}
+
+/** Calls a registered IPC handler; the map erases its argument and result types. */
+async function invokeHandler<T>(channel: string, args: unknown): Promise<T> {
+  const handler = handlers.get(channel)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: each caller names the handler's own argument and result types.
+  return (await handler?.(null, args as never)) as T
 }
 
 function makePairingCode(): string {
@@ -81,7 +103,7 @@ function makeStore(repoPath: string) {
   return {
     getRepo: vi.fn((repoId: string) => (repoId === 'repo-1' ? repo : null)),
     getRepos: vi.fn(() => [repo]),
-    getSettings: vi.fn(() => ({ activeRuntimeEnvironmentId })),
+    getSettings: vi.fn(() => ({ activeRuntimeEnvironmentId, experimentalEphemeralVms: true })),
     updateSettings: vi.fn((updates: { activeRuntimeEnvironmentId: string | null }) => {
       activeRuntimeEnvironmentId = updates.activeRuntimeEnvironmentId
     })
@@ -164,12 +186,503 @@ describe('registerEphemeralVmHandlers', () => {
       recipeId: 'plugin-cloud'
     } as never)) as { ok: true; runtime: { id: string; recipe?: { id: string } } }
     registrations.splice(0)
-    const cleaned = await handlers.get('ephemeralVm:cleanup')?.(null, {
-      runtimeId: provisioned.runtime.id
-    } as never)
+    // Never attached to a workspace, so there is nothing to acknowledge.
+    const cleaned = await invokeHandler('ephemeralVm:cleanup', {
+      runtimeId: provisioned.runtime.id,
+      ack: ''
+    })
 
     expect(provisioned.runtime.recipe).toMatchObject({ id: 'plugin-cloud' })
     expect(cleaned).toEqual(expect.objectContaining({ status: 'cleaned' }))
     expect(readFileSync(join(repoPath, 'plugin-cleaned.txt'), 'utf8')).toBe('yes')
+  })
+  it('an unreadable VM store does not abort handler registration', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const userDataPath = makeDir('orca-ephemeral-vm-bad-store-')
+    getPathMock.mockReturnValue(userDataPath)
+    writeFileSync(getEphemeralVmRuntimeStorePath(userDataPath), '{not json')
+    try {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub store covers every Store method registration and these handlers use.
+      const store = makeStore(makeDir('orca-ephemeral-vm-repo-')) as never
+      expect(() => registerEphemeralVmHandlers(store)).not.toThrow()
+      expect(handlers.has('ephemeralVm:provision')).toBe(true)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  describe('with a recipe desktop', () => {
+    const DESKTOP = { type: 'vnc', port: 5901, password: 'abc12345' }
+    const SSH_CONNECTION = {
+      type: 'ssh',
+      projectRoot: '/workspace/repo',
+      target: { label: 'Sandbox', host: 'sandbox.example.com', port: 22, username: 'root' }
+    }
+    const runtimeIds: string[] = []
+
+    afterEach(() => {
+      runtimeIds.splice(0).forEach((id) => stopEnvironmentDesktop(id))
+      desktopEnv.reset()
+    })
+
+    async function provisionWithDesktop(
+      connection: Record<string, unknown>,
+      options: {
+        destroyExitCode?: number
+        stderr?: string
+        provisionId?: string
+        sender?: { send: (channel: string, event: unknown) => void }
+      } = {}
+    ) {
+      const userDataPath = makeDir('orca-ephemeral-vm-desktop-user-data-')
+      const repoPath = makeDir('orca-ephemeral-vm-desktop-repo-')
+      getPathMock.mockReturnValue(userDataPath)
+      const destroyPath = join(repoPath, 'destroy.js')
+      writeFileSync(destroyPath, `process.exit(${options.destroyExitCode ?? 0})`)
+      const startPath = join(repoPath, 'start.js')
+      writeFileSync(
+        startPath,
+        `process.stderr.write(${JSON.stringify(options.stderr ?? '')});console.log(${JSON.stringify(
+          JSON.stringify({ schemaVersion: 1, connection, desktop: DESKTOP })
+        )})`
+      )
+      const pluginService = pluginServiceWithRecipes([
+        {
+          pluginKey: 'samples.recipes',
+          recipe: {
+            id: 'desktop-cloud',
+            name: 'Desktop Cloud',
+            create: nodeCommand(startPath),
+            destroy: nodeCommand(destroyPath)
+          }
+        }
+      ])
+      registerEphemeralVmHandlers(makeStore(repoPath) as never, pluginService as never)
+      const provisionArgs = {
+        repoId: 'repo-1',
+        recipeId: 'desktop-cloud',
+        ...(options.provisionId ? { provisionId: options.provisionId } : {})
+      }
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument and result types; these are the provision handler's.
+      const provisioned = (await handlers.get('ephemeralVm:provision')?.(
+        options.sender ? { sender: options.sender } : null,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the provision handler takes these arguments; the map erases their type.
+        provisionArgs as never
+      )) as {
+        ok: boolean
+        stderr: string
+        runtime: { id: string; runtimeEnvironmentId?: string }
+      }
+      runtimeIds.push(provisioned.runtime.id)
+      return { provisioned, userDataPath }
+    }
+
+    /** The acknowledgement the removal check issues for this workspace on the runtime's host. */
+    async function removalAck(
+      runtime: { runtimeEnvironmentId?: string },
+      workspaceId: string
+    ): Promise<string> {
+      const checked = await invokeHandler<{ ack: string } | null>('ephemeralVm:removalPreflight', {
+        hostId: `runtime:${runtime.runtimeEnvironmentId}`,
+        workspaceId
+      })
+      if (!checked?.ack) {
+        throw new Error('the removal check issued no ack')
+      }
+      // The fake environment answers no git check, so the answer waits for "Remove anyway".
+      await invokeHandler('ephemeralVm:confirmRemoval', { ack: checked.ack })
+      return checked.ack
+    }
+
+    function configureCalls() {
+      return desktopEnv.calls.filter((call) => call.method === 'desktop.configure')
+    }
+
+    it('configures the connected Orca server after provisioning', async () => {
+      const { provisioned } = await provisionWithDesktop({
+        type: 'orca-server',
+        pairingCode: makePairingCode(),
+        projectRoot: '/workspace/repo'
+      })
+
+      expect(provisioned.ok).toBe(true)
+      await vi.waitFor(() => expect(configureCalls()).toHaveLength(1))
+      expect(configureCalls()[0]).toEqual({
+        environmentId: provisioned.runtime.runtimeEnvironmentId,
+        method: 'desktop.configure',
+        params: { host: '127.0.0.1', port: 5901, password: 'abc12345' }
+      })
+    })
+
+    it('withholds secret stderr lines from the returned diagnostics', async () => {
+      const { provisioned } = await provisionWithDesktop(
+        { type: 'orca-server', pairingCode: makePairingCode(), projectRoot: '/workspace/repo' },
+        { stderr: 'generated vnc password:\n  dummy-pw-77\nVNC_PASSWORD=dummy-pw-77\nready\n' }
+      )
+
+      expect(provisioned.ok).toBe(true)
+      expect(provisioned.stderr).not.toContain('dummy-pw-77')
+      expect(provisioned.stderr).toContain('ready')
+    })
+
+    it('a window that closes mid-provision neither fails the create nor strands its cancel entry', async () => {
+      const send = vi.fn(() => {
+        throw new Error('Object has been destroyed')
+      })
+      const { provisioned } = await provisionWithDesktop(
+        { type: 'orca-server', pairingCode: makePairingCode(), projectRoot: '/workspace/repo' },
+        { stderr: 'pulling image\nstarting\n', provisionId: 'closing-window', sender: { send } }
+      )
+
+      expect(send).toHaveBeenCalled()
+      expect(provisioned.ok).toBe(true)
+      await expect(
+        invokeHandler('ephemeralVm:cancelProvision', { provisionId: 'closing-window' })
+      ).resolves.toEqual({ cancelled: false })
+    })
+
+    it('configures the SSH-managed server after provisioning', async () => {
+      connectRuntimeOwnedSshTargetMock.mockResolvedValueOnce({
+        targetId: 'runtime-ssh-desktop',
+        environmentId: 'ssh-env-1',
+        target: { id: 'runtime-ssh-desktop', label: 'Sandbox', host: 'h', port: 22, username: 'r' }
+      })
+      const { provisioned } = await provisionWithDesktop(SSH_CONNECTION)
+
+      expect(provisioned.ok).toBe(true)
+      await vi.waitFor(() =>
+        expect(configureCalls()).toEqual([
+          {
+            environmentId: 'ssh-env-1',
+            method: 'desktop.configure',
+            params: { host: '127.0.0.1', port: 5901, password: 'abc12345' }
+          }
+        ])
+      )
+    })
+
+    it('a refused configure still leaves provisioning successful', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      desktopEnv.configure = () => ({
+        id: 'r',
+        ok: false,
+        error: { code: 'desktop_agent_not_allowed', message: 'refused' }
+      })
+      connectRuntimeOwnedSshTargetMock.mockResolvedValueOnce({
+        targetId: 'runtime-ssh-desktop',
+        environmentId: 'ssh-env-1',
+        target: { id: 'runtime-ssh-desktop', label: 'Sandbox', host: 'h', port: 22, username: 'r' }
+      })
+      try {
+        const { provisioned } = await provisionWithDesktop(SSH_CONNECTION)
+
+        expect(provisioned).toMatchObject({ ok: true, connectionType: 'ssh' })
+        await vi.waitFor(() => expect(configureCalls()).toHaveLength(1))
+        expect(desktopEnv.streams).toHaveLength(0)
+      } finally {
+        warn.mockRestore()
+      }
+    })
+
+    it('attaching a workspace starts copying its recordings', async () => {
+      connectRuntimeOwnedSshTargetMock.mockResolvedValueOnce({
+        targetId: 'runtime-ssh-desktop',
+        environmentId: 'ssh-env-1',
+        target: { id: 'runtime-ssh-desktop', label: 'Sandbox', host: 'h', port: 22, username: 'r' }
+      })
+      const { provisioned, userDataPath } = await provisionWithDesktop(SSH_CONNECTION)
+      const recording = desktopEnv.finishRecording('0123456789abcdef', 1_000)
+      const workspaceId = 'repo-1::/workspace/repo'
+
+      await handlers.get('ephemeralVm:attachWorkspace')?.(
+        null,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument types; this is the attach handler's.
+        { runtimeId: provisioned.runtime.id, workspaceId } as never
+      )
+      await vi.waitFor(() => expect(desktopEnv.streams).toHaveLength(1))
+      desktopEnv.emit(desktopEnv.streams[0], { type: 'ready', subscriptionId: 'desktop-events:1' })
+
+      const key = createHash('sha256').update(workspaceId).digest('hex').slice(0, 32)
+      await vi.waitFor(() =>
+        expect(
+          existsSync(join(userDataPath, 'desktop-recordings', key, `rec-${recording.id}.mp4`))
+        ).toBe(true)
+      )
+      expect(
+        desktopEnv.calls.find((call) => call.method === 'files.resolveTerminalPath')?.params
+      ).toEqual({ worktree: `id:${workspaceId}`, pathText: recording.path })
+    })
+
+    it('removing the workspace stops its recordings sync', async () => {
+      connectRuntimeOwnedSshTargetMock.mockResolvedValueOnce({
+        targetId: 'runtime-ssh-desktop',
+        environmentId: 'ssh-env-1',
+        target: { id: 'runtime-ssh-desktop', label: 'Sandbox', host: 'h', port: 22, username: 'r' }
+      })
+      const { provisioned } = await provisionWithDesktop(SSH_CONNECTION)
+      await handlers.get('ephemeralVm:attachWorkspace')?.(
+        null,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument types; this is the attach handler's.
+        { runtimeId: provisioned.runtime.id, workspaceId: 'repo-1::/workspace/repo' } as never
+      )
+      await vi.waitFor(() => expect(desktopEnv.streams).toHaveLength(1))
+
+      const ack = await removalAck(provisioned.runtime, 'repo-1::/workspace/repo')
+      await handlers.get('ephemeralVm:cleanup')?.(
+        null,
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument types; this is the cleanup handler's.
+        { runtimeId: provisioned.runtime.id, ack } as never
+      )
+
+      expect(desktopEnv.closedStreams).toBe(1)
+    })
+
+    describe('the destroy needs the removal check acknowledgement', () => {
+      const WORKSPACE = 'repo-1::/workspace/repo'
+      type Record = { id: string; status: string; runtimeEnvironmentId?: string }
+
+      async function provisionAttached(options: { destroyExitCode?: number } = {}) {
+        connectRuntimeOwnedSshTargetMock.mockResolvedValueOnce({
+          targetId: 'runtime-ssh-desktop',
+          environmentId: 'ssh-env-1',
+          target: {
+            id: 'runtime-ssh-desktop',
+            label: 'Sandbox',
+            host: 'h',
+            port: 22,
+            username: 'r'
+          }
+        })
+        const provisioned = await provisionWithDesktop(SSH_CONNECTION, options)
+        await handlers.get('ephemeralVm:attachWorkspace')?.(
+          null,
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler map erases IPC argument types; this is the attach handler's.
+          { runtimeId: provisioned.provisioned.runtime.id, workspaceId: WORKSPACE } as never
+        )
+        await vi.waitFor(() => expect(desktopEnv.streams).toHaveLength(1))
+        return provisioned
+      }
+
+      function cleanup(runtimeId: string, ack: string): Promise<unknown> {
+        return invokeHandler('ephemeralVm:cleanup', { runtimeId, ack })
+      }
+
+      async function statusOf(runtimeId: string): Promise<string | undefined> {
+        const runtimes = await invokeHandler<Record[]>('ephemeralVm:listRuntimes', undefined)
+        return runtimes.find((runtime) => runtime.id === runtimeId)?.status
+      }
+
+      it('refuses without an ack or with an expired one, and proceeds with a valid one', async () => {
+        const { provisioned } = await provisionAttached()
+        const runtimeId = provisioned.runtime.id
+        await expect(cleanup(runtimeId, '')).rejects.toThrow('not confirmed')
+
+        vi.useFakeTimers({ toFake: ['Date'] })
+        try {
+          const expired = await removalAck(provisioned.runtime, WORKSPACE)
+          vi.setSystemTime(Date.now() + 2 * 60_000 + 1)
+          await expect(cleanup(runtimeId, expired)).rejects.toThrow('not confirmed')
+        } finally {
+          vi.useRealTimers()
+        }
+        expect(await statusOf(runtimeId)).toBe('running')
+
+        await expect(
+          cleanup(runtimeId, await removalAck(provisioned.runtime, WORKSPACE))
+        ).resolves.toMatchObject({
+          status: 'cleaned'
+        })
+      })
+
+      it('a cancelled review revokes its ack, so a retry needs a new decision', async () => {
+        const { provisioned } = await provisionAttached()
+        const checked = await invokeHandler<{ status: string; ack: string }>(
+          'ephemeralVm:removalPreflight',
+          { runtimeId: provisioned.runtime.id }
+        )
+        expect(checked.status).toBe('unchecked')
+        // Undecided: the answer alone authorizes nothing.
+        await expect(cleanup(provisioned.runtime.id, checked.ack)).rejects.toThrow('not confirmed')
+        await invokeHandler('ephemeralVm:revokeRemoval', { ack: checked.ack })
+        await expect(
+          invokeHandler('ephemeralVm:confirmRemoval', { ack: checked.ack })
+        ).resolves.toBe(false)
+        await expect(cleanup(provisioned.runtime.id, checked.ack)).rejects.toThrow('not confirmed')
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
+      })
+
+      it('a failed destroy restarts the sync and its ack cannot be reused', async () => {
+        const { provisioned } = await provisionAttached({ destroyExitCode: 1 })
+        const runtimeId = provisioned.runtime.id
+        const ack = await removalAck(provisioned.runtime, WORKSPACE)
+
+        await expect(cleanup(runtimeId, ack)).resolves.toMatchObject({ status: 'cleanup_failed' })
+        // The environment is still up, so its recordings keep being copied.
+        await vi.waitFor(() => expect(desktopEnv.streams).toHaveLength(2))
+        await expect(cleanup(runtimeId, ack)).rejects.toThrow('not confirmed')
+      })
+
+      it('a claimed removal fences new recordings on the environment with the controller token', async () => {
+        const { provisioned } = await provisionAttached()
+        const ack = await removalAck(provisioned.runtime, WORKSPACE)
+        const target = { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', { ...target, ack })
+        ).resolves.toEqual({ ok: true, required: true })
+
+        const fence = {
+          environmentId: 'ssh-env-1',
+          method: 'desktop.record.fence',
+          params: {
+            controllerToken: desktopControllerToken('ssh-env-1'),
+            fenceId: expect.any(String)
+          }
+        }
+        // The check and the claim each fence before they list.
+        expect(desktopEnv.calls.filter((call) => call.method === 'desktop.record.fence')).toEqual([
+          fence,
+          fence
+        ])
+      })
+
+      /** A clean check: its ack goes straight to the claim, as removals that skip review do. */
+      async function cleanCheck(): Promise<string> {
+        desktopEnv.gitClean = true
+        const checked = await invokeHandler<{ status: string; ack: string }>(
+          'ephemeralVm:removalPreflight',
+          { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+        )
+        expect(checked.status).toBe('clean')
+        return checked.ack
+      }
+
+      it('a recording that starts while the claim makes its final list is refused', async () => {
+        await provisionAttached()
+        const ack = await cleanCheck()
+        const starts: string[] = []
+        desktopEnv.afterList = () => starts.push(desktopEnv.startRecording())
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: true, required: true })
+        expect(starts).toEqual(['desktop_removal_pending'])
+      })
+
+      it('a recording started after the check is counted: the claim and its ack are refused', async () => {
+        const { provisioned } = await provisionAttached()
+        const ack = await cleanCheck()
+        // A host reconfigure between the check and the claim lifts the check's fence.
+        desktopEnv.fenced = false
+        expect(desktopEnv.startRecording()).toBe('started')
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: false, reason: 'recordings_unprotected' })
+        await expect(cleanup(provisioned.runtime.id, ack)).rejects.toThrow('not confirmed')
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
+      })
+
+      it('a fence the environment refuses refuses the claim', async () => {
+        await provisionAttached()
+        const ack = await cleanCheck()
+        desktopEnv.fence = () => ({
+          id: 'r',
+          ok: false,
+          error: { code: 'desktop_controller_token_invalid', message: 'stale token' }
+        })
+
+        await expect(
+          invokeHandler('ephemeralVm:claimRemoval', {
+            hostId: 'runtime:ssh-env-1',
+            workspaceId: WORKSPACE,
+            ack
+          })
+        ).resolves.toEqual({ ok: false, reason: 'recordings_unprotected' })
+      })
+
+      it('a recording whose stop fails to finalize keeps the removal unsafe and destroys nothing', async () => {
+        const { provisioned } = await provisionAttached()
+        desktopEnv.gitClean = true
+        desktopEnv.inProgress = true
+        // The encoder failed: the recording is discarded and the recorder is idle again.
+        desktopEnv.stop = () => {
+          desktopEnv.inProgress = false
+          return {
+            id: 'r',
+            ok: false,
+            error: { code: 'desktop_recording_failed', message: 'discarded' }
+          }
+        }
+
+        const copied = await invokeHandler<{ ok: boolean; ack?: string }>(
+          'ephemeralVm:copyRecordingsBeforeRemoval',
+          { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+        )
+
+        expect(copied).toMatchObject({
+          ok: false,
+          reason: 'still_pending',
+          preflight: { status: 'unsafe', recordingInProgress: true }
+        })
+        await expect(cleanup(provisioned.runtime.id, copied.ack ?? '')).rejects.toThrow(
+          'not confirmed'
+        )
+        expect(await statusOf(provisioned.runtime.id)).toBe('running')
+      })
+
+      it('copies the recordings, then destroys with the ack the copy returned', async () => {
+        const { provisioned, userDataPath } = await provisionAttached()
+        const recording = desktopEnv.finishRecording('0123456789abcdef', 1_000)
+        const target = { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+        const checked = await invokeHandler<{ recordingsNotCopied: { id: string }[] }>(
+          'ephemeralVm:removalPreflight',
+          target
+        )
+        expect(checked.recordingsNotCopied.map((pending) => pending.id)).toEqual([recording.id])
+
+        const copied = await invokeHandler<{ ok: boolean; ack?: string }>(
+          'ephemeralVm:copyRecordingsBeforeRemoval',
+          target
+        )
+        expect(copied).toMatchObject({ ok: true, copied: 1 })
+        const key = createHash('sha256').update(WORKSPACE).digest('hex').slice(0, 32)
+        expect(
+          existsSync(join(userDataPath, 'desktop-recordings', key, `rec-${recording.id}.mp4`))
+        ).toBe(true)
+        await expect(cleanup(provisioned.runtime.id, copied.ack ?? '')).resolves.toMatchObject({
+          status: 'cleaned'
+        })
+      })
+
+      it('a failed copy hands out no ack, so the environment is never destroyed', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        try {
+          const { provisioned } = await provisionAttached()
+          desktopEnv.finishRecording('0123456789abcdef', 1_000)
+          desktopEnv.failReads = 1_000
+          const target = { hostId: 'runtime:ssh-env-1', workspaceId: WORKSPACE }
+          const copied = await invokeHandler<{ ok: boolean; ack?: string }>(
+            'ephemeralVm:copyRecordingsBeforeRemoval',
+            target
+          )
+          expect(copied).toEqual({ ok: false, reason: 'copy_failed' })
+          await expect(cleanup(provisioned.runtime.id, copied.ack ?? '')).rejects.toThrow(
+            'not confirmed'
+          )
+          expect(await statusOf(provisioned.runtime.id)).toBe('running')
+        } finally {
+          warn.mockRestore()
+        }
+      })
+    })
   })
 })

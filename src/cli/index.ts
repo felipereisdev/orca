@@ -80,10 +80,7 @@ export async function main(
   // Why: tools that use orca as BROWSER run it with the URL as the only argument (#21956).
   const commandArgv =
     argv.length === 1 && /^https?:\/\//i.test(argv[0]) ? ['open-url', '--url', argv[0]] : argv
-  const parsed = normalizeCommandPositionals(
-    COMMAND_SPECS,
-    parseArgs(commandArgv, COMMAND_PATHS, COMMAND_SPECS)
-  )
+  const { parsed, trailingArgs } = parseCommandArgv(commandArgv)
   const helpPath = resolveHelpPath(parsed)
   if (helpPath !== null) {
     printHelp(COMMAND_SPECS, helpPath)
@@ -196,7 +193,8 @@ export async function main(
       },
       cwd,
       json,
-      rawArgs: argv
+      rawArgs: argv,
+      ...(trailingArgs ? { trailingArgs } : {})
     })
   } catch (error) {
     const worktreeSelector = parsed.flags.get('worktree')
@@ -217,6 +215,22 @@ export async function main(
     })
     process.exitCode = cliErrorExitCode(error, parsed.commandPath)
   }
+}
+
+function parseCommandArgv(commandArgv: string[]): {
+  parsed: ReturnType<typeof parseArgs>
+  trailingArgs?: string[]
+} {
+  const parse = (args: string[]) =>
+    normalizeCommandPositionals(COMMAND_SPECS, parseArgs(args, COMMAND_PATHS, COMMAND_SPECS))
+  const terminator = commandArgv.indexOf('--')
+  if (terminator !== -1) {
+    const parsed = parse(commandArgv.slice(0, terminator))
+    if (findCommandSpec(COMMAND_SPECS, parsed.commandPath)?.trailingArgs) {
+      return { parsed, trailingArgs: commandArgv.slice(terminator + 1) }
+    }
+  }
+  return { parsed: parse(commandArgv) }
 }
 
 const ON_CALLERS_ORCA_COMMANDS: ReadonlySet<string> = new Set(['send', 'reply', 'worker-start'])

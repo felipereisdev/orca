@@ -296,7 +296,10 @@
     "nativeChatProse": {
       "attachedImage": "Imagem anexada",
       "image": "imagem",
-      "openImageHint": "Abre a imagem em tamanho original"
+      "openImageHint": "Abre a imagem em tamanho original",
+      "playVideoHint": "Baixa e reproduz o vídeo",
+      "video": "Vídeo",
+      "videoTooLarge": "Gravação grande demais para o celular — abra no computador"
     },
     "nativeChatToolLine": {
       "added": "Adicionou",

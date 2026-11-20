@@ -114,5 +114,27 @@ export const styles = themedStyleSheet(() => ({
     backgroundColor: colors.bgRaised,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle
+  },
+  videoThumb: {
+    width: 240,
+    height: 135,
+    borderRadius: radii.surface,
+    backgroundColor: colors.bgRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm
+  },
+  videoThumbText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    textAlign: 'center'
+  },
+  videoFrame: {
+    width: '100%',
+    maxWidth: 480,
+    aspectRatio: 16 / 9
   }
 }))

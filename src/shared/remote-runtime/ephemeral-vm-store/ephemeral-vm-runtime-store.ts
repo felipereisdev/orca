@@ -9,8 +9,9 @@ import {
   toLifecycleLastErrorFields
 } from '../ephemeral-vm-recipes/ephemeral-vm-failure-copy'
 import { notifyEphemeralVmRuntimesChanged } from './ephemeral-vm-runtime-store-events'
+import * as statsCommands from './ephemeral-vm-runtime-stats-command'
+import type { ApprovedRuntimeStats } from './ephemeral-vm-runtime-feature-records'
 import {
-  featureEntryFromRuntime,
   featureIdentity,
   readEphemeralVmRuntimeFeatureStore,
   restoreRuntimeFeatureList,
@@ -19,7 +20,6 @@ import {
   type EphemeralVmRuntimeFeatureStoreSnapshot
 } from './ephemeral-vm-runtime-feature-store'
 import {
-  mergeRuntimeFeatures,
   partitionRuntimesForRollback,
   runtimeFeatureListsEqual
 } from './ephemeral-vm-runtime-rollback-projection'
@@ -62,7 +62,9 @@ export function listEphemeralVmRuntimes(userDataPath: string): EphemeralVmRuntim
 
 export function upsertEphemeralVmRuntime(
   userDataPath: string,
-  record: EphemeralVmRuntimeRecord
+  record: EphemeralVmRuntimeRecord,
+  /** Best effort: the stats step approved with the recipe; only the sidecar keeps it. */
+  options: { approvedStats?: ApprovedRuntimeStats } = {}
 ): EphemeralVmRuntimeRecord {
   const parsed = EphemeralVmRuntimeRecordSchema.parse(record)
   const loaded = readEphemeralVmRuntimeStore(userDataPath)
@@ -86,7 +88,8 @@ export function upsertEphemeralVmRuntime(
         compareRuntimeRecords
       )
     },
-    loaded.features
+    loaded.features,
+    statsCommands.pendingStatsCommand(parsed, options.approvedStats)
   )
   return parsed
 }
@@ -255,20 +258,19 @@ function readEphemeralVmRuntimeStore(userDataPath: string): LoadedEphemeralVmRun
 function writeEphemeralVmRuntimeStore(
   userDataPath: string,
   store: EphemeralVmRuntimeStore,
-  features: EphemeralVmRuntimeFeatureStoreSnapshot
+  features: EphemeralVmRuntimeFeatureStoreSnapshot,
+  pendingStats?: statsCommands.PendingRuntimeStatsCommand
 ): void {
   const path = getEphemeralVmRuntimeStorePath(userDataPath)
   try {
     const parsed = EphemeralVmRuntimeStoreSchema.parse(store)
     const { rollback, writeAhead } = partitionRuntimesForRollback(parsed.runtimes)
-    const requiredFeatures = mergeRuntimeFeatures(
-      [],
-      parsed.runtimes.filter(hasEphemeralVmRecipeResult).flatMap((entry) => {
-        const feature = featureEntryFromRuntime(entry)
-        return feature ? [feature] : []
-      })
+    const plan = statsCommands.planRuntimeFeatureWrite(
+      parsed.runtimes.filter(hasEphemeralVmRecipeResult),
+      features,
+      pendingStats
     )
-    const preparedFeatures = mergeRuntimeFeatures(features.features, requiredFeatures)
+    const { required: requiredFeatures, prepared: preparedFeatures } = plan
     writeSecureJsonFileWithinLimit(
       path,
       RollbackEphemeralVmRuntimeStoreSchema.parse({ version: 1, runtimes: rollback }),
@@ -284,8 +286,10 @@ function writeEphemeralVmRuntimeStore(
         'Could not preserve ephemeral VM runtime compatibility metadata.'
       )
     }
-    if (features.writable && !runtimeFeatureListsEqual(features.features, preparedFeatures)) {
-      writeEphemeralVmRuntimeFeatureStore(userDataPath, features, preparedFeatures)
+    const write = (list: typeof preparedFeatures): void =>
+      writeEphemeralVmRuntimeFeatureStore(userDataPath, features, list)
+    if (!statsCommands.writePreparedFeatures(features, plan, pendingStats, write)) {
+      return
     }
     if (features.writable && !runtimeFeatureListsEqual(preparedFeatures, requiredFeatures)) {
       try {
@@ -305,6 +309,9 @@ function writeEphemeralVmRuntimeStore(
   }
 }
 
-function compareRuntimeRecords(a: EphemeralVmRuntimeRecord, b: EphemeralVmRuntimeRecord): number {
+export function compareRuntimeRecords(
+  a: EphemeralVmRuntimeRecord,
+  b: EphemeralVmRuntimeRecord
+): number {
   return b.createdAt - a.createdAt || a.id.localeCompare(b.id)
 }

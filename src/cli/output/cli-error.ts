@@ -144,7 +144,7 @@ function formatRuntimeUnavailableError(message: string, error: RuntimeClientErro
 }
 
 // Streaming commands print one JSON object per line with --json, so their failure is one line too.
-const JSON_LINES_COMMANDS = new Set(['plugin dev watch'])
+const JSON_LINES_COMMANDS = new Set(['plugin dev watch', 'desktop run'])
 
 export function reportCliError(error: unknown, json: boolean, context: CliErrorContext = {}): void {
   const selector = contextRecovery(error, context)

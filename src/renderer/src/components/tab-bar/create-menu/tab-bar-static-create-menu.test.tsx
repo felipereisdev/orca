@@ -16,6 +16,7 @@ import { createDatabaseClientFixture } from '../../settings/database/testing/dat
 import type { DatabaseConnectionSummary } from '../../../../../shared/database/database-contracts'
 import type { NewTabMenuLayout } from '../../../../../shared/new-tab-menu/new-tab-menu-layout'
 import type { TabBarProps } from '../tab-bar-props'
+import type { AppState } from '@/store/types'
 
 const rpc = vi.hoisted((): { connections: DatabaseConnectionSummary[] } => ({ connections: [] }))
 vi.mock('@/runtime/rpc/calls/runtime-rpc-call', () => ({
@@ -50,13 +51,21 @@ const crm: DatabaseConnectionSummary = {
   environment: 'PRD'
 }
 
-function renderMenu(layout?: NewTabMenuLayout): void {
+function renderMenu(
+  layout?: NewTabMenuLayout,
+  runtimes: AppState['ephemeralVmRuntimesByWorkspaceId'] = {},
+  experimentalEphemeralVms = false
+): void {
   // The + menu's create row suspends global shortcuts through the preload bridge.
   Object.assign(window, { api: { ui: { setShortcutRecorderFocused: noop } } })
   useAppStore.setState(
     {
       ...initial,
-      settings: { ...getDefaultSettings('/tmp/orca-test'), newTabMenuLayout: layout },
+      settings: {
+        ...getDefaultSettings('/tmp/orca-test'),
+        newTabMenuLayout: layout,
+        experimentalEphemeralVms
+      },
       repos: [
         {
           id: 'repo',
@@ -80,7 +89,8 @@ function renderMenu(layout?: NewTabMenuLayout): void {
           tabOrder: []
         }))
       },
-      activeGroupIdByWorktree: { [WORKSPACE]: 'left' }
+      activeGroupIdByWorktree: { [WORKSPACE]: 'left' },
+      ephemeralVmRuntimesByWorkspaceId: runtimes
     },
     true
   )
@@ -178,4 +188,40 @@ it('shows the empty state when the workspace has no connections', async () => {
     'No connections associated with this project'
   )
   expect(databaseTabs()).toHaveLength(0)
+})
+
+it('desktop item shows only for workspaces with a desktop', () => {
+  const runtime = {
+    id: 'vm-1',
+    workspaceId: WORKSPACE,
+    status: 'running' as const,
+    runtimeEnvironmentId: 'env-1',
+    canSuspend: false
+  }
+  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: false } }, true)
+  expect(screen.queryByRole('button', { name: 'Desktop' })).toBeNull()
+  cleanup()
+  renderMenu(undefined, { [WORKSPACE]: { ...runtime, hasDesktop: true } }, true)
+  fireEvent.click(screen.getByRole('button', { name: 'Desktop' }))
+  expect(useAppStore.getState().unifiedTabsByWorktree[WORKSPACE]).toEqual([
+    expect.objectContaining({ contentType: 'desktop', entityId: WORKSPACE, groupId: 'right' })
+  ])
+})
+
+it('desktop item stays hidden while the ephemeral VM experiment is off', () => {
+  renderMenu(
+    undefined,
+    {
+      [WORKSPACE]: {
+        id: 'vm-1',
+        workspaceId: WORKSPACE,
+        status: 'running',
+        runtimeEnvironmentId: 'env-1',
+        canSuspend: false,
+        hasDesktop: true
+      }
+    },
+    false
+  )
+  expect(screen.queryByRole('button', { name: 'Desktop' })).toBeNull()
 })

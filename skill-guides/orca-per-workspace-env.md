@@ -287,8 +287,12 @@ environmentRecipes:
 
 `create` is required, runs locally from the repo root, and prints exactly one JSON object on stdout.
 `suspend` and `resume` are optional and read the lifecycle payload on stdin; `resume` must print
-fresh recipe JSON because the pairing may have changed. `destroy` may be omitted only with
-`destroy: none`. The legacy keys `command` and `cleanup` still map to `create` and `destroy`.
+fresh recipe JSON because the pairing may have changed. `stats` is optional too: it reads the same
+lifecycle payload on stdin and prints one JSON object,
+`{"cpuPercent": <number ≥ 0>, "memoryBytes": <integer ≥ 0>, "diskBytes": <integer ≥ 0>}`, which
+Settings > VMs shows for each running environment. Orca runs it only while that page is open, at
+most every 15 seconds, with a 5-second limit; anything else on stdout reads as "no stats".
+`destroy` may be omitted only with `destroy: none`. The legacy keys `command` and `cleanup` still map to `create` and `destroy`.
 
 Steps have no time limit by default. Set `timeoutSeconds` on the recipe to give them one, either
 one number for every step or a map with any of `create`, `suspend`, `resume`, and `destroy`; values
@@ -333,7 +337,7 @@ The base result, which is what Orca-server mode prints:
 ```
 
 `pairingCode` and `projectRoot` are required; `schemaVersion` (`1`) and `userData` are optional.
-Three named deltas change that shape:
+Four named deltas change that shape:
 
 - **`orca serve --recipe-json` output** is this same object without `userData`. Merge your own
   `userData` into it rather than rebuilding it.
@@ -343,6 +347,9 @@ Three named deltas change that shape:
   `checkoutMode: provisioned-root` to the recipe, require `ORCA_RECIPE_RESULT_SCHEMA_VERSION=2`, and
   emit `"schemaVersion": 2` with `"checkoutMode": "provisioned-root"`. Fail if the requested schema
   is not `2` rather than falling back to the ordinary shape. Details are in `references/ssh-host.md`.
+- **A desktop** adds an optional `desktop` block (`type: "vnc"`, a loopback `host`, `port`,
+  `password`, and a `launcher` with `port` and `token`) that Orca shows in the workspace's Desktop
+  tab. A reference recipe that produces it is in `references/docker-desktop-ssh.md`.
 
 ### The `orca serve` invocation
 
@@ -371,7 +378,7 @@ parses as JSON; if the process dies first, dump its stderr log and fail.
 
 `ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json` validates static wiring only; it boots
 nothing. It checks local-host execution, the repo path, that the recipe id exists, that the create,
-destroy, suspend, and resume command paths resolve, that suspend and resume are paired, and that
+destroy, suspend, resume, and stats command paths resolve, that suspend and resume are paired, and that
 each script is executable (the POSIX exec bit, skipped on Windows).
 
 **The free gate is clear only with no `fail` and no `warn`.** A `warn` keeps `ok: true`, so `ok`
@@ -404,10 +411,12 @@ rejects `--reference`, run `ORCA skills get orca-per-workspace-env --full` once 
 this guide plus every reference from the same CLI build, so read only the named one. If `--full` is
 rejected too, keep these rules, use the command's `--help`, and do not guess flags.
 
-| Action gate                                                                               | Bundled reference               |
-| ----------------------------------------------------------------------------------------- | ------------------------------- |
-| Writing the base-snapshot, auth, or create script for a snapshot-capable cloud provider   | `references/provider-vercel.md` |
-| The recipe connects over SSH instead of starting `orca serve`, including provisioned root | `references/ssh-host.md`        |
-| The environment is a local Docker container reached over SSH                              | `references/docker-ssh.md`      |
-| The user's desktop is Windows and you are scaffolding local-side scripts                  | `references/windows-scripts.md` |
-| A doctor, provision, clone, login, or snapshot step failed                                | `references/failure-modes.md`   |
+| Action gate                                                                               | Bundled reference                            |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Writing the base-snapshot, auth, or create script for a snapshot-capable cloud provider   | `references/provider-vercel.md`              |
+| The recipe connects over SSH instead of starting `orca serve`, including provisioned root | `references/ssh-host.md`                     |
+| The environment is a local Docker container reached over SSH                              | `references/docker-ssh.md`                   |
+| The environment is a Docker container with a desktop (VNC), on this Mac or another one    | `references/docker-desktop-ssh.md`           |
+| Writing the scripts for that Docker desktop recipe                                        | `references/docker-desktop-ssh-templates.md` |
+| The user's desktop is Windows and you are scaffolding local-side scripts                  | `references/windows-scripts.md`              |
+| A doctor, provision, clone, login, or snapshot step failed                                | `references/failure-modes.md`                |

@@ -29,6 +29,8 @@ export type WorktreeDeleteWithToastOptions = {
   confirmedDiscards?: ConfirmedUnsavedDiscards
   /** Throws when the confirmed workspace is gone; runs before every destructive send. */
   assertBeforeDispatch?: () => void
+  /** The delete dialog's removal session this flow took over; each removal adopts its claim in it. */
+  recipeRemovalSessionId?: string
 }
 
 export function toWorktreeDeleteIdentities(

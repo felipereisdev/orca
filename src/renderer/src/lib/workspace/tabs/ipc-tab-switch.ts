@@ -60,11 +60,11 @@ export function activateCyclableTab(store: AppStoreState, next: TypeCyclableTab)
       store.activateTab?.(next.tabId)
     }
     store.setActiveTabType('browser', worktreeId)
-  } else if (next.type === 'database') {
+  } else if (next.type === 'database' || next.type === 'desktop') {
     if (next.tabId) {
       store.activateTab(next.tabId)
     }
-    store.setActiveTabType('database', worktreeId)
+    store.setActiveTabType(next.type, worktreeId)
   } else if (next.type === 'simulator') {
     store.setActiveTab(next.tabId ?? next.id)
     if (next.tabId) {

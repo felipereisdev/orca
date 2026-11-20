@@ -50,6 +50,7 @@ vi.mock('../ipc/runtime-environments/connections/runtime-environment-request-con
 }))
 vi.mock('../ssh/targets/ssh-target-registry', () => ({ getRegisteredSshState: () => undefined }))
 vi.mock('./runtime-service', () => ({ resumeEphemeralVmRuntime: mocks.resume }))
+vi.mock('./desktop-sync-registry', () => ({ startEnvironmentDesktop: vi.fn(async () => {}) }))
 vi.mock('./runtime-ssh', () => ({
   connectRuntimeOwnedSshTarget: vi.fn(),
   refreshRuntimeOwnedSshTarget: vi.fn()

@@ -183,7 +183,8 @@ export function buildOrderedTabItems({
     if (
       recordless?.contentType === 'simulator' ||
       recordless?.contentType === 'database' ||
-      recordless?.contentType === 'room'
+      recordless?.contentType === 'room' ||
+      recordless?.contentType === 'desktop'
     ) {
       items.push({
         type: recordless.contentType,
@@ -242,8 +243,8 @@ export function findActiveVisibleTabId(
     if (item.type === 'browser') {
       return active.activeTabType === 'browser' && item.id === active.activeBrowserTabId
     }
-    if (item.type === 'database') {
-      return active.activeTabType === 'database' && item.id === active.activeFileId
+    if (item.type === 'database' || item.type === 'desktop') {
+      return active.activeTabType === item.type && item.id === active.activeFileId
     }
     if (item.type === 'simulator') {
       return active.activeTabType === 'simulator' && item.id === active.activeSimulatorTabId

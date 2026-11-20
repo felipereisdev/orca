@@ -8,6 +8,10 @@ import {
 import type { RemoveWorktreeOptions } from '@/store/slices/worktrees/teardown/worktree-removal-options'
 import type { RendererRemoveWorktreeResult } from '@/store/slices/worktrees/teardown/renderer-remove-worktree-result'
 import { showWorkspaceListChangedToast } from '../../worktree-list/listing/stale-workspace-list-toast'
+import {
+  endRecipeRemovalSession,
+  takeRecipeRemovalSession
+} from '@/runtime/ephemeral-vm/recipe-removal-session-handoff'
 import type { ConfirmedUnsavedDiscards } from '@/store/slices/worktrees/teardown/removed-workspace-unsaved-files'
 
 export function runDialogForceDelete(args: {
@@ -31,10 +35,17 @@ export function runDialogForceDelete(args: {
     closeModal()
     return
   }
+  // This removal owns the dialog's session now; it adopts its claim, then the rest is revoked.
+  const recipeRemovalSessionId = takeRecipeRemovalSession()
   // Explicit Force Delete may waive PTY-stop proof, unlike ordinary confirmed deletion.
   const deletePromise = removeWorktree(toWorktreeRemovalTarget(forceTarget), true, {
     allowUnverifiedPtyStop: true,
-    confirmedDiscards: args.confirmedDiscards
+    confirmedDiscards: args.confirmedDiscards,
+    ...(recipeRemovalSessionId ? { recipeRemovalSessionId } : {})
+  }).finally(() => {
+    if (recipeRemovalSessionId) {
+      endRecipeRemovalSession(recipeRemovalSessionId)
+    }
   })
   closeModal()
   deletePromise

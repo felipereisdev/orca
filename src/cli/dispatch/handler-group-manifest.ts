@@ -213,6 +213,24 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('../computer/computer.js')).COMPUTER_HANDLERS
   },
   {
+    name: 'desktop',
+    keys: [
+      'desktop status',
+      'desktop screenshot',
+      'desktop move',
+      'desktop click',
+      'desktop drag',
+      'desktop scroll',
+      'desktop type',
+      'desktop key',
+      'desktop run',
+      'desktop record start',
+      'desktop record stop',
+      'desktop recordings'
+    ],
+    load: async () => (await import('../desktop/desktop.js')).DESKTOP_HANDLERS
+  },
+  {
     name: 'agent-hooks',
     keys: ['agent hooks prepare-codex', 'agent hooks status', 'agent hooks off', 'agent hooks on'],
     load: async () => (await import('../agents/agent-hooks.js')).AGENT_HOOK_HANDLERS

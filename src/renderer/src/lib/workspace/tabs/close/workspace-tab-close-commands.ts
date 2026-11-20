@@ -109,7 +109,8 @@ export function createWorkspaceTabCloseCommands({
     } else if (
       item.contentType === 'simulator' ||
       item.contentType === 'database' ||
-      item.contentType === 'room'
+      item.contentType === 'room' ||
+      item.contentType === 'desktop'
     ) {
       closeUnifiedTab(item.id)
     } else {

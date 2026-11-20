@@ -22,4 +22,6 @@ export type RemoveWorktreeOptions = {
   ignoreWorkspaceCleanupScanSurvivors?: boolean
   /** The text a dialog listed when the user confirmed discarding it; other edits are offered back. */
   confirmedDiscards?: ConfirmedUnsavedDiscards
+  /** The delete dialog's removal session this removal took over; it adopts its claim in it. */
+  recipeRemovalSessionId?: string
 }

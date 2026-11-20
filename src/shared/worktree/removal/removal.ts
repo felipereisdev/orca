@@ -164,10 +164,16 @@ export function classifyWorktreeForceDeleteReason(
 export type WorktreeRemovalTarget = {
   id: string
   executionHostId: ExecutionHostId | null
+  /** The row the user chose; a same-id replacement published since is not removed. */
+  instanceId?: string
 }
 
 export function toWorktreeRemovalTarget(
-  worktree: Pick<Worktree, 'id' | 'hostId'>
+  worktree: Pick<Worktree, 'id' | 'hostId' | 'instanceId'>
 ): WorktreeRemovalTarget {
-  return { id: worktree.id, executionHostId: worktree.hostId ?? null }
+  return {
+    id: worktree.id,
+    executionHostId: worktree.hostId ?? null,
+    ...(worktree.instanceId !== undefined ? { instanceId: worktree.instanceId } : {})
+  }
 }

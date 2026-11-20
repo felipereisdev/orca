@@ -81,6 +81,14 @@ export const GIT_STATUS_METHODS = [
       runtime.readRuntimeWorktreeAtRiskLocalFiles(params.worktree, signal)
   }),
   defineMethod({
+    // Commits on no remote, so removing a workspace can warn before its history is lost.
+    name: 'git.unpushedCommitCount',
+    permission: 'workspace',
+    params: WorktreeSelector,
+    handler: async (params, { runtime, signal }) =>
+      runtime.countRuntimeGitUnpushedCommits(params.worktree, signal)
+  }),
+  defineMethod({
     name: 'git.conflictOperation',
     permission: 'workspace',
     params: WorktreeSelector,

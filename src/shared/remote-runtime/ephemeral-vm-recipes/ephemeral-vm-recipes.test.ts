@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { encodePairingOffer } from '../pairing/pairing'
 import { PAIRING_OFFER_VERSION } from '../pairing/mobile-relay-pairing-offer'
 import {
+  describeEphemeralVmRecipeStdoutForDiagnostics,
   getEphemeralVmRecipeResultWarnings,
   redactEphemeralVmRecipeResultForDiagnostics
 } from './ephemeral-vm-recipe-diagnostics'
 import { redactEphemeralVmRecipeDiagnosticText } from './ephemeral-vm-recipe-diagnostic-redaction'
+import {
+  getEphemeralVmRecipeResultDesktop,
+  parseEphemeralVmRecipeResult
+} from './ephemeral-vm-recipes'
 
 function makePairingCode(endpoint = 'wss://sandbox.example.com'): string {
   return encodePairingOffer({
@@ -122,4 +127,100 @@ describe('parseEphemeralVmRecipeResult', () => {
       }
     })
   })
+
+  it('parses a v1 connection result with a VNC desktop', () => {
+    const parsed = parseEphemeralVmRecipeResult(
+      JSON.stringify({
+        ...sshConnectionResult(),
+        desktop: { type: 'vnc', port: 5901, password: 'abc12345' }
+      })
+    )
+
+    expect(parsed.ok).toBe(true)
+    expect(parsed.ok && getEphemeralVmRecipeResultDesktop(parsed.result)).toEqual({
+      type: 'vnc',
+      port: 5901,
+      host: '127.0.0.1',
+      password: 'abc12345'
+    })
+  })
+
+  it('results without desktop still parse and the helper returns null', () => {
+    const parsed = parseEphemeralVmRecipeResult(JSON.stringify(sshConnectionResult()))
+
+    expect(parsed.ok).toBe(true)
+    expect(parsed.ok && getEphemeralVmRecipeResultDesktop(parsed.result)).toBeNull()
+  })
+
+  it('rejects desktop with an unknown type or a password over 8 chars', () => {
+    expect(
+      parseEphemeralVmRecipeResult(
+        JSON.stringify({
+          ...sshConnectionResult(),
+          desktop: { type: 'rdp', port: 5901, password: 'abc12345' }
+        })
+      ).ok
+    ).toBe(false)
+    expect(
+      parseEphemeralVmRecipeResult(
+        JSON.stringify({
+          ...sshConnectionResult(),
+          desktop: { type: 'vnc', port: 5901, password: 'abc123456' }
+        })
+      ).ok
+    ).toBe(false)
+  })
+
+  it('redacts the desktop password in diagnostics', () => {
+    const desktop = {
+      type: 'vnc' as const,
+      port: 5901,
+      host: '127.0.0.1',
+      password: 'abc12345',
+      launcher: { port: 7001, token: 'launcher-token-0123456789abcdef0123456789' }
+    }
+
+    expect(
+      redactEphemeralVmRecipeResultForDiagnostics({ ...sshConnectionResult(), desktop }).desktop
+    ).toEqual({
+      type: 'vnc',
+      port: 5901,
+      host: '127.0.0.1',
+      password: '[redacted]',
+      launcher: { port: 7001, token: '[redacted]' }
+    })
+    expect(redactEphemeralVmRecipeDiagnosticText(JSON.stringify({ desktop }))).toBe(
+      '{"desktop":{"type":"vnc","port":5901,"host":"127.0.0.1","password":"[redacted]","launcher":{"port":7001,"token":"[redacted]"}}}'
+    )
+  })
+
+  it('redacts a secret value that contains an escaped quote', () => {
+    expect(redactEphemeralVmRecipeDiagnosticText('{"password":"ab\\"c123","ok":true}')).toBe(
+      '{"password":"[redacted]","ok":true}'
+    )
+  })
+
+  it('strips URL credentials from a recipe result shown as stdout diagnostics', () => {
+    const stdout = JSON.stringify({
+      ...sshConnectionResult(),
+      userData: { repoUrl: 'https://recipe-user:recipe-token@git.example.com/team/repo.git' }
+    })
+
+    const described = describeEphemeralVmRecipeStdoutForDiagnostics(stdout)
+
+    expect(JSON.parse(described).userData).toEqual({
+      repoUrl: 'https://git.example.com/team/repo.git'
+    })
+  })
 })
+
+function sshConnectionResult() {
+  return {
+    schemaVersion: 1 as const,
+    connection: {
+      type: 'ssh' as const,
+      projectRoot: '/workspace/repo',
+      target: { label: 'Sandbox', host: 'sandbox.example.com', port: 22, username: 'root' }
+    }
+  }
+}

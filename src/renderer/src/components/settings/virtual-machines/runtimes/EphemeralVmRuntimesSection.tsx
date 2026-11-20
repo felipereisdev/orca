@@ -1,8 +1,12 @@
+import { reviewRecipeRemoval } from '@/runtime/ephemeral-vm/recipe-removal-preflights'
 import { Loader2, RefreshCw } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import type { EphemeralVmRuntimeRecord } from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
+import {
+  isEphemeralVmEnvironmentRunning,
+  type EphemeralVmRuntimeRecord
+} from '../../../../../../shared/remote-runtime/ephemeral-vm-store/ephemeral-vm-runtimes'
 import { EPHEMERAL_VM_CLEANUP_STOPPED_ERROR } from '../../../../../../shared/remote-runtime/ephemeral-vm-recipes/ephemeral-vm-recipe-destroy-result'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
@@ -13,6 +17,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../ui/tooltip'
 import { EphemeralVmCleanupStopDialog } from './EphemeralVmCleanupStopDialog'
 import { EphemeralVmRuntimeRow } from './EphemeralVmRuntimeRow'
 import { CloudVmSetupGuide } from './CloudVmSetupGuide'
+import { useEphemeralVmRuntimeStats } from './use-ephemeral-vm-runtime-stats'
+
+function showsStats(runtime: EphemeralVmRuntimeRecord): boolean {
+  return runtime.recipeResult !== undefined && isEphemeralVmEnvironmentRunning(runtime.status)
+}
 
 function hasCleanupFailed(runtime: EphemeralVmRuntimeRecord): boolean {
   return (
@@ -86,6 +95,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
   const [stoppingId, setStoppingId] = useState<string | null>(null)
   const [pendingStop, setPendingStop] = useState<EphemeralVmRuntimeRecord | null>(null)
   const mountedRef = useMountedRef()
+  const stats = useEphemeralVmRuntimeStats(runtimes.filter(showsStats).map((runtime) => runtime.id))
 
   const refresh = useCallback(
     async (showLoading = true, reportError = true): Promise<void> => {
@@ -146,9 +156,24 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
   }, [hasRunningLifecycle, refresh])
 
   const cleanupRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
+    // Checked by its own record first (older provisioned roots never recorded their workspace);
+    // main refuses to destroy a workspace's environment without the reviewed ack.
+    const acks = await reviewRecipeRemoval([
+      {
+        key: runtime.id,
+        request: { runtimeId: runtime.id },
+        displayName: runtime.workspaceName ?? runtime.workspaceId ?? runtime.id
+      }
+    ])
+    if (!acks) {
+      return
+    }
     setCleaningId(runtime.id)
     try {
-      const cleaned = await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
+      const cleaned = await window.api.ephemeralVm.cleanup({
+        runtimeId: runtime.id,
+        ack: acks.get(runtime.id) ?? ''
+      })
       if (hasCleanupStopped(cleaned)) {
         await refresh(false)
         return
@@ -319,6 +344,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
               key={runtime.id}
               runtime={runtime}
               statusLabel={getEphemeralVmRuntimeStatusLabel(runtime, t)}
+              stats={showsStats(runtime) ? (stats[runtime.id] ?? null) : null}
               cleanupFailed={hasCleanupFailed(runtime)}
               cleanupRunning={isCleanupRunning(runtime) || cleaningId === runtime.id}
               isStopping={stoppingId === runtime.id}

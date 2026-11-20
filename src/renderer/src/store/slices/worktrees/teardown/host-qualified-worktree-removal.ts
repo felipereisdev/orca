@@ -29,7 +29,9 @@ import {
 } from './host-qualified-worktree-row-removal'
 import { ambiguousWorkspaceOwnerMessage } from '@/lib/workspace/ownership/duplicate-paired-servers'
 
-type PreservedBranchWorktree = Pick<Worktree, 'displayName' | 'isMainWorktree'> | undefined
+type PreservedBranchWorktree =
+  | Pick<Worktree, 'displayName' | 'isMainWorktree' | 'instanceId'>
+  | undefined
 type RemoveWorktreeSliceResult = Awaited<ReturnType<WorktreeSlice['removeWorktree']>>
 
 /** Resolve confirmed host when given, otherwise use focus-free owner routing. */

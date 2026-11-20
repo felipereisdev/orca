@@ -5,6 +5,7 @@ import type { EphemeralVmRecipeContext } from './ephemeral-vm-recipe-runner'
 import { buildRecipeInheritedEnv } from './ephemeral-vm-recipe-env'
 import { admitProcessTreeKill } from '@orca/process-host/process-tree-kill-gate'
 import { GrowingByteBuffer } from '@orca/process-host/growing-byte-buffer'
+import { STDERR_HEAD_OMITTED_LINE } from './ephemeral-vm-recipe-stderr-sanitizer'
 
 export const DEFAULT_MAX_CAPTURE_BYTES = 1024 * 1024
 const CANCEL_FORCE_KILL_DELAY_MS = 5_000
@@ -30,7 +31,7 @@ export async function runRecipeCommand(args: {
   command: string
   repoPath: string
   context: EphemeralVmRecipeContext
-  mode: 'create' | 'suspend' | 'resume' | 'destroy'
+  mode: 'create' | 'suspend' | 'resume' | 'destroy' | 'stats'
   resultSchemaVersion: 1 | 2
   stdin?: string
   env?: NodeJS.ProcessEnv
@@ -93,7 +94,11 @@ export async function runRecipeCommand(args: {
         return
       }
       settle()
-      resolve({ stdout: takeRetainedTail(stdout), stderr: takeRetainedTail(stderr), ...result })
+      resolve({
+        stdout: takeRetainedTail(stdout),
+        stderr: takeStderrTail(stderr, stderrBytes > maxBytes),
+        ...result
+      })
     }
     const fail = (error: Error): void => {
       if (settled) {
@@ -129,6 +134,7 @@ export async function runRecipeCommand(args: {
     // Keep retained output as raw bytes; StringDecoder matches setEncoding’s per-stream callback character boundaries.
     const stdoutDecoder = new StringDecoder('utf8')
     const stderrDecoder = new StringDecoder('utf8')
+    let stderrBytes = 0
     const capture = (
       buffer: GrowingByteBuffer,
       decoder: StringDecoder,
@@ -147,7 +153,10 @@ export async function runRecipeCommand(args: {
       }
     }
     child.stdout.on('data', (chunk: Buffer) => capture(stdout, stdoutDecoder, chunk, args.onStdout))
-    child.stderr.on('data', (chunk: Buffer) => capture(stderr, stderrDecoder, chunk, args.onStderr))
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrBytes += chunk.byteLength
+      capture(stderr, stderrDecoder, chunk, args.onStderr)
+    })
     // setEncoding flushes its decoder at end-of-stream; keep that final replacement character.
     child.stdout.on('end', () => flushDecoder(stdoutDecoder, args.onStdout))
     child.stderr.on('end', () => flushDecoder(stderrDecoder, args.onStderr))
@@ -201,6 +210,20 @@ function takeRetainedTail(buffer: GrowingByteBuffer): string {
   return bytes.toString('utf8', start)
 }
 
+/**
+ * A tail whose head was dropped starts mid-line, maybe after a secret's key: that partial line
+ * goes, and the marker makes the sanitizer withhold the line after it too.
+ */
+function takeStderrTail(buffer: GrowingByteBuffer, headDropped: boolean): string {
+  const tail = takeRetainedTail(buffer)
+  if (!headDropped) {
+    return tail
+  }
+  const lineBreak = tail.search(/[\r\n]/)
+  const rest = lineBreak < 0 ? '' : tail.slice(lineBreak + 1).replace(/^\n/, '')
+  return `${STDERR_HEAD_OMITTED_LINE}\n${rest}`
+}
+
 function flushDecoder(
   decoder: StringDecoder,
   forward: ((chunk: string) => void) | undefined
@@ -252,7 +275,7 @@ export function killRecipeProcess(child: ChildProcessWithoutNullStreams, force =
 
 function buildRecipeEnv(
   { env, passEnv }: { env?: NodeJS.ProcessEnv; passEnv?: readonly string[] },
-  mode: 'create' | 'suspend' | 'resume' | 'destroy',
+  mode: 'create' | 'suspend' | 'resume' | 'destroy' | 'stats',
   context: EphemeralVmRecipeContext,
   resultSchemaVersion: 1 | 2
 ): NodeJS.ProcessEnv {

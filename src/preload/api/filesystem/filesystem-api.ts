@@ -95,6 +95,10 @@ export type FilesystemApi = {
       isImage?: true
       size?: number
     } | null>
+    /** The Mac's copy of an environment desktop recording, as an orca-media URL; null when none. */
+    grantDesktopRecordingPreview: (args: {
+      recordingId: string
+    }) => Promise<{ mediaUrl: string; mimeType: string } | null>
     readLocalLogTail: (args: LocalLogTailReadArgs) => Promise<LocalLogTailReadResult>
     startLocalLogTail: (args: LocalLogTailWatchArgs) => Promise<void>
     stopLocalLogTail: (args: { subscriptionId: string }) => Promise<void>

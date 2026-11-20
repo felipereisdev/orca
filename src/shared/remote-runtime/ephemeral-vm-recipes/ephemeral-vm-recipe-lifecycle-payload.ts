@@ -3,7 +3,7 @@ import type { EphemeralVmRecipeContext } from './ephemeral-vm-recipe-runner'
 import { quoteShellToken } from './ephemeral-vm-recipe-process'
 import type { OrcaVmRecipe } from '../../workspace-setup/orca-yaml-hook-types'
 
-export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy'
+export type EphemeralVmRecipeLifecycleMode = 'suspend' | 'resume' | 'destroy' | 'stats'
 
 export type EphemeralVmRecipeCleanupPayload = {
   schemaVersion: 1
@@ -16,12 +16,19 @@ export type EphemeralVmRecipeCleanupPayload = {
   recipeResult?: EphemeralVmRecipeResult
 }
 
-export function buildEphemeralVmRecipeCleanupPayload(args: {
+/** Manual cleanup only (clipboard/command): desktop credentials stay out of clipboards, history and argv. */
+export function buildEphemeralVmRecipeManualCleanupPayload(args: {
   recipe: Pick<OrcaVmRecipe, 'id'>
   context: EphemeralVmRecipeContext
   recipeResult?: EphemeralVmRecipeResult
 }): EphemeralVmRecipeCleanupPayload {
-  return buildEphemeralVmRecipeLifecyclePayload({ ...args, mode: 'destroy' })
+  const recipeResult = args.recipeResult && withoutDesktopCredentials(args.recipeResult)
+  return buildEphemeralVmRecipeLifecyclePayload({ ...args, recipeResult, mode: 'destroy' })
+}
+
+function withoutDesktopCredentials(result: EphemeralVmRecipeResult): EphemeralVmRecipeResult {
+  const { desktop: _desktop, ...rest } = result
+  return rest
 }
 
 export function buildEphemeralVmRecipeLifecyclePayload(args: {

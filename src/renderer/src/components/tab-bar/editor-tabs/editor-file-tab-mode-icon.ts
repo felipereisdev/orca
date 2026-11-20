@@ -4,6 +4,7 @@ import {
   GitCompareArrows,
   GitGraph,
   ListChecks,
+  MonitorPlay,
   ShieldAlert,
   Smartphone,
   type LucideIcon
@@ -28,5 +29,7 @@ export function getEditorFileTabModeIcon(
               ? Database
               : file.language === 'simulator'
                 ? Smartphone
-                : null
+                : file.language === 'desktop'
+                  ? MonitorPlay
+                  : null
 }
