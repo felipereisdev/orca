@@ -116,6 +116,9 @@ On the Mac that runs the containers (the "VPS"):
    whenever `create.sh` refuses:
    `docker run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope'`.
    This is a one-off admin step on the Docker host; no workspace container is privileged.
+   To keep the setting across restarts, run a tiny sentinel container that Docker starts again with the engine:
+   `docker run -d --name orca-ptrace-scope --label orca.purpose=ptrace-scope --restart=always --privileged --network none --memory 16m --cpus 0.05 busybox:1.37 sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope && exec sleep 2147483647'`.
+   It has no network and only sleeps. Remove it with `docker rm -f orca-ptrace-scope`.
 
 The main Mac runs the recipe scripts. They need `bash`, `node`, `ssh`, `ssh-keygen` and `tar`.
 
