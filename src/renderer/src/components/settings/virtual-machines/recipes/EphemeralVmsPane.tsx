@@ -218,6 +218,7 @@ export function EphemeralVmsPane(): React.JSX.Element {
             )}
           />
           <WhatItem
+            id="desktop"
             text={t(
               'auto.components.settings.EphemeralVmsPane.whatDesktop',
               'Can add a Desktop tab: watch the agent live, take over control, and record tests that play in the chat.'
@@ -333,9 +334,9 @@ export function EphemeralVmsPane(): React.JSX.Element {
   )
 }
 
-function WhatItem({ text }: { text: string }): React.JSX.Element {
+function WhatItem({ id, text }: { id?: string; text: string }): React.JSX.Element {
   return (
-    <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
+    <li data-what-item={id} className="flex items-start gap-2.5 text-sm text-muted-foreground">
       <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <span>{text}</span>
     </li>

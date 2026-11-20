@@ -52,7 +52,13 @@ snapshot (step 5), and `create` boots from the authenticated snapshot they produ
    instead of rebuilding.
 2. **Interview the user up front.** Gather these choices and confirm them back before scaffolding
    anything. Do not pick for them and do not guess.
-   - **Connection mode:** an Orca server or SSH, as above. Settle it first.
+   - **Desktop:** ask this first, because it decides the next two answers: "Do you need to watch
+     the agent use graphical apps, on a GUI desktop it drives that you can take over and record?"
+     If yes, read `references/docker-desktop-ssh.md`: that recipe fixes the connection mode (SSH)
+     and the provider (a Docker container on this Mac or another one, which adds the workspace's
+     Desktop tab), so ask only which Docker host instead of the connection-mode and provider
+     questions below.
+   - **Connection mode:** an Orca server or SSH, as above. Settle it before the provider.
    - **Checkout ownership:** do not ask by default. Only when the user requires the environment to
      create the exact final checkout, confirm `provisioned-root` and direct SSH; otherwise omit it.
    - **Provider:** Vercel Sandbox, Fly, Modal, an existing SSH host, and so on. For a non-obvious
@@ -65,9 +71,6 @@ snapshot (step 5), and `create` boots from the authenticated snapshot they produ
      so on) and that the user has an account for it. It is logged in during step 6.
    - **Git auth:** the token source for cloning a private repo (`GH_TOKEN`, `GITHUB_TOKEN`, or
      `gh auth token`).
-   - **Desktop:** ask "Do you need to watch the agent use graphical apps, on a GUI desktop it
-     drives that you can take over and record?" If yes, read `references/docker-desktop-ssh.md`
-     and build that recipe, which adds the workspace's Desktop tab.
 3. **Check prerequisites** (section 2) and confirm the items above are in place before any paid
    step.
 4. **Scaffold the scripts and state file**, filling in the provider's real commands, and make them

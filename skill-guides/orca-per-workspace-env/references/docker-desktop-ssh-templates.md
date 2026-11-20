@@ -905,29 +905,57 @@ docker_run_args() { # <name> <label key=value> <image>; sets run_args for the ca
 }
 # <<< docker run flags
 
-# >>> ptrace_scope fix: text for the user to run on the Docker host; this file never runs it.
-ptrace_scope_fix() {
-  local bin="$docker_bin" sentinel once
-  case "$bin" in *[!A-Za-z0-9/._-]*) bin="$(shell_quote "$bin")" ;; esac
-  sentinel="$bin run -d --name orca-ptrace-scope --label orca.purpose=ptrace-scope --restart=always --privileged --network none --memory 16m --cpus 0.05 busybox:1.37 sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope && exec sleep 2147483647'"
-  once="$bin run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope'"
-  if [ -n "$docker_host" ]; then
-    sentinel="ssh $(shell_quote "$docker_host") \"$sentinel\""
-    once="ssh $(shell_quote "$docker_host") \"$once\""
-  fi
-  printf 'Keep it at 1 across Docker restarts with a sentinel container (remove it with "docker rm -f orca-ptrace-scope"):\n  %s\n' "$sentinel"
-  printf 'Or raise it until the next Docker restart:\n  %s\nThen try again.' "$once"
+shell_word() { # quotes only when needed, so printed commands stay readable
+  case "$1" in
+    '' | *[!A-Za-z0-9/._,:@+=-]*) shell_quote "$1" ;;
+    *) printf '%s' "$1" ;;
+  esac
 }
-# <<< ptrace_scope fix
 
-check_ptrace_scope() { # <image>
-  local scope
-  scope="$(dk run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
-    --entrypoint cat "$1" /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || true)"
+# Prints, never runs, a docker command for the user to paste; over SSH the remote command is one
+# locally quoted argument after `--`, as dk sends it.
+host_command() { # <docker args...>
+  local command arg
+  # The first word also quotes `=`, which would otherwise make it an assignment.
+  case "$docker_bin" in
+    '' | *[!A-Za-z0-9/._-]*) command="$(shell_quote "$docker_bin")" ;;
+    *) command="$docker_bin" ;;
+  esac
+  for arg in "$@"; do
+    command+=" $(shell_word "$arg")"
+  done
+  [ -z "$docker_host" ] || command="ssh -- $(shell_word "$docker_host") $(shell_quote "$command")"
+  printf '%s' "$command"
+}
+
+ptrace_scope_fix() {
+  printf 'Keep it at 1 across Docker restarts with a sentinel container (remove it later with %s):\n' "$(host_command rm -f orca-ptrace-scope)"
+  printf '  %s\n' "$(host_command run -d --name orca-ptrace-scope --label orca.purpose=ptrace-scope --restart=always --privileged --network none --memory 16m --cpus 0.05 busybox:1.37 sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope && exec sleep 2147483647')"
+  printf 'Or raise it until the next Docker restart:\n  %s\nThen try again.' "$(host_command run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope')"
+}
+
+# Keeps the first line of a Docker or SSH error (the cause), without credentials, for a refusal.
+redact_error() {
+  { grep -m 1 -v '^[[:space:]]*$' || true; } | LC_ALL=C tr -cd '[:print:]' | cut -c1-300 |
+    sed -E 's#://[^/@[:space:]]+@#://[redacted]@#g; s/((token|TOKEN|Token|password|PASSWORD|Password|secret|SECRET|Secret)[=:][[:space:]]*)[^[:space:]]+/\1[redacted]/g'
+}
+
+check_ptrace_scope() { # <image, local and preferably by ID>
+  local scope err status=0
+  err="$(mktemp)"
+  scope="$(dk run --rm --pull never --network none --cap-drop ALL --security-opt no-new-privileges \
+    --entrypoint cat "$1" /proc/sys/kernel/yama/ptrace_scope 2>"$err")" || status=$?
+  if [ "$status" -ne 0 ]; then
+    scope="$(redact_error <"$err")"
+    rm -f "$err"
+    die "could not measure kernel.yama.ptrace_scope on the Docker host (exit $status): ${scope:-no error output}"
+  fi
+  rm -f "$err"
   case "$scope" in
     1 | 2 | 3) ;;
-    *) die "kernel.yama.ptrace_scope on the Docker host is '${scope:-unknown}'; it must be 1 or more so the agent cannot read the Orca server's memory.
+    0) die "kernel.yama.ptrace_scope on the Docker host is 0; it must be 1 or more so the agent cannot read the Orca server's memory.
 $(ptrace_scope_fix)" ;;
+    *) die "could not measure kernel.yama.ptrace_scope on the Docker host: read '$(printf '%s' "$scope" | redact_error)'" ;;
   esac
 }
 
@@ -1156,8 +1184,9 @@ project_root="$(payload_value 'd.recipeResult.connection.projectRoot')"
 
 previous_port="$(payload_value 'd.recipeResult.connection.target.port')"
 
-# A Docker restart can drop ptrace_scope back to 0, so check again before starting.
-image="$(dk container inspect -f '{{.Config.Image}}' "$name")"
+# A Docker restart can drop ptrace_scope back to 0, so check again before starting, with the image
+# ID the container runs (its tag may since point elsewhere or be gone).
+image="$(dk container inspect -f '{{.Image}}' "$name")"
 check_ptrace_scope "$image"
 dk start "$name" >/dev/null
 port="$(container_ssh_port "$name")"
@@ -1400,9 +1429,16 @@ template_flags_ok() {
   for required in '--init' 'no-new-privileges' '--cap-drop ALL' '--pids-limit' '--memory' '--cpus' '127.0.0.1:0:22'; do
     grep -qF -- "$required" <<<"$block" || return 1
   done
-  # The ptrace_scope fix block only prints the host admin commands, which need --privileged.
+  # Only these two exact lines may name --privileged: they print the host admin commands.
+  local exempt
+  exempt="$(
+    cat <<'HINT'
+  printf '  %s\n' "$(host_command run -d --name orca-ptrace-scope --label orca.purpose=ptrace-scope --restart=always --privileged --network none --memory 16m --cpus 0.05 busybox:1.37 sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope && exec sleep 2147483647')"
+  printf 'Or raise it until the next Docker restart:\n  %s\nThen try again.' "$(host_command run --rm --privileged --network none debian:bookworm-slim sh -c 'echo 1 > /proc/sys/kernel/yama/ptrace_scope')"
+HINT
+  )"
   scripts="$(cat "$here"/create.sh "$here"/resume.sh "$here"/auth.sh)" || return 1
-  scripts+="$(sed '/^# >>> ptrace_scope fix/,/^# <<< ptrace_scope fix/d' "$here/orca-docker-desktop.sh")" || return 1
+  scripts+=$'\n'"$(grep -vxF -e "${exempt%%$'\n'*}" -e "${exempt#*$'\n'}" "$here/orca-docker-desktop.sh")" || return 1
   ! grep -Eq -- "$refused_anywhere" <<<"$scripts"
 }
 

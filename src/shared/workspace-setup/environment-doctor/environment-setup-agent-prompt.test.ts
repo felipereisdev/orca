@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { buildEnvironmentSetupAgentPrompt } from './environment-setup-agent-prompt'
 
 describe('buildEnvironmentSetupAgentPrompt', () => {
-  it('tells the agent to ask about a desktop during the interview', () => {
-    const prompt = buildEnvironmentSetupAgentPrompt({})
-
-    expect(prompt).toContain(
-      '- In the interview, ask whether the user needs to watch the agent use graphical apps on a desktop they can take over and record; if so, follow the skill to the Docker desktop (VNC) recipe.'
-    )
+  it('routes the interview to the desktop recipe reference', () => {
+    expect(buildEnvironmentSetupAgentPrompt({})).toContain('`references/docker-desktop-ssh.md`')
   })
 
   it('carries only the redacted tail of a failure log, with fences neutralized', () => {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EphemeralVmsPane } from './EphemeralVmsPane'
 
@@ -43,14 +43,10 @@ afterEach(() => {
 })
 
 describe('EphemeralVmsPane', () => {
-  it('tells the user a recipe can include a Desktop tab', async () => {
-    render(<EphemeralVmsPane />)
+  it('lists the Desktop tab among what the skill can set up', async () => {
+    const { container } = render(<EphemeralVmsPane />)
     await act(async () => {})
 
-    expect(
-      screen.getByText(
-        'Can add a Desktop tab: watch the agent live, take over control, and record tests that play in the chat.'
-      )
-    ).toBeTruthy()
+    expect(container.querySelector('[data-what-item="desktop"]')?.textContent?.trim()).toBeTruthy()
   })
 })
