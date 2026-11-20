@@ -196,14 +196,23 @@ export function useTaskPageDetailRouting(model: TaskPageGitHubIssueDraftModel) {
       searchCache: s.jiraSearchCache
     }))
   )
-  const cachedSelectedJiraIssue = findTaskPageJiraIssue(
-    jiraCacheSnapshot.issueCache,
-    jiraCacheSnapshot.searchCache,
-    selectedJiraIssueKey,
-    {
-      sourceContext: jiraTaskSourceContext,
-      siteId: selectedJiraIssueFallback?.siteId ?? pageData.openJiraIssue?.siteId ?? null
-    }
+  const selectedJiraSiteId =
+    selectedJiraIssueFallback?.siteId ?? pageData.openJiraIssue?.siteId ?? null
+  const cachedSelectedJiraIssue = useMemo(
+    () =>
+      findTaskPageJiraIssue(
+        jiraCacheSnapshot.issueCache,
+        jiraCacheSnapshot.searchCache,
+        selectedJiraIssueKey,
+        { sourceContext: jiraTaskSourceContext, siteId: selectedJiraSiteId }
+      ),
+    [
+      jiraCacheSnapshot.issueCache,
+      jiraCacheSnapshot.searchCache,
+      selectedJiraIssueKey,
+      jiraTaskSourceContext,
+      selectedJiraSiteId
+    ]
   )
   const selectedJiraIssue = selectedJiraIssueKey
     ? (cachedSelectedJiraIssue ?? selectedJiraIssueFallback)

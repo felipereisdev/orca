@@ -21,8 +21,9 @@ describe('a follow-up to a closed worker started on a named Claude account', () 
       connectionId: null
     } as never)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: worker-start reads only these fields of the stubbed record.
-    vi.spyOn(h.runtime, 'getAccountsSnapshot').mockReturnValue({
-      claude: { accounts: [{ id: 'acct-1', email: 'dev@example.com' }], activeAccountId: null }
+    vi.spyOn(h.runtime, 'getClaudeAccountsSnapshot').mockReturnValue({
+      accounts: [{ id: 'acct-1', email: 'dev@example.com' }],
+      activeAccountId: null
     } as never)
     const task = h.db.createTask({ spec: 'review the change', runId: h.activeRunId })
     await h.call('orchestration.workerStart', {

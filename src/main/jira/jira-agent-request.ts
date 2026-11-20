@@ -35,10 +35,10 @@ export function sanitizeJiraAgentError(error: unknown): Error {
     'Unable to read Jira. Check the connection in Tasks and try again.'
   )
 }
-export function jiraAgentClient(siteId: string): JiraClientForSite {
+export async function jiraAgentClient(siteId: string): Promise<JiraClientForSite> {
   let client: JiraClientForSite | undefined
   try {
-    client = getClients(siteId).find((entry) => entry.site.id === siteId)
+    client = (await getClients(siteId)).find((entry) => entry.site.id === siteId)
   } catch {
     /* Credential failures are sanitized. */
   }

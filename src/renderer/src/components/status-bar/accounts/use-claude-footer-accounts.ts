@@ -43,7 +43,7 @@ export function useClaudeFooterAccounts(
     [environmentId]
   )
   const initial = useMemo(() => emptyClaudeAccountsState(), [])
-  const local = useProviderAccountList('claude', target, syncKey, initial, false, !owner && visible)
+  const local = useProviderAccountList('claude', target, syncKey, initial, !owner && visible)
   const accounts = owner
     ? (remoteAccounts ?? initial)
     : resolveClaudeStatusAccountState(settings, local.accounts, null)

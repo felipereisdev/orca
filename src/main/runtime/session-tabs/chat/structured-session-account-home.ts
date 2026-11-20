@@ -7,7 +7,6 @@ import { OrcaRuntimeWithStructuredSessionCliWriterHost } from './structured-sess
 import type { AgentSessionAccountHome } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-account-home'
 import type { AgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-record'
 import { agentSessionRefusalError } from '../../../../shared/agent-session/failures/agent-session-wire-refusals'
-import { botOfHomeWorkspace } from '../../../../shared/bots/bot-homes'
 
 export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRuntimeWithStructuredSessionCliWriterHost {
   /** Resolve account home through this host's agent registration; null means unregistered and create refuses. */
@@ -28,9 +27,6 @@ export abstract class OrcaRuntimeWithStructuredSessionAccountHome extends OrcaRu
           location: location ?? null,
           purpose,
           ...(permissionMode ? { permissionMode } : {}),
-          ...(botOfHomeWorkspace(this.requireStore().getBots?.() ?? [], location?.workspaceId)
-            ? { bot: true as const }
-            : {}),
           workspacePath:
             purpose === 'launch'
               ? async () =>

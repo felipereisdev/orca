@@ -18,7 +18,7 @@ import type { LocalProjectGhExecOptions } from '../workspaces/execution-host/pro
 export type TaskBoardCommentDeps = {
   repo(repoId: string): Repo | null
   getLocalGitArgs(repo: Repo): [] | [LocalProjectGhExecOptions]
-  jiraSites(): readonly Pick<JiraSite, 'id' | 'accountId'>[]
+  jiraSites(): Promise<readonly Pick<JiraSite, 'id' | 'accountId'>[]>
   jiraComments(key: string, siteId: string | null): Promise<JiraComment[]>
   linearComments(issueId: string, workspaceId: string | null): Promise<LinearComment[]>
   linearViewerId(workspaceId: string | null): Promise<string>
@@ -55,8 +55,7 @@ async function readJira(
   // Each site has its own login, so only the issue's site's account is the user.
   // Without a site id the issue's site is unknown, so any of the user's site accounts counts.
   const accountIds = new Set(
-    deps
-      .jiraSites()
+    (await deps.jiraSites())
       .filter((site) => ref.siteId === null || site.id === ref.siteId)
       .map((site) => site.accountId)
   )

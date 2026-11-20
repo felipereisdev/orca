@@ -6,9 +6,9 @@ import { useTranslate } from '@/i18n/use-translate'
 
 /** "N environments running" for live recipe environments; opens Settings → VMs. Hidden at zero. */
 export function EphemeralVmRunningIndicator({
-  iconOnly
+  iconOnly = false
 }: {
-  iconOnly: boolean
+  iconOnly?: boolean
 }): React.JSX.Element | null {
   const t = useTranslate()
   const enabled = useAppStore((state) => state.settings?.experimentalEphemeralVms === true)

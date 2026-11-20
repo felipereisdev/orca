@@ -18,7 +18,7 @@ describe('createTaskStartContextDeps for Jira', () => {
       {
         repo: () => null,
         getLocalGitArgs: () => [],
-        jiraSites: () => [],
+        jiraSites: async () => [],
         jiraComments: async () => [],
         linearComments: async () => [],
         linearViewerId: async () => 'viewer',

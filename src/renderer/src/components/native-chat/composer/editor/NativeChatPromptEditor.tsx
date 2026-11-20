@@ -18,13 +18,15 @@ import { TextSelection } from '@tiptap/pm/state'
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { shallow } from 'zustand/shallow'
 import { EditorContent } from '@tiptap/react'
-import { useNativeChatComposerEditor } from './native-chat-composer-editor-owner'
+import {
+  NativeChatComposerEditorView,
+  useNativeChatComposerEditor
+} from './native-chat-composer-editor-owner'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import {
   fileReferenceContent,
   insertPromptMention,
-  NativeChatFileReference,
   NativeChatImageReference,
   nativeChatPromptPills,
   promptLeafText,
@@ -33,6 +35,7 @@ import {
   promptTextPosition
 } from './native-chat-prompt-document'
 import { openingPromptContent, promptTextContent } from './native-chat-prompt-document-text'
+import { stagePromptPastedText } from './native-chat-prompt-paste-stage'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -110,8 +113,9 @@ function NativePromptEditor({
       // A disabled box still says why it is disabled, as the plain text box's placeholder does.
       Placeholder.configure({
         placeholder: ({ editor }) => {
+          // The live placeholder, not the aria-label: a caller may name the box apart from its hint.
           const attributes = editor.options.editorProps?.attributes
-          return typeof attributes === 'object' ? (attributes['aria-label'] ?? '') : ''
+          return typeof attributes === 'object' ? (attributes['data-placeholder-text'] ?? '') : ''
         },
         showOnlyWhenEditable: false
       })
@@ -124,6 +128,7 @@ function NativePromptEditor({
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-label': placeholder,
+        'data-placeholder-text': placeholder,
         spellcheck: spellcheck ? 'true' : 'false',
         // Chromium on macOS still applies system text replacements under spellcheck=false; autocorrect=off stops them.
         ...(spellcheck ? {} : { autocorrect: 'off', autocapitalize: 'off' }),
@@ -334,7 +339,7 @@ function NativePromptEditor({
               // Why both: the text check covers other paragraphs, the view covers soft wraps.
               return (
                 !beyond.includes('\n') &&
-                editor.view.endOfTextblock(edge === 'start' ? 'up' : 'down')
+                mountedEditorView(editor)?.endOfTextblock(edge === 'start' ? 'up' : 'down') === true
               )
             },
             select: () => {
@@ -362,7 +367,8 @@ function NativePromptEditor({
                 .run()
               editor.view.dispatch(closeHistory(editor.state.tr))
             },
-            insertMention: (from, to, token) => insertPromptMention(editor, from, to, token),
+            insertMention: (from, to, token, agent) =>
+              insertPromptMention(editor, from, to, token, agent),
             removeImageReferences: (attachmentId) => {
               const { tr } = editor.state
               editor.state.doc.descendants((node, position) => {
@@ -381,14 +387,7 @@ function NativePromptEditor({
                 editor.view.dispatch(tr.setMeta('addToHistory', false))
               }
             },
-            stagePastedText: (token) => {
-              const pill = { type: NativeChatFileReference.name, attrs: { token } }
-              editor.view.dispatch(closeHistory(editor.state.tr))
-              editor.view.dispatch(
-                editor.state.tr.replaceSelectionWith(editor.schema.nodeFromJSON(pill), false)
-              )
-              editor.view.dispatch(closeHistory(editor.state.tr))
-            },
+            stagePastedText: (token) => stagePromptPastedText(editor, token),
             insertFileReferences: (paths) => {
               editor.commands.insertContentAt(
                 editor.state.selection.from,
@@ -405,6 +404,7 @@ function NativePromptEditor({
   return (
     <NativeChatPastedTextScopeProvider value={scopeKey ?? ''}>
       <NativeChatImageRowProvider value={imageRow}>
+        <NativeChatComposerEditorView editor={editor} />
         <EditorContent
           editor={editor}
           {...events}

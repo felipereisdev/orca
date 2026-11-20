@@ -35,7 +35,7 @@ export async function jiraIssueContext(
   params: JiraIssueContextParams,
   signal?: AbortSignal
 ): Promise<JiraIssueContextResult> {
-  const client = jiraAgentClient(params.siteId)
+  const client = await jiraAgentClient(params.siteId)
   let agile
   try {
     agile = await getAgileFieldIds(client, signal)

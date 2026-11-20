@@ -1,4 +1,6 @@
+import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import type { SettingsNavTarget } from '@/components/settings/navigation/settings-navigation-types'
 import type { GlobalSettings } from '../../../../../../shared/settings/global-settings-types'
@@ -45,5 +47,21 @@ export async function persistDeleteWorktreeConfirmSkipPreference({
         }
       }
     }
+  )
+}
+
+/** The dialog's "always delete" choice, bound to the store's settings actions. */
+export function usePersistDeleteWorktreeConfirmSkip(): () => Promise<void> {
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
+  const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  return useCallback(
+    (): Promise<void> =>
+      persistDeleteWorktreeConfirmSkipPreference({
+        updateSettingsOrThrow,
+        openSettingsPage,
+        openSettingsTarget
+      }),
+    [openSettingsPage, openSettingsTarget, updateSettingsOrThrow]
   )
 }

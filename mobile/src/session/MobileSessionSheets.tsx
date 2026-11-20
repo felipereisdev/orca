@@ -1,4 +1,4 @@
-import { MobileDatabaseConnectionSheet } from '../database/MobileDatabaseConnectionSheet'
+import { MobileSessionDatabaseSheets } from './MobileSessionDatabaseSheets'
 import { Platform } from 'react-native'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { getRepoIdFromWorktreeId } from '../../../src/shared/worktree/id'
@@ -22,7 +22,12 @@ import { useMobileAllowAutoCloseActions } from './tabs/mobile-worker-auto-close'
 import { MobileAgentSessionTabActionSheet } from './tabs/MobileAgentSessionTabActionSheet'
 import { MobileSessionBotSheet } from './MobileSessionBotSheet'
 import { MobileNewTabSheet } from './tabs/MobileNewTabSheet'
+import {
+  MobileBrowserProfilePicker,
+  useMobileNewBrowserProfile
+} from './tabs/MobileBrowserProfilePicker'
 import { MobileSessionTextSizeSheet } from './MobileSessionTextSizeSheet'
+import { useMobileWindowsShellChoices } from '../terminal/session/creation/mobile-windows-shell-choices'
 
 export function MobileSessionSheets({ controller }: { controller: MobileSessionController }) {
   const t = useMobileTranslation()
@@ -101,6 +106,17 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
   } = controller
   const clipboard = useClipboardWriter()
   const onPairedHost = useWorkspaceOnPairedHost()
+  // The host owns which shells it would start here, as desktop's menu does for its own projects.
+  const terminalShells = useMobileWindowsShellChoices({
+    client,
+    sheetOpen: showCreateTabDrawer,
+    worktreeId
+  })
+  const browserProfile = useMobileNewBrowserProfile(
+    client,
+    (showCreateTabDrawer && !isFloatingWorkspaceRoute && browserScreencastSupported === true) ||
+      browserActionTarget != null
+  )
   return (
     <>
       <MobileSessionBotSheet controller={controller} />
@@ -136,16 +152,15 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         canCreateDatabase={!isFloatingWorkspaceRoute}
         onCreateDatabase={() => controller.setShowDatabaseConnections(true)}
         canCreateBrowser={!isFloatingWorkspaceRoute}
+        browserProfileLabel={browserProfile.newTabLabel}
+        onChooseBrowserProfile={() => browserProfile.setPickerOpen(true)}
         canCreateMarkdownNote={!isFloatingWorkspaceRoute && onPairedHost}
         onClose={() => setShowCreateTabDrawer(false)}
-        onCreateAgent={(option) =>
-          void handleCreateTerminal(
-            option.agent,
-            option.claudeAccountId ? { claudeAccountId: option.claudeAccountId } : undefined,
-            option.nativeChatDefault
-          )
+        onCreateAgent={(...launch) => void handleCreateTerminal(...launch)}
+        terminalShells={terminalShells}
+        onCreateTerminal={(shell) =>
+          void handleCreateTerminal(undefined, shell ? { shell } : undefined)
         }
-        onCreateTerminal={() => void handleCreateTerminal()}
         onCreateBrowser={() => {
           if (browserScreencastSupported !== true) {
             showToast(
@@ -161,23 +176,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         }}
         onCreateMarkdownNote={() => void handleCreateMarkdownNote()}
       />
-      <MobileDatabaseConnectionSheet
-        visible={controller.showDatabaseConnections}
-        opening={controller.creatingDatabase}
-        error={controller.databaseCreateError}
-        client={client}
-        worktreeId={worktreeId}
-        onClose={() => controller.setShowDatabaseConnections(false)}
-        onSelect={(connection) => void controller.handleCreateDatabase(connection)}
-      />
-      <ActionSheetModal
-        visible={controller.databaseActionTarget !== null}
-        title={controller.databaseActionTarget?.title || t('session.sheets.database', 'Database')}
-        actions={closeWithBulkActions(controller.databaseActionTarget, () =>
-          controller.setDatabaseActionTarget(null)
-        )}
-        onClose={() => controller.setDatabaseActionTarget(null)}
-      />
+      <MobileSessionDatabaseSheets controller={controller} />
       <ActionSheetModal
         visible={pendingDiffNotesDelivery !== null}
         title={t('session.sheets.sendReviewNotes', 'Send Review Notes')}
@@ -289,7 +288,13 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         onClose={() => setBrowserActionTarget(null)}
         onNavigate={handleBrowserNavigationCommand}
         onCloseTab={handleCloseSessionTab}
+        profileLabel={browserProfile.tabLabel(browserActionTarget?.browserProfileId)}
         bulkCloseActions={bulkCloseActions}
+      />
+      <MobileBrowserProfilePicker
+        choice={browserProfile}
+        // Back to the new-tab sheet, where the chosen profile now shows.
+        onAfterClose={() => setShowCreateTabDrawer(true)}
       />
       <MobileAgentSessionTabActionSheet
         controller={controller}
@@ -359,7 +364,7 @@ export function MobileSessionSheets({ controller }: { controller: MobileSessionC
         // The session page reports 'web', where RN Web maps 'url' to the URL keyboard.
         keyboardType={Platform.OS === 'android' ? 'default' : 'url'}
         onSubmit={(value) => {
-          void handleCreateBrowser(value).then((created) => {
+          void handleCreateBrowser(value, browserProfile.profileId ?? undefined).then((created) => {
             if (created) {
               setShowCreateBrowserModal(false)
             }

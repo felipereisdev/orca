@@ -55,7 +55,7 @@ function enrichDeps(jiraComments: TaskBoardEnrichDeps['jiraComments']): TaskBoar
   return {
     repo: () => null,
     getLocalGitArgs: () => [],
-    jiraSites: () => [{ id: 'site-a', accountId: 'me' }],
+    jiraSites: async () => [{ id: 'site-a', accountId: 'me' }],
     jiraComments,
     linearComments: unexpected,
     linearViewerId: unexpected,

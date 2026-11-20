@@ -75,3 +75,18 @@ export function expandMobileClaudeAccountOptions(
       : [option]
   )
 }
+
+/** What a tapped agent tile starts: its agent, the Claude account it names, and its chat choice. */
+export type NewTabAgentLaunchArgs = [
+  agent: MobileNewTabAgentOption['agent'],
+  options: { claudeAccountId: string } | undefined,
+  nativeChatDefault: boolean | undefined
+]
+
+export function newTabAgentLaunchArgs(option: MobileNewTabAgentOption): NewTabAgentLaunchArgs {
+  return [
+    option.agent,
+    option.claudeAccountId ? { claudeAccountId: option.claudeAccountId } : undefined,
+    option.nativeChatDefault
+  ]
+}

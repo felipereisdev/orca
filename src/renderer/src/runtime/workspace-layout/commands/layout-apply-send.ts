@@ -106,7 +106,7 @@ export type WindowLayoutCommand =
       split?: NewGroupSplit
     }
   | { type: 'openBrowserPage' | 'closeBrowserPage'; browserTabId: string; pageId: string }
-  | { type: 'replaceBrowserPage'; browserTabId: string; pageId: string; newPageId: string }
+  | Omit<CommandOf<'replaceTabContent'>, 'workspace'>
   | {
       type: 'setBrowserTabProfile'
       browserTabId: string
@@ -205,7 +205,7 @@ function drawnTabHolds(worktreeId: string, command: WindowLayoutCommand): DrawnT
     case 'openBrowserTab':
     case 'openBrowserPage':
     case 'closeBrowserPage':
-    case 'replaceBrowserPage':
+    case 'replaceTabContent':
     case 'setBrowserTabProfile':
     case 'openAgentSessionTab':
     case 'openDatabaseTab':

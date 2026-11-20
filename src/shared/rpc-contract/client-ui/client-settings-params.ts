@@ -96,6 +96,15 @@ export const GitHubProjectSettings = z
   })
   .strict()
 
+const HostNotificationSettingsUpdate = z
+  .object({
+    enabled: z.boolean().optional(),
+    agentTaskComplete: z.boolean().optional(),
+    agentNeedsInput: z.boolean().optional(),
+    terminalBell: z.boolean().optional()
+  })
+  .strict()
+
 export const SettingsUpdate = z
   .object({
     machineName: z.string().trim().max(MACHINE_NAME_MAX_LENGTH).optional(),
@@ -144,7 +153,12 @@ export const SettingsUpdate = z
       .transform((value) => normalizePRBotAuthorOverrides(value))
       .optional(),
     nativeChatAutoContinueAfterUsageLimit: z.boolean().optional(),
+    nativeChatResumeWorkOnRestart: z.boolean().optional(),
     nativeChatPermissionMode: z.enum(AGENT_CHAT_PERMISSION_MODES).optional(),
+    nativeChatQueueFollowUps: z.boolean().optional(),
+    nativeChatCiResultLines: z.boolean().optional(),
+    /** This host's own notification switches; see HOST_NOTIFICATION_SETTINGS_RUNTIME_CAPABILITY. */
+    hostNotifications: HostNotificationSettingsUpdate.optional(),
     workspaceCleanupPolicy: WorkspaceCleanupRulesParam.optional(),
     taskBoard: z
       .unknown()

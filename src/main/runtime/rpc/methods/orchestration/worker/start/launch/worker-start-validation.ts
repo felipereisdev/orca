@@ -149,8 +149,8 @@ export async function assertWorkerClaudeAccountUsable(args: {
     )
   }
   const account = runtime
-    .getAccountsSnapshot()
-    .claude.accounts.find((candidate) => candidate.id === claudeAccountId)
+    .getClaudeAccountsSnapshot()
+    .accounts.find((candidate) => candidate.id === claudeAccountId)
   if (!account) {
     throw new OrchestrationError(
       'invalid_argument',

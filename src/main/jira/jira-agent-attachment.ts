@@ -60,7 +60,7 @@ export async function jiraAttachmentRead(
       'Attachment offset must be a nonnegative integer within the file limit.'
     )
   }
-  const client = jiraAgentClient(params.siteId)
+  const client = await jiraAgentClient(params.siteId)
   const raw = await jiraAgentRequest(
     client,
     jiraAgentIssuePath(client, params.key, ['attachment']),

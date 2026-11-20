@@ -10,8 +10,12 @@ import type { ExecutionHostId } from '../../../../../../shared/execution-host/ex
 import { STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY } from '../../../../../../shared/agent-session/capabilities/structured-agent-session-surface-capabilities'
 import '../structured-agent-session-launch-intent'
 import { StructuredAgentSessionOwnerUnresolvedError } from '../structured-agent-session-launch-errors'
-import { buildAgentLaunchRouteInput } from './agent-launch-route-input'
-import type { AgentLaunchRouteArgs, AgentLaunchRouteStore } from './agent-launch-route-input'
+import {
+  buildAgentLaunchRouteInput,
+  routeHostStatuses,
+  type AgentLaunchRouteArgs,
+  type AgentLaunchRouteStore
+} from './agent-launch-route-input'
 import {
   resolveAgentLaunchRoute,
   structuredAgentLaunchDowngrade,
@@ -212,7 +216,7 @@ function reportStructuredLaunchDowngrade(
     relearnHostStructuredAgents(
       input.executionHostId,
       input.hostCapabilities,
-      store.runtimeStatusByEnvironmentId
+      routeHostStatuses(store)
     ).catch((error: unknown) => {
       console.warn('[agent-launch-route] could not ask the host for its agents again', error)
     })
@@ -263,11 +267,7 @@ export function awaitStructuredRouteHostAnswer(
       capabilities = await Promise.race([wait.known, deadline])
     }
     await Promise.race([
-      relearnHostStructuredAgents(
-        input.executionHostId,
-        capabilities,
-        store.runtimeStatusByEnvironmentId
-      ),
+      relearnHostStructuredAgents(input.executionHostId, capabilities, routeHostStatuses(store)),
       deadline
     ])
   }

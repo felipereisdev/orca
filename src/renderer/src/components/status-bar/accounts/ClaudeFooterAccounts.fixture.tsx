@@ -4,7 +4,8 @@ import { createEmptyRateLimitState } from '../../../../../shared/agent-usage/rat
 import type { ProviderRateLimits } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { buildClaudeStatusSwitchGroups } from './status-bar-claude-accounts'
 import { buildStatusBarUsageEntries } from '../usage/status-bar-usage-entries'
-import { StatusBarUsageIndicators } from '../usage/StatusBarUsageIndicators'
+import { ProviderSegment, UsageOverflowChip } from '../usage/StatusBarProviderSegment'
+import { UsageUnitLabel } from '../usage/usage-unit-label'
 import { ClaudeFooterVisibilityMenu } from './ClaudeFooterVisibilityMenu'
 import {
   DropdownMenu,
@@ -68,14 +69,25 @@ function Footer({
     <div className="space-y-6 bg-background p-3">
       <div className="flex h-6 items-center gap-3 whitespace-nowrap border-t border-border bg-card px-3 text-xs">
         <button className="inline-flex items-center gap-3 rounded px-1 py-0.5" aria-label="Usage">
-          <StatusBarUsageIndicators
-            entries={entries}
-            collapsedIds={collapsed ? entries.slice(0, 1).map((entry) => entry.id) : []}
-            compact={collapsed}
-            mode="compact"
-            display="used"
-            collapseUsage={collapsed}
-          />
+          {entries.length > 0 ? <UsageUnitLabel display="used" /> : <span>Usage</span>}
+          {(collapsed ? entries.slice(1) : entries).map(({ id, limits, accountLabel }) => (
+            <span key={id} title={accountLabel} className="inline-flex">
+              <ProviderSegment
+                p={limits}
+                accountLabel={accountLabel}
+                compact={collapsed}
+                display="used"
+                mode="compact"
+              />
+            </span>
+          ))}
+          {collapsed ? (
+            <UsageOverflowChip
+              hidden={entries.slice(0, 1)}
+              providerCount={entries.length}
+              display="used"
+            />
+          ) : null}
         </button>
       </div>
       {menu ? (

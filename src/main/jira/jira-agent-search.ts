@@ -15,7 +15,7 @@ export async function jiraAgentSearchIssues(
   params: JiraAgentSearchIssuesParams,
   signal?: AbortSignal
 ): Promise<JiraAgentSearchIssuesResult> {
-  const client = jiraAgentClient(params.siteId)
+  const client = await jiraAgentClient(params.siteId)
   if (params.filter === 'all' && !params.jql && client.site.authType !== 'server') {
     const ids: string[] = []
     let complete = false

@@ -1,5 +1,6 @@
 import { claudePaneAccountId } from '@/lib/agent-session/accounts/claude/claude-pane-account-selection'
 import type { AppState } from '@/store/types'
+import type { RuntimeStatuses } from '@/store/slices/runtime-status/views/runtime-status-owner'
 
 import {
   collectAgentPaneConversations,
@@ -26,6 +27,7 @@ export type CliChatResumeSource = {
 
 export function resolveCliChatResumeSource(
   state: AppState,
+  statuses: RuntimeStatuses,
   args: { tab: { id: string; worktreeId: string }; paneKey?: string }
 ): CliChatResumeSource | null {
   const conversation = args.paneKey
@@ -40,7 +42,7 @@ export function resolveCliChatResumeSource(
         tab: { worktreeId: args.tab.worktreeId, tabId: args.tab.id }
       }).find((candidate) => candidate.tabId === args.tab.id)
   const offer = conversation
-    ? resolvePaneResumeInNewChatOffer(state, {
+    ? resolvePaneResumeInNewChatOffer(state, statuses, {
         worktreeId: conversation.worktreeId,
         paneKey: conversation.paneKey
       })

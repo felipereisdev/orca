@@ -20,7 +20,7 @@ export async function addRemoteLink(args: {
   }
   let entry: JiraClientForSite | undefined
   try {
-    const entries = getClients(args.siteId)
+    const entries = await getClients(args.siteId)
     entry = entries.length === 1 && entries[0].site.id === args.siteId ? entries[0] : undefined
   } catch {
     return {
@@ -49,7 +49,7 @@ export async function addRemoteLink(args: {
     return { ok: true, id: String(link.id) }
   } catch (error) {
     if (isAuthError(error)) {
-      clearToken(entry.site.id)
+      await clearToken(entry)
     }
     const status = getErrorStatus(error)
     return {

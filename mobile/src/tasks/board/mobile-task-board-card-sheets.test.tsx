@@ -682,7 +682,13 @@ describe('starting a card on My board', () => {
       expect(pushed).toEqual([
         {
           pathname: '/h/[hostId]/session/[worktreeId]',
-          params: { hostId: `host-primary-${surface}`, worktreeId: RUN_WORKTREE, paneKey }
+          params: {
+            hostId: `host-primary-${surface}`,
+            worktreeId: RUN_WORKTREE,
+            paneKey,
+            // Each pane request carries its own intent, so the session page applies it once.
+            paneIntent: expect.any(String)
+          }
         }
       ])
     }

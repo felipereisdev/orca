@@ -38,7 +38,7 @@ export async function listProjects(
   siteId?: JiraSiteSelection | null,
   strict = false
 ): Promise<JiraProject[]> {
-  const entries = getClients(siteId)
+  const entries = await getClients(siteId)
   requireStrictJiraSite(entries, siteId, strict)
   if (entries.length === 0) {
     return []
@@ -51,12 +51,12 @@ export async function listProjects(
       } catch (error) {
         if (strict) {
           if (isAuthError(error)) {
-            clearToken(entry.site.id)
+            await clearToken(entry)
           }
           throw sanitizeJiraAgentError(error)
         }
         if (isAuthError(error)) {
-          clearToken(entry.site.id)
+          await clearToken(entry)
           if (shouldSurfaceSiteFailure(siteId, entries.length)) {
             throw error
           }

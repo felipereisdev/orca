@@ -18,7 +18,6 @@ export function useClaudeAccountPicker(
     target ?? { kind: 'local' },
     `${contextKey ?? ''}:${open}`,
     initialAccounts,
-    open,
     enabled
   )
   const accountTarget =

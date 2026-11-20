@@ -54,11 +54,9 @@ describe('worker-start --account', () => {
       connectionId: null
     } as never)
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: worker-start reads only these fields of the stubbed record.
-    vi.spyOn(runtime, 'getAccountsSnapshot').mockReturnValue({
-      claude: {
-        accounts: [{ id: 'acct-1', email: 'dev@example.com', authMethod: 'subscription-oauth' }],
-        activeAccountId: null
-      }
+    vi.spyOn(runtime, 'getClaudeAccountsSnapshot').mockReturnValue({
+      accounts: [{ id: 'acct-1', email: 'dev@example.com', authMethod: 'subscription-oauth' }],
+      activeAccountId: null
     } as never)
     vi.spyOn(runtime, 'createTerminal').mockResolvedValue({
       handle: 'term_worker',

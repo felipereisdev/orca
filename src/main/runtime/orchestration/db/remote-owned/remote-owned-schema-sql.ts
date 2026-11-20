@@ -50,7 +50,10 @@ CREATE TABLE IF NOT EXISTS remote_placements (
   -- The coordinator that sent this start (a ⏹ stops only its own); all NULL on rows from older builds.
   started_by_handle          TEXT,
   started_by_pane_key        TEXT,
-  started_by_orca_session_id TEXT
+  started_by_orca_session_id TEXT,
+  -- Set when every send under request_key failed before leaving this Orca, so a cancel may retire
+  -- the reservation; a resend clears it first.
+  never_sent_at      TEXT
 );
 -- Closing a link visits only its own rows here and in remote_dispatches.
 CREATE INDEX IF NOT EXISTS idx_remote_placements_conversation ON remote_placements(conversation_id);

@@ -21,6 +21,22 @@ export function writePlacementStarter(
     )
 }
 
+/** Who sent a start; null or absent on starts from older builds. */
+export type StartedBy = OrchestrationCoordinatorKey | null
+
+/** A new attempt answering this link's placement belongs to whoever sent that start. */
+export function copyNewAttemptStarter(
+  db: OrchestrationDb,
+  known: boolean,
+  placement: RemotePlacementRow | undefined,
+  conversationId: string,
+  dispatchId: string
+): void {
+  if (!known && placement?.conversation_id === conversationId) {
+    copyPlacementStarter(db, placement, dispatchId)
+  }
+}
+
 /** The attempt that answered a placement belongs to whoever sent that start. */
 export function copyPlacementStarter(
   db: OrchestrationDb,

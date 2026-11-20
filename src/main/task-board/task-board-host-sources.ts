@@ -56,7 +56,7 @@ export function hostLinearPriorityLabel(priority: number): string {
 }
 
 async function readJira({ signal }: TaskBoardListOptions): Promise<TaskBoardProviderResult> {
-  const status = getJiraStatus()
+  const status = await getJiraStatus()
   if (!status.connected) {
     return disconnectedTaskBoardResult('jira')
   }
@@ -83,7 +83,7 @@ async function readJira({ signal }: TaskBoardListOptions): Promise<TaskBoardProv
 }
 
 async function readLinear(): Promise<TaskBoardProviderResult> {
-  if (!getLinearStatus().connected) {
+  if (!(await getLinearStatus()).connected) {
     return disconnectedTaskBoardResult('linear')
   }
   try {

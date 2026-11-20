@@ -148,8 +148,8 @@ function jiraHost(transitions: JiraTransition[], options: { rereadFails?: boolea
     moveHolds: createTaskBoardMoveHolds(),
     repo: () => null,
     getLocalGitArgs: () => [],
-    jiraSites: () => [{ id: 'site-a', accountId: 'me' }],
-    jiraSiteCount: () => 1,
+    jiraSites: async () => [{ id: 'site-a', accountId: 'me' }],
+    jiraSiteCount: async () => 1,
     jiraIssue: async () => {
       state.reads += 1
       if (options.rereadFails && state.reads > 1) {
@@ -251,8 +251,8 @@ function gitlabHost(
     moveHolds: createTaskBoardMoveHolds(),
     repo: () => ({ id: 'app', path: '/src/app', displayName: 'app', badgeColor: '', addedAt: 1 }),
     getLocalGitArgs: () => [],
-    jiraSites: () => [],
-    jiraSiteCount: () => 0,
+    jiraSites: async () => [],
+    jiraSiteCount: async () => 0,
     jiraIssue: unused,
     jiraComments: unused,
     linearComments: unused,

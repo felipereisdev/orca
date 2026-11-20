@@ -58,3 +58,21 @@ export function claudeAccountHomeEnv(
     ? explicitClaudeAccountEnv(base, claudeAccountId, { CLAUDE_CONFIG_DIR: home })
     : { ...base, ...claudeConfigDirEnvPatch(home, { env: base }) }
 }
+
+/** Pins the account a launch would run under now, without preparing its folder: managed settings
+ *  can refuse flags per account, so flag checks must ask as that account. */
+export async function withClaudeLaunchAccountPin(
+  router: ClaudeProfileRouter | undefined,
+  env: Record<string, string>,
+  recordHome: string
+): Promise<Record<string, string>> {
+  const home = router
+    ? await resolveStructuredClaudeAccountHomePath({
+        launchEnv: env,
+        wslDistro: null,
+        purpose: 'identity',
+        getClaudeConfigDirectory: () => router.systemDefaultHome()
+      })
+    : recordHome
+  return { ...env, ...claudeConfigDirEnvPatch(home, { env }) }
+}

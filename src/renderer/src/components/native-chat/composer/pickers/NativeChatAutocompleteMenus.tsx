@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState } from 'react'
-import { ChevronRight, Database, Package, RotateCcw } from 'lucide-react'
+import { ChevronRight, Package, RotateCcw } from 'lucide-react'
 import { nativeChatMentionChoices, type NativeChatMentionChoice } from './native-chat-mention-items'
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
@@ -19,6 +19,7 @@ import { nativeChatMentionValue } from '../native-chat-composer-types'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PickerListbox, PickerOptionButton, PickerStatus } from './NativeChatPickerParts'
 import { NativeChatMentionChatList } from './NativeChatMentionChatList'
+import { NativeChatDatabaseMentionOptions } from './NativeChatDatabaseMentionOptions'
 import { cn } from '@/lib/class-names'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
@@ -263,7 +264,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
 
   // A bot's chats are read once its row has been highlighted or hovered a moment.
   const memberOf = (value: string) =>
-    room?.mentions.find((mention) => nativeChatMentionValue(mention) === value)
+    room?.mentions.find((mention) => nativeChatMentionValue(mention) === value) ??
+    room?.agents?.find((mention) => nativeChatMentionValue(mention) === value)
   const [hovered, setHovered] = useState<string | null>(null)
   const highlighted = memberOf(files[selectedIndex] ?? '')?.id ?? null
   const prefetch = chats?.picker.prefetch
@@ -312,10 +314,19 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           ? t('components.native-chat.composer.filesLoadFailed', "Couldn't load files")
           : nativeChatMentionEmptyText(room !== null && !room.withFiles)
 
-  // A bot's chat lists the other bots, then files, each under its heading.
-  const bots = room?.withFiles ? files.filter((value) => memberOf(value)).length : 0
-  const databases = mention.databases ?? []
+  // The room's bots lead, then this chat's crew agents, then files, each under its heading.
+  const agentValues = new Set(room?.agents?.map(nativeChatMentionValue))
+  const leading = (from: number, matches: (value: string) => boolean) => {
+    const end = files.findIndex((value, index) => index >= from && !matches(value))
+    return (end === -1 ? files.length : end) - from
+  }
+  const bots = room ? leading(0, (value) => !agentValues.has(value) && Boolean(memberOf(value))) : 0
+  const agentCount = leading(bots, (value) => agentValues.has(value))
+  const listed = bots + agentCount
+  const hasDatabases = (mention.databases?.length ?? 0) > 0
   const grouped = room?.withFiles === true && bots + room.unavailable.length > 0
+  const botsHeaded = grouped || (bots > 0 && agentCount > 0)
+  const headed = grouped || agentCount > 0
   const option = (path: string, index: number) => {
     const member = room ? memberOf(path) : undefined
     const selected = index === selectedIndex
@@ -328,7 +339,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
         activeItemRef={activeItemRef}
         onChoose={() => onChoose(path)}
         onPointerEnter={member?.id ? () => setHovered(member.id ?? null) : undefined}
-        className={opens ? 'pr-20' : undefined}
+        // Room for the Chats action; important, as the row's own px-2 comes later in the CSS.
+        className={cn(member && 'items-center', opens && '!pr-20')}
       >
         <NativeChatMentionOption value={path} member={member} />
         {opens ? (
@@ -352,7 +364,7 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => chats.drill.enter(opens)}
           className={cn(
-            'absolute top-1.5 right-2 h-6 items-center gap-0.5 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground',
+            'absolute top-1/2 right-2 h-6 -translate-y-1/2 items-center gap-0.5 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground',
             selected ? 'flex' : 'hidden group-hover/bot-row:flex'
           )}
         >
@@ -365,41 +377,28 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
 
   return (
     <PickerListbox id={listboxId}>
-      {grouped ? <PickerGroupHeading kind="bots" /> : null}
-      <div onPointerLeave={() => setHovered(null)}>{files.slice(0, bots).map(option)}</div>
+      {botsHeaded ? <PickerGroupHeading kind="bots" /> : null}
+      <div className="flex flex-col gap-0.5" onPointerLeave={() => setHovered(null)}>
+        {files.slice(0, bots).map(option)}
+      </div>
       {grouped ? <NativeChatUnavailableMentions room={room} /> : null}
-      {(grouped || databases.length > 0) && files.length > bots ? (
+      {agentCount > 0 ? <PickerGroupHeading kind="agents" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files.slice(bots, listed).map((path, index) => option(path, index + bots))}
+      </div>
+      {(headed || hasDatabases) && files.length > listed ? (
         <PickerGroupHeading kind="files" />
       ) : null}
-      {files.slice(bots).map((path, index) => option(path, index + bots))}
-      {databases.length > 0 ? (
-        <div className="px-2 pb-1 pt-1.5 text-2xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-          {t('database.mention.connections', 'Database connections')}
-        </div>
-      ) : null}
-      {databases.map((entry, offset) => (
-        <PickerOptionButton
-          key={entry.reference.connectionId}
-          id={`${listboxId}-option-${files.length + offset}`}
-          selected={selectedIndex === files.length + offset}
-          activeItemRef={activeItemRef}
-          onChoose={() => onChoose(entry.reference)}
-        >
-          <Database className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="truncate">@{entry.reference.aliasAtSelection}</p>
-            <p className="text-xs text-muted-foreground">
-              {entry.engine} · {entry.environment} · {entry.executionHostId}
-            </p>
-          </div>
-        </PickerOptionButton>
-      ))}
-      {mention.databasesLoading ? (
-        <PickerStatus busy>
-          {t('database.mention.loading', 'Loading database connections…')}
-        </PickerStatus>
-      ) : null}
-      {mention.databasesError ? <PickerStatus>{mention.databasesError}</PickerStatus> : null}
+      <div className="flex flex-col gap-0.5">
+        {files.slice(listed).map((path, index) => option(path, index + listed))}
+      </div>
+      <NativeChatDatabaseMentionOptions
+        mention={mention}
+        listboxId={listboxId}
+        selectedIndex={selectedIndex}
+        activeItemRef={activeItemRef}
+        onChoose={onChoose}
+      />
       {statusText ? (
         <PickerStatus>
           {mention.loading ? <LoadingSpinner className="size-3.5" /> : null}

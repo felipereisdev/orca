@@ -1,5 +1,4 @@
 import type { TaskRow } from '../orchestration-records'
-import type { OrchestrationCoordinatorKey } from '../../addressing/orchestration-caller-identity'
 import type { OrchestrationDb } from '../orchestration-db'
 import { OrchestrationError } from '../../orchestration-error'
 import { taskNotFoundError } from '../../coordinator/dispatch/task-dispatch-refusal'
@@ -25,7 +24,11 @@ import {
 } from './remote-dispatch-records'
 import { getOpenRemoteRunLink, type RemoteRunLinkRow } from './remote-run-links'
 import { getLiveRemotePlacement, type RemotePlacementRow } from './remote-placement-hold'
-import { copyPlacementStarter, writePlacementStarter } from './remote-start-starter'
+import {
+  copyNewAttemptStarter,
+  writePlacementStarter,
+  type StartedBy
+} from './remote-start-starter'
 import { writtenRow } from './written-row'
 
 export function getRemotePlacement(
@@ -43,7 +46,9 @@ type TaskCreation = Omit<Parameters<OrchestrationDb['createTask']>[0], 'id' | 'r
 /**
  * Claims the Task for a start on the link's server before the start is sent: the Task is
  * dispatched here and fenced from every other start until the server answers. A same-key retry
- * finds its own reservation. Creates the Task (under its adopted ID) when `create` is given.
+ * finds its own reservation and clears its never-sent mark before it sends. `nothingSent` says no
+ * earlier send under this key can have reached the server. Creates the Task (under its adopted ID)
+ * when `create` is given.
  */
 export function reserveRemotePlacement(
   db: OrchestrationDb,
@@ -53,9 +58,9 @@ export function reserveRemotePlacement(
     requestKey: string
     create?: TaskCreation
     retryOf?: string
-    startedBy?: OrchestrationCoordinatorKey | null
+    startedBy?: StartedBy
   }
-): { placement: RemotePlacementRow; task: TaskRow } {
+): { placement: RemotePlacementRow; task: TaskRow; nothingSent: boolean } {
   const transaction = beginLifecycleWriteTransaction(db.db, 'reserve_remote_placement')
   try {
     const link = getOpenRemoteRunLink(db, params.link.conversation_id)
@@ -72,10 +77,14 @@ export function reserveRemotePlacement(
       existing?.request_key === params.requestKey &&
       existing.conversation_id === link.conversation_id
     ) {
+      db.db
+        .prepare('UPDATE remote_placements SET never_sent_at = NULL WHERE task_id = ?')
+        .run(params.taskId)
       commitLifecycleWriteTransaction(db.db, transaction)
       return {
-        placement: existing,
-        task: writtenRow(db.getTask(params.taskId), `Task ${params.taskId}`)
+        placement: { ...existing, never_sent_at: null },
+        task: writtenRow(db.getTask(params.taskId), `Task ${params.taskId}`),
+        nothingSent: existing.never_sent_at !== null
       }
     }
     const task =
@@ -100,7 +109,7 @@ export function reserveRemotePlacement(
            run_id = excluded.run_id, environment_id = excluded.environment_id,
            conversation_id = excluded.conversation_id, state = 'reserved',
            request_key = excluded.request_key, prior_task_status = excluded.prior_task_status,
-           dispatch_id = excluded.dispatch_id`
+           dispatch_id = excluded.dispatch_id, never_sent_at = NULL`
       )
       .run(
         task.id,
@@ -122,7 +131,8 @@ export function reserveRemotePlacement(
     commitLifecycleWriteTransaction(db.db, transaction)
     return {
       placement: writtenRow(getRemotePlacement(db, task.id), `Placement of ${task.id}`),
-      task: writtenRow(db.getTask(task.id), `Task ${task.id}`)
+      task: writtenRow(db.getTask(task.id), `Task ${task.id}`),
+      nothingSent: true
     }
   } catch (error) {
     rollbackLifecycleWriteTransaction(db.db, transaction)
@@ -226,9 +236,7 @@ export function adoptRemoteAttempt(
   const known = getRemoteDispatch(db, attempt.dispatchId)
   const record = ensureRemoteDispatchRecord(db, link, attempt)
   const placement = getRemotePlacement(db, attempt.taskId)
-  if (!known && placement?.conversation_id === link.conversation_id) {
-    copyPlacementStarter(db, placement, record.dispatch_id)
-  }
+  copyNewAttemptStarter(db, Boolean(known), placement, link.conversation_id, record.dispatch_id)
   if (
     placement?.conversation_id !== link.conversation_id ||
     placement.dispatch_id === record.dispatch_id

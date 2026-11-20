@@ -25,7 +25,7 @@ export type TaskStartOptionsRuntime = Pick<
   | 'listRepos'
   | 'getClientSettings'
   | 'getRepoBaseRefDefault'
-  | 'getAccountsSnapshot'
+  | 'getClaudeAccountsSnapshot'
   | 'structuredAgentModelCatalog'
   | 'resolveAgentDetectionHost'
   | 'resolveStructuredAgentCatalogWorkspacePath'
@@ -75,7 +75,7 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
         claudeAccountTarget: claudeLaunchTargetForDetectionHost(host)
       }
     },
-    claudeAccounts: () => runtime.getAccountsSnapshot().claude.accounts,
+    claudeAccounts: () => runtime.getClaudeAccountsSnapshot().accounts,
     modelCatalog: async (agent, accountId, repo) => {
       const catalog = await runtime.structuredAgentModelCatalog()
       if (!catalog) {
@@ -84,8 +84,8 @@ export function createTaskStartOptionsDeps(runtime: TaskStartOptionsRuntime): Ta
       // Read-only: preparing the account's launch would set up its profile on every read.
       const account = accountId
         ? runtime
-            .getAccountsSnapshot()
-            .claude.accounts.find((candidate) => candidate.id === accountId)
+            .getClaudeAccountsSnapshot()
+            .accounts.find((candidate) => candidate.id === accountId)
         : undefined
       const accountHome =
         account && (account.managedAuthRuntime ?? 'host') === 'host'

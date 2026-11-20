@@ -2,7 +2,8 @@ import type { RefObject } from 'react'
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
 import {
   applyNativeChatMention,
-  type NativeChatComposerInput
+  type NativeChatComposerInput,
+  type NativeChatMentionToken
 } from '../editor/native-chat-composer-input'
 import type { NativeChatMentionChoice } from './native-chat-mention-items'
 import { completeNativeChatMention } from './native-chat-mention-completion'
@@ -21,7 +22,7 @@ export function useNativeChatMentionCompletion({
   liveDraft: () => [string, number]
   commit: (result: { draft: string; caret: number }) => void
 }) {
-  return (choice: NativeChatMentionChoice, token?: string, from?: number) => {
+  return (choice: NativeChatMentionChoice, token?: NativeChatMentionToken, from?: number) => {
     if (disabled.current || (from === undefined && autocomplete.mode !== 'mention')) {
       return
     }

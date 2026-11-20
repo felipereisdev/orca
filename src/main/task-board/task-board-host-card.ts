@@ -26,7 +26,7 @@ import { hostLinearPriorityLabel } from './task-board-host-sources'
 export type TaskBoardCardReadDeps = TaskBoardCommentDeps & {
   jiraIssue(key: string, siteId: string | null): Promise<JiraIssue | null>
   /** The listing names the site on cards only when several are connected. */
-  jiraSiteCount(): number
+  jiraSiteCount(): Promise<number>
   linearIssue(id: string, workspaceId: string | null): Promise<LinearIssue | null>
   gitlabWorkItemStatuses: typeof getGitLabWorkItemStatuses
 }
@@ -66,7 +66,7 @@ export async function readTaskBoardCard(
       }
       return toJiraTaskBoardCard(
         { ...issue, siteId: issue.siteId ?? ref.siteId ?? undefined },
-        deps.jiraSiteCount() > 1
+        (await deps.jiraSiteCount()) > 1
       )
     }
     case 'linear': {

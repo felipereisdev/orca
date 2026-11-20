@@ -26,11 +26,19 @@ import {
   releaseRemotePlacement,
   reserveRemotePlacement
 } from '../../db/remote-owned/remote-placements'
-import { refuseTaskOfClosedPairing } from '../../db/remote-owned/remote-placement-hold'
+import {
+  markRemotePlacementNeverSent,
+  refuseTaskOfClosedPairing
+} from '../../db/remote-owned/remote-placement-hold'
 import { callRemoteOwnedServer } from './remote-owned-calls'
 import { resolveCrossMachineChildParent } from '../cross-machine-child-parent'
 import { remoteForwardKey } from './remote-forward-caller'
-import { errorData, inServerTerms, serverNeverAnswered } from './remote-owned-answers'
+import {
+  errorData,
+  failedBeforeSending,
+  inServerTerms,
+  serverNeverAnswered
+} from './remote-owned-answers'
 
 type StartParams = z.infer<typeof WorkerStartParams>
 type StartContext = Pick<
@@ -115,7 +123,7 @@ export async function startRemoteOwnedWorker(
   const link = openRemoteRunLink(db, run.id, server, (handle, type) =>
     runtime.notifyMessageArrived(handle, type)
   )
-  const { task } = reserveRemotePlacement(db, {
+  const { task, nothingSent } = reserveRemotePlacement(db, {
     link,
     taskId,
     requestKey: forward.key,
@@ -168,7 +176,8 @@ export async function startRemoteOwnedWorker(
       taskId,
       error,
       key: forward.key,
-      createdByStart: !existingTask
+      createdByStart: !existingTask,
+      nothingSent
     })
     const named = errorData(error)?.dispatchId
     if (typeof named === 'string') {
@@ -216,8 +225,7 @@ export async function startRemoteOwnedWorker(
       dispatchId: started.data.dispatchId,
       taskId: task.id,
       workerAddress: `dispatch:${started.data.dispatchId}`,
-      task: task.spec,
-      agent
+      task: task.spec
     })
   }
   const answer = inServerTerms(receipt, { server: server.name, forward })
@@ -267,6 +275,7 @@ function settleUnansweredStart(
     key: string
     error: unknown
     createdByStart: boolean
+    nothingSent: boolean
   }
 ): void {
   const db = runtime.getOrchestrationDb()
@@ -286,5 +295,7 @@ function settleUnansweredStart(
   } else if (!outcomeUnknown) {
     // The server's ordinary start refused it, which a start that had launched answers with a receipt.
     releaseRemotePlacement(db, start.taskId, start.key, { createdByStart: start.createdByStart })
+  } else if (start.nothingSent && failedBeforeSending(start.error)) {
+    markRemotePlacementNeverSent(db, start.taskId, start.key)
   }
 }

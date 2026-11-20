@@ -47,7 +47,6 @@ export function ClaudeChatAccountLabel({
     target ?? { kind: 'local' },
     accountId ?? '',
     initial,
-    active,
     active && accountId !== null
   )
   if (!accountId) {

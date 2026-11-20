@@ -118,6 +118,8 @@ export function createStructuredAgentSessionLaunchIntent(
     resumeFrom,
     hostSeedOptions,
     forkFrom,
+    // New chats keep the legacy id until pane keys address the tab by its own id.
+    undefined,
     claudeAccountId
   )
 }
@@ -130,6 +132,7 @@ function buildStructuredAgentSessionLaunchIntent(
   resumeFrom: StructuredAgentSessionResumeSource | undefined,
   hostSeedOptions: LaunchSeed,
   forkFrom: StructuredAgentSessionForkSource | undefined,
+  tabId: string | undefined,
   claudeAccountId?: string
 ): StructuredAgentSessionLaunchIntent {
   const state = useAppStore.getState()
@@ -146,6 +149,7 @@ function buildStructuredAgentSessionLaunchIntent(
       ...(claudeAccountId ? { claudeAccountId } : {}),
       ...(resumeFrom ? { resumeFrom } : {}),
       ...(forkFrom ? { forkFrom } : {}),
+      ...(tabId ? { tabId } : {}),
       randomUuid: createNonSecureContextUuid
     }),
     ...(forkFrom ? {} : launchSeedOptions(state, owner, agent, hostSeedOptions, resumeFrom))
@@ -181,6 +185,7 @@ export function retryStructuredAgentSessionLaunchIntent(
       fresh ? undefined : intent.params.resumeFrom,
       intent.seedOptions,
       intent.params.forkFrom,
+      intent.params.tabId,
       intent.params.claudeAccountId
     ),
     forkRequiresInheritedOriginal: intent.forkRequiresInheritedOriginal,
@@ -199,6 +204,8 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
   expectedRuntimeFence: number | null
   resumeFrom?: StructuredAgentSessionResumeSource
   forkFrom?: StructuredAgentSessionForkSource
+  /** The chat tab's id the recorded create carries, when it names one. */
+  tabId?: string
   /** A paired server's seed, kept with the launch so a reload shows what create runs. */
   explicitLaunchOptions?: Readonly<Record<string, string>>
   seedOptions?: Readonly<Record<string, string>>
@@ -228,6 +235,7 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
       ...(args.claudeAccountId ? { claudeAccountId: args.claudeAccountId } : {}),
       ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
       ...(args.forkFrom ? { forkFrom: args.forkFrom } : {}),
+      ...(args.tabId ? { tabId: args.tabId } : {}),
       ...(args.firstMessage ? { firstMessage: args.firstMessage } : {}),
       ...(args.optionsMode ? { optionsMode: args.optionsMode } : {}),
       ...(args.options ? { options: args.options } : {})

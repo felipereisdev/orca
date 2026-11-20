@@ -65,7 +65,7 @@ async function readJiraImageUrls(
   key: string,
   siteId: string | null
 ): Promise<string[]> {
-  const [client] = getJiraClients(siteId)
+  const [client] = await getJiraClients(siteId)
   if (!client) {
     throw new Error('Jira site unavailable')
   }

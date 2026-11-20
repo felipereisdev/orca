@@ -66,6 +66,11 @@ export function endMirroredTurn(end: ChatTurnEnd, mirrored: SlackMirrorTurn): vo
   })
 }
 
+// A turn's length by the machine's clock, when its start was seen and the clock ran forward.
+function tookOf(ended: ChatTurnEnd['ended']): { tookMs?: number } {
+  return ended.turnId !== null && ended.at > ended.turnId ? { tookMs: ended.at - ended.turnId } : {}
+}
+
 export type ChatTurnReplies = {
   /** Fills the reply outbox rows an ended turn answered (design item 125). */
   replyFill?: () => ConversationReplyFill | null
@@ -96,6 +101,8 @@ export async function endRepliedTurn(
   if (!fill || !turn.stamps?.length || !turn.turnItemId) {
     return false
   }
+  const failure =
+    end.news.outcome === 'failure' ? { failure: connectorFailure(turn.failure, end.agent) } : {}
   const covered = await fill({
     sessionId: end.news.sessionId,
     turnItemId: turn.turnItemId,
@@ -104,9 +111,8 @@ export async function endRepliedTurn(
     prose: turn.turnProse ?? '',
     bot: Boolean(link.bot),
     links: link.bot ? await links() : [],
-    ...(end.news.outcome === 'failure'
-      ? { failure: connectorFailure(turn.failure, end.agent) }
-      : {})
+    ...tookOf(end.ended),
+    ...failure
   }).catch((error: unknown) => {
     console.warn('[connector] could not fill reply outbox rows', error)
     return new Set<string>()
@@ -116,7 +122,8 @@ export async function endRepliedTurn(
   }
   await end.workersChecked()
   if (end.current()) {
-    end.emit({ ...end.ended, stateOnly: true })
+    // The cloud keeps the thread's failure from whichever of this and the reply lands last.
+    end.emit({ ...end.ended, stateOnly: true, ...failure })
   }
   return true
 }

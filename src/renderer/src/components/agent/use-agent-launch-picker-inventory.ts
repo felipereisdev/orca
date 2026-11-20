@@ -16,7 +16,8 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { readHostAgentLaunchDefaults } from '../../runtime/agent-launch-settings/agent-launch-settings-transport'
 import type { NewTabAgentMenuModel } from './launch-menu/new-tab-agent-menu-model'
-import { buildAgentLaunchRouteInput } from '@/lib/agent-session/launch/routing/agent-launch-route-input'
+import { buildRouteInputForStatuses } from '@/lib/agent-session/launch/routing/agent-launch-route-input'
+import { readRuntimeStatusesForView } from '@/store/slices/runtime-status/views/runtime-status-owner'
 import { workspaceKindForWorktreeId } from '../../../../shared/agent-launch/contracts/workspace-launch-kind'
 import { structuredAgentSessionTargetForHost } from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
 import type { RuntimeGitContext } from '@/runtime/source-control/git/runtime-git-client-context'
@@ -70,13 +71,15 @@ export function useAgentLaunchPickerInventorySource(
   }, [selected])
   const context = model.state === 'settled' ? model.pickerContext : undefined
   const settings = context ? context.settings : store.getState().settings
-  const route = buildAgentLaunchRouteInput(store.getState(), {
-    agent: 'claude',
-    workspace: context?.workspace ?? {
-      kind: worktreeId ? workspaceKindForWorktreeId(worktreeId) : 'floating',
-      ...(worktreeId ? { worktreeId } : {})
-    }
-  })
+  const pickerRoute = () =>
+    buildRouteInputForStatuses(store.getState(), readRuntimeStatusesForView(store), {
+      agent: 'claude',
+      workspace: context?.workspace ?? {
+        kind: worktreeId ? workspaceKindForWorktreeId(worktreeId) : 'floating',
+        ...(worktreeId ? { worktreeId } : {})
+      }
+    })
+  const route = pickerRoute()
   const executionHostId = context?.executionHostId ?? route.executionHostId
   const target = structuredAgentSessionTargetForHost(executionHostId)
   const { accounts, expandAccounts } = useClaudeAccountPicker(
@@ -116,13 +119,7 @@ export function useAgentLaunchPickerInventorySource(
       ? localCapabilities.state === 'known'
         ? localCapabilities.capabilities
         : null
-      : buildAgentLaunchRouteInput(state, {
-          agent: 'claude',
-          workspace: context?.workspace ?? {
-            kind: worktreeId ? workspaceKindForWorktreeId(worktreeId) : 'floating',
-            ...(worktreeId ? { worktreeId } : {})
-          }
-        }).hostCapabilities
+      : route.hostCapabilities
   const coherentCatalog =
     hostCapabilities?.includes(AGENT_SESSION_COHERENT_MODEL_CATALOG_CAPABILITY) === true
   const draftTarget = useMemo(
@@ -279,8 +276,11 @@ export function useAgentLaunchPickerInventorySource(
                   ? build(defaults.settings).map((entry) => ({
                       ...entry,
                       defaultsPending: false,
+                      // Without a workspace there are no workspace chat seeds to wait for.
                       structuredDefaultsPending:
-                        entry.surfaces.includes('chat') && !defaults.structuredKnown,
+                        entry.surfaces.includes('chat') &&
+                        !defaults.structuredKnown &&
+                        selector !== undefined,
                       ownerKey: key,
                       draftTarget,
                       worktreeId

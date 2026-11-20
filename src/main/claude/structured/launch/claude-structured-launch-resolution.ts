@@ -3,7 +3,7 @@ import { CLAUDE_EXPLICIT_ENV_DELETIONS } from '../../../claude-accounts/runtime-
 import { claudeBotSessionOptions } from './claude-bot-session-options'
 import { withBotLaunchToolsEnv } from '../../../bots/bot-launch-tools'
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
-import { prepareClaudeLaunchAccount } from './claude-launch-account'
+import { prepareClaudeLaunchAccount, withClaudeLaunchAccountPin } from './claude-launch-account'
 import { assertStructuredAgentResolutionCurrent } from '../../../native-chat/agent-launch/structured-agent-command-resolution'
 import { activeProviderContext } from '../../../../shared/agent-session/conversation-context/agent-session-provider-context'
 import { getClaudeProfileRouter } from '../../../claude-accounts/profiles/routing/claude-profile-installed-router'
@@ -97,6 +97,8 @@ export type ClaudeStructuredLaunch = {
   cliFlag: ClaudeCliFlagCheck
   /** Chain identity is independent of whether a transcript exists to resume. */
   continuesChain: boolean
+  /** The user's Command setting this launch runs, as written; absent for the stock CLI. */
+  configuredCommand?: string
   /** Chain head replaced by this rewind fork. */
   forkedFromKey?: string
 }
@@ -192,7 +194,7 @@ export function claudeStructuredLaunchPart(
       command: sources.command,
       prefixArgs: sources.prefixArgs,
       cwd,
-      env: claudeProbeEnv(sources)
+      env: await withClaudeLaunchAccountPin(router, claudeProbeEnv(sources), accountHome.path)
     }
     const launchFlags = resolveClaudeLaunchFlags(
       { ...deps, prepareVisuals: basis.visuals },
@@ -200,7 +202,7 @@ export function claudeStructuredLaunchPart(
       probeLaunch
     )
     const launchArgs = await deps.resolveLaunchArgs()
-    const { thinkingDisplayArgs, visuals, promptSuggestions } = await launchFlags
+    const { thinkingDisplayArgs, visuals, promptSuggestions, refused } = await launchFlags
     const linked = await basis.linkedSkills()
     const discovery = claudeDiscoveryOptions({
       configuredArgs: launchArgs,
@@ -282,7 +284,7 @@ export function claudeStructuredLaunchPart(
           ...CLAUDE_STRUCTURED_BASE_OPTIONS,
           ...permission,
           ...discovery,
-          ...(await claudeBotSessionOptions(basis, linked.projects, tools)),
+          ...(await claudeBotSessionOptions(basis, linked.projects, tools, refused)),
           ...(promptSuggestions ? { promptSuggestions } : {}),
           extraArgs: {
             ...discovery.extraArgs,
@@ -303,12 +305,16 @@ export function claudeStructuredLaunchPart(
         cliFlag: async (flag, ...budget) =>
           deps.cliFlags ? deps.cliFlags.check(flag, probeLaunch, ...budget) : 'unknown',
         continuesChain,
+        ...(sources.configured ? { configuredCommand: sources.configured } : {}),
         ...(fork && head && !continuesChain
           ? { forkedFromKey: agentSessionProviderHandleKey(head) }
           : {})
       },
       env,
-      inheritedEnvToDelete: record.claudeAccountId ? CLAUDE_EXPLICIT_ENV_DELETIONS : [],
+      inheritedEnvToDelete: [
+        ...(record.claudeAccountId ? CLAUDE_EXPLICIT_ENV_DELETIONS : []),
+        ...refused.envToDelete
+      ],
       // The agent runtime follows Orca's CLI directory on PATH so another orca cannot shadow it.
       cliRuntimeCommand: command
     }

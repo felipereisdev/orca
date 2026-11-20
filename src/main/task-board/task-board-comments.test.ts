@@ -10,7 +10,7 @@ function commentDeps(overrides: Partial<TaskBoardCommentDeps>): TaskBoardComment
   return {
     repo: () => null,
     getLocalGitArgs: () => [],
-    jiraSites: () => [],
+    jiraSites: async () => [],
     jiraComments: unexpected,
     linearComments: unexpected,
     linearViewerId: unexpected,
@@ -23,7 +23,7 @@ function commentDeps(overrides: Partial<TaskBoardCommentDeps>): TaskBoardComment
 describe('readTaskBoardComments', () => {
   it('marks a comment as own by the account of the issue’s site, not the active one', async () => {
     const deps = commentDeps({
-      jiraSites: () => [
+      jiraSites: async () => [
         { id: 'site-a', accountId: 'account-a' },
         { id: 'site-b', accountId: 'account-b' }
       ],
