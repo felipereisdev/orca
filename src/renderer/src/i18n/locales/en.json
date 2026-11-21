@@ -13016,7 +13016,8 @@
           "setUpWithAgent": "Set up with agent",
           "setUpWithAgentHint": "Starts your default agent in {{repo}}. It edits orca.yaml, runs the doctors until they pass, and opens a PR.",
           "setUpWithAgentNoRepo": "Add a project first.",
-          "whatDesktop": "Can add a Desktop tab: watch the agent live, take over control, and record tests that play in the chat."
+          "whatDesktop": "Can add a Desktop tab: watch the agent live, take over control, and record tests that play in the chat.",
+          "desktopSkillNote": "Also installs orca-desktop, here and in each recipe environment: agents there have no display, so they start GUI apps and e2e tests with orca desktop run and you watch them in the Desktop tab."
         },
         "ephemeralVmsExperimentalSetting": {
           "description": "Shows setup controls and workspace run targets for repo-owned, on-demand environments.",

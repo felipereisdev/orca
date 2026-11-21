@@ -9,7 +9,11 @@ import { AgentSkillSetupPanel } from '../../../skills/setup/AgentSkillSetupPanel
 import { EphemeralVmRecipeRow } from './EphemeralVmRecipeRow'
 import { translate } from '@/i18n/i18n'
 import { useTranslate } from '@/i18n/use-translate'
-import { EPHEMERAL_VMS_SKILL_NAME } from '@/lib/skills/installation/agent-feature-skill-names'
+import {
+  EPHEMERAL_VMS_SKILL_NAME,
+  ORCA_DESKTOP_SKILL_NAME,
+  ephemeralVmAgentSkillNames
+} from '@/lib/skills/installation/agent-feature-skill-names'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
   useInstalledAgentSkill
@@ -33,6 +37,10 @@ export function EphemeralVmsPane(): React.JSX.Element {
   const openModal = useAppStore((state) => state.openModal)
   const repos = useAppStore((state) => state.repos)
   const activeRepoId = useAppStore((state) => state.activeRepoId)
+  const experimentalEphemeralVms = useAppStore(
+    (state) => state.settings?.experimentalEphemeralVms === true
+  )
+  const offeredSkillNames = ephemeralVmAgentSkillNames({ experimentalEphemeralVms })
   const setupRepo = pickEnvironmentSetupRepo(repos, activeRepoId)
   const [agentLaunching, setAgentLaunching] = useState(false)
   const activeSkillRuntime = useActiveProjectSkillRuntime()
@@ -52,15 +60,21 @@ export function EphemeralVmsPane(): React.JSX.Element {
     }
   }, [])
 
-  const {
-    installed: skillDetected,
-    loading: skillLoading,
-    error: skillError,
-    refresh: refreshSkill
-  } = useInstalledAgentSkill(EPHEMERAL_VMS_SKILL_NAME, {
+  const skillDiscovery = {
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
-  })
+  }
+  const envSkill = useInstalledAgentSkill(EPHEMERAL_VMS_SKILL_NAME, skillDiscovery)
+  const desktopSkill = useInstalledAgentSkill(ORCA_DESKTOP_SKILL_NAME, skillDiscovery)
+  const skillDetected = envSkill.installed && desktopSkill.installed
+  const skillLoading = envSkill.loading || desktopSkill.loading
+  const skillError = envSkill.error ?? desktopSkill.error
+  const refreshEnvSkill = envSkill.refresh
+  const refreshDesktopSkill = desktopSkill.refresh
+  const refreshSkill = useCallback(async (): Promise<boolean> => {
+    const [env, desktop] = await Promise.all([refreshEnvSkill(), refreshDesktopSkill()])
+    return env && desktop
+  }, [refreshDesktopSkill, refreshEnvSkill])
 
   const refresh = useCallback(async (): Promise<void> => {
     const generation = ++refreshGenerationRef.current
@@ -179,7 +193,15 @@ export function EphemeralVmsPane(): React.JSX.Element {
           'auto.components.settings.EphemeralVmsPane.skillDescription',
           'Sets up, builds, authenticates, and validates repo-owned environment recipes.'
         )}
-        skillNames={[EPHEMERAL_VMS_SKILL_NAME]}
+        footer={
+          <p className="text-xs text-muted-foreground">
+            {t(
+              'auto.components.settings.EphemeralVmsPane.desktopSkillNote',
+              'Also installs orca-desktop, here and in each recipe environment: agents there have no display, so they start GUI apps and e2e tests with orca desktop run and you watch them in the Desktop tab.'
+            )}
+          </p>
+        }
+        skillNames={offeredSkillNames}
         installed={skillDetected}
         loading={skillLoading}
         error={activeSkillRuntime.installDisabledReason ?? skillError}
