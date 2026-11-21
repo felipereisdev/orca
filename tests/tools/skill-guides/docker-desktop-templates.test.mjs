@@ -8,10 +8,10 @@ import {
   statSync,
   writeFileSync
 } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer } from 'node:https'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 const TEMPLATES = path.resolve(
   'skill-guides/orca-per-workspace-env/references/docker-desktop-ssh-templates.md'
@@ -110,7 +110,12 @@ function flagsOk(dir) {
 function gitToken(dir, repoUrl, env = {}) {
   const bin = path.join(dir, 'stub-bin')
   mkdirSync(bin, { recursive: true })
-  writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\necho gh-cli-token\n', { mode: 0o755 })
+  // A bare `gh auth token` answers the active host, which can be an Enterprise one.
+  writeFileSync(
+    path.join(bin, 'gh'),
+    '#!/bin/sh\n[ "$*" = "auth token --hostname github.com" ] && echo gh-cli-token || echo enterprise-token\n',
+    { mode: 0o755 }
+  )
   return execFileSync(
     'bash',
     [
@@ -131,8 +136,9 @@ function gitToken(dir, repoUrl, env = {}) {
 }
 
 /**
- * Runs the real orca-desktop-clone as this user against `repoUrl`, which the home's git config
- * rewrites to `rewriteTo`; getent is stubbed to that home, and system config (a keychain helper) is off.
+ * Runs the real orca-desktop-clone as this user against `repoUrl` (rewritten to `rewriteTo` when
+ * given). getent is stubbed to a fresh home that trusts the test certificate; system config (a
+ * keychain helper) is off.
  */
 function runClone(dir, { repoUrl, rewriteTo, token }) {
   const home = path.join(dir, 'home')
@@ -142,7 +148,8 @@ function runClone(dir, { repoUrl, rewriteTo, token }) {
   writeFileSync(path.join(bin, 'getent'), `#!/bin/sh\necho "u:x:1:1::${home}:/bin/sh"\n`, {
     mode: 0o755
   })
-  writeFileSync(path.join(home, '.gitconfig'), `[url "${rewriteTo}"]\n\tinsteadOf = ${repoUrl}\n`)
+  const rewrite = rewriteTo ? `[url "${rewriteTo}"]\n\tinsteadOf = ${repoUrl}\n` : ''
+  writeFileSync(path.join(home, '.gitconfig'), `${rewrite}[http]\n\tsslCAInfo = ${tls.cert}\n`)
   return new Promise((resolve) => {
     const child = execFile(
       path.join(dir, 'orca-desktop-clone'),
@@ -159,6 +166,22 @@ function runClone(dir, { repoUrl, rewriteTo, token }) {
     )
     child.stdin.end(`${token}\n`)
   })
+}
+
+/** The askpass helper orca-desktop-clone writes, answering one git prompt for `host`. */
+function askpass(dir, host, prompt) {
+  const helper = path.join(dir, 'askpass-dir')
+  mkdirSync(helper, { recursive: true })
+  const clone = readFileSync(path.join(dir, 'orca-desktop-clone'), 'utf8')
+  const body = /<<'ASKPASS'\n([\s\S]*?)\nASKPASS\n/.exec(clone)?.[1]
+  if (!body) {
+    throw new Error('orca-desktop-clone writes no ASKPASS heredoc')
+  }
+  writeFileSync(path.join(helper, 'askpass'), `${body}\n`, { mode: 0o700 })
+  writeFileSync(path.join(helper, 'host'), `${host}\n`)
+  writeFileSync(path.join(helper, 'token'), 'issued-token\n')
+  const result = spawnSync(path.join(helper, 'askpass'), [prompt], { encoding: 'utf8' })
+  return { status: result.status, stdout: result.stdout }
 }
 
 function bareRepo(dir) {
@@ -185,24 +208,43 @@ function bareRepo(dir) {
   return bare
 }
 
-/** Serves a bare repo over git's dumb HTTP protocol, only to basic auth with this token. */
-async function authServer(root, token) {
+/** A self-signed certificate for 127.0.0.1 and localhost, made once for the file. */
+const tls = {}
+
+/**
+ * Serves a bare repo over git's dumb HTTPS protocol, only to basic auth with this token, and
+ * records every Authorization header it receives. With `redirectTo`, it only redirects there.
+ */
+async function authServer(root, token, { redirectTo, host = '127.0.0.1' } = {}) {
   const expected = `Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
-  const server = createServer((request, response) => {
-    if (request.headers.authorization !== expected) {
-      response.writeHead(401, { 'WWW-Authenticate': 'Basic realm="repo"' }).end()
-      return
+  const authorizations = []
+  const server = createServer(
+    { key: readFileSync(tls.key), cert: readFileSync(tls.cert) },
+    (request, response) => {
+      if (redirectTo) {
+        response.writeHead(302, { Location: `${redirectTo}${request.url}` }).end()
+        return
+      }
+      if (request.headers.authorization) {
+        authorizations.push(request.headers.authorization)
+      }
+      if (request.headers.authorization !== expected) {
+        response.writeHead(401, { 'WWW-Authenticate': 'Basic realm="repo"' }).end()
+        return
+      }
+      const file = path.join(root, new URL(request.url, 'https://x').pathname)
+      if (!file.startsWith(root) || !existsSync(file) || statSync(file).isDirectory()) {
+        response.writeHead(404).end()
+        return
+      }
+      response
+        .writeHead(200, { 'Content-Type': 'application/octet-stream' })
+        .end(readFileSync(file))
     }
-    const file = path.join(root, new URL(request.url, 'http://x').pathname)
-    if (!file.startsWith(root) || !existsSync(file) || statSync(file).isDirectory()) {
-      response.writeHead(404).end()
-      return
-    }
-    response.writeHead(200, { 'Content-Type': 'application/octet-stream' }).end(readFileSync(file))
-  })
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  )
+  await new Promise((resolve) => server.listen(0, host, resolve))
   servers.push(server)
-  return `http://127.0.0.1:${server.address().port}`
+  return { port: server.address().port, authorizations }
 }
 
 const servers = []
@@ -210,6 +252,41 @@ const servers = []
 function edit(file, change) {
   writeFileSync(file, change(readFileSync(file, 'utf8')))
 }
+
+beforeAll(() => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'orca-docker-desktop-tls-'))
+  tls.dir = dir
+  tls.key = path.join(dir, 'key.pem')
+  tls.cert = path.join(dir, 'cert.pem')
+  writeFileSync(
+    path.join(dir, 'san.cnf'),
+    '[req]\ndistinguished_name=dn\nx509_extensions=san\nprompt=no\n[dn]\nCN=localhost\n' +
+      '[san]\nsubjectAltName=IP:127.0.0.1,DNS:localhost\nbasicConstraints=critical,CA:TRUE\n'
+  )
+  execFileSync(
+    'openssl',
+    [
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-days',
+      '1',
+      '-keyout',
+      tls.key,
+      '-out',
+      tls.cert,
+      '-config',
+      path.join(dir, 'san.cnf')
+    ],
+    { stdio: 'ignore' }
+  )
+})
+
+afterAll(() => {
+  rmSync(tls.dir, { recursive: true, force: true })
+})
 
 afterEach(() => {
   for (const server of servers.splice(0)) {
@@ -300,17 +377,58 @@ describe.skipIf(process.platform === 'win32')('docker desktop recipe templates',
     expect(existsSync(path.join(open.home, '.git-credentials'))).toBe(false)
 
     const authed = extractTemplates()
-    const base = await authServer(path.join(authed, 'served'), 'good-token')
     bareRepo(authed)
+    const { port } = await authServer(path.join(authed, 'served'), 'good-token')
     const needed = await runClone(authed, {
-      repoUrl: 'https://github.com/acme/repo.git',
-      rewriteTo: `${base}/repo.git`,
+      repoUrl: `https://127.0.0.1:${port}/repo.git`,
       token: 'good-token'
     })
     expect(needed.stderr).toBe('')
     expect(needed.ok).toBe(true)
     const store = path.join(needed.home, '.git-credentials')
-    expect(readFileSync(store, 'utf8')).toBe('https://x-access-token:good-token@github.com\n')
+    expect(readFileSync(store, 'utf8')).toBe(
+      `https://x-access-token:good-token@127.0.0.1%3a${port}\n`
+    )
     expect(statSync(store).mode & 0o777).toBe(0o600)
+  })
+
+  it('gives the token to no host but the one it was issued for, even across a redirect', async () => {
+    const dir = extractTemplates()
+    bareRepo(dir)
+    const other = await authServer(path.join(dir, 'served'), 'good-token', { host: 'localhost' })
+    const issued = await authServer(path.join(dir, 'served'), 'good-token', {
+      redirectTo: `https://localhost:${other.port}`
+    })
+    const redirected = await runClone(dir, {
+      repoUrl: `https://127.0.0.1:${issued.port}/repo.git`,
+      token: 'good-token'
+    })
+
+    expect(redirected.ok).toBe(false)
+    expect(other.authorizations).toEqual([])
+    expect(existsSync(path.join(redirected.home, '.git-credentials'))).toBe(false)
+  })
+
+  it('answers only the issued host in the askpass prompt', () => {
+    const dir = extractTemplates()
+    const prompt = (text) => askpass(dir, 'github.com', text)
+
+    expect(prompt("Username for 'https://github.com': ")).toEqual({
+      status: 0,
+      stdout: 'x-access-token\n'
+    })
+    expect(prompt("Password for 'https://x-access-token@github.com': ")).toEqual({
+      status: 0,
+      stdout: 'issued-token\n'
+    })
+    for (const other of [
+      "Username for 'https://evil.example.test': ",
+      "Password for 'https://x-access-token@evil.example.test': ",
+      "Username for 'https://github.com.evil.example.test': ",
+      "Password for 'https://someone@github.com': ",
+      'Enter passphrase for key: '
+    ]) {
+      expect(prompt(other)).toEqual({ status: 1, stdout: '' })
+    }
   })
 })

@@ -61,7 +61,9 @@ the launcher first, so a listener that does not know the token receives only a n
 fails with `desktop_launcher_rejected`; a malformed or missing proof is a rejection too. The
 launcher checks a client's proof against its current token, gives an unauthenticated connection
 five seconds, and closes every unauthenticated connection when the token rotates. For the clone, the git token reaches a `GIT_ASKPASS`
-helper through a 0600 file removed afterwards. When git asked for the token, it is kept in `dev`'s
+helper through a 0600 file removed afterwards. The helper answers only git's prompts for the URL's own host
+(`Username for 'https://<host>'` and `Password for 'https://x-access-token@<host>'`). A prompt for any
+other host, including the target of a redirect, gets nothing and fails. When git asked for the token, it is kept in `dev`'s
 git credential store after a successful clone of an `https://` URL (`~/.git-credentials`, 0600, with
 `credential.https://<host>.helper store` scoped to the repo's host). Later fetch and push, and the
 environment doctor's check of `origin`, then work without asking. A clone that never asked (a public
@@ -158,7 +160,7 @@ it under `[127.0.0.1]:<port>`, replacing only a stale entry for that endpoint, a
 removes the entry while it still matches the container.
 
 The git token is bound to the host it was issued for. `GH_TOKEN`, `GITHUB_TOKEN`, else
-`gh auth token`, are GitHub tokens, so `create.sh` sends one only when the repo URL is
+`gh auth token --hostname github.com` (pinned: a bare `gh auth token` can answer an Enterprise host), are GitHub tokens, so `create.sh` sends one only when the repo URL is
 `https://github.com/…`. For another host (GitHub Enterprise, GitLab, a self-hosted server), set
 `ORCA_DESKTOP_GIT_TOKEN` and `ORCA_DESKTOP_GIT_TOKEN_HOST` (for example `gitlab.example.com`) in
 Orca's environment. The token is sent only when the URL's host matches exactly. Keep the token out

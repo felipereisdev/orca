@@ -287,10 +287,11 @@ Clones the repo as `dev`, with the git token on stdin, and keeps the token for l
 ```bash
 #!/bin/bash
 # Runs as dev: orca-desktop-clone <url> <dest> [ref]. The first stdin line is the git token (may be
-# empty; create.sh sends one only for the host it was issued for); the clone reaches it only
-# through a GIT_ASKPASS helper reading a 0600 file removed on exit. When git asked for it, the
-# token goes to dev's git credential store (~/.git-credentials, 0600), scoped to the https host,
-# so later fetch and push work too. A clone that never asked stores nothing.
+# empty; create.sh sends one only for the host it was issued for, the URL's https host). The clone
+# reaches it only through a GIT_ASKPASS helper that answers prompts for that host alone (never a
+# redirect target) and reads 0600 files removed on exit. When git asked for it, the token goes to
+# dev's git credential store (~/.git-credentials, 0600), scoped to that host, so later fetch and
+# push work too. A clone that never asked stores nothing.
 set -eu
 url="$1" dest="$2" ref="${3:-}"
 IFS= read -r token || true
@@ -299,14 +300,26 @@ HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
 export HOME
 saved_token="$token"
 
+# Only an https:// URL without user info names the host the token was issued for.
+host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
+
 umask 077
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-if [ -n "$token" ]; then
+if [ -n "$token" ] && [ -n "$host" ]; then
   printf '%s\n' "$token" > "$tmp/token"
-  # shellcheck disable=SC2016 # $1 belongs to the helper script.
-  printf '#!/bin/sh\n: > %s\ncase "$1" in Username*) echo x-access-token ;; *) cat %s ;; esac\n' \
-    "$tmp/asked" "$tmp/token" > "$tmp/askpass"
+  printf '%s\n' "$host" > "$tmp/host"
+  cat > "$tmp/askpass" <<'ASKPASS'
+#!/bin/sh
+# Answers git only for the issued host; any other prompt (a redirect, another host) gets nothing.
+d="$(dirname "$0")"
+host="$(cat "$d/host")"
+case "$1" in
+  "Username for 'https://$host'"*) : > "$d/asked"; echo x-access-token ;;
+  "Password for 'https://x-access-token@$host'"*) cat "$d/token" ;;
+  *) exit 1 ;;
+esac
+ASKPASS
   chmod 0700 "$tmp/askpass"
   export GIT_ASKPASS="$tmp/askpass"
 fi
@@ -324,8 +337,7 @@ if [ -n "$ref" ]; then
   git -C "$dest" checkout --quiet "$ref"
 fi
 
-# Only an https:// URL without user info names a host the token belongs to.
-host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
+# Stored only for the issued host, and only when git asked that host for the token.
 if [ -n "$saved_token" ] && [ -n "$host" ] && [ -e "$tmp/asked" ]; then
   umask 077
   git config --global "credential.https://$host.helper" store
@@ -1123,7 +1135,8 @@ repo_name="$(printf '%s' "$repo_name" | LC_ALL=C tr -c 'A-Za-z0-9_.-' '-')"
 project_root="/work/$repo_name"
 
 # A token only for the host it was issued for: ORCA_DESKTOP_GIT_TOKEN for
-# ORCA_DESKTOP_GIT_TOKEN_HOST, else GitHub's (GH_TOKEN, GITHUB_TOKEN, gh) for github.com only.
+# ORCA_DESKTOP_GIT_TOKEN_HOST, else GitHub's for github.com only (GH_TOKEN, GITHUB_TOKEN, or gh
+# pinned to github.com: a bare `gh auth token` can answer an Enterprise host).
 git_token() {
   local host
   host="$(printf '%s' "$repo_url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p' | LC_ALL=C tr '[:upper:]' '[:lower:]')"
@@ -1131,7 +1144,7 @@ git_token() {
     [ "$host" = "$(printf '%s' "${ORCA_DESKTOP_GIT_TOKEN_HOST:-}" | LC_ALL=C tr '[:upper:]' '[:lower:]')" ]; then
     printf '%s\n' "$ORCA_DESKTOP_GIT_TOKEN"
   elif [ "$host" = github.com ]; then
-    printf '%s\n' "${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}}"
+    printf '%s\n' "${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token --hostname github.com 2>/dev/null || true)}}"
   else
     printf '\n'
   fi
