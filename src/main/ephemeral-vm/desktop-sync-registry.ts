@@ -125,7 +125,11 @@ function configure(
       entry.controllerToken = configured.controllerToken
       resetRetry(entry)
       // The environment's agents have no display; the skill tells them to use `orca desktop run`.
-      void installDesktopAgentSkillOnEnvironment(target.environmentId)
+      // The experiment may have been turned off during the configure, so it is read again.
+      void installDesktopAgentSkillOnEnvironment(
+        target.environmentId,
+        () => runtimeDesktop(store, entry.runtime) !== null
+      )
     }
     if (entry.restartQueued) {
       entry.restartQueued = false

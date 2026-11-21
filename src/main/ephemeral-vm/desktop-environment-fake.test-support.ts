@@ -55,6 +55,9 @@ class DesktopEnvironmentFake {
   stop: () => FakeResponse = () => failure('desktop_not_recording', 'not recording')
   /** Runs right after a list took its snapshot, as if it happened just after the list answered. */
   afterList: (() => void) | null = null
+  /** `skills.planBundledOrca`, the start of the desktop skill install; unknown by default. */
+  planSkills: () => FakeResponse | Promise<FakeResponse> = () =>
+    failure('method_not_found', 'skills.planBundledOrca')
 
   reset(): void {
     this.files.clear()
@@ -78,6 +81,7 @@ class DesktopEnvironmentFake {
     }
     this.stop = () => failure('desktop_not_recording', 'not recording')
     this.afterList = null
+    this.planSkills = () => failure('method_not_found', 'skills.planBundledOrca')
   }
 
   /** `desktop.record.start` as the recorder answers it: refused while a removal fences it. */
@@ -166,6 +170,8 @@ class DesktopEnvironmentFake {
     switch (method) {
       case 'desktop.configure':
         return this.configure(args)
+      case 'skills.planBundledOrca':
+        return this.planSkills()
       case 'desktop.recordings.list':
         return this.list()
       case 'desktop.record.fence':
