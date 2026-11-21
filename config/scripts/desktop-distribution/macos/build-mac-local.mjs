@@ -2,7 +2,10 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildLocalOrcadTemplate } from '../../orcad-distribution/template/build-local-orcad-template.mjs'
-import { LOCAL_ORCAD_TARGETS_ENV } from '../../orcad-distribution/template/local-orcad-template-targets.cjs'
+import {
+  isReleaseOrCiBuild,
+  LOCAL_ORCAD_TARGETS_ENV
+} from '../../orcad-distribution/template/local-orcad-template-targets.cjs'
 
 export function createLocalBuildVersion(baseVersion, timestamp, commit) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(baseVersion)) {
@@ -31,10 +34,17 @@ export function getLocalBuildIdentity() {
 }
 
 /** Env that declares the template to electron-builder; a failed or skipped build ships none, never a stale one. */
-export function localOrcadTemplateEnv(env = process.env, options = {}) {
+export async function localOrcadTemplateEnv(env = process.env, options = {}) {
   const outputDir = options.outputDir ?? resolve('out', 'orcad-template')
+  if (isReleaseOrCiBuild(env)) {
+    console.log('[build:mac] CI build: skipping the local orcad template; packaging is unchanged')
+    return { [LOCAL_ORCAD_TARGETS_ENV]: undefined }
+  }
   try {
-    const result = buildLocalOrcadTemplate(env, { outputDir })
+    const result = await buildLocalOrcadTemplate(env, {
+      outputDir,
+      dockerProgram: options.dockerProgram
+    })
     if (result.status === 'built') {
       return { [LOCAL_ORCAD_TARGETS_ENV]: result.targets.join(',') }
     }
@@ -50,7 +60,7 @@ export function localOrcadTemplateEnv(env = process.env, options = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
   const identity = getLocalBuildIdentity()
   console.log(`[build:mac] local update version ${identity.version}`)
-  const templateEnv = localOrcadTemplateEnv()
+  const templateEnv = await localOrcadTemplateEnv()
   execFileSync(
     process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
     ['exec', 'electron-builder', '--config', 'config/electron-builder.config.cjs', '--mac'],

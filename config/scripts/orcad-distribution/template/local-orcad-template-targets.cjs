@@ -76,6 +76,7 @@ function localPackagingOrcadTemplateTargets(env = process.env) {
 }
 
 module.exports = {
+  isReleaseOrCiBuild,
   DEFAULT_LOCAL_ORCAD_TARGETS,
   LOCAL_ORCAD_TARGETS_ENV,
   localOrcadDockerPlatform,

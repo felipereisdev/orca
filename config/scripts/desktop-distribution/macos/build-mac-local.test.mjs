@@ -12,15 +12,33 @@ afterEach(() => {
   }
 })
 
+function partialTemplate() {
+  const root = mkdtempSync(join(tmpdir(), 'build-mac-local-'))
+  dirs.push(root)
+  const outputDir = join(root, 'orcad-template')
+  mkdirSync(join(outputDir, 'targets', 'linux-arm64-glibc'), { recursive: true })
+  writeFileSync(join(outputDir, 'orcad-template.json'), '{}')
+  return outputDir
+}
+
 describe('localOrcadTemplateEnv', () => {
-  it('packages no stale partial template when the step is turned off', () => {
-    const root = mkdtempSync(join(tmpdir(), 'build-mac-local-'))
-    dirs.push(root)
-    const outputDir = join(root, 'orcad-template')
-    mkdirSync(join(outputDir, 'targets', 'linux-arm64-glibc'), { recursive: true })
-    writeFileSync(join(outputDir, 'orcad-template.json'), '{}')
-    const env = localOrcadTemplateEnv({ ORCA_LOCAL_ORCAD_TARGETS: 'none' }, { outputDir })
+  it('packages no stale partial template when the step is turned off', async () => {
+    const outputDir = partialTemplate()
+    const env = await localOrcadTemplateEnv(
+      { ORCA_LOCAL_ORCAD_TARGETS: 'none' },
+      { outputDir, dockerProgram: join(outputDir, '..', 'no-docker') }
+    )
     expect(existsSync(outputDir)).toBe(false)
+    expect(env).toEqual({ ORCA_LOCAL_ORCAD_TARGETS: undefined })
+  })
+
+  it('leaves CI packaging as it was', async () => {
+    const outputDir = partialTemplate()
+    const env = await localOrcadTemplateEnv(
+      { CI: 'true', ORCA_LOCAL_ORCAD_TARGETS: 'linux-arm64-glibc' },
+      { outputDir, dockerProgram: join(outputDir, '..', 'no-docker') }
+    )
+    expect(existsSync(outputDir)).toBe(true)
     expect(env).toEqual({ ORCA_LOCAL_ORCAD_TARGETS: undefined })
   })
 })
