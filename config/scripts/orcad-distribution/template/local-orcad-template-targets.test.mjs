@@ -2,19 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   localOrcadDockerPlatform,
   localOrcadTemplateTargets,
-  packagingOrcadTemplateTargets
+  localPackagingOrcadTemplateTargets
 } from './local-orcad-template-targets.cjs'
-
-const ALL_TARGETS = [
-  'darwin-arm64',
-  'darwin-x64',
-  'linux-arm64-glibc',
-  'linux-x64-glibc',
-  'linux-arm64-musl',
-  'linux-x64-musl',
-  'win32-arm64',
-  'win32-x64'
-]
 
 describe('localOrcadTemplateTargets', () => {
   it('defaults to linux-arm64-glibc', () => {
@@ -57,24 +46,34 @@ describe('localOrcadDockerPlatform', () => {
   })
 })
 
-describe('packagingOrcadTemplateTargets', () => {
-  it('checks every target when nothing is declared', () => {
-    expect(packagingOrcadTemplateTargets({})).toEqual(ALL_TARGETS)
-    expect(packagingOrcadTemplateTargets({ ORCA_LOCAL_ORCAD_TARGETS: 'none' })).toEqual(ALL_TARGETS)
+describe('localPackagingOrcadTemplateTargets', () => {
+  it('declares nothing when the build sets no local targets', () => {
+    expect(localPackagingOrcadTemplateTargets({})).toBeNull()
+    expect(localPackagingOrcadTemplateTargets({ ORCA_LOCAL_ORCAD_TARGETS: 'none' })).toBeNull()
   })
 
-  it('checks exactly the declared targets of a local build', () => {
+  it('declares exactly the targets of a local build', () => {
     expect(
-      packagingOrcadTemplateTargets({ ORCA_LOCAL_ORCAD_TARGETS: 'linux-arm64-glibc' })
+      localPackagingOrcadTemplateTargets({ ORCA_LOCAL_ORCAD_TARGETS: 'linux-arm64-glibc' })
     ).toEqual(['linux-arm64-glibc'])
   })
 
-  it('ignores a declaration when the release requires the full template', () => {
-    expect(
-      packagingOrcadTemplateTargets({
-        ORCA_LOCAL_ORCAD_TARGETS: 'linux-arm64-glibc',
-        ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
-      })
-    ).toEqual(ALL_TARGETS)
+  it('ignores an inherited declaration in any release or CI build', () => {
+    for (const release of [
+      { ORCA_REQUIRE_ORCAD_TEMPLATE: '1' },
+      { ORCA_MAC_RELEASE: '1' },
+      { ORCA_MAC_HOURLY: '1' },
+      { ORCA_WIN_DAILY: '1' },
+      { ORCA_LINUX_ARM64_RELEASE: '1' },
+      { CI: 'true' },
+      { GITHUB_ACTIONS: 'true' }
+    ]) {
+      expect(
+        localPackagingOrcadTemplateTargets({
+          ...release,
+          ORCA_LOCAL_ORCAD_TARGETS: 'linux-arm64-glibc'
+        })
+      ).toBeNull()
+    }
   })
 })

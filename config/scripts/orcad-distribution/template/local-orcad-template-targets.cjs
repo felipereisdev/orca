@@ -45,12 +45,34 @@ function localOrcadDockerPlatform(target) {
   return `linux/${DOCKER_ARCH_BY_TARGET_ARCH[match[1]]}`
 }
 
-/** Targets packaging verifies: a local build's declared subset, else the release's full matrix. */
-function packagingOrcadTemplateTargets(env = process.env) {
-  if (env.ORCA_REQUIRE_ORCAD_TEMPLATE === '1' || !(env[LOCAL_ORCAD_TARGETS_ENV] ?? '').trim()) {
-    return ORCAD_TEMPLATE_TARGETS
+// Release and CI builds always verify the full matrix, whatever a developer's shell exported.
+const RELEASE_BUILD_FLAGS = [
+  'ORCA_REQUIRE_ORCAD_TEMPLATE',
+  'ORCA_MAC_RELEASE',
+  'ORCA_MAC_HOURLY',
+  'ORCA_MAC_DAILY',
+  'ORCA_MAC_ADHOC',
+  'ORCA_WIN_HOURLY',
+  'ORCA_WIN_DAILY',
+  'ORCA_WIN_ADHOC',
+  'ORCA_LINUX_ARM64_RELEASE'
+]
+
+function isReleaseOrCiBuild(env) {
+  const ci = (env.CI ?? '').trim().toLowerCase()
+  return (
+    RELEASE_BUILD_FLAGS.some((flag) => env[flag] === '1') ||
+    (ci !== '' && ci !== '0' && ci !== 'false') ||
+    env.GITHUB_ACTIONS === 'true'
+  )
+}
+
+/** The exact targets a local build declared for packaging; null means verify the release matrix. */
+function localPackagingOrcadTemplateTargets(env = process.env) {
+  if (isReleaseOrCiBuild(env) || !(env[LOCAL_ORCAD_TARGETS_ENV] ?? '').trim()) {
+    return null
   }
-  return localOrcadTemplateTargets(env) ?? ORCAD_TEMPLATE_TARGETS
+  return localOrcadTemplateTargets(env)
 }
 
 module.exports = {
@@ -58,5 +80,5 @@ module.exports = {
   LOCAL_ORCAD_TARGETS_ENV,
   localOrcadDockerPlatform,
   localOrcadTemplateTargets,
-  packagingOrcadTemplateTargets
+  localPackagingOrcadTemplateTargets
 }

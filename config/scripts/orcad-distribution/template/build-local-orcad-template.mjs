@@ -1,11 +1,22 @@
 #!/usr/bin/env node
 // Builds a partial orcad template for local builds: glibc Linux targets, each in a Docker container of its own arch.
 // Targets: ORCA_LOCAL_ORCAD_TARGETS (default linux-arm64-glibc, `none` skips). Writes out/orcad-template.
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  closeSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { runProcessSync } from '@orca/process-host'
+import { ORCAD_CLI_PACKAGE_FILENAME } from '../../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts'
 import {
   LOCAL_ORCAD_TARGETS_ENV,
   localOrcadDockerPlatform,
@@ -84,9 +95,9 @@ function git(args, cwd = ROOT) {
   return run('git', args, { cwd, capture: true }).stdout.trim()
 }
 
-function dockerUnavailableReason() {
+function dockerUnavailableReason(program) {
   try {
-    const result = run('docker', ['info', '--format', '{{.ServerVersion}}'], {
+    const result = run(program, ['info', '--format', '{{.ServerVersion}}'], {
       capture: true,
       allowFailure: true,
       timeoutMs: 30_000
@@ -180,29 +191,73 @@ function runBuilder({ image, platform, cacheDir, src, slots, templateTargets, me
   ])
 }
 
-/** Builds out/orcad-template for the declared targets; skips without Docker or with `none`. */
-export function buildLocalOrcadTemplate(env = process.env) {
-  const targets = localOrcadTemplateTargets(env)
-  if (!targets) {
-    log(`skipped: ${LOCAL_ORCAD_TARGETS_ENV}=none`)
-    return { status: 'skipped', reason: `${LOCAL_ORCAD_TARGETS_ENV}=none` }
+const LOCK_POLL_MS = 5_000
+const LOCK_WAIT_MS = 2 * 60 * 60 * 1000
+
+function lockHolderIsAlive(lockPath) {
+  let holder
+  try {
+    holder = JSON.parse(readFileSync(lockPath, 'utf8'))
+  } catch {
+    // A half-written lock is a holder starting up; an old unreadable one is debris.
+    return existsSync(lockPath) && Date.now() - statSync(lockPath).mtimeMs < 10_000
   }
-  const byPlatform = new Map()
-  for (const target of targets) {
-    const platform = localOrcadDockerPlatform(target)
-    byPlatform.set(platform, [...(byPlatform.get(platform) ?? []), target])
+  try {
+    process.kill(holder.pid, 0)
+    return true
+  } catch (error) {
+    return error?.code === 'EPERM'
   }
-  const unavailable = dockerUnavailableReason()
-  if (unavailable) {
-    log(`skipped: ${unavailable}; this build ships no orcad template`)
-    return { status: 'skipped', reason: unavailable }
+}
+
+/** Exclusive lock on the shared cache; a lock whose owner died is reclaimed. Returns its release. */
+export function acquireLocalOrcadCacheLock(lockPath, { waitMs = LOCK_WAIT_MS } = {}) {
+  const deadline = Date.now() + waitMs
+  let announced = false
+  for (;;) {
+    try {
+      const fd = openSync(lockPath, 'wx')
+      writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }))
+      closeSync(fd)
+      return () => rmSync(lockPath, { force: true })
+    } catch (error) {
+      if (error?.code !== 'EEXIST') {
+        throw error
+      }
+    }
+    if (!lockHolderIsAlive(lockPath)) {
+      rmSync(lockPath, { force: true })
+      continue
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `another local orcad template build holds ${lockPath} (${readFileSync(lockPath, 'utf8')})`
+      )
+    }
+    if (!announced) {
+      log(`waiting for another local orcad template build (${lockPath})`)
+      announced = true
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_POLL_MS)
   }
+}
+
+/** The template's CLI package records the commit it was built from; refuse any other checkout's. */
+export function assertTemplateFromCommit(templateDir, head) {
+  const { commit } = JSON.parse(
+    readFileSync(join(templateDir, ...ORCAD_CLI_PACKAGE_FILENAME.split('/')), 'utf8')
+  )
+  if (commit !== head) {
+    throw new Error(`the built template comes from ${commit}, not this checkout's HEAD ${head}`)
+  }
+}
+
+function buildInCache(targets, byPlatform, outputDir) {
   const head = git(['rev-parse', 'HEAD'])
-  if (git(['status', '--porcelain', '--untracked-files=no'])) {
+  if (git(['status', '--porcelain', '--untracked-files=normal'])) {
     log(`warning: uncommitted changes are not in the template; it is built from HEAD ${head}`)
   }
   log(`building ${targets.join(', ')} from ${head}`)
-  const startedAt = Date.now()
   // The first target's platform builds the template last, from every platform's prebuilds.
   const builds = [...byPlatform].map(([platform, slots]) => {
     const dockerArch = platform.split('/')[1]
@@ -224,13 +279,44 @@ export function buildLocalOrcadTemplate(env = process.env) {
     })
     log(`${build.platform} done in ${Math.round((Date.now() - phaseStartedAt) / 1000)}s`)
   }
-  const outputDir = join(ROOT, 'out', 'orcad-template')
+  const builtDir = join(primary.src, 'out', 'orcad-template')
+  assertTemplateFromCommit(builtDir, head)
+  cpSync(builtDir, outputDir, { recursive: true, verbatimSymlinks: true })
+  assertTemplateFromCommit(outputDir, head)
+}
+
+/** Builds out/orcad-template for the declared targets; any run that produces none leaves none behind. */
+export function buildLocalOrcadTemplate(env = process.env, options = {}) {
+  const outputDir = options.outputDir ?? join(ROOT, 'out', 'orcad-template')
+  // Why first: a stale template from an older HEAD or other targets must never be packaged.
   rmSync(outputDir, { recursive: true, force: true })
-  cpSync(join(primary.src, 'out', 'orcad-template'), outputDir, {
-    recursive: true,
-    verbatimSymlinks: true
-  })
-  verifyPackagedOrcadTemplate(join(ROOT, 'out'), targets)
+  const targets = localOrcadTemplateTargets(env)
+  if (!targets) {
+    log(`skipped: ${LOCAL_ORCAD_TARGETS_ENV}=none`)
+    return { status: 'skipped', reason: `${LOCAL_ORCAD_TARGETS_ENV}=none` }
+  }
+  const byPlatform = new Map()
+  for (const target of targets) {
+    const platform = localOrcadDockerPlatform(target)
+    byPlatform.set(platform, [...(byPlatform.get(platform) ?? []), target])
+  }
+  const unavailable = dockerUnavailableReason(options.dockerProgram ?? 'docker')
+  if (unavailable) {
+    log(`skipped: ${unavailable}; this build ships no orcad template`)
+    return { status: 'skipped', reason: unavailable }
+  }
+  const startedAt = Date.now()
+  mkdirSync(CACHE_ROOT, { recursive: true })
+  const release = acquireLocalOrcadCacheLock(join(CACHE_ROOT, '.lock'))
+  try {
+    buildInCache(targets, byPlatform, outputDir)
+    verifyPackagedOrcadTemplate(dirname(outputDir), targets, { exact: true })
+  } catch (error) {
+    rmSync(outputDir, { recursive: true, force: true })
+    throw error
+  } finally {
+    release()
+  }
   log(`ok — ${targets.join(', ')} in ${Math.round((Date.now() - startedAt) / 1000)}s`)
   return { status: 'built', targets }
 }

@@ -31,12 +31,10 @@ export function getLocalBuildIdentity() {
 }
 
 /** Env that declares the template to electron-builder; a failed or skipped build ships none, never a stale one. */
-export function localOrcadTemplateEnv(env = process.env) {
-  if (env[LOCAL_ORCAD_TARGETS_ENV]?.trim() === 'none') {
-    return {}
-  }
+export function localOrcadTemplateEnv(env = process.env, options = {}) {
+  const outputDir = options.outputDir ?? resolve('out', 'orcad-template')
   try {
-    const result = buildLocalOrcadTemplate(env)
+    const result = buildLocalOrcadTemplate(env, { outputDir })
     if (result.status === 'built') {
       return { [LOCAL_ORCAD_TARGETS_ENV]: result.targets.join(',') }
     }
@@ -45,7 +43,7 @@ export function localOrcadTemplateEnv(env = process.env) {
       `[build:mac] orcad template build failed, packaging without it: ${error instanceof Error ? error.message : String(error)}`
     )
   }
-  rmSync(resolve('out', 'orcad-template'), { recursive: true, force: true })
+  rmSync(outputDir, { recursive: true, force: true })
   return { [LOCAL_ORCAD_TARGETS_ENV]: undefined }
 }
 

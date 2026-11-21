@@ -32,7 +32,10 @@ function targetFileContents(target, filename) {
   return `${target}:${filename}`
 }
 
-export async function writeOrcadTemplateTestFixture(resourcesDir, { compat = false } = {}) {
+export async function writeOrcadTemplateTestFixture(
+  resourcesDir,
+  { compat = false, targets: baseTargets = ORCAD_TEMPLATE_TARGETS } = {}
+) {
   const templateDir = join(resourcesDir, 'orcad-template')
   const commonSha256 = {}
   for (const filename of orcadTemplateCommonFilenames(['out/mobile-web/index.html'])) {
@@ -46,7 +49,7 @@ export async function writeOrcadTemplateTestFixture(resourcesDir, { compat = fal
     )
   }
   const targets = {}
-  for (const target of [...ORCAD_TEMPLATE_TARGETS, ...(compat ? COMPAT_SERVER_TARGETS : [])]) {
+  for (const target of [...baseTargets, ...(compat ? COMPAT_SERVER_TARGETS : [])]) {
     const targetDir = join(templateDir, ORCAD_TEMPLATE_TARGETS_DIR, target)
     const files = {}
     for (const filename of orcadTemplateTargetFilenames(target)) {
@@ -58,13 +61,15 @@ export async function writeOrcadTemplateTestFixture(resourcesDir, { compat = fal
     targets[target] = { files }
   }
   const browserName = 'agent-browser-linux-x64'
-  targets['linux-x64-glibc'] = {
-    ...targets['linux-x64-glibc'],
-    browserName,
-    browserSha256: await write(
-      join(templateDir, ORCAD_TEMPLATE_TARGETS_DIR, 'linux-x64-glibc', browserName),
-      'browser'
-    )
+  if (targets['linux-x64-glibc']) {
+    targets['linux-x64-glibc'] = {
+      ...targets['linux-x64-glibc'],
+      browserName,
+      browserSha256: await write(
+        join(templateDir, ORCAD_TEMPLATE_TARGETS_DIR, 'linux-x64-glibc', browserName),
+        'browser'
+      )
+    }
   }
   await writeFile(
     join(templateDir, ORCAD_TEMPLATE_MANIFEST_FILENAME),
