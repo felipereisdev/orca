@@ -28,7 +28,7 @@ The image. Its hash (with the four files it copies) names `orca-desktop:<hash>`.
 # Users: vnc runs Xvnc and owns the VNC password; gui runs the launcher and every program it starts;
 # dev is the agent/SSH user, with no X access and no sudo. dev and gui share the checkout via `work`:
 # /work is setgid `work`, and dev's SSH sessions and the launcher use umask 002.
-FROM node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
 
 # Agent CLIs baked into the image; the auth image adds their login.
 ARG AGENT_PACKAGES="@openai/codex@0.170.0 @anthropic-ai/claude-code@2.1.328"
@@ -41,7 +41,8 @@ RUN sed -i \
       /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::Check-Valid-Until=false update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates ffmpeg fluxbox git iproute2 openssh-client openssh-server procps \
+      ca-certificates ffmpeg fluxbox g++ git iproute2 make openssh-client openssh-server procps \
+      python3 \
       tigervnc-standalone-server tigervnc-tools util-linux x11-utils xauth \
       fonts-dejavu-core libasound2 libatk-bridge2.0-0 libatspi2.0-0 libcups2 libdrm2 libgbm1 \
       libgtk-3-0 libnotify4 libnss3 libsecret-1-0 libx11-xcb1 libxcomposite1 libxdamage1 \
@@ -281,15 +282,21 @@ exit 1
 
 ### `orca-desktop-clone`
 
-Clones the repo as `dev`, with the git token on stdin.
+Clones the repo as `dev`, with the git token on stdin, and keeps the token for later fetch and push.
 
 ```bash
 #!/bin/bash
 # Runs as dev: orca-desktop-clone <url> <dest> [ref]. The first stdin line is the git token (may be
-# empty); it reaches git only through a GIT_ASKPASS helper reading a 0600 file removed on exit.
+# empty); the clone reaches it only through a GIT_ASKPASS helper reading a 0600 file removed on
+# exit. After a clone of an https:// URL, the token goes to dev's git credential store
+# (~/.git-credentials, 0600), scoped to that host, so later fetch and push work too.
 set -eu
 url="$1" dest="$2" ref="${3:-}"
 IFS= read -r token || true
+# docker exec -u dev does not set HOME; git config --global and the store live there.
+HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+export HOME
+saved_token="$token"
 
 umask 077
 tmp="$(mktemp -d)"
@@ -315,6 +322,16 @@ fi
 if [ -n "$ref" ]; then
   git -C "$dest" checkout --quiet "$ref"
 fi
+
+# Only an https:// URL without user info names a host the token belongs to.
+host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
+if [ -n "$saved_token" ] && [ -n "$host" ]; then
+  umask 077
+  git config --global "credential.https://$host.helper" store
+  printf 'protocol=https\nhost=%s\nusername=x-access-token\npassword=%s\n\n' \
+    "$host" "$saved_token" | git credential approve
+fi
+saved_token=''
 ```
 
 ### `orca-desktop-launcher`

@@ -60,8 +60,16 @@ Orca's server and the launcher prove it to each other with HMAC-SHA256 over fres
 the launcher first, so a listener that does not know the token receives only a nonce and the run
 fails with `desktop_launcher_rejected`; a malformed or missing proof is a rejection too. The
 launcher checks a client's proof against its current token, gives an unauthenticated connection
-five seconds, and closes every unauthenticated connection when the token rotates. The git token reaches a `GIT_ASKPASS` helper through a 0600
-file removed after the clone.
+five seconds, and closes every unauthenticated connection when the token rotates. For the clone, the git token reaches a `GIT_ASKPASS`
+helper through a 0600 file removed afterwards. After a successful clone of an `https://` URL, the
+token is kept in `dev`'s git credential store (`~/.git-credentials`, 0600, with
+`credential.https://<host>.helper store` scoped to the repo's host), so later fetch and push, and
+the environment doctor's check of `origin`, work without asking.
+
+The trade-off: the agent runs as `dev`, so it can read and use that token. That is the same access
+an agent on the Mac already has through `gh` or the Mac's own credentials. Give Orca a fine-grained
+token limited to this repo (and the permissions the agent needs) through `GH_TOKEN` or
+`GITHUB_TOKEN` in Orca's environment, rather than a broad personal token.
 
 The desktop ports are held before anyone can log in. On every container start the root entrypoint
 starts Xvnc (as `vnc`) and the launcher (as `gui`) with throwaway secrets, waits until 5901 and
@@ -175,7 +183,10 @@ environmentRecipes:
 
 `create.sh` builds `orca-desktop:<hash>` when the Docker host lacks it; the hash covers the
 Dockerfile and the four files copied into the image, so editing any of them rebuilds once. The
-image pins its base by digest, Debian packages by a snapshot date, and the agent CLIs by version.
+image pins its base (`node:24-bookworm-slim`) by digest, Debian packages by a snapshot date, and
+the agent CLIs by version. Node 24 ships npm 11, which honors a repo's `allowScripts`; the image
+also carries `g++`, `make` and `python3`, so native modules such as `better-sqlite3` build in the
+checkout.
 
 `auth.sh` is the interactive auth snapshot. Run it by hand in a terminal with
 `ORCA_DESKTOP_AGENT=codex` or `claude`: it starts the base image, prints the exact

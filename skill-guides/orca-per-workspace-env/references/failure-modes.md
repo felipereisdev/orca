@@ -38,6 +38,13 @@ Streams are redacted and capped at both ends, keeping the start and the failure.
 - **The `GIT_ASKPASS` helper aborts the clone with `$1: unbound variable`.** The `printf` or heredoc
   that wrote the helper inside `bash -lc` under `set -u` expanded `$1` and `$GH_TOKEN` at write time
   instead of leaving them for git-runtime. The same mistake writes the real token into the file.
+- **The doctor fails with "Cannot reach remote origin ... could not read Username" after a good
+  clone.** The token served only the clone and was deleted, so later fetch and push have no
+  credential. Keep it in the user's git credential store, scoped to the repo's host, as
+  `orca-desktop-clone` in `references/docker-desktop-ssh-templates.md` does.
+- **`npm install` rebuilds native modules and fails without a compiler.** npm 10 (Node 22) ignores
+  npm 11's `allowScripts`, and a slim image has no `python3`, `make` or `g++`. Base the image on
+  Node 24 and install those three.
 
 ## Agent auth
 
