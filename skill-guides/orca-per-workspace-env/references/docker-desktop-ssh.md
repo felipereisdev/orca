@@ -61,10 +61,11 @@ the launcher first, so a listener that does not know the token receives only a n
 fails with `desktop_launcher_rejected`; a malformed or missing proof is a rejection too. The
 launcher checks a client's proof against its current token, gives an unauthenticated connection
 five seconds, and closes every unauthenticated connection when the token rotates. For the clone, the git token reaches a `GIT_ASKPASS`
-helper through a 0600 file removed afterwards. After a successful clone of an `https://` URL, the
-token is kept in `dev`'s git credential store (`~/.git-credentials`, 0600, with
-`credential.https://<host>.helper store` scoped to the repo's host), so later fetch and push, and
-the environment doctor's check of `origin`, work without asking.
+helper through a 0600 file removed afterwards. When git asked for the token, it is kept in `dev`'s
+git credential store after a successful clone of an `https://` URL (`~/.git-credentials`, 0600, with
+`credential.https://<host>.helper store` scoped to the repo's host). Later fetch and push, and the
+environment doctor's check of `origin`, then work without asking. A clone that never asked (a public
+repo) stores nothing, so pushing from there needs the user to add a credential.
 
 The trade-off: the agent runs as `dev`, so it can read and use that token. That is the same access
 an agent on the Mac already has through `gh` or the Mac's own credentials. Give Orca a fine-grained
@@ -147,14 +148,22 @@ environment win. The scripts read only `ORCA_DOCKER_*` and `ORCA_DESKTOP_*` keys
 | `ORCA_DESKTOP_KNOWN_HOSTS`                                      | `~/.ssh/known_hosts`         | Where container host keys are recorded       |
 | `ORCA_DESKTOP_REPO_URL`                                         | `ORCA_REPO_URL`, else origin | Repo to clone into `/work`                   |
 | `ORCA_DESKTOP_REPO_REF`                                         | default branch               | Ref to check out after cloning               |
+| `ORCA_DESKTOP_GIT_TOKEN_HOST`                                   | empty                        | Host `ORCA_DESKTOP_GIT_TOKEN` is sent to     |
 | `ORCA_DESKTOP_CPUS`, `ORCA_DESKTOP_MEMORY`, `ORCA_DESKTOP_PIDS` | `2`, `4g`, `2048`            | Limits                                       |
 
 With a remote host, Orca reaches the container through the Docker host: the target is
 `127.0.0.1:<published port>` with `jumpHost` set to `ORCA_DOCKER_HOST`. Each container generates
 its own SSH host key on first start; `create` and `resume` read it through `docker exec` and record
 it under `[127.0.0.1]:<port>`, replacing only a stale entry for that endpoint, and `destroy`
-removes the entry while it still matches the container. The git token (`GH_TOKEN`, `GITHUB_TOKEN`,
-else `gh auth token`) is sent only for `https://` repo URLs.
+removes the entry while it still matches the container.
+
+The git token is bound to the host it was issued for. `GH_TOKEN`, `GITHUB_TOKEN`, else
+`gh auth token`, are GitHub tokens, so `create.sh` sends one only when the repo URL is
+`https://github.com/…`. For another host (GitHub Enterprise, GitLab, a self-hosted server), set
+`ORCA_DESKTOP_GIT_TOKEN` and `ORCA_DESKTOP_GIT_TOKEN_HOST` (for example `gitlab.example.com`) in
+Orca's environment. The token is sent only when the URL's host matches exactly. Keep the token out
+of `docker-desktop.env`, which is for non-secret settings. Any other URL gets no token, so a
+private repo there fails to clone instead of receiving an unrelated credential.
 
 Gitignore `id_ed25519`, `id_ed25519.pub` and `docker-desktop.env`.
 

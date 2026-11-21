@@ -1,5 +1,14 @@
-import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFile, execFileSync, spawnSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -97,11 +106,115 @@ function flagsOk(dir) {
   return result.status === 0
 }
 
+// create.sh's token choice for a repo URL, with gh stubbed so it never reaches the real CLI.
+function gitToken(dir, repoUrl, env = {}) {
+  const bin = path.join(dir, 'stub-bin')
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(path.join(bin, 'gh'), '#!/bin/sh\necho gh-cli-token\n', { mode: 0o755 })
+  return execFileSync(
+    'bash',
+    [
+      '-c',
+      'set -euo pipefail; repo_url="$2"; eval "$(sed -n "/^git_token()/,/^}/p" "$1/create.sh")"; git_token',
+      '_',
+      dir,
+      repoUrl
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        PATH: `${bin}:/usr/bin:/bin`,
+        ...env
+      }
+    }
+  )
+}
+
+/**
+ * Runs the real orca-desktop-clone as this user against `repoUrl`, which the home's git config
+ * rewrites to `rewriteTo`; getent is stubbed to that home, and system config (a keychain helper) is off.
+ */
+function runClone(dir, { repoUrl, rewriteTo, token }) {
+  const home = path.join(dir, 'home')
+  const bin = path.join(dir, 'clone-bin')
+  mkdirSync(home, { recursive: true })
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(path.join(bin, 'getent'), `#!/bin/sh\necho "u:x:1:1::${home}:/bin/sh"\n`, {
+    mode: 0o755
+  })
+  writeFileSync(path.join(home, '.gitconfig'), `[url "${rewriteTo}"]\n\tinsteadOf = ${repoUrl}\n`)
+  return new Promise((resolve) => {
+    const child = execFile(
+      path.join(dir, 'orca-desktop-clone'),
+      [repoUrl, path.join(dir, 'checkout')],
+      {
+        encoding: 'utf8',
+        env: {
+          PATH: `${bin}:${process.env.PATH}`,
+          GIT_CONFIG_NOSYSTEM: '1',
+          XDG_CONFIG_HOME: path.join(home, '.config')
+        }
+      },
+      (error, stdout, stderr) => resolve({ ok: !error, stderr, home })
+    )
+    child.stdin.end(`${token}\n`)
+  })
+}
+
+function bareRepo(dir) {
+  const work = path.join(dir, 'src')
+  const bare = path.join(dir, 'served', 'repo.git')
+  const git = (...args) =>
+    execFileSync('git', args, { env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1' } })
+  git('init', '-q', '-b', 'main', work)
+  git(
+    '-C',
+    work,
+    '-c',
+    'user.email=t@t',
+    '-c',
+    'user.name=t',
+    'commit',
+    '-q',
+    '--allow-empty',
+    '-m',
+    'init'
+  )
+  git('clone', '-q', '--bare', work, bare)
+  git('-C', bare, 'update-server-info')
+  return bare
+}
+
+/** Serves a bare repo over git's dumb HTTP protocol, only to basic auth with this token. */
+async function authServer(root, token) {
+  const expected = `Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+  const server = createServer((request, response) => {
+    if (request.headers.authorization !== expected) {
+      response.writeHead(401, { 'WWW-Authenticate': 'Basic realm="repo"' }).end()
+      return
+    }
+    const file = path.join(root, new URL(request.url, 'http://x').pathname)
+    if (!file.startsWith(root) || !existsSync(file) || statSync(file).isDirectory()) {
+      response.writeHead(404).end()
+      return
+    }
+    response.writeHead(200, { 'Content-Type': 'application/octet-stream' }).end(readFileSync(file))
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  servers.push(server)
+  return `http://127.0.0.1:${server.address().port}`
+}
+
+const servers = []
+
 function edit(file, change) {
   writeFileSync(file, change(readFileSync(file, 'utf8')))
 }
 
 afterEach(() => {
+  for (const server of servers.splice(0)) {
+    server.close()
+  }
   for (const dir of directories.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -156,5 +269,48 @@ describe.skipIf(process.platform === 'win32')('docker desktop recipe templates',
       text.replace('ptrace_scope_fix() {\n', 'ptrace_scope_fix() {\n  dk run --privileged z\n')
     )
     expect(flagsOk(inserted)).toBe(false)
+  })
+  it('passes a GitHub token only to github.com, and an explicit one only to its host', () => {
+    const dir = extractTemplates()
+    const github = { GH_TOKEN: 'gh-env-token' }
+    const override = {
+      ORCA_DESKTOP_GIT_TOKEN: 'other-token',
+      ORCA_DESKTOP_GIT_TOKEN_HOST: 'git.example.test'
+    }
+
+    expect(gitToken(dir, 'https://github.com/acme/repo.git', github)).toBe('gh-env-token\n')
+    expect(gitToken(dir, 'https://github.com/acme/repo.git')).toBe('gh-cli-token\n')
+    expect(gitToken(dir, 'https://git.example.test/acme/repo.git', github)).toBe('\n')
+    expect(gitToken(dir, 'https://git.example.test/acme/repo.git')).toBe('\n')
+    expect(gitToken(dir, 'https://git.example.test/acme/repo.git', override)).toBe('other-token\n')
+    expect(gitToken(dir, 'https://github.com/acme/repo.git', { ...github, ...override })).toBe(
+      'gh-env-token\n'
+    )
+    expect(gitToken(dir, 'git@github.com:acme/repo.git', github)).toBe('\n')
+  })
+
+  it('stores the token only when the clone needed it', async () => {
+    const anonymous = extractTemplates()
+    const open = await runClone(anonymous, {
+      repoUrl: 'https://github.com/acme/repo.git',
+      rewriteTo: `file://${bareRepo(anonymous)}`,
+      token: 'unused-token'
+    })
+    expect(open.ok).toBe(true)
+    expect(existsSync(path.join(open.home, '.git-credentials'))).toBe(false)
+
+    const authed = extractTemplates()
+    const base = await authServer(path.join(authed, 'served'), 'good-token')
+    bareRepo(authed)
+    const needed = await runClone(authed, {
+      repoUrl: 'https://github.com/acme/repo.git',
+      rewriteTo: `${base}/repo.git`,
+      token: 'good-token'
+    })
+    expect(needed.stderr).toBe('')
+    expect(needed.ok).toBe(true)
+    const store = path.join(needed.home, '.git-credentials')
+    expect(readFileSync(store, 'utf8')).toBe('https://x-access-token:good-token@github.com\n')
+    expect(statSync(store).mode & 0o777).toBe(0o600)
   })
 })
