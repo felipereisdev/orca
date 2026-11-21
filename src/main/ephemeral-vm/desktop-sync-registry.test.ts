@@ -289,3 +289,53 @@ describe('desktop hand-off lifecycle', () => {
     expect(configureCalls()).toBe(2)
   })
 })
+
+describe('desktop skill install at hand-over', () => {
+  afterEach(() => {
+    stopEnvironmentDesktop('vm-1')
+    state.statusListeners.splice(0)
+    env.reset()
+  })
+
+  function skillPlans(): number {
+    return env.methods().filter((method) => method === 'skills.planBundledOrca').length
+  }
+
+  it('starts no install when the experiment is turned off while the configure is pending', async () => {
+    const settings = { experimentalEphemeralVms: true }
+    const store = { getSettings: () => settings }
+    const release = holdConfigures()
+    const started = startEnvironmentDesktop(store, runningRuntime())
+    settings.experimentalEphemeralVms = false
+    release()
+    await started
+    await settle()
+
+    expect(configureCalls()).toBe(1)
+    expect(skillPlans()).toBe(0)
+  })
+
+  it('a pending install leaves the desktop configured and its recordings syncing', async () => {
+    env.planSkills = () => new Promise(() => {})
+    await startEnvironmentDesktop(STORE, runningRuntime())
+
+    await vi.waitFor(() => expect(skillPlans()).toBe(1))
+    expect(desktopControllerToken('env-1')).toBe('controller-token-1')
+    await vi.waitFor(() => expect(env.streams).toHaveLength(1))
+  })
+
+  it('a failed install leaves the desktop configured and its recordings syncing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await startEnvironmentDesktop(STORE, runningRuntime())
+    await settle()
+
+    expect(skillPlans()).toBe(1)
+    expect(warn).toHaveBeenCalledWith('[ephemeral-vm] desktop skill install failed', {
+      environmentId: 'env-1',
+      code: 'method_not_found'
+    })
+    expect(desktopControllerToken('env-1')).toBe('controller-token-1')
+    expect(env.streams).toHaveLength(1)
+    warn.mockRestore()
+  })
+})

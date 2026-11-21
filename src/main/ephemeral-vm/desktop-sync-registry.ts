@@ -9,6 +9,7 @@ import {
   type DesktopRuntime,
   type DesktopSettingsSource
 } from './desktop-configure'
+import { installDesktopAgentSkillOnEnvironment } from './desktop-agent-skill-install'
 import { indexLocalRecordings } from './desktop-recording-index'
 import { syncEnvironmentRecordings } from './desktop-recording-sync'
 
@@ -123,6 +124,12 @@ function configure(
     if (configured.outcome === 'configured') {
       entry.controllerToken = configured.controllerToken
       resetRetry(entry)
+      // The environment's agents have no display; the skill tells them to use `orca desktop run`.
+      // The experiment may have been turned off during the configure, so it is read again.
+      void installDesktopAgentSkillOnEnvironment(
+        target.environmentId,
+        () => runtimeDesktop(store, entry.runtime) !== null
+      )
     }
     if (entry.restartQueued) {
       entry.restartQueued = false

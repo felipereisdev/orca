@@ -28,7 +28,7 @@ The image. Its hash (with the four files it copies) names `orca-desktop:<hash>`.
 # Users: vnc runs Xvnc and owns the VNC password; gui runs the launcher and every program it starts;
 # dev is the agent/SSH user, with no X access and no sudo. dev and gui share the checkout via `work`:
 # /work is setgid `work`, and dev's SSH sessions and the launcher use umask 002.
-FROM node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
 
 # Agent CLIs baked into the image; the auth image adds their login.
 ARG AGENT_PACKAGES="@openai/codex@0.170.0 @anthropic-ai/claude-code@2.1.328"
@@ -41,7 +41,8 @@ RUN sed -i \
       /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::Check-Valid-Until=false update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates ffmpeg fluxbox git iproute2 openssh-client openssh-server procps \
+      ca-certificates ffmpeg fluxbox g++ git iproute2 make openssh-client openssh-server procps \
+      python3 \
       tigervnc-standalone-server tigervnc-tools util-linux x11-utils xauth \
       fonts-dejavu-core libasound2 libatk-bridge2.0-0 libatspi2.0-0 libcups2 libdrm2 libgbm1 \
       libgtk-3-0 libnotify4 libnss3 libsecret-1-0 libx11-xcb1 libxcomposite1 libxdamage1 \
@@ -281,40 +282,60 @@ exit 1
 
 ### `orca-desktop-clone`
 
-Clones the repo as `dev`, with the git token on stdin.
+Clones the repo as `dev`, with the git token on stdin, and keeps the token for later fetch and push.
 
 ```bash
 #!/bin/bash
 # Runs as dev: orca-desktop-clone <url> <dest> [ref]. The first stdin line is the git token (may be
-# empty); it reaches git only through a GIT_ASKPASS helper reading a 0600 file removed on exit.
+# empty; create.sh sends one only for the host it was issued for, the URL's https host). No prompt
+# is parsed: the clone gets the token from a credential-store helper scoped to that exact host, so
+# git consults it only for a URL whose host git itself parsed as that host (never a redirect
+# target). The helper's file is 0600 and removed on exit. When git asked for the token, it goes to
+# dev's git credential store (~/.git-credentials, 0600) with the same host-scoped helper, so later
+# fetch and push work too. A clone that never asked stores nothing.
 set -eu
 url="$1" dest="$2" ref="${3:-}"
 IFS= read -r token || true
+# docker exec -u dev does not set HOME; git config --global and the store live there.
+HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+export HOME
+export GIT_TERMINAL_PROMPT=0
+
+# Only an https:// URL without user info names the host the token was issued for.
+host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
 
 umask 077
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-if [ -n "$token" ]; then
-  printf '%s\n' "$token" > "$tmp/token"
-  # shellcheck disable=SC2016 # $1 belongs to the helper script.
-  printf '#!/bin/sh\ncase "$1" in Username*) echo x-access-token ;; *) cat %s ;; esac\n' \
-    "$tmp/token" > "$tmp/askpass"
-  chmod 0700 "$tmp/askpass"
-  export GIT_ASKPASS="$tmp/askpass"
+git_args=()
+if [ -n "$token" ] && [ -n "$host" ]; then
+  # credential-store encodes the token itself, whatever characters it holds.
+  printf 'protocol=https\nhost=%s\nusername=x-access-token\npassword=%s\n\n' "$host" "$token" |
+    git credential-store --file="$tmp/credentials" store
+  # Clears inherited helpers, then answers only https://<host>; a `get` marks that git asked.
+  git_args=(-c credential.helper=
+    -c "credential.https://$host.helper=!f() { [ \"\$1\" != get ] || : > '$tmp/asked'; git credential-store --file='$tmp/credentials' \"\$@\"; }; f")
 fi
-token=''
-export GIT_TERMINAL_PROMPT=0
 
 # /work is setgid `work`: gui gets read/write on the checkout through the group.
 umask 007
 if [ -d "$dest/.git" ]; then
-  git -C "$dest" fetch --quiet origin
+  git ${git_args[@]+"${git_args[@]}"} -C "$dest" fetch --quiet origin
 else
-  git clone --quiet -- "$url" "$dest"
+  git ${git_args[@]+"${git_args[@]}"} clone --quiet -- "$url" "$dest"
 fi
 if [ -n "$ref" ]; then
   git -C "$dest" checkout --quiet "$ref"
 fi
+
+# Stored only for the issued host, and only when git asked that host for the token.
+if [ -n "$token" ] && [ -n "$host" ] && [ -e "$tmp/asked" ]; then
+  umask 077
+  git config --global "credential.https://$host.helper" store
+  printf 'protocol=https\nhost=%s\nusername=x-access-token\npassword=%s\n\n' \
+    "$host" "$token" | git credential approve
+fi
+token=''
 ```
 
 ### `orca-desktop-launcher`
@@ -1104,11 +1125,20 @@ repo_name="$(basename "${repo_url%/}" .git)"
 repo_name="$(printf '%s' "$repo_name" | LC_ALL=C tr -c 'A-Za-z0-9_.-' '-')"
 project_root="/work/$repo_name"
 
+# A token only for the host it was issued for: ORCA_DESKTOP_GIT_TOKEN for
+# ORCA_DESKTOP_GIT_TOKEN_HOST, else GitHub's for github.com only (GH_TOKEN, GITHUB_TOKEN, or gh
+# pinned to github.com: a bare `gh auth token` can answer an Enterprise host).
 git_token() {
-  case "$repo_url" in
-    https://*) printf '%s\n' "${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}}" ;;
-    *) printf '\n' ;;
-  esac
+  local host
+  host="$(printf '%s' "$repo_url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p' | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+  if [ -n "$host" ] && [ -n "${ORCA_DESKTOP_GIT_TOKEN:-}" ] &&
+    [ "$host" = "$(printf '%s' "${ORCA_DESKTOP_GIT_TOKEN_HOST:-}" | LC_ALL=C tr '[:upper:]' '[:lower:]')" ]; then
+    printf '%s\n' "$ORCA_DESKTOP_GIT_TOKEN"
+  elif [ "$host" = github.com ]; then
+    printf '%s\n' "${GH_TOKEN:-${GITHUB_TOKEN:-$(gh auth token --hostname github.com 2>/dev/null || true)}}"
+  else
+    printf '\n'
+  fi
 }
 
 ensure_base_image

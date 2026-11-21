@@ -5,16 +5,18 @@ description: >-
   `orca desktop`: run GUI apps and end-to-end tests on it, take screenshots, click,
   type and record a test as a video the user can watch in the chat. Use when a
   workspace's environment has a desktop and the task needs a visible GUI or a recorded
-  test. For a local app window use `orca-computer-use`; for Orca's embedded browser use
-  `orca-cli`.
+  test, or when a GUI app, Electron app or e2e test fails with "Missing X server or
+  $DISPLAY" in such a workspace. For a local app window use `orca-computer-use`; for
+  Orca's embedded browser use `orca-cli`.
 ---
 
 # Orca Desktop
 
 This discovery stub loads the version-matched guide from the Orca executable used for this session.
 
-Use `orca desktop` for the remote desktop of an environment-recipe workspace; start GUI
-programs and tests only with `orca desktop run -- …`.
+Use `orca desktop` for the remote desktop of an environment-recipe workspace. In a recipe
+environment you have no display: start every GUI app and e2e test with
+`orca desktop run -- <command>` from the checkout, and the user watches it in the Desktop tab.
 
 ## Resolve the CLI for this session
 

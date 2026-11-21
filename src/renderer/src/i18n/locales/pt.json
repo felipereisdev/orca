@@ -7732,7 +7732,8 @@
           "checking": "Verificando receitas...",
           "none": "Nenhuma receita encontrada ainda.",
           "cloudVmSkillTitle": "Skill de configuração de VM na Nuvem",
-          "cloudVmRefresh": "Atualizar receitas de VM na Nuvem"
+          "cloudVmRefresh": "Atualizar receitas de VM na Nuvem",
+          "desktopSkillNote": "Também instala o orca-desktop, aqui e em cada ambiente de receita: lá os agentes não têm display, então iniciam apps com interface gráfica e testes e2e com orca desktop run, e você os acompanha na aba Desktop."
         },
         "automations": {
           "showButtonDescription": "Mostra o atalho de Automações na barra lateral.",

@@ -68,16 +68,16 @@
     {
       "name": "orca-desktop",
       "sourcePath": "skills/orca-desktop",
-      "packageDigest": "8828fff6a355a2d46953b02aaaeb1d7f93ff3512fecf11c20fd26460ae4ad88c",
+      "packageDigest": "dd46ebde5f06bde6de25587c87b326c593491b98e4b2db4e4d6178955c356869",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 2840,
+          "size": 3061,
           "executable": false,
           "classification": "text",
-          "exactSha256": "3325bc062dc6cde130e5aef41eb1b688a7f38dc28cc671c474cea9002a7d1a54",
-          "textNormalizedSha256": "3325bc062dc6cde130e5aef41eb1b688a7f38dc28cc671c474cea9002a7d1a54",
-          "identitySha256": "3325bc062dc6cde130e5aef41eb1b688a7f38dc28cc671c474cea9002a7d1a54"
+          "exactSha256": "d8e392e61cc7d5d8fb0cc6fc257e3e16203a281f0a01579b4c55a67acd4cd606",
+          "textNormalizedSha256": "d8e392e61cc7d5d8fb0cc6fc257e3e16203a281f0a01579b4c55a67acd4cd606",
+          "identitySha256": "d8e392e61cc7d5d8fb0cc6fc257e3e16203a281f0a01579b4c55a67acd4cd606"
         }
       ]
     },
