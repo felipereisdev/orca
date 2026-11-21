@@ -287,18 +287,19 @@ Clones the repo as `dev`, with the git token on stdin, and keeps the token for l
 ```bash
 #!/bin/bash
 # Runs as dev: orca-desktop-clone <url> <dest> [ref]. The first stdin line is the git token (may be
-# empty; create.sh sends one only for the host it was issued for, the URL's https host). The clone
-# reaches it only through a GIT_ASKPASS helper that answers prompts for that host alone (never a
-# redirect target) and reads 0600 files removed on exit. When git asked for it, the token goes to
-# dev's git credential store (~/.git-credentials, 0600), scoped to that host, so later fetch and
-# push work too. A clone that never asked stores nothing.
+# empty; create.sh sends one only for the host it was issued for, the URL's https host). No prompt
+# is parsed: the clone gets the token from a credential-store helper scoped to that exact host, so
+# git consults it only for a URL whose host git itself parsed as that host (never a redirect
+# target). The helper's file is 0600 and removed on exit. When git asked for the token, it goes to
+# dev's git credential store (~/.git-credentials, 0600) with the same host-scoped helper, so later
+# fetch and push work too. A clone that never asked stores nothing.
 set -eu
 url="$1" dest="$2" ref="${3:-}"
 IFS= read -r token || true
 # docker exec -u dev does not set HOME; git config --global and the store live there.
 HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
 export HOME
-saved_token="$token"
+export GIT_TERMINAL_PROMPT=0
 
 # Only an https:// URL without user info names the host the token was issued for.
 host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
@@ -306,45 +307,35 @@ host="$(printf '%s' "$url" | sed -n 's#^https://\([^/@]*\)/.*#\1#p')"
 umask 077
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+git_args=()
 if [ -n "$token" ] && [ -n "$host" ]; then
-  printf '%s\n' "$token" > "$tmp/token"
-  printf '%s\n' "$host" > "$tmp/host"
-  cat > "$tmp/askpass" <<'ASKPASS'
-#!/bin/sh
-# Answers git only for the issued host; any other prompt (a redirect, another host) gets nothing.
-d="$(dirname "$0")"
-host="$(cat "$d/host")"
-case "$1" in
-  "Username for 'https://$host'"*) : > "$d/asked"; echo x-access-token ;;
-  "Password for 'https://x-access-token@$host'"*) cat "$d/token" ;;
-  *) exit 1 ;;
-esac
-ASKPASS
-  chmod 0700 "$tmp/askpass"
-  export GIT_ASKPASS="$tmp/askpass"
+  # credential-store encodes the token itself, whatever characters it holds.
+  printf 'protocol=https\nhost=%s\nusername=x-access-token\npassword=%s\n\n' "$host" "$token" |
+    git credential-store --file="$tmp/credentials" store
+  # Clears inherited helpers, then answers only https://<host>; a `get` marks that git asked.
+  git_args=(-c credential.helper=
+    -c "credential.https://$host.helper=!f() { [ \"\$1\" != get ] || : > '$tmp/asked'; git credential-store --file='$tmp/credentials' \"\$@\"; }; f")
 fi
-token=''
-export GIT_TERMINAL_PROMPT=0
 
 # /work is setgid `work`: gui gets read/write on the checkout through the group.
 umask 007
 if [ -d "$dest/.git" ]; then
-  git -C "$dest" fetch --quiet origin
+  git ${git_args[@]+"${git_args[@]}"} -C "$dest" fetch --quiet origin
 else
-  git clone --quiet -- "$url" "$dest"
+  git ${git_args[@]+"${git_args[@]}"} clone --quiet -- "$url" "$dest"
 fi
 if [ -n "$ref" ]; then
   git -C "$dest" checkout --quiet "$ref"
 fi
 
 # Stored only for the issued host, and only when git asked that host for the token.
-if [ -n "$saved_token" ] && [ -n "$host" ] && [ -e "$tmp/asked" ]; then
+if [ -n "$token" ] && [ -n "$host" ] && [ -e "$tmp/asked" ]; then
   umask 077
   git config --global "credential.https://$host.helper" store
   printf 'protocol=https\nhost=%s\nusername=x-access-token\npassword=%s\n\n' \
-    "$host" "$saved_token" | git credential approve
+    "$host" "$token" | git credential approve
 fi
-saved_token=''
+token=''
 ```
 
 ### `orca-desktop-launcher`

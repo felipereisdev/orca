@@ -60,10 +60,10 @@ Orca's server and the launcher prove it to each other with HMAC-SHA256 over fres
 the launcher first, so a listener that does not know the token receives only a nonce and the run
 fails with `desktop_launcher_rejected`; a malformed or missing proof is a rejection too. The
 launcher checks a client's proof against its current token, gives an unauthenticated connection
-five seconds, and closes every unauthenticated connection when the token rotates. For the clone, the git token reaches a `GIT_ASKPASS`
-helper through a 0600 file removed afterwards. The helper answers only git's prompts for the URL's own host
-(`Username for 'https://<host>'` and `Password for 'https://x-access-token@<host>'`). A prompt for any
-other host, including the target of a redirect, gets nothing and fails. When git asked for the token, it is kept in `dev`'s
+five seconds, and closes every unauthenticated connection when the token rotates. For the clone, the token sits in a 0600 credential file removed afterwards. Git reaches it only
+through a `store` helper scoped to `https://<host>`, and inherited helpers are cleared for the clone.
+No prompt is parsed: git consults the helper only for a URL whose host it parses as exactly that host,
+so a redirect to another host, even one that puts the issued host in its userinfo, gets nothing. When git asked for the token, it is kept in `dev`'s
 git credential store after a successful clone of an `https://` URL (`~/.git-credentials`, 0600, with
 `credential.https://<host>.helper store` scoped to the repo's host). Later fetch and push, and the
 environment doctor's check of `origin`, then work without asking. A clone that never asked (a public

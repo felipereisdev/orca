@@ -168,22 +168,6 @@ function runClone(dir, { repoUrl, rewriteTo, token }) {
   })
 }
 
-/** The askpass helper orca-desktop-clone writes, answering one git prompt for `host`. */
-function askpass(dir, host, prompt) {
-  const helper = path.join(dir, 'askpass-dir')
-  mkdirSync(helper, { recursive: true })
-  const clone = readFileSync(path.join(dir, 'orca-desktop-clone'), 'utf8')
-  const body = /<<'ASKPASS'\n([\s\S]*?)\nASKPASS\n/.exec(clone)?.[1]
-  if (!body) {
-    throw new Error('orca-desktop-clone writes no ASKPASS heredoc')
-  }
-  writeFileSync(path.join(helper, 'askpass'), `${body}\n`, { mode: 0o700 })
-  writeFileSync(path.join(helper, 'host'), `${host}\n`)
-  writeFileSync(path.join(helper, 'token'), 'issued-token\n')
-  const result = spawnSync(path.join(helper, 'askpass'), [prompt], { encoding: 'utf8' })
-  return { status: result.status, stdout: result.stdout }
-}
-
 function bareRepo(dir) {
   const work = path.join(dir, 'src')
   const bare = path.join(dir, 'served', 'repo.git')
@@ -396,39 +380,26 @@ describe.skipIf(process.platform === 'win32')('docker desktop recipe templates',
     const dir = extractTemplates()
     bareRepo(dir)
     const other = await authServer(path.join(dir, 'served'), 'good-token', { host: 'localhost' })
-    const issued = await authServer(path.join(dir, 'served'), 'good-token', {
-      redirectTo: `https://localhost:${other.port}`
-    })
-    const redirected = await runClone(dir, {
-      repoUrl: `https://127.0.0.1:${issued.port}/repo.git`,
-      token: 'good-token'
-    })
-
-    expect(redirected.ok).toBe(false)
-    expect(other.authorizations).toEqual([])
-    expect(existsSync(path.join(redirected.home, '.git-credentials'))).toBe(false)
-  })
-
-  it('answers only the issued host in the askpass prompt', () => {
-    const dir = extractTemplates()
-    const prompt = (text) => askpass(dir, 'github.com', text)
-
-    expect(prompt("Username for 'https://github.com': ")).toEqual({
-      status: 0,
-      stdout: 'x-access-token\n'
-    })
-    expect(prompt("Password for 'https://x-access-token@github.com': ")).toEqual({
-      status: 0,
-      stdout: 'issued-token\n'
-    })
-    for (const other of [
-      "Username for 'https://evil.example.test': ",
-      "Password for 'https://x-access-token@evil.example.test': ",
-      "Username for 'https://github.com.evil.example.test': ",
-      "Password for 'https://someone@github.com': ",
-      'Enter passphrase for key: '
+    const issued = await authServer(path.join(dir, 'served'), 'good-token')
+    const host = `127.0.0.1:${issued.port}`
+    // Git decodes the userinfo into its prompts, so this one starts like the issued host's.
+    for (const target of [
+      `https://localhost:${other.port}`,
+      `https://${encodeURIComponent(host)}@localhost:${other.port}`,
+      `https://x-access-token%40${encodeURIComponent(host)}@localhost:${other.port}`,
+      `https://x-access-token%40${encodeURIComponent(host)}%27@localhost:${other.port}`
     ]) {
-      expect(prompt(other)).toEqual({ status: 1, stdout: '' })
+      const redirector = await authServer(path.join(dir, 'served'), 'good-token', {
+        redirectTo: target
+      })
+      const redirected = await runClone(dir, {
+        repoUrl: `https://127.0.0.1:${redirector.port}/repo.git`,
+        token: 'good-token'
+      })
+
+      expect(redirected.ok).toBe(false)
+      expect(other.authorizations).toEqual([])
+      expect(existsSync(path.join(redirected.home, '.git-credentials'))).toBe(false)
     }
   })
 })
