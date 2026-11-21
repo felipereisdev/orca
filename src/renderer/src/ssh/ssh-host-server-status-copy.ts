@@ -138,6 +138,16 @@ function unavailableLine(
   if (fixable) {
     return { tone: 'destructive', text: fixable }
   }
+  if (reason === 'artifacts_unavailable') {
+    // Only a build that skipped this platform's server gets here; an older Orca would not help.
+    return {
+      tone: 'destructive',
+      text: t(
+        'auto.components.settings.sshHostServer.buildLacksServer',
+        'This Orca build doesn’t include the server for this host’s platform. To use this host, install an Orca release, which includes every platform’s server.'
+      )
+    }
+  }
   const cause = reason ? unavailableCause(reason, t) : null
   if (cause) {
     return {
@@ -165,11 +175,6 @@ function unavailableCause(reason: string, t: Translate = translate): string | nu
       return t(
         'auto.components.settings.sshHostServer.cause.unsupportedHost',
         'Orca has no server build for this system'
-      )
-    case 'artifacts_unavailable':
-      return t(
-        'auto.components.settings.sshHostServer.cause.artifactsUnavailable',
-        'this Orca build doesn’t include the server'
       )
     case 'libc_unidentified':
       return t(

@@ -12788,7 +12788,6 @@
           "failureDetails": "詳細",
           "cause": {
             "unsupportedHost": "Orca にはこのシステム用のサーバービルドがありません",
-            "artifactsUnavailable": "この Orca ビルドにはサーバーが含まれていません",
             "libcUnidentified": "Orca はホストのシステムライブラリを特定できませんでした",
             "runtimeSelfTest": "サーバーのランタイムが自己テストに失敗しました",
             "securitySoftware": "セキュリティソフトウェアがサーバーのランタイムを変更しました",

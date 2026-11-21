@@ -12103,7 +12103,6 @@
           "failureDetails": "세부 정보",
           "cause": {
             "unsupportedHost": "Orca에는 이 시스템용 서버 빌드가 없습니다",
-            "artifactsUnavailable": "이 Orca 빌드에는 서버가 포함되어 있지 않습니다",
             "libcUnidentified": "Orca가 호스트의 시스템 라이브러리를 식별하지 못했습니다",
             "runtimeSelfTest": "서버 런타임이 자체 테스트에 실패했습니다",
             "securitySoftware": "보안 소프트웨어가 서버 런타임을 변경했습니다",

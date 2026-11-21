@@ -9221,7 +9221,6 @@
           "failureDetails": "Detalhes",
           "cause": {
             "unsupportedHost": "O Orca não tem uma compilação do servidor para este sistema",
-            "artifactsUnavailable": "esta compilação do Orca não inclui o servidor",
             "libcUnidentified": "o Orca não conseguiu identificar as bibliotecas do sistema do host",
             "runtimeSelfTest": "o ambiente de execução do servidor falhou no autoteste",
             "securitySoftware": "um software de segurança alterou o ambiente de execução do servidor",
@@ -9232,6 +9231,7 @@
           "refusedBlocked": "O Orca ainda não está configurado neste host: algo no host está impedindo a movimentação.",
           "unsupported": "Este host não é compatível com esta versão do Orca ({{reason}}). Para continuar usando-o, instale uma versão anterior do Orca.",
           "unsupportedUnknown": "Este host não é compatível com esta versão do Orca. Para continuar usando-o, instale uma versão anterior do Orca.",
+          "buildLacksServer": "Esta compilação do Orca não inclui o servidor para a plataforma deste host. Para usar este host, instale uma versão oficial do Orca, que inclui o servidor de todas as plataformas.",
           "tunnelUnsupported": "Este host não é compatível com esta versão do Orca: seu servidor SSH não permite encaminhamento de portas, e o Orca também não conseguiu acessar o servidor pela sessão SSH. Para continuar usando-o, instale uma versão anterior do Orca.",
           "setupRetry": "O Orca não conseguiu iniciar o servidor neste host. Tente conectar novamente.",
           "moveHeld": "O Orca pausou a movimentação dos projetos deste host para o servidor Orca porque não conseguiu confirmar a cópia no servidor. Nada foi perdido: o host mantém seus projetos e permanece bloqueado até a movimentação terminar. Conecte novamente para retomar. Se o servidor não puder voltar, pare-o ou esqueça-o em Configurações > Orca nos seus hosts SSH.",

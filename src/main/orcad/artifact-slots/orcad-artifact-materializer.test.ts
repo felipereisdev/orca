@@ -40,6 +40,7 @@ import {
   materializeOrcadArtifact,
   resetOrcadArtifactMaterializationsForTests
 } from './orcad-artifact-materializer'
+import { classifyOrcadHostUnavailable } from '../diagnostics/orcad-host-unavailable'
 
 const TARGET = 'linux-x64-glibc' as const
 const PAGE_ASSETS = ['out/mobile-web/index.html']
@@ -167,6 +168,18 @@ describe('assembleOrcadArtifact', () => {
       }
     }
   )
+
+  it('reads a default target the template omits as this build lacking it, not as an unsupported host', async () => {
+    const fixture = createTemplate()
+    const omitted = await assembleOrcadArtifact({ ...fixture, target: 'linux-arm64-glibc' }).catch(
+      (error: unknown) => error
+    )
+    expect(classifyOrcadHostUnavailable(omitted)).toBe('artifacts_unavailable')
+    const compat = await assembleOrcadArtifact({ ...fixture, target: 'linux-x64-glibc217' }).catch(
+      (error: unknown) => error
+    )
+    expect(classifyOrcadHostUnavailable(compat)).toBe('unsupported_host')
+  })
 
   it('rejects a packaged native file that does not match its manifest', async () => {
     const fixture = createTemplate()

@@ -12654,7 +12654,6 @@
           "failureDetails": "Détails",
           "cause": {
             "unsupportedHost": "Orca n'a pas de build de serveur pour ce système",
-            "artifactsUnavailable": "cette version d'Orca n'inclut pas le serveur",
             "libcUnidentified": "Orca n'a pas pu identifier les bibliothèques système de l'hôte",
             "runtimeSelfTest": "le runtime du serveur a échoué à son auto-test",
             "securitySoftware": "un logiciel de sécurité a modifié le runtime du serveur",

@@ -47,6 +47,7 @@ pnpm dev:fresh [--keep] [--seed-from[=<profile dir>]]   # temporary profile, rem
 
 - Local installs use pnpm's global virtual store (`~/pnpm/store`) shared by all worktrees. Do not keep a `node_modules` in your home directory: it hides missing-dependency bugs. Set `ORCA_PNPM_GLOBAL_VIRTUAL_STORE=0` in your shell to opt out.
 - Before a cross-architecture build (including `pnpm build:mac`, which builds x64 and arm64), run `pnpm install:release`.
+- `pnpm build:mac` ships an Orca server template only for the glibc Linux targets in `ORCA_LOCAL_ORCAD_TARGETS` (default `linux-arm64-glibc`; `none` turns it off), so SSH hosts and containers on those platforms work. It builds them in Docker, from a clean checkout of HEAD cached under `~/.cache/orca-local-orcad/`; run it alone with `node config/scripts/orcad-distribution/template/build-local-orcad-template.mjs`. Without Docker, or if that build fails, the app is packaged with no template. Release builds (`ORCA_REQUIRE_ORCAD_TEMPLATE=1`) still require all targets.
 - On Linux, `pnpm build`, `pnpm build:native`, and packaging need a running Docker daemon for the clipboard helper. For native Wayland development, run `pnpm build:native` before `pnpm dev`. See the [clipboard build guide](../native/wayland-clipboard/README.md#building-and-testing).
 
 ## Troubleshooting

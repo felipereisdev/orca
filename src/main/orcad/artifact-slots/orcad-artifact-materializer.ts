@@ -21,6 +21,7 @@ import {
   orcadTemplateTargetFilenames
 } from '../../../shared/remote-runtime/orcad-distribution/orcad-artifacts'
 import {
+  isCompatServerTarget,
   pinnedNodeRuntimeAsset,
   type NodeRuntimeTarget
 } from '../../../shared/node-runtime/node-runtime-pin'
@@ -163,6 +164,13 @@ export async function assembleOrcadArtifact(args: {
   }
 }
 
+// A default target is missing only from a partial (local) build; a missing compat target is unsupported.
+function templateTargetMissingError(target: NodeRuntimeTarget): Error {
+  return isCompatServerTarget(target)
+    ? new OrcadHostUnsupportedError(`Packaged orcad template does not support ${target}`)
+    : new OrcadArtifactsUnavailableError(`This Orca build has no server for ${target}`)
+}
+
 function artifactSources(
   templateDir: string,
   target: NodeRuntimeTarget,
@@ -172,7 +180,7 @@ function artifactSources(
   const targetDir = join(templateDir, ORCAD_TEMPLATE_TARGETS_DIR, target)
   const targetManifest = manifest.targets[target]
   if (!targetManifest) {
-    throw new OrcadHostUnsupportedError(`Packaged orcad template does not support ${target}`)
+    throw templateTargetMissingError(target)
   }
   const packagedRipgrep = orcadTemplatePackagedRipgrep(
     manifest.schemaVersion,
@@ -215,7 +223,7 @@ function expectedTemplateSha256(
 ): Map<string, ExpectedSha256> {
   const targetManifest = manifest.targets[target]
   if (!targetManifest) {
-    throw new OrcadHostUnsupportedError(`Packaged orcad template does not support ${target}`)
+    throw templateTargetMissingError(target)
   }
   const expected = new Map<string, ExpectedSha256>()
   for (const filename of orcadTemplateCommonFilenames(mobileWebAssets)) {

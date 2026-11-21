@@ -13952,7 +13952,6 @@
           "failureDetails": "Details",
           "cause": {
             "unsupportedHost": "Orca has no server build for this system",
-            "artifactsUnavailable": "this Orca build doesn’t include the server",
             "libcUnidentified": "Orca couldn’t identify the host’s system libraries",
             "runtimeSelfTest": "the server’s runtime failed its self-test",
             "securitySoftware": "security software changed the server’s runtime",
@@ -13963,6 +13962,7 @@
           "refusedBlocked": "Orca isn’t set up on this host yet: something on the host stops the move.",
           "unsupported": "This host isn’t supported by this version of Orca ({{reason}}). To keep using it, install an older version of Orca.",
           "unsupportedUnknown": "This host isn’t supported by this version of Orca. To keep using it, install an older version of Orca.",
+          "buildLacksServer": "This Orca build doesn’t include the server for this host’s platform. To use this host, install an Orca release, which includes every platform’s server.",
           "tunnelUnsupported": "This host isn’t supported by this version of Orca: its SSH server doesn’t allow port forwarding, and Orca couldn’t reach its server through the SSH session either. To keep using it, install an older version of Orca.",
           "setupRetry": "Orca couldn’t start its server on this host. Try connecting again.",
           "setupFreeHostSpace": "This host doesn’t have enough free disk space for Orca to keep a backup of its server data while starting it. Free up space on the host, then connect again.",

@@ -14,9 +14,9 @@ const {
 } = require('../../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts')
 const {
   COMPAT_SERVER_TARGETS,
-  ORCAD_TEMPLATE_TARGETS,
   pinnedNodeRuntimeAsset
 } = require('../../../../src/shared/node-runtime/node-runtime-pin.ts')
+const { packagingOrcadTemplateTargets } = require('./local-orcad-template-targets.cjs')
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/
 const BROWSER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -156,8 +156,8 @@ function verifyTarget(resourcesDir, templateDir, target, value, schemaVersion) {
   requireExactNames(listFiles(targetDir), inventory, `${target} file inventory`)
 }
 
-/** `targets` narrows the inventory for a CI-only partial template; packaging checks them all. */
-function verifyPackagedOrcadTemplate(resourcesDir, targets = ORCAD_TEMPLATE_TARGETS) {
+/** `targets` narrows the inventory for a partial template; packaging checks all unless a local build declares its own. */
+function verifyPackagedOrcadTemplate(resourcesDir, targets = packagingOrcadTemplateTargets()) {
   const templateDir = join(resourcesDir, 'orcad-template')
   const manifest = requireRecord(readManifest(templateDir), 'manifest')
   if (![TEMPLATE_SCHEMA_VERSION, 4].includes(manifest.schemaVersion)) {
